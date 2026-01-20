@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+deepface
+tf-keras
+numpy
+python-multipart
+requests

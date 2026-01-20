@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  db:
+    image: ankane/pgvector:v0.5.1 # PostgreSQL with vector extension
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: gatepass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - gatepass-net
+    restart: always
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - gatepass-net
+    restart: always
+
+  backend:
+    build: ./backend
+    container_name: gatepass_backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://admin:password@db:5432/gatepass
+      REDIS_URL: redis://redis:6379
+      SECRET_KEY: supersecretkey
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    depends_on:
+      - db
+      - redis
+    networks:
+      - gatepass-net
+
+  frontend:
+    build: ./frontend
+    container_name: gatepass_frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_URL: http://localhost:8000
+    networks:
+      - gatepass-net
+    # In production, we'd build static files and serve via Nginx, 
+    # but for dev we use the dev server.
+
+  ai-face:
+    build: ./ai_services/face_recognition
+    container_name: gatepass_ai_face
+    ports:
+      - "8001:8001"
+    networks:
+      - gatepass-net
+    restart: on-failure
+
+networks:
+  gatepass-net:
+    driver: bridge
+
+volumes:
+  postgres_data:

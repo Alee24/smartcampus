@@ -1,0 +1,10 @@
+I ran a script that performed a full reset and seeded the following:
+
+Admin Account: mettoalex@gmail.com (Password: Digital2025)
+Test Accounts:
+Lecturer: lecturer@test.com (Password: Pass123!)
+Guard: guard@test.com (Password: Pass123!)
+Student Body: 50 procedurally generated students with realistic names (e.g., "James Smith") and admission numbers.
+Traffic Logs: Generated ~30 
+
+26ZAD200883

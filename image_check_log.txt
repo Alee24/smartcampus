@@ -1,0 +1,5 @@
+Checking Database for Student Image...
+User Found: Alex Metto (ID: fa5376c8-445c-4b64-bf4b-d6f2d7c02192)
+Admission Number: 25ZAD111307
+Profile Image DB Value: /static/profiles/fa5376c8-445c-4b64-bf4b-d6f2d7c02192_11dc2427.png
+ERROR: File NOT FOUND on disk at 'static/profiles/fa5376c8-445c-4b64-bf4b-d6f2d7c02192_11dc2427.png'
