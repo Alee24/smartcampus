@@ -1,39 +1,59 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import {
-    LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut, Search,
+    LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut,
     Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode,
-    Server, Database, ShieldCheck, Calendar, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, X, Activity
+    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, X, Activity, BarChart3
 } from 'lucide-react'
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
+} from 'recharts'
 
+
+// 1. Critical Components (Load immediately for FCP)
 import Login from './Login'
-import UsersComp from './Users'
-import LiveClasses from './LiveClasses'
-import { PrivacyPolicy } from './privacy/PrivacyPolicy'
-import { CookiePolicy } from './privacy/CookiePolicy'
-import { UserDataRights } from './privacy/UserDataRights'
-import GateControl from './GateControl'
-import VehicleIntel from './VehicleIntel'
-import Attendance from './Attendance'
-import SettingsComp from './Settings'
-import Integrations from './Integrations'
-import BulkUpload from './BulkUpload'
-import StudentVerification from './StudentVerification'
-import GuardianDashboard from './GuardianDashboard'
 import LandingPage from './LandingPage'
-import Timetable from './Timetable'
-import CameraMonitoring from './CameraMonitoring'
-import DashboardCustomizer from './DashboardCustomizer'
-import AISettings from './AISettings'
-import CompanySettings from './CompanySettings'
-import ClassroomManagement from './ClassroomManagement'
-import CourseReports from './CourseReports'
-import EventManagement from './EventManagement'
+
+// 2. Lazy Loaded Components (Split chunks)
+const UsersComp = lazy(() => import('./Users'))
+const LiveClasses = lazy(() => import('./LiveClasses'))
+const PrivacyPolicy = lazy(() => import('./privacy/PrivacyPolicy').then(module => ({ default: module.PrivacyPolicy })))
+const CookiePolicy = lazy(() => import('./privacy/CookiePolicy').then(module => ({ default: module.CookiePolicy })))
+const UserDataRights = lazy(() => import('./privacy/UserDataRights').then(module => ({ default: module.UserDataRights })))
+const GateControl = lazy(() => import('./GateControl'))
+const VehicleIntel = lazy(() => import('./VehicleIntel'))
+const Attendance = lazy(() => import('./Attendance'))
+const SettingsComp = lazy(() => import('./Settings'))
+const Integrations = lazy(() => import('./Integrations'))
+const BulkUpload = lazy(() => import('./BulkUpload'))
+const StudentVerification = lazy(() => import('./StudentVerification'))
+const GuardianDashboard = lazy(() => import('./GuardianDashboard'))
+const Timetable = lazy(() => import('./Timetable'))
+const CameraMonitoring = lazy(() => import('./CameraMonitoring'))
+const DashboardCustomizer = lazy(() => import('./DashboardCustomizer'))
+const AISettings = lazy(() => import('./AISettings'))
+const CompanySettings = lazy(() => import('./CompanySettings'))
+const ClassroomManagement = lazy(() => import('./ClassroomManagement'))
+const CourseReports = lazy(() => import('./CourseReports'))
+const EventManagement = lazy(() => import('./EventManagement'))
+const SecurityDashboard = lazy(() => import('./SecurityDashboard'))
+const VisitorManagement = lazy(() => import('./VisitorManagement'))
+const ScanLogs = lazy(() => import('./ScanLogs'))
+const GatesDashboard = lazy(() => import('./GatesDashboard'))
+const StudentDashboard = lazy(() => import('./StudentDashboard'))
+const SelfServiceEntry = lazy(() => import('./SelfServiceEntry'))
+const Reports = lazy(() => import('./Reports'))
+const CampusCalendar = lazy(() => import('./CampusCalendar'))
+
+// 3. Non-lazy components (small/critical)
 import InstallPWA from './components/InstallPWA'
 import PermissionsModal from './components/PermissionsModal'
-import SecurityDashboard from './SecurityDashboard'
-import VisitorManagement from './VisitorManagement'
-import ScanLogs from './ScanLogs'
-import GatesDashboard from './GatesDashboard'
+
+// Helper for Suspense Fallback
+const PageLoader = () => (
+    <div className="flex items-center justify-center p-20">
+        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+    </div>
+)
 
 interface DashboardStats {
     active_students: number
@@ -48,11 +68,35 @@ interface LogEntry {
     status: string
     isAlert: boolean
 }
-
 function App() {
+    // Public Route Check
+    const path = window.location.pathname
+    if (path.startsWith('/gate-pass/')) {
+        return (
+            <Suspense fallback={<div className="h-screen flex items-center justify-center">Loading...</div>}>
+                <SelfServiceEntry />
+            </Suspense>
+        )
+    }
+
     const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'))
     const [showLanding, setShowLanding] = useState(!localStorage.getItem('token')) // Show landing if not logged in
-    const [activeTab, setActiveTab] = useState('dashboard')
+
+    // Get user role from localStorage and set initial dashboard
+    const userRole = localStorage.getItem('userRole') || 'student'
+    const getInitialTab = () => {
+        if (!localStorage.getItem('token')) return 'dashboard'
+        // Role-based default dashboards
+        switch (userRole.toLowerCase()) {
+            case 'student': return 'student-dashboard'
+            case 'admin': return 'dashboard'
+            case 'security': return 'gates-dashboard'
+            case 'lecturer': return 'live'
+            default: return 'dashboard'
+        }
+    }
+
+    const [activeTab, setActiveTab] = useState(getInitialTab())
     const [darkMode, setDarkMode] = useState(false) // Default to Light Mode
     const [stats, setStats] = useState<DashboardStats>({
         active_students: 0,
@@ -62,15 +106,29 @@ function App() {
     })
     const [recentLogs, setRecentLogs] = useState<LogEntry[]>([])
     const [kpiData, setKpiData] = useState<any>({ normalized: [], labels: [] })
+    const [analytics, setAnalytics] = useState<any>({ roles: [], gates: [] })
     const [cameraAlerts, setCameraAlerts] = useState<any[]>([])
     const [todaySessions, setTodaySessions] = useState<any[]>([])
-    const [role, setRole] = useState<string>('')
+    const [role, setRole] = useState<string>(localStorage.getItem('userRole') || 'student')
     const [currentUser, setCurrentUser] = useState<any>(null)
     const [notifications, setNotifications] = useState<any[]>([])
     const [showNotifications, setShowNotifications] = useState(false)
+    const [showUserMenu, setShowUserMenu] = useState(false)
     const [loading, setLoading] = useState(true)
     const [isSidebarOpen, setSidebarOpen] = useState(false)
     const [isSidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const [openGroups, setOpenGroups] = useState<any>({
+        overview: true,
+        events: false,
+        people: true,
+        security: true,
+        academics: false,
+        settings: false,
+        analytics: false,
+        support: false,
+        legal: false
+    })
+    const toggleGroup = (key: string) => setOpenGroups((prev: any) => ({ ...prev, [key]: !prev[key] }))
     const [showSecurityCheck, setShowSecurityCheck] = useState(false)
     const [menuConfig, setMenuConfig] = useState<any>({})
     const [showProfileModal, setShowProfileModal] = useState(false)
@@ -140,7 +198,8 @@ function App() {
     const getDefaultConfig = () => {
         return {
             'Student': {
-                'dashboard': true,
+                'dashboard': false,
+                'student-dashboard': true,
                 'users': false,
                 'verification': false,
                 'attendance': true,
@@ -338,6 +397,9 @@ function App() {
             const kpiRes = await fetch('/api/dashboard/kpi', { headers })
             if (kpiRes.ok) setKpiData(await kpiRes.json())
 
+            const analRes = await fetch('/api/dashboard/analytics', { headers })
+            if (analRes.ok) setAnalytics(await analRes.json())
+
             // Fetch today's classes
             const timetableRes = await fetch('/api/timetable/timetable/weekly', { headers })
             if (timetableRes.ok) {
@@ -446,227 +508,219 @@ function App() {
                     </div>
 
                     <nav className="space-y-1 overflow-y-auto max-h-[calc(100vh-250px)] scrollbar-hide">
-                        <div className="text-xs font-semibold text-[var(--text-secondary)] uppercase px-4 mb-2 tracking-wider">Overview</div>
-                        {isMenuEnabled('dashboard') && (
-                            <NavItem
-                                icon={<LayoutDashboard size={18} />}
-                                label="Dashboard"
-                                active={activeTab === 'dashboard'}
-                                onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
-                            />
+                        <SidebarGroup title="Overview" isOpen={openGroups.overview} onToggle={() => toggleGroup('overview')} isSidebarCollapsed={isSidebarCollapsed}>
+                            {isMenuEnabled('dashboard') && (
+                                <NavItem
+                                    icon={<LayoutDashboard size={18} />}
+                                    label="Dashboard"
+                                    active={activeTab === 'dashboard'}
+                                    onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
+                                />
+                            )}
+                        </SidebarGroup>
+
+                        {/* Gate Operations - Core Functionality */}
+                        {(isMenuEnabled('gate') || isMenuEnabled('vehicles')) && (
+                            <SidebarGroup title="Gate Operations" isOpen={openGroups.security} onToggle={() => toggleGroup('security')} isSidebarCollapsed={isSidebarCollapsed}>
+                                {isMenuEnabled('gate') && (
+                                    <NavItem
+                                        icon={<Shield size={18} />}
+                                        label="Gate Control"
+                                        active={activeTab === 'gate'}
+                                        onClick={() => { setActiveTab('gate'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                                {isMenuEnabled('gate') && (
+                                    <NavItem
+                                        icon={<ClipboardList size={18} />}
+                                        label="Visitor Logs"
+                                        active={activeTab === 'visitors'}
+                                        onClick={() => { setActiveTab('visitors'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                                {isMenuEnabled('vehicles') && (
+                                    <NavItem
+                                        icon={<Car size={18} />}
+                                        label="Vehicle Intel"
+                                        active={activeTab === 'vehicles'}
+                                        onClick={() => { setActiveTab('vehicles'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                                {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                                    <NavItem
+                                        icon={<ClipboardList size={18} />}
+                                        label="Scan Logs"
+                                        active={activeTab === 'scan-logs'}
+                                        onClick={() => { setActiveTab('scan-logs'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                                {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                                    <NavItem
+                                        icon={<Activity size={18} />}
+                                        label="Gates Analytics"
+                                        active={activeTab === 'gates-dashboard'}
+                                        onClick={() => { setActiveTab('gates-dashboard'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                            </SidebarGroup>
+                        )}
+
+                        {/* Security Monitor */}
+                        {(isMenuEnabled('live') || isMenuEnabled('cameras')) && (
+                            <SidebarGroup title="Security Monitor" isOpen={openGroups.security} onToggle={() => toggleGroup('security')} isSidebarCollapsed={isSidebarCollapsed}>
+                                {isMenuEnabled('live') && (
+                                    <NavItem
+                                        icon={<MonitorPlay size={18} />}
+                                        label="Live Monitor"
+                                        active={activeTab === 'live'}
+                                        onClick={() => { setActiveTab('live'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                                {isMenuEnabled('cameras') && (
+                                    <NavItem
+                                        icon={<Video size={18} />}
+                                        label="Surveillance"
+                                        active={activeTab === 'cameras'}
+                                        onClick={() => { setActiveTab('cameras'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                            </SidebarGroup>
+                        )}
+
+                        {/* People Management */}
+                        {(isMenuEnabled('users') || isMenuEnabled('verification')) && (
+                            <SidebarGroup title="People" isOpen={openGroups.people} onToggle={() => toggleGroup('people')} isSidebarCollapsed={isSidebarCollapsed}>
+                                {isMenuEnabled('users') && (
+                                    <NavItem
+                                        icon={<Users size={18} />}
+                                        label="Students / Staff"
+                                        active={activeTab === 'users'}
+                                        onClick={() => { setActiveTab('users'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                                {isMenuEnabled('verification') && (
+                                    <NavItem
+                                        icon={<ShieldCheck size={18} />}
+                                        label="ID Verification"
+                                        active={activeTab === 'verification'}
+                                        onClick={() => { setActiveTab('verification'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                            </SidebarGroup>
                         )}
 
                         {/* Events Section */}
-                        {(isMenuEnabled('events')) && (
-                            <div className="mt-4 mb-2 px-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Events</div>
-                        )}
-                        {isMenuEnabled('events') && (
+                        <SidebarGroup title="Events" isOpen={openGroups.events} onToggle={() => toggleGroup('events')} isSidebarCollapsed={isSidebarCollapsed}>
                             <NavItem
                                 icon={<Calendar size={18} />}
                                 label="Events & Guests"
                                 active={activeTab === 'events'}
                                 onClick={() => { setActiveTab('events'); setSidebarOpen(false); }}
                             />
-                        )}
-
-                        {/* People Management */}
-                        {(isMenuEnabled('users') || isMenuEnabled('verification')) && (
-                            <div className="mt-4 mb-2 px-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">People</div>
-                        )}
-                        {isMenuEnabled('users') && (
                             <NavItem
-                                icon={<Users size={18} />}
-                                label="Students / Staff"
-                                active={activeTab === 'users'}
-                                onClick={() => { setActiveTab('users'); setSidebarOpen(false); }}
+                                icon={<CalendarDays size={18} />}
+                                label="Campus Calendar"
+                                active={activeTab === 'calendar'}
+                                onClick={() => { setActiveTab('calendar'); setSidebarOpen(false); }}
                             />
-                        )}
-                        {isMenuEnabled('verification') && (
-                            <NavItem
-                                icon={<ShieldCheck size={18} />}
-                                label="ID Verification"
-                                active={activeTab === 'verification'}
-                                onClick={() => { setActiveTab('verification'); setSidebarOpen(false); }}
-                            />
-                        )}
-
-                        {/* Security Suite */}
-                        {(isMenuEnabled('gate') || isMenuEnabled('live') || isMenuEnabled('cameras') || isMenuEnabled('vehicles')) && (
-                            <div className="mt-4 mb-2 px-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Security</div>
-                        )}
-                        {isMenuEnabled('live') && (
-                            <NavItem
-                                icon={<MonitorPlay size={18} />}
-                                label="Live Monitor"
-                                active={activeTab === 'live'}
-                                onClick={() => { setActiveTab('live'); setSidebarOpen(false); }}
-                            />
-                        )}
-                        {isMenuEnabled('gate') && (
-                            <NavItem
-                                icon={<Shield size={18} />}
-                                label="Gate Control"
-                                active={activeTab === 'gate'}
-                                onClick={() => { setActiveTab('gate'); setSidebarOpen(false); }}
-                            />
-                        )}
-                        {isMenuEnabled('gate') && (
-                            <NavItem
-                                icon={<ClipboardList size={18} />}
-                                label="Visitor Logs"
-                                active={activeTab === 'visitors'}
-                                onClick={() => { setActiveTab('visitors'); setSidebarOpen(false); }}
-                            />
-                        )}
-                        {isMenuEnabled('vehicles') && (
-                            <NavItem
-                                icon={<Car size={18} />}
-                                label="Vehicle Intel"
-                                active={activeTab === 'vehicles'}
-                                onClick={() => { setActiveTab('vehicles'); setSidebarOpen(false); }}
-                            />
-                        )}
-                        {isMenuEnabled('cameras') && (
-                            <NavItem
-                                icon={<Video size={18} />}
-                                label="Surveillance"
-                                active={activeTab === 'cameras'}
-                                onClick={() => { setActiveTab('cameras'); setSidebarOpen(false); }}
-                            />
-                        )}
-                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
-                            <NavItem
-                                icon={<ClipboardList size={18} />}
-                                label="Scan Logs"
-                                active={activeTab === 'scan-logs'}
-                                onClick={() => { setActiveTab('scan-logs'); setSidebarOpen(false); }}
-                            />
-                        )}
-                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
-                            <NavItem
-                                icon={<Activity size={18} />}
-                                label="Gates Analytics"
-                                active={activeTab === 'gates-dashboard'}
-                                onClick={() => { setActiveTab('gates-dashboard'); setSidebarOpen(false); }}
-                            />
-                        )}
+                        </SidebarGroup>
 
                         {/* Academics */}
                         {(isMenuEnabled('timetable') || isMenuEnabled('attendance')) && (
-                            <div className="mt-4 mb-2 px-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Academics</div>
+                            <SidebarGroup title="Academics" isOpen={openGroups.academics} onToggle={() => toggleGroup('academics')} isSidebarCollapsed={isSidebarCollapsed}>
+                                {isMenuEnabled('attendance') && (
+                                    <NavItem
+                                        icon={<QrCode size={18} />}
+                                        label="Class Attendance"
+                                        active={activeTab === 'attendance'}
+                                        onClick={() => { setActiveTab('attendance'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                                {isMenuEnabled('timetable') && (
+                                    <>
+                                        <NavItem
+                                            icon={<Calendar size={18} />}
+                                            label="Timetable"
+                                            active={activeTab === 'timetable'}
+                                            onClick={() => { setActiveTab('timetable'); setSidebarOpen(false); }}
+                                        />
+                                        <NavItem
+                                            icon={<FileText size={18} />}
+                                            label="Courses"
+                                            active={activeTab === 'courses'}
+                                            onClick={() => { setActiveTab('courses'); setSidebarOpen(false); }}
+                                        />
+                                        <NavItem
+                                            icon={<Building size={18} />}
+                                            label="Classrooms"
+                                            active={activeTab === 'classrooms'}
+                                            onClick={() => { setActiveTab('classrooms'); setSidebarOpen(false); }}
+                                        />
+                                    </>
+                                )}
+                            </SidebarGroup>
                         )}
-                        {isMenuEnabled('attendance') && (
-                            <NavItem
-                                icon={<QrCode size={18} />}
-                                label="Class Attendance"
-                                active={activeTab === 'attendance'}
-                                onClick={() => { setActiveTab('attendance'); setSidebarOpen(false); }}
-                            />
-                        )}
-                        {isMenuEnabled('timetable') && (
-                            <>
-                                <NavItem
-                                    icon={<Calendar size={18} />}
-                                    label="Timetable"
-                                    active={activeTab === 'timetable'}
-                                    onClick={() => { setActiveTab('timetable'); setSidebarOpen(false); }}
-                                />
-                                <NavItem
-                                    icon={<FileText size={18} />}
-                                    label="Courses"
-                                    active={activeTab === 'courses'}
-                                    onClick={() => { setActiveTab('courses'); setSidebarOpen(false); }}
-                                />
-                                <NavItem
-                                    icon={<Building size={18} />}
-                                    label="Classrooms"
-                                    active={activeTab === 'classrooms'}
-                                    onClick={() => { setActiveTab('classrooms'); setSidebarOpen(false); }}
-                                />
-                            </>
-                        )}
-                    </nav>
-                </div>
 
-                <div className="mt-auto p-4 border-t border-[var(--border-color)]">
-                    <nav className="space-y-1 mb-4">
-                        <div className="text-xs font-semibold text-[var(--text-secondary)] uppercase px-4 mb-2 tracking-wider">Settings</div>
+                        {/* Analytics - Only for Admins */}
                         {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
-                            <>
+                            <SidebarGroup title="Analytics" isOpen={openGroups.analytics} onToggle={() => toggleGroup('analytics')} isSidebarCollapsed={isSidebarCollapsed}>
                                 <NavItem
-                                    icon={<Sliders size={18} />}
-                                    label="Dashboard Designer"
-                                    active={activeTab === 'dashboard-designer'}
-                                    onClick={() => { setActiveTab('dashboard-designer'); setSidebarOpen(false); }}
+                                    icon={<BarChart3 size={18} />}
+                                    label="System Reports"
+                                    active={activeTab === 'reports'}
+                                    onClick={() => { setActiveTab('reports'); setSidebarOpen(false); }}
                                 />
-                                <NavItem
-                                    icon={<Brain size={18} />}
-                                    label="AI Settings"
-                                    active={activeTab === 'ai-settings'}
-                                    onClick={() => { setActiveTab('ai-settings'); setSidebarOpen(false); }}
-                                />
-                                <NavItem
-                                    icon={<Building2 size={18} />}
-                                    label="Company Settings"
-                                    active={activeTab === 'company-settings'}
-                                    onClick={() => { setActiveTab('company-settings'); setSidebarOpen(false); }}
-                                />
-                            </>
-                        )}
-                        {isMenuEnabled('bulk') && (
-                            <NavItem
-                                icon={<Database size={18} />}
-                                label="Data Import"
-                                active={activeTab === 'bulk'}
-                                onClick={() => { setActiveTab('bulk'); setSidebarOpen(false); }}
-                            />
-                        )}
-                        {isMenuEnabled('settings') && (
-                            <NavItem
-                                icon={<Settings size={18} />}
-                                label="Settings"
-                                active={activeTab === 'settings'}
-                                onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}
-                            />
-                        )}
-                        {isMenuEnabled('integrations') && (
-                            <NavItem
-                                icon={<Server size={18} />}
-                                label="Integrations"
-                                active={activeTab === 'integrations'}
-                                onClick={() => { setActiveTab('integrations'); setSidebarOpen(false); }}
-                            />
+                            </SidebarGroup>
                         )}
                     </nav>
                 </div>
 
                 <div className="mt-auto p-4 border-t border-[var(--border-color)]">
                     <nav className="space-y-1 mb-4">
-                        <div className="text-xs font-semibold text-[var(--text-secondary)] uppercase px-4 mb-2 tracking-wider">Support</div>
-                        <NavItem icon={<HelpCircle size={18} />} label="Help Center" active={false} onClick={() => { }} />
+                        {/* Settings removed from Sidebar for Admin as per request */}
+                    </nav>
+                </div>
+
+                <div className="mt-auto p-4 border-t border-[var(--border-color)]">
+                    <nav className="space-y-1 mb-4">
+                        {/* Administration - Visible on Mobile for Admins since Top Bar is hidden */}
+                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                            <SidebarGroup title="Administration" isOpen={openGroups.admin} onToggle={() => toggleGroup('admin')} isSidebarCollapsed={isSidebarCollapsed}>
+                                <NavItem icon={<Settings size={18} />} label="General Settings" active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }} />
+                                <NavItem icon={<Database size={18} />} label="Data Management" active={activeTab === 'bulk'} onClick={() => { setActiveTab('bulk'); setSidebarOpen(false); }} />
+                                <NavItem icon={<Building2 size={18} />} label="Company Profile" active={activeTab === 'company-settings'} onClick={() => { setActiveTab('company-settings'); setSidebarOpen(false); }} />
+                                <NavItem icon={<Brain size={18} />} label="AI Configuration" active={activeTab === 'ai-settings'} onClick={() => { setActiveTab('ai-settings'); setSidebarOpen(false); }} />
+                                <NavItem icon={<Sliders size={18} />} label="Design System" active={activeTab === 'dashboard-designer'} onClick={() => { setActiveTab('dashboard-designer'); setSidebarOpen(false); }} />
+                                <NavItem icon={<Server size={18} />} label="API Integrations" active={activeTab === 'integrations'} onClick={() => { setActiveTab('integrations'); setSidebarOpen(false); }} />
+                            </SidebarGroup>
+                        )}
+                        <SidebarGroup title="Support" isOpen={openGroups.support} onToggle={() => toggleGroup('support')} isSidebarCollapsed={isSidebarCollapsed}>
+                            <NavItem icon={<HelpCircle size={18} />} label="Help Center" active={false} onClick={() => { }} />
+                        </SidebarGroup>
                     </nav>
 
                     {/* Legal Section */}
-                    <div className="px-4 mb-2">
-                        <div className="text-[10px] uppercase font-bold text-[var(--text-secondary)] mb-2 mt-4 tracking-wider">Privacy & Legal</div>
-                        <NavItem
-                            icon={<ShieldCheck size={18} />}
-                            label="Privacy Policy"
-                            active={activeTab === 'privacy'}
-                            onClick={() => { setActiveTab('privacy'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
-                        />
-                        <NavItem
-                            icon={<Scale size={18} />}
-                            label="Data Rights"
-                            active={activeTab === 'rights'}
-                            onClick={() => { setActiveTab('rights'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
-                        />
-                        <NavItem
-                            icon={<Database size={18} />}
-                            label="Cookie Policy"
-                            active={activeTab === 'cookies'}
-                            onClick={() => { setActiveTab('cookies'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
-                        />
+                    <div className="mb-2">
+                        <SidebarGroup title="Privacy & Legal" isOpen={openGroups.legal} onToggle={() => toggleGroup('legal')} isSidebarCollapsed={isSidebarCollapsed}>
+                            <NavItem
+                                icon={<ShieldCheck size={18} />}
+                                label="Privacy Policy"
+                                active={activeTab === 'privacy'}
+                                onClick={() => { setActiveTab('privacy'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
+                            />
+                            <NavItem
+                                icon={<Scale size={18} />}
+                                label="Data Rights"
+                                active={activeTab === 'rights'}
+                                onClick={() => { setActiveTab('rights'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
+                            />
+                            <NavItem
+                                icon={<Database size={18} />}
+                                label="Cookie Policy"
+                                active={activeTab === 'cookies'}
+                                onClick={() => { setActiveTab('cookies'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
+                            />
+                        </SidebarGroup>
                     </div>
 
                     <div className="flex items-center justify-between px-4 py-2 border-t border-[var(--border-color)] mt-2">
@@ -689,20 +743,148 @@ function App() {
 
             {/* Main Content */}
             <main className={`flex-1 p-3 sm:p-4 lg:p-8 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
-                {/* Top Header */}
-                <header className="flex justify-between items-center mb-4 sm:mb-6 lg:mb-10 py-2 sm:py-4 lg:py-6">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        <button
-                            onClick={() => setSidebarOpen(true)}
-                            className="lg:hidden p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--primary-color)] active:scale-95 transition-transform"
-                        >
-                            <Briefcase size={20} className="rotate-90" />
-                        </button>
-                        <h2 className="text-lg sm:text-xl lg:text-3xl font-bold capitalize truncate max-w-[150px] sm:max-w-none">
-                            {activeTab.replace('-', ' ')}
-                        </h2>
+                <Suspense fallback={<PageLoader />}>
+                    {/* Top Header - 2 Row Layout */}
+                    <header className="flex flex-col gap-4 mb-6 pt-4 pb-2">
+                        {/* Row 1: Primary Navigation */}
+                        <div className="flex justify-between items-center w-full">
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                                <button
+                                    onClick={() => setSidebarOpen(true)}
+                                    className="lg:hidden p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--primary-color)] active:scale-95 transition-transform"
+                                >
+                                    <Briefcase size={20} className="rotate-90" />
+                                </button>
 
-                        {/* Context Top Menu */}
+                                <h2 className="text-xl sm:text-2xl lg:text-3xl font-black capitalize tracking-tight truncate shrink-0">
+                                    {activeTab.replace('-', ' ')}
+                                </h2>
+
+                                {/* Admin Top Bar - Row 1 Inline */}
+                                {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') ? (
+                                    <div className="hidden xl:flex items-center gap-1 ml-4 p-1 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800/30 overflow-x-auto max-w-[800px] scrollbar-hide">
+                                        <div className="px-2 text-[10px] font-black text-green-600 uppercase tracking-widest flex-shrink-0">Admin</div>
+                                        {[
+                                            { id: 'settings', label: 'General', icon: Settings },
+                                            { id: 'bulk', label: 'Data', icon: Database },
+                                            { id: 'company-settings', label: 'Company', icon: Building2 },
+                                            { id: 'ai-settings', label: 'AI', icon: Brain },
+                                            { id: 'dashboard-designer', label: 'Design', icon: Sliders },
+                                            { id: 'integrations', label: 'APIs', icon: Server },
+                                            { id: 'calendar', label: 'Calendar', icon: Calendar }
+                                        ].map(item => (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => setActiveTab(item.id)}
+                                                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-md transition-all whitespace-nowrap ${activeTab === item.id
+                                                    ? 'bg-green-600 text-white shadow-sm'
+                                                    : 'text-green-700 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/40'
+                                                    }`}
+                                            >
+                                                <item.icon size={14} />
+                                                {item.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    /* Terms for Non-Admin */
+                                    <div className="hidden lg:flex items-center gap-2 ml-4 pl-4 border-l border-[var(--border-color)]">
+                                        <button
+                                            onClick={() => setActiveTab('privacy')}
+                                            className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--primary-color)] hover:bg-[var(--bg-primary)] rounded-lg transition-colors"
+                                        >
+                                            Terms & Conditions
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Right: Notifications & Profile */}
+                            <div className="flex items-center gap-3 relative shrink-0">
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setShowNotifications(!showNotifications)}
+                                        className="p-2 relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                                    >
+                                        <Bell size={20} />
+                                        {notifications.length > 0 && (
+                                            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                                        )}
+                                    </button>
+                                    {showNotifications && (
+                                        <div className="absolute right-0 mt-2 w-80 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-2xl z-50 max-h-96 overflow-y-auto">
+                                            <div className="p-4 border-b border-[var(--border-color)] flex items-center justify-between">
+                                                <h3 className="font-bold text-[var(--text-primary)]">Notifications</h3>
+                                                <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full font-bold">{notifications.length}</span>
+                                            </div>
+                                            <div className="divide-y divide-[var(--border-color)]">
+                                                {notifications.length === 0 ? (
+                                                    <div className="p-8 text-center text-[var(--text-secondary)]"><Bell size={32} className="mx-auto mb-2 opacity-20" /><p className="text-sm">No new notifications</p></div>
+                                                ) : (
+                                                    notifications.map((notif: any, i: number) => (
+                                                        <div key={i} className="p-4 hover:bg-[var(--bg-primary)] cursor-pointer transition-colors">
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                                                                <div className="flex-1">
+                                                                    <p className="text-sm font-medium text-[var(--text-primary)]">{notif.title}</p>
+                                                                    <p className="text-xs text-[var(--text-secondary)] mt-1">{notif.message}</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Profile Dropdown */}
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setShowUserMenu(!showUserMenu)}
+                                        className="flex items-center gap-3 pl-4 border-l border-[var(--border-color)] group"
+                                    >
+                                        <div className="hidden lg:block text-right">
+                                            <div className="text-sm font-bold text-[var(--text-primary)]">{currentUser?.full_name || 'User'}</div>
+                                            <div className="text-xs text-[var(--text-secondary)]">{currentUser?.role || 'Role'}</div>
+                                        </div>
+                                        <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white shadow-lg group-hover:scale-105 transition-transform">
+                                            <User size={20} />
+                                            <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold ${currentUser?.status === 'active' ? 'bg-green-500' : 'bg-red-500'
+                                                }`}></div>
+                                        </div>
+                                    </button>
+
+                                    {showUserMenu && (
+                                        <div className="absolute right-0 top-full mt-2 w-56 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                            <div className="p-2 space-y-1">
+                                                <button
+                                                    onClick={() => { setShowProfileModal(true); setShowUserMenu(false); }}
+                                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--bg-primary)] text-sm font-medium flex items-center gap-2"
+                                                >
+                                                    <User size={16} /> My Profile
+                                                </button>
+                                                <button
+                                                    onClick={() => { setActiveTab('settings'); setShowUserMenu(false); }}
+                                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-[var(--bg-primary)] text-sm font-medium flex items-center gap-2"
+                                                >
+                                                    <Settings size={16} /> Settings
+                                                </button>
+                                                <div className="h-px bg-[var(--border-color)] my-1"></div>
+                                                <button
+                                                    onClick={handleLogout}
+                                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-red-50 text-red-600 text-sm font-bold flex items-center gap-2"
+                                                >
+                                                    <LogOut size={16} /> Logout
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Row 2: Context Menu (Secondary Navigation) */}
                         {(() => {
                             const groups: any = {
                                 security: [
@@ -727,310 +909,307 @@ function App() {
 
                             if (currentGroup) {
                                 return (
-                                    <div className="hidden md:flex items-center gap-1 ml-6 p-1.5 bg-[var(--bg-surface)] rounded-xl border border-[var(--border-color)]">
-                                        {currentGroup.map(item => (
-                                            isMenuEnabled(item.id) && (
-                                                <button
-                                                    key={item.id}
-                                                    onClick={() => setActiveTab(item.id)}
-                                                    className={`px-5 py-2.5 text-sm font-bold rounded-lg transition-all ${activeTab === item.id
-                                                        ? 'bg-[var(--bg-primary)] shadow-sm text-[var(--text-primary)] ring-1 ring-black/5'
-                                                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50'
-                                                        }`}
-                                                >
-                                                    {item.label}
-                                                </button>
-                                            )
-                                        ))}
+                                    <div className="w-full overflow-x-auto pb-1 animate-in slide-in-from-left-4">
+                                        <div className="flex items-center gap-2 p-1">
+                                            {currentGroup.map(item => (
+                                                isMenuEnabled(item.id) && (
+                                                    <button
+                                                        key={item.id}
+                                                        onClick={() => setActiveTab(item.id)}
+                                                        className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === item.id
+                                                            ? 'bg-[var(--bg-primary)] shadow-sm text-[var(--text-primary)] ring-1 ring-[var(--border-color)]'
+                                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50'
+                                                            }`}
+                                                    >
+                                                        {item.label}
+                                                    </button>
+                                                )
+                                            ))}
+                                        </div>
                                     </div>
                                 )
                             }
                         })()}
-                    </div>
-                    <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
-                        <div className="relative hidden lg:block">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={16} />
-                            <input
-                                type="text"
-                                placeholder="Search..."
-                                className="pl-10 pr-4 py-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 w-64 transition-all"
-                            />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-secondary)] border border-[var(--border-color)] px-1 rounded">⌘K</div>
-                        </div>
-                        <div className="relative">
-                            <button
-                                onClick={() => setShowNotifications(!showNotifications)}
-                                className="p-2 relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                            >
-                                <Bell size={20} />
-                                {notifications.length > 0 && (
-                                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                                )}
-                            </button>
+                    </header>
 
-                            {/* Notification Dropdown */}
-                            {showNotifications && (
-                                <div className="absolute right-0 mt-2 w-80 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-2xl z-50 max-h-96 overflow-y-auto">
-                                    <div className="p-4 border-b border-[var(--border-color)] flex items-center justify-between">
-                                        <h3 className="font-bold text-[var(--text-primary)]">Notifications</h3>
-                                        <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full font-bold">
-                                            {notifications.length}
-                                        </span>
+                    {activeTab === 'dashboard' && role === 'Guardian' && <GuardianDashboard />}
+                    {activeTab === 'dashboard' && role === 'Security' && <SecurityDashboard onNavigate={setActiveTab} />}
+                    {activeTab === 'visitors' && <VisitorManagement />}
+                    {activeTab === 'calendar' && <CampusCalendar />}
+                    {activeTab === 'dashboard' && role !== 'Guardian' && role !== 'Security' && (
+                        <div className="animate-fade-in">
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                                <StatCard title="Total Students" value={stats.active_students} change="+6%" trend="up" />
+                                <StatCard title="New Entries" value={stats.gate_entries_today} change="+12%" trend="up" />
+                                <StatCard title="Security Alerts" value={stats.security_alerts} change="-2%" trend="down" />
+                                <StatCard title="Vehicles Parked" value={stats.vehicles_parked} change="+4%" trend="up" />
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                                {/* Main Graph Area */}
+                                <div className="lg:col-span-2 glass-card p-4">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-semibold text-base">Weekly Traffic</h3>
+                                        <select className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg px-3 py-1 text-sm outline-none">
+                                            <option>Last 7 Days</option>
+                                        </select>
                                     </div>
-                                    <div className="divide-y divide-[var(--border-color)]">
-                                        {notifications.length === 0 ? (
-                                            <div className="p-8 text-center text-[var(--text-secondary)]">
-                                                <Bell size={32} className="mx-auto mb-2 opacity-20" />
-                                                <p className="text-sm">No new notifications</p>
-                                            </div>
+                                    {/* Real Graph Bars (Recharts) */}
+                                    <div className="h-[280px]">
+                                        {kpiData.details ? (
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={kpiData.labels.map((l: any, i: any) => ({
+                                                    name: l,
+                                                    people: kpiData.details.people[i],
+                                                    vehicles: kpiData.details.vehicles[i]
+                                                }))}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
+                                                    <XAxis dataKey="name" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                                                    <YAxis tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                                                    <RechartsTooltip
+                                                        contentStyle={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)', borderRadius: '12px' }}
+                                                        labelStyle={{ fontWeight: 'bold', color: 'var(--text-primary)' }}
+                                                        cursor={{ fill: 'var(--bg-primary)' }}
+                                                    />
+                                                    <Legend wrapperStyle={{ paddingTop: '8px', fontSize: '11px' }} />
+                                                    <Bar dataKey="people" name="People" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                                    <Bar dataKey="vehicles" name="Vehicles" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
                                         ) : (
-                                            notifications.map((notif: any, i: number) => (
-                                                <div key={i} className="p-4 hover:bg-[var(--bg-primary)] cursor-pointer transition-colors">
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
-                                                        <div className="flex-1">
-                                                            <p className="text-sm font-medium text-[var(--text-primary)]">{notif.title}</p>
-                                                            <p className="text-xs text-[var(--text-secondary)] mt-1">{notif.message}</p>
-                                                            <p className="text-xs text-[var(--text-secondary)] mt-2">{notif.time}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))
+                                            <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)]">Loading...</div>
                                         )}
                                     </div>
                                 </div>
-                            )}
-                        </div>
 
-                        <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-4 border-l border-[var(--border-color)] sm:border-l-0 lg:border-l">
-                            <button
-                                onClick={() => setShowProfileModal(true)}
-                                className="relative w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white shadow-lg hover:shadow-xl transition-all active:scale-95 cursor-pointer"
-                            >
-                                <User size={20} className="sm:hidden" strokeWidth={2.5} />
-                                <User size={24} className="hidden sm:block lg:hidden" strokeWidth={2.5} />
-                                <User size={28} className="hidden lg:block" strokeWidth={2.5} />
-                                {/* Status Badge */}
-                                <div className={`absolute -bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 border-white flex items-center justify-center text-xs font-bold animate-pulse ${currentUser?.status === 'suspended'
-                                    ? 'bg-red-500 text-white'
-                                    : currentUser?.status === 'active' && currentUser?.admission_date
-                                        ? 'bg-green-500 text-white'
-                                        : 'bg-yellow-500 text-white'
-                                    }`}>
-                                    {currentUser?.status === 'suspended' ? '✕' : currentUser?.status === 'active' && currentUser?.admission_date ? '✓' : '!'}
-                                </div>
-                            </button>
-                            <div className="hidden lg:block">
-                                <div className="text-sm font-bold text-[var(--text-primary)]">{currentUser?.full_name || 'User'}</div>
-                                <div className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
-                                    <span className="px-2 py-0.5 bg-primary-100 text-primary-700 rounded-full font-medium">
-                                        {currentUser?.role || 'Role'}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleLogout}
-                                className="ml-3 hidden sm:flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 rounded-lg text-sm font-bold transition-all"
-                            >
-                                <LogOut size={16} />
-                                <span className="hidden xl:inline">Logout</span>
-                            </button>
-                        </div>
-                    </div>
-                </header>
-
-                {activeTab === 'dashboard' && role === 'Guardian' && <GuardianDashboard />}
-                {activeTab === 'dashboard' && role === 'Security' && <SecurityDashboard onNavigate={setActiveTab} />}
-                {activeTab === 'visitors' && <VisitorManagement />}
-                {activeTab === 'dashboard' && role !== 'Guardian' && role !== 'Security' && (
-                    <div className="animate-fade-in">
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                            <StatCard title="Total Students" value={stats.active_students} change="+6%" trend="up" />
-                            <StatCard title="New Entries" value={stats.gate_entries_today} change="+12%" trend="up" />
-                            <StatCard title="Security Alerts" value={stats.security_alerts} change="-2%" trend="down" />
-                            <StatCard title="Vehicles Parked" value={stats.vehicles_parked} change="+4%" trend="up" />
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* Main Graph Area */}
-                            <div className="lg:col-span-2 glass-card p-6 min-h-[400px]">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="font-semibold text-lg">KPI Performance</h3>
-                                    <select className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg px-3 py-1 text-sm outline-none">
-                                        <option>Last Year</option>
-                                        <option>This Year</option>
-                                    </select>
-                                </div>
-                                <div className="h-[300px] w-full flex items-end justify-between gap-2 px-4">
-                                    {/* Real Graph Bars */}
-                                    {kpiData.normalized && kpiData.normalized.length > 0 ? (
-                                        kpiData.normalized.map((h: number, i: number) => (
-                                            <div key={i} className="w-full bg-indigo-50 rounded-t-sm relative group hover:bg-indigo-100 transition-colors" style={{ height: `${h || 5}%` }}>
-                                                <div className="absolute bottom-0 w-full bg-gradient-to-t from-indigo-500/20 to-indigo-500/50 h-full rounded-t-sm group-hover:from-indigo-500/30 group-hover:to-indigo-500/60 transition-all"></div>
-                                                {/* Tooltip */}
-                                                <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded">
-                                                    {kpiData.raw ? kpiData.raw[i] : h} entries
+                                {/* Analytics Row (New) */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6 border-t border-[var(--border-color)] pt-6">
+                                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/10 dark:to-emerald-900/10 p-4 rounded-xl border border-green-200 dark:border-green-800">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h4 className="font-bold text-xs uppercase tracking-wider text-green-800 dark:text-green-400">Gate Traffic (Live)</h4>
+                                            <div className="flex items-center gap-2 text-[10px]">
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-2 h-2 bg-green-500 rounded"></div>
+                                                    <span className="font-semibold text-gray-600 dark:text-gray-400">In</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-2 h-2 bg-red-500 rounded"></div>
+                                                    <span className="font-semibold text-gray-600 dark:text-gray-400">Out</span>
                                                 </div>
                                             </div>
-                                        ))
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)]">No data available</div>
+                                        </div>
+                                        <div className="h-[200px]">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={analytics.gates} layout="vertical" margin={{ left: 5, right: 10, top: 0, bottom: 0 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e5e7eb" />
+                                                    <XAxis type="number" tick={{ fontSize: 9, fill: 'var(--text-secondary)', fontWeight: 600 }} axisLine={false} tickLine={false} />
+                                                    <YAxis dataKey="name" type="category" width={60} tick={{ fontSize: 10, fill: 'var(--text-primary)', fontWeight: 700 }} axisLine={false} tickLine={false} />
+                                                    <RechartsTooltip
+                                                        cursor={{ fill: 'rgba(34, 197, 94, 0.1)' }}
+                                                        contentStyle={{
+                                                            borderRadius: '8px',
+                                                            fontSize: '11px',
+                                                            fontWeight: 600,
+                                                            backgroundColor: 'var(--bg-card)',
+                                                            border: '1px solid var(--border-color)'
+                                                        }}
+                                                        formatter={(value: any, name: any) => [
+                                                            `${value}`,
+                                                            name === 'checkins' ? 'In' : 'Out'
+                                                        ]}
+                                                    />
+                                                    <Bar dataKey="checkins" name="In" fill="#22c55e" radius={[0, 4, 4, 0]} barSize={12} />
+                                                    <Bar dataKey="checkouts" name="Out" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={12} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                        {/* Live Summary Stats */}
+                                        <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-green-200 dark:border-green-800">
+                                            <div className="text-center p-2 bg-white dark:bg-gray-800 rounded-lg">
+                                                <div className="text-lg font-black text-green-600">
+                                                    {analytics.gates.reduce((sum: number, gate: any) => sum + (gate.checkins || 0), 0)}
+                                                </div>
+                                                <div className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 mt-0.5">Check-Ins</div>
+                                            </div>
+                                            <div className="text-center p-2 bg-white dark:bg-gray-800 rounded-lg">
+                                                <div className="text-lg font-black text-red-600">
+                                                    {analytics.gates.reduce((sum: number, gate: any) => sum + (gate.checkouts || 0), 0)}
+                                                </div>
+                                                <div className="text-[10px] font-semibold text-gray-600 dark:text-gray-400 mt-0.5">Check-Outs</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-[var(--bg-primary)] p-4 rounded-xl">
+                                        <h4 className="font-semibold mb-3 text-xs uppercase tracking-wider text-[var(--text-secondary)]">User Roles</h4>
+                                        <div className="h-[160px]">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                                                    <Pie data={analytics.roles} dataKey="value" nameKey="name" cx="45%" cy="50%" innerRadius={28} outerRadius={48} fill="#8884d8" paddingAngle={5}>
+                                                        {analytics.roles.map((_: any, index: number) => (
+                                                            <Cell key={`cell-${index}`} fill={['#6366f1', '#a855f7', '#ec4899', '#f59e0b'][index % 4]} />
+                                                        ))}
+                                                    </Pie>
+                                                    <RechartsTooltip contentStyle={{ borderRadius: '8px', fontSize: '11px' }} />
+                                                    <Legend iconSize={6} wrapperStyle={{ fontSize: '9px' }} layout="vertical" align="right" verticalAlign="middle" />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="hidden">
+
+                                    {/* System Setup Wizard Tooltip (Only for Admin if data is low) */}
+                                    {role === 'SuperAdmin' && todaySessions.length === 0 && (
+                                        <div className="mt-8 p-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl text-white relative overflow-hidden shadow-xl animate-pulse">
+                                            <div className="relative z-10 flex items-center justify-between">
+                                                <div>
+                                                    <h4 className="font-bold text-lg mb-1">Finish System Setup</h4>
+                                                    <p className="text-sm opacity-90">Upload your courses and timetable to see live analytics.</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => setActiveTab('bulk')}
+                                                    className="px-6 py-2 bg-white text-indigo-600 rounded-xl font-bold shadow-lg hover:scale-105 transition-all"
+                                                >
+                                                    Start Guide
+                                                </button>
+                                            </div>
+                                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                                        </div>
                                     )}
                                 </div>
-                                <div className="flex justify-between mt-4 text-xs text-[var(--text-secondary)] px-2">
-                                    {kpiData.labels && kpiData.labels.map((m: string) => <span key={m}>{m}</span>)}
-                                </div>
 
-                                {/* System Setup Wizard Tooltip (Only for Admin if data is low) */}
-                                {role === 'SuperAdmin' && todaySessions.length === 0 && (
-                                    <div className="mt-8 p-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl text-white relative overflow-hidden shadow-xl animate-pulse">
-                                        <div className="relative z-10 flex items-center justify-between">
-                                            <div>
-                                                <h4 className="font-bold text-lg mb-1">Finish System Setup</h4>
-                                                <p className="text-sm opacity-90">Upload your courses and timetable to see live analytics.</p>
-                                            </div>
-                                            <button
-                                                onClick={() => setActiveTab('bulk')}
-                                                className="px-6 py-2 bg-white text-indigo-600 rounded-xl font-bold shadow-lg hover:scale-105 transition-all"
-                                            >
-                                                Start Guide
-                                            </button>
+                                {/* Right Sidebar / Schedule */}
+                                <div className="space-y-6">
+                                    <div className="glass-card p-6">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-semibold">Schedule</h3>
+                                            <button className="text-xs border border-[var(--border-color)] px-2 py-1 rounded hover:bg-[var(--bg-primary)]">See All</button>
                                         </div>
-                                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                                    </div>
-                                )}
-                            </div>
+                                        {/* Calendar Strip */}
+                                        <div className="flex justify-between items-center mb-6 text-sm">
+                                            <button className="p-1 hover:bg-[var(--bg-primary)] rounded"><ChevronRight className="rotate-180" size={16} /></button>
+                                            <span className="font-medium">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+                                            <button className="p-1 hover:bg-[var(--bg-primary)] rounded"><ChevronRight size={16} /></button>
+                                        </div>
+                                        <div className="flex justify-between mb-6 text-xs text-center">
+                                            {[...Array(5)].map((_, i) => {
+                                                const d = new Date()
+                                                d.setDate(d.getDate() - 2 + i)
+                                                const isActive = i === 2
+                                                return (
+                                                    <div key={i} className={`p-2 rounded-xl cursor-pointer ${isActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'hover:bg-[var(--bg-primary)]'}`}>
+                                                        <div className={`mb-1 ${isActive ? 'text-indigo-200' : 'text-[var(--text-secondary)]'}`}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                                                        <div className="font-bold text-lg">{d.getDate()}</div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
 
-                            {/* Right Sidebar / Schedule */}
-                            <div className="space-y-6">
-                                <div className="glass-card p-6">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-semibold">Schedule</h3>
-                                        <button className="text-xs border border-[var(--border-color)] px-2 py-1 rounded hover:bg-[var(--bg-primary)]">See All</button>
-                                    </div>
-                                    {/* Calendar Strip */}
-                                    <div className="flex justify-between items-center mb-6 text-sm">
-                                        <button className="p-1 hover:bg-[var(--bg-primary)] rounded"><ChevronRight className="rotate-180" size={16} /></button>
-                                        <span className="font-medium">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
-                                        <button className="p-1 hover:bg-[var(--bg-primary)] rounded"><ChevronRight size={16} /></button>
-                                    </div>
-                                    <div className="flex justify-between mb-6 text-xs text-center">
-                                        {[...Array(5)].map((_, i) => {
-                                            const d = new Date()
-                                            d.setDate(d.getDate() - 2 + i)
-                                            const isActive = i === 2
-                                            return (
-                                                <div key={i} className={`p-2 rounded-xl cursor-pointer ${isActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'hover:bg-[var(--bg-primary)]'}`}>
-                                                    <div className={`mb-1 ${isActive ? 'text-indigo-200' : 'text-[var(--text-secondary)]'}`}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                                                    <div className="font-bold text-lg">{d.getDate()}</div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-
-                                    {/* Live Meeting/Class Items */}
-                                    <div className="space-y-3">
-                                        {todaySessions.length === 0 ? (
-                                            <p className="text-xs text-[var(--text-secondary)] text-center py-4">No classes scheduled for today.</p>
-                                        ) : (
-                                            todaySessions.slice(0, 3).map((session, i) => (
-                                                <div key={i} className="bg-[var(--bg-primary)] p-4 rounded-xl">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <span className="text-xs font-semibold bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded">{session.course_code}</span>
-                                                        <div className="flex -space-x-1">
-                                                            <div className="w-5 h-5 rounded-full bg-green-100 border border-white flex items-center justify-center">
-                                                                <Wifi size={10} className="text-green-600" />
+                                        {/* Live Meeting/Class Items */}
+                                        <div className="space-y-3">
+                                            {todaySessions.length === 0 ? (
+                                                <p className="text-xs text-[var(--text-secondary)] text-center py-4">No classes scheduled for today.</p>
+                                            ) : (
+                                                todaySessions.slice(0, 3).map((session, i) => (
+                                                    <div key={i} className="bg-[var(--bg-primary)] p-4 rounded-xl">
+                                                        <div className="flex justify-between items-start mb-2">
+                                                            <span className="text-xs font-semibold bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded">{session.course_code}</span>
+                                                            <div className="flex -space-x-1">
+                                                                <div className="w-5 h-5 rounded-full bg-green-100 border border-white flex items-center justify-center">
+                                                                    <Wifi size={10} className="text-green-600" />
+                                                                </div>
                                                             </div>
                                                         </div>
+                                                        <h4 className="font-bold text-sm mb-1">{session.course_name}</h4>
+                                                        <p className="text-xs text-[var(--text-secondary)]">{session.start_time.slice(0, 5)} - {session.end_time.slice(0, 5)} • {session.room_code}</p>
                                                     </div>
-                                                    <h4 className="font-bold text-sm mb-1">{session.course_name}</h4>
-                                                    <p className="text-xs text-[var(--text-secondary)]">{session.start_time.slice(0, 5)} - {session.end_time.slice(0, 5)} • {session.room_code}</p>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Recent Logs Section */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+                                <div className="lg:col-span-2 glass-card p-6">
+                                    <h3 className="font-semibold mb-6">Recent Activity</h3>
+                                    <div className="space-y-3">
+                                        {recentLogs.length === 0 ? (
+                                            <p className="text-center text-[var(--text-secondary)] py-4">No recent activity</p>
+                                        ) : (
+                                            recentLogs.map((log, i) => (
+                                                <LogItem
+                                                    key={i}
+                                                    user={log.user}
+                                                    time={log.time}
+                                                    status={log.status}
+                                                    isAlert={log.isAlert}
+                                                />
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="lg:col-span-1 glass-card p-6">
+                                    <h3 className="font-semibold mb-6">Camera Alerts</h3>
+                                    <div className="space-y-4">
+                                        {cameraAlerts.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-6 text-[var(--text-secondary)]">
+                                                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-2">
+                                                    <ShieldCheck className="text-green-600" size={20} />
+                                                </div>
+                                                <p className="text-xs">All systems secure</p>
+                                            </div>
+                                        ) : (
+                                            cameraAlerts.map((alert, i) => (
+                                                <div key={i} className="flex gap-4 p-3 rounded-lg bg-red-50 border border-red-100">
+                                                    <div className="mt-1">
+                                                        <AlertTriangle className="text-red-500" size={16} />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-bold text-red-700">{alert.alert_type}</div>
+                                                        <div className="text-[10px] text-red-600">{alert.alert_message}</div>
+                                                    </div>
                                                 </div>
                                             ))
                                         )}
                                     </div>
                                 </div>
+
                             </div>
                         </div>
+                    )}
 
-                        {/* Recent Logs Section */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-                            <div className="lg:col-span-2 glass-card p-6">
-                                <h3 className="font-semibold mb-6">Recent Activity</h3>
-                                <div className="space-y-3">
-                                    {recentLogs.length === 0 ? (
-                                        <p className="text-center text-[var(--text-secondary)] py-4">No recent activity</p>
-                                    ) : (
-                                        recentLogs.map((log, i) => (
-                                            <LogItem
-                                                key={i}
-                                                user={log.user}
-                                                time={log.time}
-                                                status={log.status}
-                                                isAlert={log.isAlert}
-                                            />
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="lg:col-span-1 glass-card p-6">
-                                <h3 className="font-semibold mb-6">Camera Alerts</h3>
-                                <div className="space-y-4">
-                                    {cameraAlerts.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center py-6 text-[var(--text-secondary)]">
-                                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-2">
-                                                <ShieldCheck className="text-green-600" size={20} />
-                                            </div>
-                                            <p className="text-xs">All systems secure</p>
-                                        </div>
-                                    ) : (
-                                        cameraAlerts.map((alert, i) => (
-                                            <div key={i} className="flex gap-4 p-3 rounded-lg bg-red-50 border border-red-100">
-                                                <div className="mt-1">
-                                                    <AlertTriangle className="text-red-500" size={16} />
-                                                </div>
-                                                <div>
-                                                    <div className="text-xs font-bold text-red-700">{alert.alert_type}</div>
-                                                    <div className="text-[10px] text-red-600">{alert.alert_message}</div>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'users' && <UsersComp />}
-                {activeTab === 'live' && <LiveClasses fullScreen={true} />}
-                {activeTab === 'attendance' && <Attendance />}
-                {activeTab === 'gate' && <GateControl />}
-                {activeTab === 'vehicles' && <VehicleIntel />}
-                {activeTab === 'timetable' && <Timetable />}
-                {activeTab === 'events' && <EventManagement />}
-                {activeTab === 'classrooms' && <ClassroomManagement />}
-                {activeTab === 'courses' && <CourseReports />}
-                {activeTab === 'cameras' && <CameraMonitoring />}
-                {activeTab === 'settings' && <SettingsComp />}
-                {activeTab === 'integrations' && <Integrations />}
-                {activeTab === 'bulk' && <BulkUpload />}
-                {activeTab === 'dashboard-designer' && <DashboardCustomizer />}
-                {activeTab === 'ai-settings' && <AISettings />}
-                {activeTab === 'company-settings' && <CompanySettings />}
-                {activeTab === 'verification' && <StudentVerification />}
-                {activeTab === 'privacy' && <PrivacyPolicy />}
-                {activeTab === 'cookies' && <CookiePolicy />}
-                {activeTab === 'rights' && <UserDataRights />}
-                {activeTab === 'scan-logs' && <ScanLogs />}
-                {activeTab === 'gates-dashboard' && <GatesDashboard />}
-                <footer className="mt-10 pt-6 border-t border-[var(--border-color)] text-center text-sm text-[var(--text-secondary)]">
-                    <p>&copy; {new Date().getFullYear()} Smart Campus System. Developed by <a href="https://www.kkdes.co.ke" target="_blank" rel="noopener noreferrer" className="text-[var(--primary-color)] font-bold hover:underline">KKDES</a></p>
-                </footer>
+                    {activeTab === 'users' && <UsersComp />}
+                    {activeTab === 'live' && <LiveClasses fullScreen={true} />}
+                    {activeTab === 'attendance' && <Attendance />}
+                    {activeTab === 'gate' && <GateControl />}
+                    {activeTab === 'vehicles' && <VehicleIntel />}
+                    {activeTab === 'timetable' && <Timetable />}
+                    {activeTab === 'events' && <EventManagement />}
+                    {activeTab === 'classrooms' && <ClassroomManagement />}
+                    {activeTab === 'courses' && <CourseReports />}
+                    {activeTab === 'cameras' && <CameraMonitoring />}
+                    {activeTab === 'settings' && <SettingsComp />}
+                    {activeTab === 'integrations' && <Integrations />}
+                    {activeTab === 'bulk' && <BulkUpload />}
+                    {activeTab === 'dashboard-designer' && <DashboardCustomizer />}
+                    {activeTab === 'ai-settings' && <AISettings />}
+                    {activeTab === 'company-settings' && <CompanySettings />}
+                    {activeTab === 'reports' && <Reports />}
+                    {activeTab === 'verification' && <StudentVerification />}
+                    {activeTab === 'privacy' && <PrivacyPolicy />}
+                    {activeTab === 'cookies' && <CookiePolicy />}
+                    {activeTab === 'rights' && <UserDataRights />}
+                    {activeTab === 'scan-logs' && <ScanLogs />}
+                    {activeTab === 'gates-dashboard' && <GatesDashboard />}
+                    {activeTab === 'student-dashboard' && <StudentDashboard />}
+                    <footer className="mt-10 pt-6 border-t border-[var(--border-color)] text-center text-sm text-[var(--text-secondary)]">
+                        <p>&copy; {new Date().getFullYear()} Smart Campus System.</p>
+                    </footer>
+                </Suspense>
             </main >
 
             {/* Profile Picture Modal */}
@@ -1122,6 +1301,26 @@ function App() {
             <InstallPWA />
             <PermissionsModal />
         </div >
+    )
+}
+
+function SidebarGroup({ title, children, isOpen, onToggle, isSidebarCollapsed }: any) {
+    if (isSidebarCollapsed) {
+        return <div className="py-2 border-b border-[var(--border-color)] last:border-0">{children}</div>
+    }
+    return (
+        <div className="mb-1">
+            <button
+                onClick={onToggle}
+                className="w-full flex items-center justify-between px-4 py-2 text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider hover:text-[var(--text-primary)] transition-colors group"
+            >
+                {title}
+                <ChevronRight size={14} className={`transition-transform duration-200 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] ${isOpen ? 'rotate-90' : ''}`} />
+            </button>
+            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                {children}
+            </div>
+        </div>
     )
 }
 

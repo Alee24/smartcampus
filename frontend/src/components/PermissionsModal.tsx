@@ -1,15 +1,24 @@
 import { useState, useEffect } from 'react'
-import { Camera, MapPin, Bell, Check, Shield, ArrowRight } from 'lucide-react'
+import { Camera, MapPin, Bell, Check, Shield, ArrowRight, Lock, RefreshCw, XCircle } from 'lucide-react'
 
 export default function PermissionsModal() {
+    // Disabled - permissions popup not working properly
+    return null;
+
     const [permissions, setPermissions] = useState({
         camera: false,
         location: false,
         notifications: false
     })
+    const [permissionStatus, setPermissionStatus] = useState({
+        camera: 'prompt', // prompt, granted, denied
+        location: 'prompt',
+        notifications: 'prompt'
+    })
     const [isOpen, setIsOpen] = useState(false)
     const [isChecking, setIsChecking] = useState(true)
     const [isRequesting, setIsRequesting] = useState(false)
+    const [errorMsg, setErrorMsg] = useState<{ title: string, desc: string } | null>(null)
 
     useEffect(() => {
         checkPermissions()
@@ -26,48 +35,43 @@ export default function PermissionsModal() {
 
     const checkPermissions = async () => {
         setIsChecking(true)
-        const newState = {
-            camera: false,
-            location: false,
-            notifications: false
-        }
+        const newPerms = { camera: false, location: false, notifications: false }
+        const newStatus = { camera: 'prompt', location: 'prompt', notifications: 'prompt' }
 
         // Check Notifications
         if ('Notification' in window) {
-            newState.notifications = Notification.permission === 'granted'
-        }
-
-        // Check Camera
-        try {
-            const devices = await navigator.mediaDevices.enumerateDevices()
-            const hasLabels = devices.some(d => d.kind === 'videoinput' && d.label !== '')
-            newState.camera = hasLabels
-        } catch (e) {
-            newState.camera = false
+            newStatus.notifications = Notification.permission
+            newPerms.notifications = Notification.permission === 'granted'
         }
 
         // Check Location
         try {
-            const locStatus = await navigator.permissions.query({ name: 'geolocation' })
-            newState.location = locStatus.state === 'granted'
+            const loc = await navigator.permissions.query({ name: 'geolocation' })
+            newStatus.location = loc.state
+            newPerms.location = loc.state === 'granted'
+            loc.onchange = () => checkPermissions()
         } catch (e) {
-            newState.location = false // Firefox might fail query
+            // Firefox or unsupported
         }
 
-        setPermissions(newState)
+        // Check Camera (Rough check via devices)
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices()
+            const hasLabels = devices.some(d => d.kind === 'videoinput' && d.label !== '')
+            newPerms.camera = hasLabels
+            newStatus.camera = hasLabels ? 'granted' : 'prompt'
+            // We can't easily detect 'denied' for camera without trying to open it
+        } catch (e) { }
 
-        // Check if all are granted (Notifications are optional for blocking)
-        const allGranted = newState.camera && newState.location
-        // We still track notifications in state, but don't block entry on them
+        setPermissions(newPerms)
+        setPermissionStatus(newStatus)
 
-        // Open if any important one is missing (and not ignored)
+        const allGranted = newPerms.camera && newPerms.location
         const ignored = localStorage.getItem('permissions_ignored')
 
         if (!allGranted) {
-            // Only auto-open if not previously ignored
             if (!ignored) setIsOpen(true)
         } else {
-            // Auto-close if all granted (Success!)
             setIsOpen(false)
         }
 
@@ -76,30 +80,58 @@ export default function PermissionsModal() {
 
     const requestAll = async () => {
         setIsRequesting(true)
+        setErrorMsg(null)
 
-        // 1. Notifications
         try {
-            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+            // 1. Camera
+            if (!permissions.camera) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+                    setTimeout(() => stream.getTracks().forEach(t => t.stop()), 100)
+                    setPermissions(prev => ({ ...prev, camera: true }))
+                    setPermissionStatus(prev => ({ ...prev, camera: 'granted' }))
+                } catch (e: any) {
+                    console.warn("Camera denied:", e)
+                    if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                        setPermissionStatus(prev => ({ ...prev, camera: 'denied' }))
+                        // Don't block, just mark as denied
+                    }
+                }
+            }
+
+            // 2. Location
+            if (!permissions.location) {
+                try {
+                    await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(
+                            () => {
+                                setPermissions(prev => ({ ...prev, location: true }))
+                                setPermissionStatus(prev => ({ ...prev, location: 'granted' }))
+                                resolve(true)
+                            },
+                            (err) => reject(err),
+                            { timeout: 8000 }
+                        )
+                    })
+                } catch (e: any) {
+                    if (e.code === 1) { // PERMISSION_DENIED
+                        setPermissionStatus(prev => ({ ...prev, location: 'denied' }))
+                        // Don't block, just mark as denied
+                    }
+                }
+            }
+
+            // 3. Notifications
+            if ('Notification' in window && Notification.permission === 'default') {
                 await Notification.requestPermission()
             }
-        } catch (e) { console.warn("Notification error", e) }
 
-        // 2. Location
-        try {
-            await new Promise((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject)
-            })
-        } catch (e) { console.warn("Location denied") }
-
-        // 3. Camera
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-            stream.getTracks().forEach(t => t.stop()) // Close immediately
-        } catch (e) { console.warn("Camera denied") }
-
-        // Re-check
-        await checkPermissions()
-        setIsRequesting(false)
+        } catch (error) {
+            console.error("Chain error", error)
+        } finally {
+            await checkPermissions()
+            setIsRequesting(false)
+        }
     }
 
     const handleDismiss = () => {
@@ -112,7 +144,32 @@ export default function PermissionsModal() {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] p-6 md:p-8 rounded-2xl w-full max-w-md shadow-2xl relative overflow-hidden">
-                {/* Visual Decor */}
+
+                {/* Error Overlay */}
+                {errorMsg && (
+                    <div className="absolute inset-0 z-20 bg-[var(--bg-surface)] p-8 flex flex-col items-center justify-center text-center animate-in slide-in-from-bottom">
+                        <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-full flex items-center justify-center mb-4">
+                            <Lock size={32} />
+                        </div>
+                        <h3 className="text-xl font-bold text-red-600 mb-2">{errorMsg.title}</h3>
+                        <p className="text-[var(--text-secondary)] mb-8">{errorMsg.desc}</p>
+
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-800"
+                        >
+                            <RefreshCw size={18} />
+                            Reload Page
+                        </button>
+                        <button
+                            onClick={() => setErrorMsg(null)}
+                            className="mt-4 text-sm text-[var(--text-secondary)] hover:underline"
+                        >
+                            Back
+                        </button>
+                    </div>
+                )}
+
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
 
                 <div className="relative z-10">
@@ -120,52 +177,42 @@ export default function PermissionsModal() {
                         <Shield size={32} />
                     </div>
 
-                    <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2 text-center md:text-left">Enable Permissions</h3>
+                    <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2 text-center md:text-left">Permissions Required</h3>
                     <p className="text-[var(--text-secondary)] mb-8 text-center md:text-left">
-                        To get the full Smart Campus experience, please enable the following permissions.
+                        We need access to your camera and location for security checks.
                     </p>
 
                     <div className="space-y-4 mb-8">
                         {/* Camera */}
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)]">
+                        <div className={`flex items-center justify-between p-4 rounded-xl border ${permissionStatus.camera === 'denied' ? 'bg-red-50 border-red-200 dark:bg-red-900/10' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
                             <div className="flex items-center gap-3">
                                 <div className={`p-2 rounded-lg ${permissions.camera ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                                     <Camera size={20} />
                                 </div>
                                 <div>
                                     <p className="font-bold text-[var(--text-primary)]">Camera Access</p>
-                                    <p className="text-xs text-[var(--text-secondary)]">For QR scanning & gate entry</p>
+                                    <p className="text-xs text-[var(--text-secondary)]">
+                                        {permissionStatus.camera === 'denied' ? <span className="text-red-500 font-bold">Blocked by browser</span> : "For QR scanning"}
+                                    </p>
                                 </div>
                             </div>
-                            {permissions.camera ? <Check className="text-green-500" size={20} /> : <div className="w-5 h-5 rounded-full border-2 border-gray-300"></div>}
+                            {permissions.camera ? <Check className="text-green-500" size={20} /> : permissionStatus.camera === 'denied' ? <XCircle className="text-red-500" size={20} /> : <div className="w-5 h-5 rounded-full border-2 border-gray-300"></div>}
                         </div>
 
                         {/* Location */}
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)]">
+                        <div className={`flex items-center justify-between p-4 rounded-xl border ${permissionStatus.location === 'denied' ? 'bg-red-50 border-red-200 dark:bg-red-900/10' : 'bg-[var(--bg-primary)] border-[var(--border-color)]'}`}>
                             <div className="flex items-center gap-3">
                                 <div className={`p-2 rounded-lg ${permissions.location ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                                     <MapPin size={20} />
                                 </div>
                                 <div>
                                     <p className="font-bold text-[var(--text-primary)]">Location</p>
-                                    <p className="text-xs text-[var(--text-secondary)]">For campus geofencing</p>
+                                    <p className="text-xs text-[var(--text-secondary)]">
+                                        {permissionStatus.location === 'denied' ? <span className="text-red-500 font-bold">Blocked by browser</span> : "For geofencing"}
+                                    </p>
                                 </div>
                             </div>
-                            {permissions.location ? <Check className="text-green-500" size={20} /> : <div className="w-5 h-5 rounded-full border-2 border-gray-300"></div>}
-                        </div>
-
-                        {/* Notifications */}
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)]">
-                            <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-lg ${permissions.notifications ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                    <Bell size={20} />
-                                </div>
-                                <div>
-                                    <p className="font-bold text-[var(--text-primary)]">Notifications</p>
-                                    <p className="text-xs text-[var(--text-secondary)]">Security alerts & updates</p>
-                                </div>
-                            </div>
-                            {permissions.notifications ? <Check className="text-green-500" size={20} /> : <div className="w-5 h-5 rounded-full border-2 border-gray-300"></div>}
+                            {permissions.location ? <Check className="text-green-500" size={20} /> : permissionStatus.location === 'denied' ? <XCircle className="text-red-500" size={20} /> : <div className="w-5 h-5 rounded-full border-2 border-gray-300"></div>}
                         </div>
                     </div>
 
@@ -175,14 +222,14 @@ export default function PermissionsModal() {
                             disabled={isRequesting}
                             className="w-full py-4 bg-[image:var(--gradient-primary)] text-white font-bold rounded-xl shadow-lg hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait"
                         >
-                            {isRequesting ? "Please allow in prompts..." : "Allow All Access"}
+                            {isRequesting ? "Requesting access..." : "Allow Access"}
                             {!isRequesting && <ArrowRight size={18} />}
                         </button>
                         <button
                             onClick={handleDismiss}
-                            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] py-2"
+                            className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] py-2 underline"
                         >
-                            Maybe Later
+                            Continue to Dashboard
                         </button>
                     </div>
                 </div>

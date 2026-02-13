@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Users, Book, CheckCircle } from 'lucide-react'
+import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Users, Book, CheckCircle, Search } from 'lucide-react'
 
 export default function Timetable() {
     const [activeTab, setActiveTab] = useState('timetable')
@@ -17,6 +17,9 @@ export default function Timetable() {
     const [selectedClassroom, setSelectedClassroom] = useState<any>(null)
     const [selectedCourse, setSelectedCourse] = useState<any>(null)
     const [selectedDay, setSelectedDay] = useState<string | null>(null)
+    const [selectedSlot, setSelectedSlot] = useState<any>(null)
+    const [editingSlot, setEditingSlot] = useState<any>(null)
+    const [searchQuery, setSearchQuery] = useState('')
 
     const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     const ROOM_TYPES = ['lecture_hall', 'lab', 'seminar_room', 'auditorium']
@@ -223,6 +226,75 @@ export default function Timetable() {
         }
     }
 
+    const handleUpdateSlot = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!editingSlot) return
+
+        const formData = new FormData(e.target as HTMLFormElement)
+
+        const data = {
+            course_id: formData.get('course_id'),
+            classroom_id: formData.get('classroom_id'),
+            lecturer_id: formData.get('lecturer_id'),
+            day_of_week: parseInt(formData.get('day_of_week') as string),
+            start_time: formData.get('start_time') + ':00',
+            end_time: formData.get('end_time') + ':00',
+            effective_from: formData.get('effective_from') || null,
+            effective_until: formData.get('effective_until') || null
+        }
+
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/timetable/timetable/${editingSlot.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            })
+
+            if (res.ok) {
+                alert('✓ Class allocation updated successfully!')
+                setEditingSlot(null)
+                setSelectedSlot(null)
+                fetchTimetable()
+            } else {
+                const error = await res.json()
+                alert(error.detail || 'Failed to update slot')
+            }
+        } catch (err) {
+            console.error(err)
+            alert('Error updating slot')
+        }
+    }
+
+    const handleDeleteSlot = async (slotId: string) => {
+        if (!confirm('Are you sure you want to delete this class allocation?')) return
+
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/timetable/timetable/${slotId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+
+            if (res.ok) {
+                alert('✓ Class allocation deleted successfully!')
+                setEditingSlot(null)
+                setSelectedSlot(null)
+                setSelectedDay(null)
+                fetchTimetable()
+            } else {
+                const error = await res.json()
+                alert(error.detail || 'Failed to delete slot')
+            }
+        } catch (err) {
+            console.error(err)
+            alert('Error deleting slot')
+        }
+    }
+
     return (
         <div className="animate-fade-in">
             <header className="mb-8">
@@ -308,8 +380,8 @@ export default function Timetable() {
                                             const isActive = day === today && activeSessions.some(s => s.course_code === slot.course_code);
                                             return (
                                                 <div key={slot.id} className={`p-2 rounded-lg border text-xs transition-all ${isActive
-                                                        ? 'bg-green-100 border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse dark:bg-green-900/30'
-                                                        : 'bg-[var(--bg-primary)] border-[var(--border-color)]'
+                                                    ? 'bg-green-100 border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse dark:bg-green-900/30'
+                                                    : 'bg-[var(--bg-primary)] border-[var(--border-color)]'
                                                     }`}>
                                                     <div className={`font-bold truncate ${isActive ? 'text-green-700 dark:text-green-400' : 'text-primary-600'}`}>
                                                         {slot.course_code}
@@ -335,7 +407,7 @@ export default function Timetable() {
 
                     {/* Zoom Effect Modal for Day View */}
                     {selectedDay && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in" onClick={() => setSelectedDay(null)}>
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in" onClick={() => { setSelectedDay(null); setSearchQuery(''); }}>
                             <div
                                 className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-lg m-4 rounded-3xl shadow-2xl overflow-hidden transform transition-all animate-zoom-in"
                                 onClick={e => e.stopPropagation()}
@@ -348,63 +420,197 @@ export default function Timetable() {
                                     <h2 className="text-3xl font-bold relative z-10">{selectedDay}</h2>
                                     <p className="text-white/80 relative z-10">{(timetable[selectedDay] || []).length} Classes Scheduled</p>
                                     <button
-                                        onClick={() => setSelectedDay(null)}
+                                        onClick={() => { setSelectedDay(null); setSearchQuery(''); }}
                                         className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 p-2 rounded-full transition-colors text-white"
                                     >
                                         <Trash2 className="rotate-45" size={20} /> {/* Using Trash2 as X icon for now, usually X or XIcon */}
                                     </button>
                                 </div>
 
-                                <div className="p-6 max-h-[70vh] overflow-y-auto space-y-4">
-                                    {(timetable[selectedDay] || []).length > 0 ? (
-                                        timetable[selectedDay].map((slot: any) => (
-                                            <div key={slot.id} className="flex gap-4 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] hover:border-[var(--primary-color)] transition-all group">
-                                                <div className="flex flex-col items-center justify-center min-w-[80px] border-r border-[var(--border-color)] pr-4">
-                                                    <span className="font-bold text-lg text-[var(--text-primary)]">{slot.start_time}</span>
-                                                    <span className="text-xs text-[var(--text-secondary)]">{slot.end_time}</span>
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <div className="flex items-center gap-2">
-                                                                <h4 className="font-bold text-lg text-primary-600">{slot.course_code}</h4>
-                                                                {selectedDay === new Date().toLocaleDateString('en-US', { weekday: 'long' }) &&
-                                                                    activeSessions.some(s => s.course_code === slot.course_code) && (
-                                                                        <span className="px-2 py-0.5 bg-green-500 text-white text-xs font-bold rounded-full animate-pulse shadow-lg shadow-green-500/50">
-                                                                            LIVE ACTIVITY
-                                                                        </span>
-                                                                    )}
-                                                            </div>
-                                                            <p className="text-sm font-medium text-[var(--text-primary)]">{slot.course_name}</p>
-                                                        </div>
-                                                        <div className="bg-primary-50 text-primary-700 px-3 py-1 rounded-full text-xs font-bold">
-                                                            {slot.room_code}
-                                                        </div>
-                                                    </div>
+                                {/* Search Bar */}
+                                <div className="px-6 pt-4 pb-2 border-b border-[var(--border-color)]">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={18} />
+                                        <input
+                                            type="text"
+                                            placeholder="Search by code, name, or lecturer..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                                        />
+                                    </div>
+                                </div>
 
-                                                    <div className="flex items-center gap-4 mt-3 text-sm text-[var(--text-secondary)]">
-                                                        <span className="flex items-center gap-1">
-                                                            <Users size={14} /> {slot.lecturer_name}
-                                                        </span>
-                                                        <span className="flex items-center gap-1">
-                                                            <MapPin size={14} /> {slot.room_name}
-                                                        </span>
+                                <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4">
+                                    {(() => {
+                                        // Filter classes based on search query
+                                        const filteredSlots = (timetable[selectedDay] || []).filter((slot: any) => {
+                                            if (!searchQuery.trim()) return true
+
+                                            const query = searchQuery.toLowerCase()
+                                            return (
+                                                slot.course_code?.toLowerCase().includes(query) ||
+                                                slot.course_name?.toLowerCase().includes(query) ||
+                                                slot.lecturer_name?.toLowerCase().includes(query) ||
+                                                slot.room_code?.toLowerCase().includes(query)
+                                            )
+                                        })
+
+                                        return filteredSlots.length > 0 ? (
+                                            filteredSlots.map((slot: any) => {
+                                                const isEditing = editingSlot?.id === slot.id
+
+                                                return isEditing ? (
+                                                    /* Edit Mode */
+                                                    <form key={slot.id} onSubmit={handleUpdateSlot} className="p-4 rounded-xl bg-[var(--bg-primary)] border-2 border-primary-500 shadow-lg">
+                                                        <div className="flex justify-between items-center mb-4">
+                                                            <h4 className="font-bold text-lg">Edit {slot.course_code}</h4>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEditingSlot(null)}
+                                                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                                                            >
+                                                                <Trash2 className="rotate-45" size={18} />
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                                            <div className="col-span-2">
+                                                                <label className="block font-bold mb-1">Course</label>
+                                                                <select name="course_id" defaultValue={slot.course_id} required className="w-full p-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)]">
+                                                                    {courses.map((c: any) => (
+                                                                        <option key={c.id} value={c.id}>{c.course_code} - {c.course_name}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+
+                                                            <div className="col-span-2">
+                                                                <label className="block font-bold mb-1">Classroom</label>
+                                                                <select name="classroom_id" defaultValue={slot.classroom_id} required className="w-full p-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)]">
+                                                                    {classrooms.map((r: any) => (
+                                                                        <option key={r.id} value={r.id}>{r.room_code} - {r.room_name}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+
+                                                            <div className="col-span-2">
+                                                                <label className="block font-bold mb-1">Lecturer</label>
+                                                                <select name="lecturer_id" defaultValue={slot.lecturer_id} required className="w-full p-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)]">
+                                                                    {lecturers.map((l: any) => (
+                                                                        <option key={l.id} value={l.id}>{l.name}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="block font-bold mb-1">Day</label>
+                                                                <select name="day_of_week" defaultValue={DAYS.indexOf(selectedDay || 'Monday')} required className="w-full p-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)]">
+                                                                    {DAYS.map((d, i) => (
+                                                                        <option key={d} value={i}>{d}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+
+                                                            <div>
+                                                                <label className="block font-bold mb-1">Start Time</label>
+                                                                <input name="start_time" type="time" defaultValue={slot.start_time.slice(0, 5)} required className="w-full p-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)]" />
+                                                            </div>
+
+                                                            <div className="col-span-2">
+                                                                <label className="block font-bold mb-1">End Time</label>
+                                                                <input name="end_time" type="time" defaultValue={slot.end_time.slice(0, 5)} required className="w-full p-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-surface)]" />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex justify-between gap-3 mt-4 pt-4 border-t border-[var(--border-color)]">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteSlot(slot.id)}
+                                                                className="px-4 py-2 rounded-lg bg-red-100 text-red-700 font-bold hover:bg-red-200 transition-all flex items-center gap-2"
+                                                            >
+                                                                <Trash2 size={16} /> Delete
+                                                            </button>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setEditingSlot(null)}
+                                                                    className="px-4 py-2 rounded-lg text-[var(--text-secondary)] font-bold hover:bg-[var(--bg-primary)] transition-all"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                                <button
+                                                                    type="submit"
+                                                                    className="px-6 py-2 rounded-lg bg-[image:var(--gradient-primary)] text-white font-bold shadow-lg hover:shadow-primary-500/30 transition-all"
+                                                                >
+                                                                    Update
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </form>
+                                                ) : (
+                                                    /* View Mode */
+                                                    <div
+                                                        key={slot.id}
+                                                        className="flex gap-4 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] hover:border-[var(--primary-color)] transition-all group cursor-pointer"
+                                                        onClick={() => setEditingSlot(slot)}
+                                                    >
+                                                        <div className="flex flex-col items-center justify-center min-w-[80px] border-r border-[var(--border-color)] pr-4">
+                                                            <span className="font-bold text-lg text-[var(--text-primary)]">{slot.start_time}</span>
+                                                            <span className="text-xs text-[var(--text-secondary)]">{slot.end_time}</span>
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <div className="flex justify-between items-start">
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <h4 className="font-bold text-lg text-primary-600">{slot.course_code}</h4>
+                                                                        {selectedDay === new Date().toLocaleDateString('en-US', { weekday: 'long' }) &&
+                                                                            activeSessions.some(s => s.course_code === slot.course_code) && (
+                                                                                <span className="px-2 py-0.5 bg-green-500 text-white text-xs font-bold rounded-full animate-pulse shadow-lg shadow-green-500/50">
+                                                                                    LIVE ACTIVITY
+                                                                                </span>
+                                                                            )}
+                                                                    </div>
+                                                                    <p className="text-sm font-medium text-[var(--text-primary)]">{slot.course_name}</p>
+                                                                </div>
+                                                                <div className="bg-primary-50 text-primary-700 px-3 py-1 rounded-full text-xs font-bold">
+                                                                    {slot.room_code}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-4 mt-3 text-sm text-[var(--text-secondary)]">
+                                                                <span className="flex items-center gap-1">
+                                                                    <Users size={14} /> {slot.lecturer_name}
+                                                                </span>
+                                                                <span className="flex items-center gap-1">
+                                                                    <MapPin size={14} /> {slot.room_name}
+                                                                </span>
+                                                            </div>
+
+                                                            <div className="mt-2 text-xs text-[var(--text-secondary)] opacity-60">
+                                                                Click to edit or delete
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                )
+                                            })
+                                        ) : (
+                                            <div className="text-center py-12 text-[var(--text-secondary)]">
+                                                <Search size={48} className="mx-auto mb-4 opacity-20" />
+                                                <p>No classes found matching "{searchQuery}"</p>
+                                                <button
+                                                    onClick={() => setSearchQuery('')}
+                                                    className="mt-4 text-primary-600 font-bold hover:underline"
+                                                >
+                                                    Clear search
+                                                </button>
                                             </div>
-                                        ))
-                                    ) : (
-                                        <div className="text-center py-12 text-[var(--text-secondary)]">
-                                            <Calendar size={48} className="mx-auto mb-4 opacity-20" />
-                                            <p>No classes scheduled for {selectedDay}.</p>
-                                            <p className="text-sm mt-2">Enjoy your free time!</p>
-                                        </div>
-                                    )}
+                                        )
+                                    })()}
                                 </div>
 
                                 <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-primary)] text-center">
                                     <button
-                                        onClick={() => setSelectedDay(null)}
+                                        onClick={() => { setSelectedDay(null); setSearchQuery(''); }}
                                         className="text-[var(--primary-color)] font-bold text-sm hover:underline"
                                     >
                                         Close View

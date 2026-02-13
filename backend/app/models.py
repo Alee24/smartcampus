@@ -84,10 +84,12 @@ class UserLocationLog(UUIDModel, table=True):
     user: User = Relationship(back_populates="location_logs")
 
 
+
 class Gate(UUIDModel, table=True):
     __tablename__ = "gates"
-    name: str
+    name: str = Field(unique=True, index=True)
     location: Optional[str] = None
+    is_active: bool = True
 
 class EntryLog(UUIDModel, table=True):
     __tablename__ = "entry_logs"
@@ -98,8 +100,25 @@ class EntryLog(UUIDModel, table=True):
     method: str # qr, face, manual
     guard_id: Optional[UUID] = Field(foreign_key="users.id", nullable=True)
     status: str # allowed, rejected
+    ip_address: Optional[str] = None
+    verification_image: Optional[str] = None
 
     user: User = Relationship(back_populates="entry_logs", sa_relationship_kwargs={"foreign_keys": "EntryLog.user_id"})
+
+class GateScanLog(UUIDModel, table=True):
+    __tablename__ = "gate_scan_logs"
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    scan_type: str
+    scanned_value: Optional[str] = None
+    status: str
+    
+    gate_id: Optional[UUID] = Field(foreign_key="gates.id", nullable=True)
+    guard_id: Optional[UUID] = Field(foreign_key="users.id", nullable=True)
+    scanner_name: Optional[str] = None
+    
+    details: Optional[str] = None
+    
+    gate: Optional[Gate] = Relationship()
 
 class Vehicle(UUIDModel, table=True):
     __tablename__ = "vehicles"
@@ -134,7 +153,7 @@ class Classroom(UUIDModel, table=True):
     room_code: str = Field(unique=True, index=True)  # e.g., "LH1", "LAB-CS-01"
     room_name: str  # e.g., "Lecture Hall 1", "Computer Lab"
     building: Optional[str] = None
-    floor: Optional[int] = None
+    floor: Optional[str] = None
     capacity: int = 0
     room_type: str = "lecture_hall"  # lecture_hall, lab, seminar_room, auditorium
     
@@ -391,10 +410,12 @@ class Visitor(UUIDModel, table=True):
     id_number: str = Field(index=True)
     
     visit_details: str 
+    visitor_type: str = "visitor" # visitor, taxi, delivery
     
     time_in: datetime = Field(default_factory=datetime.utcnow)
     time_out: Optional[datetime] = None
     
+    gate_id: Optional[UUID] = Field(foreign_key="gates.id", nullable=True) # Link to Gate
     status: str = "checked_in"
 
 # Event Management Models
@@ -421,6 +442,8 @@ class EventVisitor(UUIDModel, table=True):
     visitor_name: str
     visitor_identifier: str # Admission No or ID No
     phone_number: str
+    email: Optional[str] = None
+    status: str = "pre_registered" # pre_registered, checked_in
     bio_data: Optional[dict] = Field(default={}, sa_column=Column(JSON)) 
     entry_time: datetime = Field(default_factory=datetime.utcnow)
     scanned_by: Optional[UUID] = Field(foreign_key="users.id", nullable=True)

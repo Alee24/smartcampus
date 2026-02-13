@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, CheckCircle, XCircle, Shield, Calendar, User, Building, Hash, Sparkles } from 'lucide-react'
+import { Search, CheckCircle, XCircle, Shield, Calendar, User, Building, Sparkles } from 'lucide-react'
 
 export default function StudentVerification() {
     const [query, setQuery] = useState('')
@@ -187,123 +187,118 @@ export default function StudentVerification() {
                                 {/* Glow Effect */}
                                 <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded-3xl blur-2xl opacity-50 animate-pulse"></div>
 
-                                {/* Main Card */}
-                                <div className="relative bg-gradient-to-br from-white via-purple-50 to-pink-50 dark:from-gray-800 dark:via-purple-900/30 dark:to-pink-900/30 rounded-3xl shadow-2xl overflow-hidden border-2 border-white/50 backdrop-blur-xl">
-                                    {/* Card Header with Logo */}
-                                    <div className="relative h-48 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 overflow-hidden">
+                                {/* Main Card - Horizontal Neck Tag Style */}
+                                <div className="relative bg-gradient-to-br from-white via-purple-50 to-pink-50 dark:from-gray-800 dark:via-purple-900/30 dark:to-pink-900/30 rounded-3xl shadow-2xl overflow-hidden border-2 border-white/50 backdrop-blur-xl max-w-4xl mx-auto">
+                                    {/* Card Header - Compact */}
+                                    <div className="relative h-20 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 overflow-hidden">
                                         {/* Animated Background Pattern */}
                                         <div className="absolute inset-0 opacity-20">
                                             <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] animate-slide"></div>
                                         </div>
 
-                                        {/* University Logo */}
-                                        <div className="relative h-full flex items-center justify-between px-8">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-24 h-24 bg-white rounded-2xl p-3 shadow-xl transform hover:rotate-12 transition-transform">
+                                        {/* University Logo & Name - Compact */}
+                                        <div className="relative h-full flex items-center justify-between px-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-14 h-14 bg-white rounded-xl p-2 shadow-lg">
                                                     <img
-                                                        src={companySettings.logo_url || "/api/placeholder/96/96"}
+                                                        src={companySettings.logo_url || "/api/placeholder/56/56"}
                                                         alt="University Logo"
                                                         className="w-full h-full object-contain"
                                                     />
                                                 </div>
                                                 <div className="text-white">
-                                                    <h2 className="text-3xl font-black tracking-tight">{companySettings.company_name?.toUpperCase() || 'UNIVERSITY'}</h2>
-                                                    <p className="text-purple-100 font-medium">Official Student ID Card</p>
+                                                    <h2 className="text-lg font-black tracking-tight">{companySettings.company_name?.toUpperCase() || 'UNIVERSITY'}</h2>
+                                                    <p className="text-purple-100 font-medium text-xs">Official Student ID Card</p>
                                                 </div>
                                             </div>
 
-                                            {/* Verified Badge */}
-                                            <div className="bg-white/20 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/30">
-                                                <div className="flex items-center gap-2">
-                                                    <CheckCircle className="text-green-300" size={24} />
-                                                    <span className="text-white font-bold text-lg">VERIFIED</span>
+                                            {/* Verified Badge - Compact */}
+                                            <div className="bg-white/20 backdrop-blur-md rounded-xl px-4 py-2 border border-white/30">
+                                                <div className="flex items-center gap-1">
+                                                    <CheckCircle className="text-green-300" size={16} />
+                                                    <span className="text-white font-bold text-sm">VERIFIED</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Card Body */}
-                                    <div className="p-8">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                            {/* Photo Section */}
-                                            <div className="flex flex-col items-center">
+                                    {/* Card Body - Responsive Layout: Stacked on Mobile, Horizontal on Desktop */}
+                                    <div className="p-6">
+                                        <div className="flex flex-col md:flex-row gap-6 items-center md:items-start text-center md:text-left">
+                                            {/* Left: Large Photo */}
+                                            <div className="flex-shrink-0">
                                                 <div className="relative group">
                                                     {/* Photo Glow */}
                                                     <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl blur-xl opacity-50 group-hover:opacity-75 transition-opacity"></div>
 
-                                                    {/* Photo Frame */}
-                                                    <div className="relative w-48 h-48 rounded-3xl overflow-hidden border-4 border-white shadow-2xl transform group-hover:scale-105 transition-transform">
+                                                    {/* Photo Frame - Large */}
+                                                    <div className="relative w-72 h-80 rounded-3xl overflow-hidden border-4 border-white shadow-2xl transform group-hover:scale-105 transition-transform">
                                                         {result.profile_image ? (
                                                             <img
-                                                                src={result.profile_image}
+                                                                src={result.profile_image.startsWith('http') ? result.profile_image : `http://localhost:8000${result.profile_image}`}
                                                                 alt={result.full_name}
                                                                 className="w-full h-full object-cover"
                                                             />
                                                         ) : (
                                                             <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center">
-                                                                <User size={64} className="text-white" />
+                                                                <User size={100} className="text-white" />
                                                             </div>
                                                         )}
                                                     </div>
 
                                                     {/* Verified Badge on Photo */}
-                                                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-green-500 text-white px-4 py-1 rounded-full text-xs font-bold shadow-lg flex items-center gap-1">
+                                                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-green-500 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg flex items-center gap-2 whitespace-nowrap">
                                                         <CheckCircle size={14} />
-                                                        ACTIVE
+                                                        {result.status?.toUpperCase() || 'ACTIVE'}
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {/* Details Section */}
-                                            <div className="md:col-span-2 space-y-6">
-                                                {/* Name */}
+                                            {/* Right: Details Section */}
+                                            <div className="flex-1 space-y-4 w-full">
+                                                {/* Name & ID */}
                                                 <div>
-                                                    <h3 className="text-4xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+                                                    <h3 className="text-3xl md:text-4xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-1 break-words">
                                                         {result.full_name}
                                                     </h3>
-                                                    <p className="text-2xl font-bold text-purple-600">
+                                                    <p className="text-xl md:text-2xl font-bold text-purple-600">
                                                         {result.admission_number}
                                                     </p>
                                                 </div>
 
-                                                {/* Info Grid */}
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-2xl p-4 border border-purple-200 dark:border-purple-700">
-                                                        <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 mb-2">
+                                                {/* Info Grid - Compact */}
+                                                <div className="grid grid-cols-1 gap-3">
+                                                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-700">
+                                                        <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 mb-1">
                                                             <Building size={18} />
-                                                            <span className="text-xs font-bold uppercase">School</span>
+                                                            <span className="text-xs font-bold uppercase">School/Department</span>
                                                         </div>
-                                                        <p className="font-bold text-lg">{result.school || 'N/A'}</p>
+                                                        <p className="font-bold text-xl">{result.school || 'N/A'}</p>
                                                     </div>
 
-                                                    <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-2xl p-4 border border-blue-200 dark:border-blue-700">
-                                                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-2">
+                                                    <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-700">
+                                                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
                                                             <Shield size={18} />
-                                                            <span className="text-xs font-bold uppercase">Status</span>
+                                                            <span className="text-xs font-bold uppercase">Account Status</span>
                                                         </div>
-                                                        <p className="font-bold text-lg capitalize">{result.status || 'Active'}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-3 h-3 rounded-full ${result.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                                                            <p className="font-bold text-xl capitalize">{result.status || 'Active'}</p>
+                                                        </div>
                                                     </div>
 
-                                                    <div className="bg-gradient-to-br from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-2xl p-4 border border-pink-200 dark:border-pink-700">
-                                                        <div className="flex items-center gap-2 text-pink-600 dark:text-pink-400 mb-2">
+                                                    <div className="bg-gradient-to-br from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-pink-200 dark:border-pink-700">
+                                                        <div className="flex items-center gap-2 text-pink-600 dark:text-pink-400 mb-1">
                                                             <Calendar size={18} />
-                                                            <span className="text-xs font-bold uppercase">Admitted</span>
+                                                            <span className="text-xs font-bold uppercase">Last Accessed</span>
                                                         </div>
-                                                        <p className="font-bold text-lg">{result.admission_date || 'N/A'}</p>
-                                                    </div>
-
-                                                    <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-2xl p-4 border border-purple-200 dark:border-purple-700">
-                                                        <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 mb-2">
-                                                            <Hash size={18} />
-                                                            <span className="text-xs font-bold uppercase">ID</span>
-                                                        </div>
-                                                        <p className="font-bold text-lg font-mono">{result.id}</p>
+                                                        <p className="font-bold text-xl">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                                                     </div>
                                                 </div>
 
-                                                {/* Footer Note */}
-                                                <div className="bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 rounded-xl p-4 border-l-4 border-purple-600">
-                                                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                                                {/* Footer Note - Compact */}
+                                                <div className="bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 rounded-lg p-3 border-l-4 border-purple-600">
+                                                    <p className="text-xs text-gray-700 dark:text-gray-300">
                                                         <span className="font-bold">⚠️ Official Document:</span> This card is property of Riara University.
                                                         If found, please return to Security Office.
                                                     </p>
@@ -312,13 +307,13 @@ export default function StudentVerification() {
                                         </div>
                                     </div>
 
-                                    {/* Card Footer */}
-                                    <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 px-8 py-4">
+                                    {/* Card Footer - Compact */}
+                                    <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 px-6 py-3">
                                         <div className="flex justify-between items-center text-white">
-                                            <p className="text-sm font-medium">© 2026 Riara University • Developed by KKDES</p>
+                                            <p className="text-xs font-medium">© 2026 Riara University</p>
                                             <div className="flex items-center gap-2">
                                                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                                                <span className="text-sm font-bold">VERIFIED & ACTIVE</span>
+                                                <span className="text-xs font-bold">VERIFIED & ACTIVE</span>
                                             </div>
                                         </div>
                                     </div>

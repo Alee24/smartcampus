@@ -8,7 +8,7 @@ import os
 DATABASE_URL = os.getenv("DATABASE_URL")
 # Adjust for asyncpg if needed: postgresql+asyncpg://...
 # Adjust for Async MySQL: mysql+aiomysql://root:@localhost:3306/gatepass
-ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://") if DATABASE_URL else "mysql+aiomysql://root:@127.0.0.1:3306/gatepass"
+ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://") if DATABASE_URL else "mysql+aiomysql://root:@127.0.0.1:3306/gatepass_v2"
 
 engine = create_async_engine(ASYNC_DATABASE_URL, echo=True, future=True)
 

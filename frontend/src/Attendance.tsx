@@ -71,21 +71,53 @@ function StudentView() {
     useEffect(() => {
         let scanner: Html5Qrcode | null = null;
         if (cameraActive) {
-            scanner = new Html5Qrcode("reader");
-            scanner.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: 250 },
-                (decodedText) => {
-                    handleScan(decodedText)
+            const initScanner = async () => {
+                try {
+                    // Check if camera permission is granted first
+                    const devices = await navigator.mediaDevices.enumerateDevices()
+                    const hasCamera = devices.some(d => d.kind === 'videoinput')
+
+                    if (!hasCamera) {
+                        setStatus({ type: 'error', msg: 'No camera found on this device' })
+                        setCameraActive(false)
+                        return
+                    }
+
+                    scanner = new Html5Qrcode("reader");
+                    await scanner.start(
+                        { facingMode: "environment" },
+                        { fps: 10, qrbox: 250 },
+                        (decodedText) => {
+                            handleScan(decodedText)
+                            setCameraActive(false)
+                            scanner?.stop().catch(console.error)
+                        },
+                        () => { } // Ignore errors while scanning
+                    )
+                } catch (err: any) {
+                    console.error("Camera error:", err)
+
+                    // Provide specific error messages
+                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                        setStatus({
+                            type: 'error',
+                            msg: '📷 Camera permission denied. Please allow camera access in your browser settings and try again.'
+                        })
+                    } else if (err.name === 'NotFoundError') {
+                        setStatus({ type: 'error', msg: 'No camera found on this device' })
+                    } else if (err.name === 'NotReadableError') {
+                        setStatus({ type: 'error', msg: 'Camera is being used by another application' })
+                    } else {
+                        setStatus({
+                            type: 'error',
+                            msg: 'Could not access camera. Please check permissions and try again.'
+                        })
+                    }
                     setCameraActive(false)
-                    scanner?.stop().catch(console.error)
-                },
-                () => { } // Ignore errors while scanning
-            ).catch(err => {
-                console.error(err)
-                setStatus({ type: 'error', msg: 'Could not access camera. Please allow permissions.' })
-                setCameraActive(false)
-            })
+                }
+            }
+
+            initScanner()
         }
         return () => {
             if (scanner && scanner.isScanning) {

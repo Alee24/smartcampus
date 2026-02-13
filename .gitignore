@@ -10,3 +10,13 @@ venv
 .idea
 .vscode
 coverage
+
+# Gatepass specific ignores
+backend/static/profiles/*
+!backend/static/profiles/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/*.sqlite
+backend/*.db
+migrations/
+*.log

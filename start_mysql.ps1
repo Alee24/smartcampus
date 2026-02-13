@@ -1,27 +1,34 @@
-# Start MySQL Service
+
+# Start MySQL Service (XAMPP)
 # Right-click this file and select "Run with PowerShell as Administrator"
 
-Write-Host "Starting MySQL80 service..." -ForegroundColor Cyan
+Write-Host "Starting MySQL (XAMPP)..." -ForegroundColor Cyan
 
 try {
-    Start-Service MySQL80
-    Write-Host "MySQL80 started successfully!" -ForegroundColor Green
-    
-    # Verify it's running
-    $service = Get-Service MySQL80
-    Write-Host "`nService Status: $($service.Status)" -ForegroundColor Yellow
-    
-    if ($service.Status -eq "Running") {
-        Write-Host "`n✓ MySQL is now running!" -ForegroundColor Green
-        Write-Host "You can now login to the Smart Campus system." -ForegroundColor White
+    # Check if already running
+    $process = Get-Process mysqld -ErrorAction SilentlyContinue
+    if ($process) {
+        Write-Host "MySQL is already running (PID: $($process.Id))" -ForegroundColor Green
+    }
+    else {
+        Write-Host "Launching mysqld..." -ForegroundColor Yellow
+        Start-Process "C:\xampp\mysql\bin\mysqld.exe" -ArgumentList "--defaults-file=C:\xampp\mysql\bin\my.ini", "--standalone" -WindowStyle Hidden
+        
+        Start-Sleep -Seconds 3
+        
+        $process = Get-Process mysqld -ErrorAction SilentlyContinue
+        if ($process) {
+            Write-Host "MySQL started successfully!" -ForegroundColor Green
+        }
+        else {
+            Write-Host "Failed to verify MySQL start. Check logs." -ForegroundColor Red
+        }
     }
 }
 catch {
-    Write-Host "`n✗ Failed to start MySQL80" -ForegroundColor Red
+    Write-Host "`n✗ Failed to start MySQL" -ForegroundColor Red
     Write-Host "Error: $_" -ForegroundColor Red
-    Write-Host "`nPlease run this script as Administrator:" -ForegroundColor Yellow
-    Write-Host "Right-click → Run with PowerShell (Administrator)" -ForegroundColor Yellow
 }
 
-Write-Host "`nPress any key to exit..."
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+Write-Host "`nDone."
+Start-Sleep -Seconds 2

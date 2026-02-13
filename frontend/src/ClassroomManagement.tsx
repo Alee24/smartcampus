@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
-    Building, QrCode, RefreshCw, Download, Users, Clock,
-    CheckCircle, AlertCircle, Activity, MapPin, Maximize2, Wifi, XCircle, Printer
+    Building, QrCode, RefreshCw, Clock,
+    CheckCircle, AlertCircle, Activity, MapPin, Wifi, XCircle, Printer
 } from 'lucide-react'
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
@@ -20,6 +20,7 @@ interface Classroom {
     current_class?: string
     total_scans_today?: number
     is_active?: boolean
+    amenities?: string[]
 }
 
 interface PrintableRoom {
@@ -38,6 +39,10 @@ export default function ClassroomManagement() {
     const [loading, setLoading] = useState(true)
     const [generating, setGenerating] = useState(false)
     const [downloading, setDownloading] = useState(false)
+    const [editingRoom, setEditingRoom] = useState<Classroom | null>(null)
+    const [amenityOptions, setAmenityOptions] = useState<string[]>([])
+    // Mode switched to inline, so showEditModal is deprecated/removed logic
+    const [showEditModal, setShowEditModal] = useState(false)
 
     // Stats
     const [stats, setStats] = useState({
@@ -49,6 +54,7 @@ export default function ClassroomManagement() {
 
     useEffect(() => {
         fetchClassrooms()
+        fetchAmenityOptions()
         fetchPrintableData() // Fetch rich data for PDFs
 
         // Auto-refresh every 2 seconds for near real-time updates
@@ -146,6 +152,21 @@ export default function ClassroomManagement() {
         } catch (e) {
             console.error(e)
             alert("Error deactivating system")
+        }
+    }
+
+    const fetchAmenityOptions = async () => {
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/timetable/amenities/options', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setAmenityOptions(data.amenities)
+            }
+        } catch (err) {
+            console.error(err)
         }
     }
 
@@ -344,6 +365,49 @@ export default function ClassroomManagement() {
         }
     }
 
+    const handleEditRoom = (room: Classroom) => {
+        setEditingRoom(room)
+        // setShowEditModal(true) // Removed to prevent double modal/inline issue
+    }
+
+    const handleUpdateRoom = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!editingRoom) return
+
+        try {
+            const token = localStorage.getItem('token')
+            const formData = new FormData(e.target as HTMLFormElement)
+
+            const updateData = {
+                room_name: formData.get('room_name'),
+                building: formData.get('building'),
+                floor: formData.get('floor'),
+                capacity: parseInt(formData.get('capacity') as string)
+            }
+
+            const res = await fetch(`/api/timetable/classrooms/${editingRoom.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updateData)
+            })
+
+            if (res.ok) {
+                alert('✓ Room updated successfully!')
+                setShowEditModal(false)
+                setEditingRoom(null)
+                fetchClassrooms()
+            } else {
+                alert('Failed to update room')
+            }
+        } catch (e) {
+            console.error(e)
+            alert('Error updating room')
+        }
+    }
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen">
@@ -490,131 +554,271 @@ export default function ClassroomManagement() {
                 </div>
             </div>
 
-            {/* Classrooms Grid (Live & Auto-Sorted) */}
+            {/* Classrooms Grid (Sorted by Usage) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative">
                 {[...classrooms]
                     .sort((a, b) => {
-                        // Priority: Active -> Recent -> Alphabetical
+                        // Priority: Most scans -> Active -> Recent -> Alphabetical
+                        const scansA = a.total_scans_today || 0
+                        const scansB = b.total_scans_today || 0
+                        if (scansA !== scansB) return scansB - scansA
+
                         if (a.is_active && !b.is_active) return -1
                         if (!a.is_active && b.is_active) return 1
+
                         const timeA = new Date(a.last_attendance || 0).getTime()
                         const timeB = new Date(b.last_attendance || 0).getTime()
                         if (timeA !== timeB) return timeB - timeA
+
                         return a.room_code.localeCompare(b.room_code)
                     })
-                    .map((room) => (
-                        <div
-                            key={room.id}
-                            className={`glass-card p-6 border-2 transition-all duration-500 relative overflow-hidden ${room.is_active
-                                ? 'border-green-500 bg-green-50 dark:bg-green-900/10 shadow-[0_0_40px_-10px_rgba(34,197,94,0.4)] order-first scale-100 z-10'
-                                : 'border-red-200 dark:border-red-800 bg-opacity-50'
-                                }`}
-                        >
-                            {/* Live Indicator Overlay */}
-                            {room.is_active && (
-                                <div className="absolute top-0 right-0 p-4 z-20">
-                                    <span className="relative flex h-3 w-3">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                                    </span>
-                                </div>
-                            )}
+                    .map((room) => {
+                        const isEditing = editingRoom?.id === room.id
 
-                            {/* Header */}
-                            <div className="flex items-start justify-between mb-4 relative z-10">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="text-2xl font-black tracking-tight">{room.room_code}</h3>
-                                        {room.is_active ? (
-                                            <span className="px-2 py-0.5 bg-green-600 text-white text-[10px] font-black uppercase tracking-widest rounded-md shadow-sm animate-pulse">
-                                                LIVE
-                                            </span>
-                                        ) : (
-                                            <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 text-[10px] font-bold uppercase tracking-widest rounded-md border border-gray-200 dark:border-gray-700">
-                                                IDLE
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-sm font-medium text-[var(--text-secondary)]">{room.room_name}</p>
-                                </div>
-                                {(room.qr_code || printableRooms.find(p => p.room_code === room.room_code)) && (
-                                    <button
-                                        onClick={() => downloadSinglePoster(room.room_code)}
-                                        className="p-2 bg-gray-50 dark:bg-gray-800 hover:bg-gray-200 rounded-lg transition-colors border border-gray-200 dark:border-gray-700 group/btn"
-                                        title="Download Poster PDF"
-                                    >
-                                        <Printer size={16} className="group-hover/btn:text-indigo-600" />
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Active Session Highlight Card */}
-                            {room.is_active && (
-                                <div className="mb-6 p-4 bg-green-100/80 dark:bg-green-900/40 rounded-2xl border border-green-200 dark:border-green-800 animate-in slide-in-from-bottom-2 fade-in duration-500">
-                                    <div className="flex items-center gap-2 text-green-700 dark:text-green-300 font-bold text-xs uppercase tracking-widest mb-2 opacity-80">
-                                        <Wifi size={14} className="animate-pulse" /> Active Session
-                                    </div>
-                                    <p className="font-extrabold text-xl leading-tight mb-3 text-green-900 dark:text-green-100 tracking-tight">
-                                        {room.current_class || "Ad-hoc Scan"}
-                                    </p>
-                                    <div className="grid grid-cols-2 gap-2 border-t border-green-200 dark:border-green-800 pt-3">
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase mb-0.5">Scanned By</span>
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                                                <span className="text-sm font-mono font-black">{room.last_student_adm || "N/A"}</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase mb-0.5">Total Today</span>
-                                            <span className="text-sm font-mono font-black">{room.total_scans_today}</span>
-                                        </div>
-                                    </div>
-                                    <div className="mt-3 flex justify-center">
-                                        <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-white/50 dark:bg-black/20 px-3 py-1 rounded-full flex items-center gap-2">
-                                            <Clock size={12} /> {new Date(room.last_attendance || Date.now()).toLocaleTimeString()}
+                        return (
+                            <div
+                                key={room.id}
+                                className={`glass-card border-2 transition-all duration-500 relative overflow-hidden ${isEditing ? 'col-span-full lg:col-span-2' : ''
+                                    } ${room.is_active
+                                        ? 'border-green-500 bg-green-50 dark:bg-green-900/10 shadow-[0_0_40px_-10px_rgba(34,197,94,0.4)] order-first scale-100 z-10'
+                                        : 'border-red-200 dark:border-red-800 bg-opacity-50'
+                                    }`}
+                            >
+                                {/* Live Indicator Overlay */}
+                                {room.is_active && (
+                                    <div className="absolute top-0 right-0 p-4 z-20">
+                                        <span className="relative flex h-3 w-3">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                                         </span>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {/* Details (Only show if not active to reduce clutter, or minimal) */}
-                            {!room.is_active && (
-                                <div className="space-y-3 mb-6">
-                                    <div className="flex items-center gap-3 text-xs font-medium text-[var(--text-secondary)]">
-                                        <div className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] flex items-center justify-center">
-                                            <MapPin size={14} />
+                                {!isEditing ? (
+                                    /* View Mode */
+                                    <div className="p-6 cursor-pointer" onClick={() => handleEditRoom(room)}>
+                                        {/* Header */}
+                                        <div className="flex items-start justify-between mb-4 relative z-10">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <h3 className="text-2xl font-black tracking-tight">{room.room_code}</h3>
+                                                    {room.is_active ? (
+                                                        <span className="px-2 py-0.5 bg-green-600 text-white text-[10px] font-black uppercase tracking-widest rounded-md shadow-sm animate-pulse">
+                                                            LIVE
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 text-[10px] font-bold uppercase tracking-widest rounded-md border border-gray-200 dark:border-gray-700">
+                                                            IDLE
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm font-medium text-[var(--text-secondary)]">{room.room_name}</p>
+                                            </div>
+                                            {(room.qr_code || printableRooms.find(p => p.room_code === room.room_code)) && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); downloadSinglePoster(room.room_code); }}
+                                                    className="p-2 bg-gray-50 dark:bg-gray-800 hover:bg-gray-200 rounded-lg transition-colors border border-gray-200 dark:border-gray-700 group/btn"
+                                                    title="Download Poster PDF"
+                                                >
+                                                    <Printer size={16} className="group-hover/btn:text-indigo-600" />
+                                                </button>
+                                            )}
                                         </div>
-                                        <div className="flex flex-col">
-                                            <span className="uppercase text-[10px] font-bold opacity-50">Location</span>
-                                            <span>{room.building} • Flr {room.floor}</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-xs font-medium text-[var(--text-secondary)]">
-                                        <div className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] flex items-center justify-center">
-                                            <Activity size={14} />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="uppercase text-[10px] font-bold opacity-50">Usage</span>
-                                            <span>{room.total_scans_today || 0} Scans Today</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
-                            {/* QR Code */}
-                            {(!room.is_active && room.qr_code) && (
-                                <div className="mt-auto group cursor-pointer" onClick={() => downloadSinglePoster(room.room_code)}>
-                                    <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm group-hover:shadow-md transition-all relative">
-                                        <img src={room.qr_code} className="w-full h-32 object-contain opacity-80 group-hover:opacity-100 transition-opacity" alt="QR" />
-                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded-xl">
-                                            <Printer className="text-black drop-shadow-sm" size={24} />
+                                        {/* Active Session Highlight Card */}
+                                        {room.is_active && (
+                                            <div className="mb-6 p-4 bg-green-100/80 dark:bg-green-900/40 rounded-2xl border border-green-200 dark:border-green-800 animate-in slide-in-from-bottom-2 fade-in duration-500">
+                                                <div className="flex items-center gap-2 text-green-700 dark:text-green-300 font-bold text-xs uppercase tracking-widest mb-2 opacity-80">
+                                                    <Wifi size={14} className="animate-pulse" /> Active Session
+                                                </div>
+                                                <p className="font-extrabold text-xl leading-tight mb-3 text-green-900 dark:text-green-100 tracking-tight">
+                                                    {room.current_class || "Ad-hoc Scan"}
+                                                </p>
+                                                <div className="grid grid-cols-2 gap-2 border-t border-green-200 dark:border-green-800 pt-3">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase mb-0.5">Scanned By</span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                                            <span className="text-sm font-mono font-black">{room.last_student_adm || "N/A"}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-[10px] text-green-600 dark:text-green-400 font-bold uppercase mb-0.5">Total Today</span>
+                                                        <span className="text-sm font-mono font-black">{room.total_scans_today}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-3 flex justify-center">
+                                                    <span className="text-xs font-bold text-green-700 dark:text-green-300 bg-white/50 dark:bg-black/20 px-3 py-1 rounded-full flex items-center gap-2">
+                                                        <Clock size={12} /> {new Date(room.last_attendance || Date.now()).toLocaleTimeString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Details (Only show if not active to reduce clutter, or minimal) */}
+                                        {!room.is_active && (
+                                            <div className="space-y-3 mb-6">
+                                                <div className="flex items-center gap-3 text-xs font-medium text-[var(--text-secondary)]">
+                                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] flex items-center justify-center">
+                                                        <MapPin size={14} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="uppercase text-[10px] font-bold opacity-50">Location</span>
+                                                        <span>{room.building} • Flr {room.floor}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-xs font-medium text-[var(--text-secondary)]">
+                                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] flex items-center justify-center">
+                                                        <Activity size={14} />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="uppercase text-[10px] font-bold opacity-50">Usage</span>
+                                                        <span>{room.total_scans_today || 0} Scans Today</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* QR Code */}
+                                        {(!room.is_active && room.qr_code) && (
+                                            <div className="mt-auto group" onClick={(e) => { e.stopPropagation(); downloadSinglePoster(room.room_code); }}>
+                                                <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm group-hover:shadow-md transition-all relative">
+                                                    <img src={room.qr_code} className="w-full h-32 object-contain opacity-80 group-hover:opacity-100 transition-opacity" alt="QR" />
+                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded-xl">
+                                                        <Printer className="text-black drop-shadow-sm" size={24} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="mt-4 text-center text-xs text-[var(--text-secondary)] opacity-60">
+                                            Click to edit details
                                         </div>
                                     </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                                ) : (
+                                    /* Edit Mode */
+                                    <form onSubmit={handleUpdateRoom} className="p-6">
+                                        <div className="flex justify-between items-center mb-6">
+                                            <h3 className="text-xl font-bold text-[var(--text-primary)]">Edit {room.room_code}</h3>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingRoom(null)}
+                                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                                            >
+                                                <XCircle size={20} />
+                                            </button>
+                                        </div>
+
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Room Code</label>
+                                                <input
+                                                    name="room_code"
+                                                    type="text"
+                                                    defaultValue={room.room_code}
+                                                    required
+                                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary-500 outline-none"
+                                                    placeholder="e.g. LAB-101"
+                                                />
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Room Name</label>
+                                                <input
+                                                    name="room_name"
+                                                    defaultValue={room.room_name}
+                                                    required
+                                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary-500 outline-none"
+                                                    placeholder="e.g. Computer Lab 1"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Building</label>
+                                                <input
+                                                    name="building"
+                                                    defaultValue={room.building}
+                                                    required
+                                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary-500 outline-none"
+                                                    placeholder="e.g. Main"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Floor</label>
+                                                <input
+                                                    name="floor"
+                                                    defaultValue={room.floor}
+                                                    required
+                                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary-500 outline-none"
+                                                    placeholder="e.g. 2"
+                                                />
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Capacity</label>
+                                                <input
+                                                    name="capacity"
+                                                    type="number"
+                                                    defaultValue={room.capacity}
+                                                    required
+                                                    min="1"
+                                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary-500 outline-none"
+                                                    placeholder="e.g. 50"
+                                                />
+                                            </div>
+
+                                            {/* Amenities */}
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-3">Amenities</label>
+                                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                                    {amenityOptions.map((amenity) => (
+                                                        <label key={amenity} className="flex items-center gap-2 p-2 rounded-lg hover:bg-[var(--bg-surface)] cursor-pointer transition-colors">
+                                                            <input
+                                                                type="checkbox"
+                                                                name="amenities"
+                                                                value={amenity}
+                                                                defaultChecked={room.amenities?.includes(amenity)}
+                                                                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                                            />
+                                                            <span className="text-sm text-[var(--text-primary)]">{amenity}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="md:col-span-2 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+                                                <p className="text-sm text-blue-800 dark:text-blue-200">
+                                                    <strong>Usage Stats:</strong> {room.total_scans_today || 0} scans today
+                                                </p>
+                                                {room.last_attendance && (
+                                                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                                                        Last scan: {new Date(room.last_attendance).toLocaleString()}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-[var(--border-color)]">
+                                            <button
+                                                type="button"
+                                                onClick={() => { setEditingRoom(null); setShowEditModal(false); }}
+                                                className="px-6 py-3 rounded-xl text-[var(--text-secondary)] font-bold hover:bg-[var(--bg-primary)] transition-all"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                className="px-8 py-3 rounded-xl bg-[image:var(--gradient-primary)] text-white font-bold shadow-lg hover:shadow-primary-500/30 transition-all transform hover:-translate-y-1"
+                                            >
+                                                Update Room
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+                            </div>
+                        )
+                    })}
             </div>
 
             {/* Empty State */}
@@ -634,10 +838,113 @@ export default function ClassroomManagement() {
                 <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
                     <li>• <strong>Green rooms</strong> have recorded attendance recently (active)</li>
                     <li>• <strong>Red/Gray rooms</strong> have no recent activity (inactive)</li>
+                    <li>• <strong>Click any room card</strong> to edit its details (name, building, floor, capacity)</li>
+                    <li>• <strong>Rooms are sorted</strong> by most scans today (most used first)</li>
                     <li>• Click "Activate All" to generate secure network QR codes for all rooms.</li>
                     <li>• Use "Download All Posters" to get high-quality A3 PDF posters for printing.</li>
                 </ul>
             </div>
+
+            {/* Edit Room Modal */}
+            {showEditModal && editingRoom && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto" onClick={() => setShowEditModal(false)}>
+                    <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-lg rounded-2xl shadow-2xl animate-fade-in my-8 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex-shrink-0 p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-[image:var(--gradient-primary)] text-white rounded-t-2xl">
+                            <h3 className="text-2xl font-bold">Edit Classroom</h3>
+                            <button onClick={() => setShowEditModal(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors">
+                                <XCircle size={24} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleUpdateRoom} className="p-6 space-y-4 overflow-y-auto flex-1">
+                            <div>
+                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Room Code</label>
+                                <input
+                                    type="text"
+                                    value={editingRoom.room_code}
+                                    disabled
+                                    className="w-full p-3 rounded-xl bg-gray-100 dark:bg-gray-800 border border-[var(--border-color)] text-[var(--text-secondary)] cursor-not-allowed"
+                                />
+                                <p className="text-xs text-[var(--text-secondary)] mt-1">Room code cannot be changed</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Room Name</label>
+                                <input
+                                    name="room_name"
+                                    defaultValue={editingRoom.room_name}
+                                    required
+                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary-500 outline-none"
+                                    placeholder="e.g. Computer Lab 1"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Building</label>
+                                    <input
+                                        name="building"
+                                        defaultValue={editingRoom.building}
+                                        required
+                                        className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary-500 outline-none"
+                                        placeholder="e.g. Main"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Floor</label>
+                                    <input
+                                        name="floor"
+                                        defaultValue={editingRoom.floor}
+                                        required
+                                        className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary-500 outline-none"
+                                        placeholder="e.g. 2"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Capacity</label>
+                                <input
+                                    name="capacity"
+                                    type="number"
+                                    defaultValue={editingRoom.capacity}
+                                    required
+                                    min="1"
+                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary-500 outline-none"
+                                    placeholder="e.g. 50"
+                                />
+                            </div>
+
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
+                                <p className="text-sm text-blue-800 dark:text-blue-200">
+                                    <strong>Usage Stats:</strong> {editingRoom.total_scans_today || 0} scans today
+                                </p>
+                                {editingRoom.last_attendance && (
+                                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                                        Last scan: {new Date(editingRoom.last_attendance).toLocaleString()}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-color)] flex-shrink-0 sticky bottom-0 bg-[var(--bg-surface)] -mx-6 px-6 pb-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowEditModal(false)}
+                                    className="px-6 py-3 rounded-xl text-[var(--text-secondary)] font-bold hover:bg-[var(--bg-primary)] transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-8 py-3 rounded-xl bg-[image:var(--gradient-primary)] text-white font-bold shadow-lg hover:shadow-primary-500/30 transition-all transform hover:-translate-y-1"
+                                >
+                                    Update Room
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

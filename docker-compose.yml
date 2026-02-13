@@ -2,21 +2,24 @@ version: '3.8'
 
 services:
   db:
-    image: ankane/pgvector:v0.5.1 # PostgreSQL with vector extension
+    image: mysql:8.0
+    container_name: gatepass_db
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: gatepass
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: gatepass_v2
+      MYSQL_PASSWORD: user_password
+      MYSQL_USER: gatepass_user
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     ports:
-      - "5432:5432"
+      - "3306:3306"
     networks:
       - gatepass-net
     restart: always
 
   redis:
     image: redis:alpine
+    container_name: gatepass_redis
     ports:
       - "6379:6379"
     networks:
@@ -26,37 +29,34 @@ services:
   backend:
     build: ./backend
     container_name: gatepass_backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
-      - ./backend:/app
+      - ./backend/static:/app/static
+      - ./backend/uploads:/app/uploads
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://admin:password@db:5432/gatepass
+      DATABASE_URL: mysql+aiomysql://gatepass_user:user_password@db:3306/gatepass_v2
       REDIS_URL: redis://redis:6379
-      SECRET_KEY: supersecretkey
+      SECRET_KEY: supersecretkey # Update this in production
       ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      ACCESS_TOKEN_EXPIRE_MINUTES: 43200 # 30 Days
     depends_on:
       - db
       - redis
     networks:
       - gatepass-net
+    restart: always
 
   frontend:
     build: ./frontend
     container_name: gatepass_frontend
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "8080:80"
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: /api
     networks:
       - gatepass-net
-    # In production, we'd build static files and serve via Nginx, 
-    # but for dev we use the dev server.
+    restart: always
 
   ai-face:
     build: ./ai_services/face_recognition
@@ -65,11 +65,11 @@ services:
       - "8001:8001"
     networks:
       - gatepass-net
-    restart: on-failure
+    restart: always
 
 networks:
   gatepass-net:
     driver: bridge
 
 volumes:
-  postgres_data:
+  mysql_data:

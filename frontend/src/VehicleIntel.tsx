@@ -1,116 +1,268 @@
 import { useState, useEffect } from 'react'
-import { Car, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Car, AlertTriangle, RefreshCw, Search, ArrowDownCircle, ArrowUpCircle, Clock, LogIn, LogOut, MoreHorizontal, CheckCircle } from 'lucide-react'
 
 export default function VehicleIntel() {
-    const [vehicles, setVehicles] = useState<any[]>([])
+    const [vehicles, setVehicles] = useState<any[]>([]) // Registered Vehicles
+    const [logs, setLogs] = useState<any[]>([])         // Activity Logs
     const [loading, setLoading] = useState(true)
+    const [searchQuery, setSearchQuery] = useState('')
+    const [viewMode, setViewMode] = useState<'fleet' | 'logs'>('fleet')
 
-    const fetchLogs = () => {
+    const fetchData = async () => {
         const token = localStorage.getItem('token')
-        fetch('/api/gate/vehicle-logs', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        })
-            .then(res => res.json())
-            .then(data => {
-                if (Array.isArray(data)) {
-                    setVehicles(data)
-                }
-                setLoading(false)
-            })
-            .catch(err => {
-                console.error("Failed to fetch vehicle logs", err)
-                setLoading(false)
-            })
+        const headers = { 'Authorization': `Bearer ${token}` }
+
+        try {
+            const [vehRes, logRes] = await Promise.all([
+                fetch('/api/gate/vehicles', { headers }),
+                fetch('/api/gate/vehicle-logs', { headers })
+            ])
+
+            if (vehRes.ok) setVehicles(await vehRes.json())
+            if (logRes.ok) setLogs(await logRes.json())
+
+            setLoading(false)
+        } catch (err) {
+            console.error("Failed to fetch data", err)
+            setLoading(false)
+        }
     }
 
     useEffect(() => {
-        fetchLogs()
-        // Poll every 5 seconds for live updates
-        const interval = setInterval(fetchLogs, 5000)
+        fetchData()
+        const interval = setInterval(fetchData, 5000)
         return () => clearInterval(interval)
     }, [])
+
+    const handleAction = async (action: 'entry' | 'exit', vehicle: any) => {
+        const token = localStorage.getItem('token')
+        const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+
+        if (action === 'entry') {
+            if (!confirm(`Mark ${vehicle.plate_number} as Entered?`)) return
+            try {
+                await fetch('/api/gate/manual-vehicle-entry', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        plate_number: vehicle.plate_number,
+                        driver_name: vehicle.driver_name,
+                        driver_contact: vehicle.driver_contact,
+                        driver_id_number: vehicle.driver_id_number,
+                        passengers: 1
+                    })
+                })
+                fetchData() // Refresh immediately
+            } catch (e) { alert("Network Error") }
+        } else {
+            if (!confirm(`Mark ${vehicle.plate_number} as Exited?`)) return
+            try {
+                await fetch('/api/gate/vehicle-exit', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ plate_number: vehicle.plate_number })
+                })
+                fetchData()
+            } catch (e) { alert("Network Error") }
+        }
+    }
+
+    // Merge Data for Fleet View
+    const fleetList = vehicles.map(v => {
+        // Find latest log
+        const latestLog = logs.find(l => l.plate === v.plate_number)
+        const isParked = latestLog && !latestLog.exit_time
+        return {
+            ...v,
+            latestLog,
+            status: isParked ? 'parked' : 'exited', // exited or never entered
+            lastSeen: latestLog ? latestLog.entry_time : null
+        }
+    }).filter(v => {
+        const q = searchQuery.toLowerCase()
+        return !q || v.plate_number.toLowerCase().includes(q) || v.make?.toLowerCase().includes(q) || v.driver_name?.toLowerCase().includes(q)
+    })
+
+    // Filter for Logs View
+    const filteredLogs = logs.filter(v => {
+        const q = searchQuery.toLowerCase()
+        return !q || v.plate?.toLowerCase().includes(q) || v.make?.toLowerCase().includes(q)
+    })
+
+    // Stats
+    const parkedCount = logs.filter(v => !v.exit_time).length
+    const exitedCount = logs.filter(v => v.exit_time).length
+    const totalRegistered = vehicles.length
 
     return (
         <div className="animate-fade-in p-2">
             <header className="mb-8 flex justify-between items-end">
                 <div>
                     <h2 className="text-3xl font-bold">Vehicle Intelligence</h2>
-                    <p className="text-[var(--text-secondary)]">AI-Powered License Plate & Make Recognition</p>
+                    <p className="text-[var(--text-secondary)]">Fleet Management & Activity Logs</p>
                 </div>
-                <button onClick={() => { setLoading(true); fetchLogs(); }} className="bg-blue-50 text-blue-600 p-2 rounded-lg hover:bg-blue-100 transition-colors" title="Refresh Logs">
-                    <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setViewMode(viewMode === 'fleet' ? 'logs' : 'fleet')}
+                        className="bg-white border border-[var(--border-color)] px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-50 transition-colors"
+                    >
+                        Switch to {viewMode === 'fleet' ? 'Activity Logs' : 'Fleet View'}
+                    </button>
+                    <button onClick={() => { setLoading(true); fetchData(); }} className="bg-blue-50 text-blue-600 p-2 rounded-lg hover:bg-blue-100 transition-colors">
+                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+                    </button>
+                </div>
             </header>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="glass-card p-4 border-l-4 border-blue-500">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-[var(--text-secondary)]">Registered Vehicles</p>
+                            <p className="text-3xl font-bold text-[var(--text-primary)]">{totalRegistered}</p>
+                        </div>
+                        <Car className="text-blue-500" size={32} />
+                    </div>
+                </div>
+                <div className="glass-card p-4 border-l-4 border-green-500">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-[var(--text-secondary)]">Currently Parked</p>
+                            <p className="text-3xl font-bold text-green-600">{parkedCount}</p>
+                        </div>
+                        <ArrowDownCircle className="text-green-500" size={32} />
+                    </div>
+                </div>
+                <div className="glass-card p-4 border-l-4 border-gray-500">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-[var(--text-secondary)]">Exited Today</p>
+                            <p className="text-3xl font-bold text-gray-600">{exitedCount}</p>
+                        </div>
+                        <ArrowUpCircle className="text-gray-500" size={32} />
+                    </div>
+                </div>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 <div className="col-span-2 glass-card p-0 overflow-hidden flex flex-col h-[600px]">
-                    <div className="p-4 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-surface)]/50 shrink-0">
-                        <h3 className="font-bold flex items-center gap-2"><Car size={18} /> Live Vehicle Logs</h3>
-                        <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                            Live Feed Active
-                        </span>
+                    <div className="p-4 border-b border-[var(--border-color)] bg-[var(--bg-surface)]/50 shrink-0">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold flex items-center gap-2">
+                                <Car size={18} /> {viewMode === 'fleet' ? 'Registered Fleet Status' : 'Vehicle Activity Logs'}
+                            </h3>
+                            {viewMode === 'logs' && (
+                                <span className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                    Live Feed
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Search Bar */}
+                        <div className="relative mb-3">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={18} />
+                            <input
+                                type="text"
+                                placeholder={viewMode === 'fleet' ? "Search Registered Fleet..." : "Search Logs..."}
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                            />
+                        </div>
                     </div>
+
                     <div className="overflow-y-auto flex-1 custom-scrollbar">
                         <table className="w-full text-left bg-[var(--bg-surface)]">
                             <thead className="text-xs text-[var(--text-secondary)] uppercase bg-[var(--bg-primary)] border-b border-[var(--border-color)] sticky top-0 z-10 backdrop-blur-md">
                                 <tr>
                                     <th className="p-4">Plate No.</th>
-                                    <th className="p-4">AI Analysis</th>
-                                    <th className="p-4">Confidence</th>
-                                    <th className="p-4">Snapshot</th>
-                                    <th className="p-4">Time</th>
+                                    <th className="p-4">Details</th>
+                                    <th className="p-4">{viewMode === 'fleet' ? 'Last Activity' : 'Timestamps'}</th>
                                     <th className="p-4">Status</th>
+                                    <th className="p-4 text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--border-color)]">
-                                {loading && vehicles.length === 0 ? (
-                                    <tr><td colSpan={6} className="p-8 text-center text-gray-400">Loading intelligence feed...</td></tr>
-                                ) : vehicles.length === 0 ? (
-                                    <tr><td colSpan={6} className="p-8 text-center text-gray-400">No vehicle entries detected.</td></tr>
+                                {viewMode === 'fleet' ? (
+                                    // FLEET VIEW
+                                    fleetList.length === 0 ? (
+                                        <tr><td colSpan={5} className="p-8 text-center text-gray-400">No registered vehicles found.</td></tr>
+                                    ) : (
+                                        fleetList.map((v, i) => (
+                                            <tr key={i} className="hover:bg-[var(--bg-primary)] transition-colors">
+                                                <td className="p-4 font-mono font-bold text-lg">{v.plate_number}</td>
+                                                <td className="p-4">
+                                                    <div className="font-bold text-sm">{v.make} {v.model}</div>
+                                                    <div className="text-xs text-[var(--text-secondary)]">{v.driver_name}</div>
+                                                </td>
+                                                <td className="p-4 text-sm font-mono text-[var(--text-secondary)]">
+                                                    {v.latestLog ? formatTime(v.lastSeen) : 'Never'}
+                                                </td>
+                                                <td className="p-4">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${v.status === 'parked' ? 'text-green-500 bg-green-500/10' : 'text-gray-500 bg-gray-500/10'
+                                                        }`}>
+                                                        {v.status === 'parked' ? 'PARKED' : 'OUT'}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 flex justify-center">
+                                                    {v.status === 'exited' ? (
+                                                        <button
+                                                            onClick={() => handleAction('entry', v)}
+                                                            className="flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            <LogIn size={14} /> Mark Entry
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleAction('exit', v)}
+                                                            className="flex items-center gap-1 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors"
+                                                        >
+                                                            <LogOut size={14} /> Mark Exit
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )
                                 ) : (
-                                    vehicles.map((v, i) => (
-                                        <tr key={v.id || i} className="hover:bg-[var(--bg-primary)] transition-colors animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${i * 50}ms` }}>
-                                            <td className="p-4 font-mono font-bold text-lg">{v.plate}</td>
-                                            <td className="p-4">
-                                                <div className="font-bold text-sm">{v.make}</div>
-                                                <div className="flex gap-2 mt-1 text-xs text-[var(--text-secondary)]">
-                                                    <span className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700">{v.color}</span>
-                                                    <span className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700">{v.passengers} Pax</span>
-                                                    {v.ai_data?.analysis?.type && <span className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700">{v.ai_data.analysis.type}</span>}
-                                                </div>
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="text-xs font-bold text-green-600 dark:text-green-400">
-                                                        {v.ai_data?.confidence || '98%'} Match
-                                                    </div>
-                                                    <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-green-500 rounded-full" style={{ width: v.ai_data?.confidence || '98%' }}></div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="p-4">
-                                                {v.image ? (
-                                                    <div className="group relative w-16 h-10">
-                                                        <img src={v.image} className="w-full h-full object-cover rounded border border-gray-200" alt="Car" />
-                                                        <div className="absolute inset-0 bg-black/50 hidden group-hover:flex items-center justify-center rounded cursor-pointer">
-                                                            <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-                                                        </div>
-                                                    </div>
-                                                ) : <span className="text-xs text-gray-400">No Img</span>}
-                                            </td>
-                                            <td className="p-4 text-sm text-[var(--text-secondary)] font-mono">{v.time}</td>
-                                            <td className="p-4">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${v.status === 'allowed' ? 'text-green-500 bg-green-500/10' :
-                                                    v.status === 'visitor' ? 'text-blue-500 bg-blue-500/10' :
-                                                        'text-red-500 bg-red-500/10'
-                                                    }`}>
-                                                    {v.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))
+                                    // LOGS VIEW
+                                    filteredLogs.length === 0 ? (
+                                        <tr><td colSpan={5} className="p-8 text-center text-gray-400">No logs found.</td></tr>
+                                    ) : (
+                                        filteredLogs.map((v, i) => {
+                                            const isParked = !v.exit_time
+                                            return (
+                                                <tr key={i} className="hover:bg-[var(--bg-primary)] transition-colors">
+                                                    <td className="p-4 font-mono font-bold text-lg">{v.plate}</td>
+                                                    <td className="p-4">
+                                                        <div className="font-bold text-sm">{v.make || 'Unknown'}</div>
+                                                        <div className="text-xs text-[var(--text-secondary)]">{v.driver_name}</div>
+                                                    </td>
+                                                    <td className="p-4 text-sm font-mono">
+                                                        <div className="flex items-center gap-1"><ArrowDownCircle size={12} className="text-green-500" /> {formatTime(v.time)}</div>
+                                                        {v.exit_time && <div className="flex items-center gap-1 mt-1"><ArrowUpCircle size={12} className="text-gray-500" /> {formatTime(v.exit_time)}</div>}
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${isParked ? 'text-green-500 bg-green-500/10' : 'text-gray-500 bg-gray-500/10'}`}>
+                                                            {isParked ? 'PARKED' : 'EXITED'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 text-center">
+                                                        {isParked && (
+                                                            <button
+                                                                onClick={() => handleAction('exit', { plate_number: v.plate })}
+                                                                className="text-red-500 hover:text-red-700 mx-auto"
+                                                            >
+                                                                <LogOut size={16} />
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })
+                                    )
                                 )}
                             </tbody>
                         </table>
@@ -120,7 +272,6 @@ export default function VehicleIntel() {
                 <div className="glass-card p-6 h-fit">
                     <h3 className="font-bold mb-4 flex items-center gap-2"><AlertTriangle size={18} className="text-yellow-500" /> Watchlist</h3>
                     <div className="space-y-3">
-                        {/* Static / Mock Watchlist for now */}
                         <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">
                             <div className="flex justify-between items-start">
                                 <div>
@@ -139,22 +290,27 @@ export default function VehicleIntel() {
                                 <span className="text-xs bg-yellow-500 text-black px-1 rounded">Warning</span>
                             </div>
                         </div>
-
-                        {/* Dynamic Flagged Vehicles? */}
-                        {vehicles.filter(v => v.status === 'flagged').map((v, i) => (
-                            <div key={i} className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 animate-pulse">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <div className="font-bold text-red-500">{v.plate}</div>
-                                        <div className="text-xs text-red-400 opacity-80">Check vehicle</div>
-                                    </div>
-                                    <span className="text-xs bg-red-500 text-white px-1 rounded">FLAGGED</span>
-                                </div>
-                            </div>
-                        ))}
                     </div>
                 </div>
             </div>
         </div>
     )
+}
+
+// Helper functions (kept)
+function formatTime(timestamp: string) {
+    if (!timestamp) return '-'
+    const date = new Date(timestamp)
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+}
+
+function calculateDuration(start: string, end: string) {
+    if (!start || !end) return '-'
+    const startTime = new Date(start).getTime()
+    const endTime = new Date(end).getTime()
+    const diff = endTime - startTime
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+    if (hours > 0) return `${hours}h ${minutes}m`
+    return `${minutes}m`
 }

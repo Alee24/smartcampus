@@ -3,7 +3,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from datetime import datetime
 from sqlmodel import select, func
 from app.database import get_session
-from app.models import User, AttendanceRecord, Gate, EntryLog, Vehicle, VehicleLog, SystemActivity
+from app.models import User, AttendanceRecord, Gate, EntryLog, Vehicle, VehicleLog, SystemActivity, Role
 
 from app.auth import get_current_user
 
@@ -35,21 +35,47 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session), curr
 
 @router.get("/kpi")
 async def get_kpi_data(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
-    current_year = datetime.utcnow().year
+    from datetime import timedelta
+    today = datetime.utcnow().date()
+    
     data = []
-    for month in range(1, 13):
-         start = datetime(current_year, month, 1)
-         if month == 12: end = datetime(current_year + 1, 1, 1)
-         else: end = datetime(current_year, month + 1, 1)
-         q1 = select(func.count(EntryLog.id)).where((EntryLog.entry_time >= start) & (EntryLog.entry_time < end))
-         c1 = (await session.exec(q1)).one()
-         q2 = select(func.count(VehicleLog.id)).where((VehicleLog.entry_time >= start) & (VehicleLog.entry_time < end))
-         c2 = (await session.exec(q2)).one()
-         data.append(c1 + c2)
-         
-    max_val = max(data) if max(data) > 0 else 1
+    labels = []
+    people_data = []
+    vehicle_data = []
+    
+    # Last 7 Days Trend
+    for i in range(6, -1, -1):
+        day = today - timedelta(days=i)
+        start = datetime.combine(day, datetime.min.time())
+        end = datetime.combine(day, datetime.max.time())
+        
+        # People Entries
+        q1 = select(func.count(EntryLog.id)).where((EntryLog.entry_time >= start) & (EntryLog.entry_time <= end))
+        c1 = (await session.exec(q1)).one()
+        
+        # Vehicle Entries
+        q2 = select(func.count(VehicleLog.id)).where((VehicleLog.entry_time >= start) & (VehicleLog.entry_time <= end))
+        c2 = (await session.exec(q2)).one()
+        
+        total = c1 + c2
+        data.append(total)
+        people_data.append(c1)
+        vehicle_data.append(c2)
+        labels.append(day.strftime("%a")) # Mon, Tue...
+
+    max_val = max(data) if data and max(data) > 0 else 10
+    # Normalize to 100% height
     normalized = [int((x / max_val) * 100) for x in data]
-    return {"raw": data, "normalized": normalized, "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]}
+    
+    return {
+        "raw": data,
+        "normalized": normalized,
+        "labels": labels,
+        "details": {
+            "people": people_data,
+            "vehicles": vehicle_data
+        }
+    }
 
 @router.get("/recent-logs")
 async def get_recent_logs(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
@@ -60,10 +86,6 @@ async def get_recent_logs(session: AsyncSession = Depends(get_session), current_
     # 2. Vehicle Entries
     v_stm = select(VehicleLog).order_by(VehicleLog.entry_time.desc()).limit(10)
     v_logs = (await session.exec(v_stm)).all()
-    
-    # 3. System Activity (New)
-    sa_stm = select(SystemActivity).order_by(SystemActivity.timestamp.desc()).limit(10)
-    sa_logs = (await session.exec(sa_stm)).all()
     
     combined = []
     
@@ -87,27 +109,6 @@ async def get_recent_logs(session: AsyncSession = Depends(get_session), current_
              "time": v.entry_time.strftime("%H:%M %p"),
              "status": "Vehicle Entry",
              "isAlert": False
-         })
-         
-    # Process System Activity
-    for sa in sa_logs:
-         actor_name = "System"
-         if sa.actor_id:
-             actor = await session.get(User, sa.actor_id)
-             if actor: actor_name = actor.full_name
-         
-         is_alert = "FAIL" in sa.action_type or "ALERT" in sa.action_type
-         
-         # Beautify Status
-         desc = sa.description
-         if len(desc) > 30: desc = desc[:30] + "..."
-         
-         combined.append({
-             "user": actor_name,
-             "time_obj": sa.timestamp,
-             "time": sa.timestamp.strftime("%H:%M %p"),
-             "status": desc,
-             "isAlert": is_alert
          })
          
     # Sort by time descend
@@ -167,4 +168,48 @@ async def get_guardian_dashboard(session: AsyncSession = Depends(get_session), c
     return {
         "guardian_name": current_user.full_name,
         "wards": ward_data
+    }
+
+@router.get("/analytics")
+async def get_analytics(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
+    from datetime import timedelta
+    
+    # 1. Active User Roles
+    # Correctly join with Role table to get role name
+    roles_q = select(Role.name, func.count(User.id)).where(User.role_id == Role.id).where(User.status == "active").group_by(Role.name)
+    roles_res = (await session.exec(roles_q)).all()
+    roles_data = [{"name": r, "value": c} for r, c in roles_res]
+    
+    # 2. Gate Usage (Last 30 Days)
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    
+    # Check-ins
+    q_in = select(Gate.name, func.count(EntryLog.id))\
+        .join(Gate)\
+        .where(EntryLog.entry_time >= thirty_days_ago)\
+        .group_by(Gate.name)
+    res_in = (await session.exec(q_in)).all()
+
+    # Check-outs
+    q_out = select(Gate.name, func.count(EntryLog.id))\
+        .join(Gate)\
+        .where(EntryLog.exit_time >= thirty_days_ago)\
+        .group_by(Gate.name)
+    res_out = (await session.exec(q_out)).all()
+    
+    # Merge results
+    gate_stats = {}
+    for name, count in res_in:
+        gate_stats.setdefault(name, {"checkins": 0, "checkouts": 0})
+        gate_stats[name]["checkins"] = count
+        
+    for name, count in res_out:
+        gate_stats.setdefault(name, {"checkins": 0, "checkouts": 0})
+        gate_stats[name]["checkouts"] = count
+        
+    gates_data = [{"name": k, "checkins": v["checkins"], "checkouts": v["checkouts"]} for k, v in gate_stats.items()]
+    
+    return {
+        "roles": roles_data,
+        "gates": gates_data
     }

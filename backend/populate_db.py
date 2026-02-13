@@ -108,36 +108,36 @@ async def populate():
                     await session.refresh(gate)
                 gates.append(gate)
 
-            # 3. Create 50 Students - DISABLED as per request
+            # 3. Create 50 Students
             students = []
-            # first_names = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth"]
-            # last_names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"]
-            # schools = ["Engineering", "Science", "Arts", "Business", "Law"]
+            first_names = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth"]
+            last_names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"]
+            schools = ["Engineering", "Science", "Arts", "Business", "Law"]
 
-            # for i in range(1, 51):
-            #     adm = f"STD{1000+i}"
-            #     res = await session.exec(select(User).where(User.admission_number == adm))
-            #     existing = res.first()
-            #     if not existing:
-            #         fname = f"{random.choice(first_names)} {random.choice(last_names)}"
-            #         user = User(
-            #             admission_number=adm,
-            #             full_name=fname,
-            #             email=f"{fname.replace(' ', '.').lower()}{i}@student.com",
-            #             school=random.choice(schools),
-            #             hashed_password=get_password_hash("Student123"),
-            #             role_id=roles["Student"].id,
-            #             status="active",
-            #             has_smartphone=random.choice([True, False])
-            #         )
-            #         session.add(user)
-            #         await session.commit()
-            #         await session.refresh(user)
-            #         students.append(user)
-            #     else:
-            #         students.append(existing)
+            for i in range(1, 51):
+                adm = f"STD{1000+i}"
+                res = await session.exec(select(User).where(User.admission_number == adm))
+                existing = res.first()
+                if not existing:
+                    fname = f"{random.choice(first_names)} {random.choice(last_names)}"
+                    user = User(
+                        admission_number=adm,
+                        full_name=fname,
+                        email=f"{fname.replace(' ', '.').lower()}{i}@student.com",
+                        school=random.choice(schools),
+                        hashed_password=get_password_hash("Student123"),
+                        role_id=roles["Student"].id,
+                        status="active",
+                        has_smartphone=random.choice([True, False])
+                    )
+                    session.add(user)
+                    await session.commit()
+                    await session.refresh(user)
+                    students.append(user)
+                else:
+                    students.append(existing)
             
-            # print(f"Ensured {len(students)} students.")
+            print(f"Ensured {len(students)} students.")
 
             # 4. Generate Traffic
             if len(students) > 0:

@@ -8,8 +8,15 @@ from app.routers import dashboard, users, gate_control, attendance, admin
 from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.orm import selectinload
 from contextlib import asynccontextmanager
 import os
+import asyncio
+import sys
+
+# Set Windows event loop policy for compatibility with aiomysql/asyncio on Windows
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # Create static directory if not exists
 os.makedirs("static/profiles", exist_ok=True)
@@ -236,7 +243,11 @@ async def emergency_reset(session: AsyncSession = Depends(get_session)):
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_session)):
     print(f"Login Attempt: {form_data.username}")
     
-    query = select(User).where((User.email == form_data.username) | (User.admission_number == form_data.username))
+    # Query with eager loading of role relationship
+    query = select(User).where(
+        (User.email == form_data.username) | (User.admission_number == form_data.username)
+    ).options(selectinload(User.role))
+    
     result = await session.exec(query)
     user = result.first()
     
@@ -259,7 +270,34 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         )
     
     access_token = create_access_token(data={"sub": user.email or user.admission_number})
-    return {"access_token": access_token, "token_type": "bearer"}
+    
+    # Get role name - fetch from database if not loaded
+    role_name = "student"  # Default
+    if user.role:
+        role_name = user.role.name
+    else:
+        # Fallback: fetch role separately if not loaded
+        role_query = select(Role).where(Role.id == user.role_id)
+        role_result = await session.exec(role_query)
+        role = role_result.first()
+        if role:
+            role_name = role.name
+    
+    print(f"User role: {role_name}")
+    
+    # Return user info including role
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "user": {
+            "id": str(user.id),
+            "full_name": user.full_name,
+            "email": user.email,
+            "admission_number": user.admission_number,
+            "role": role_name,
+            "profile_image": user.profile_image
+        }
+    }
 
 @app.post("/api/auth/register")
 async def register(
@@ -430,6 +468,10 @@ app.include_router(ai.router, prefix="/api/admin", tags=["ai"])
 # Import and include events router
 from app.routers import events
 app.include_router(events.router)
+
+# Import and include reports router
+from app.routers import reports
+app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 
 @app.get("/")
 async def root():

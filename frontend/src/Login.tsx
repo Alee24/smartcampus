@@ -39,8 +39,30 @@ export default function Login({ onLogin }: LoginProps) {
             }
 
             const data = await response.json()
+            console.log('Login response:', data) // Debug: see what backend returns
+            // Validate response structure
+            if (!data.access_token) {
+                throw new Error('Invalid response: missing access token')
+            }
+
             // Store token
             localStorage.setItem('token', data.access_token)
+
+            // Store user info if available
+            if (data.user) {
+                localStorage.setItem('userRole', data.user.role || 'student')
+                localStorage.setItem('userName', data.user.full_name || '')
+                localStorage.setItem('userEmail', data.user.email || data.user.admission_number || '')
+                localStorage.setItem('userImage', data.user.profile_image || '')
+            } else {
+                // Fallback: set default values
+                console.warn('User object not in response, using defaults')
+                localStorage.setItem('userRole', 'student')
+                localStorage.setItem('userName', email)
+                localStorage.setItem('userEmail', email)
+                localStorage.setItem('userImage', '')
+            }
+
             onLogin()
         } catch (err: any) {
             console.error(err)

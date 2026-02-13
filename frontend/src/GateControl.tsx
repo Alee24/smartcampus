@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Scan, ShieldAlert, BadgeCheck, XCircle, Camera, Car, RefreshCw, StopCircle, Clock, TrendingUp, Activity, Search } from 'lucide-react'
+import { Scan, ShieldAlert, BadgeCheck, XCircle, Camera, Car, RefreshCw, StopCircle, Clock, TrendingUp, Activity, Search, Calendar } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 
 export default function GateControl() {
@@ -8,6 +8,9 @@ export default function GateControl() {
     const [lastScan, setLastScan] = useState<any>(null)
     const [stream, setStream] = useState<MediaStream | null>(null)
     const [scanMode, setScanMode] = useState<'qr' | 'plate' | null>(null)
+    const [refreshTrigger, setRefreshTrigger] = useState(0)
+
+    const refreshData = () => setRefreshTrigger(prev => prev + 1)
 
     // Manual Vehicle Logic
     const [showManualVehicle, setShowManualVehicle] = useState(false)
@@ -93,7 +96,7 @@ export default function GateControl() {
                 alert(result.detail || "Error logging vehicle")
             }
             // Refresh List
-            // fetchVehicleData() - Need to expose or trigger
+            refreshData()
         } catch (e) {
             console.error(e)
             alert("Network Error")
@@ -112,6 +115,7 @@ export default function GateControl() {
             if (res.ok) {
                 const data = await res.json()
                 setRecentVehicles(prev => prev.map(v => v.plate === plate && !v.exit_time ? { ...v, exit_time: data.time } : v))
+                refreshData()
             } else {
                 alert("Error recording exit (Vehicle might not be inside)")
             }
@@ -165,6 +169,21 @@ export default function GateControl() {
         longest_stays: []
     })
     const [recentVehicles, setRecentVehicles] = useState<any[]>([])
+    const [registeredVehicles, setRegisteredVehicles] = useState<any[]>([])
+    const [checkMode, setCheckMode] = useState<'person' | 'vehicle_in' | 'vehicle_out'>('person')
+
+    const handleMainAction = () => {
+        if (!admissionNumber) return;
+        if (checkMode === 'person') {
+            handleManualScan();
+        } else if (checkMode === 'vehicle_in') {
+            setManualPlate(admissionNumber);
+            setShowManualVehicle(true);
+        } else {
+            handleExit(admissionNumber);
+            setAdmissionNumber('');
+        }
+    }
 
     useEffect(() => {
         const fetchVehicleData = async () => {
@@ -175,14 +194,20 @@ export default function GateControl() {
                 const statsRes = await fetch('/api/gate/vehicle-stats', { headers })
                 if (statsRes.ok) setVehicleStats(await statsRes.json())
 
-                const logsRes = await fetch('/api/gate/vehicle-logs', { headers })
+                // Cache busting added to debug update issues
+                const regRes = await fetch(`/api/gate/vehicles?_t=${Date.now()}`, { headers })
+                if (regRes.ok) setRegisteredVehicles(await regRes.json())
+                else console.error("Vehicles fetch failed", regRes.status)
+
+                const logsRes = await fetch(`/api/gate/vehicle-logs?_t=${Date.now()}`, { headers })
                 if (logsRes.ok) setRecentVehicles(await logsRes.json())
+                else console.error("Logs fetch failed", logsRes.status)
             } catch (e) { console.error(e) }
         }
         fetchVehicleData()
         const interval = setInterval(fetchVehicleData, 30000)
         return () => clearInterval(interval)
-    }, [])
+    }, [refreshTrigger])
 
     const startCamera = async (mode: 'qr' | 'plate') => {
         setPermissionError('');
@@ -294,26 +319,77 @@ export default function GateControl() {
 
             {/* Control Panel */}
             <div className="glass-card p-6 h-fit">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-[var(--text-primary)]">
                     <Scan className="text-primary-500" />
-                    Gate Entry Control
+                    Gate Control Station
                 </h3>
+
+                {/* Mode Tabs */}
+                <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl mb-6">
+                    <button
+                        onClick={() => setCheckMode('person')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${checkMode === 'person' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        👤 Person Entry
+                    </button>
+                    <button
+                        onClick={() => setCheckMode('vehicle_in')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${checkMode === 'vehicle_in' ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        🚗 Vehicle In
+                    </button>
+                    <button
+                        onClick={() => setCheckMode('vehicle_out')}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${checkMode === 'vehicle_out' ? 'bg-white dark:bg-gray-700 shadow-sm text-red-600' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        ⛔ Vehicle Out
+                    </button>
+                </div>
 
                 <div className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Manual Entry / Barcode</label>
+                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                            {checkMode === 'person' ? "Admission Number / ID" : "Number Plate"}
+                        </label>
                         <div className="flex gap-2">
-                            <input
-                                value={admissionNumber}
-                                onChange={(e) => setAdmissionNumber(e.target.value)}
-                                placeholder="Enter Adm No or Plate..."
-                                className="flex-1 p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] outline-none focus:border-primary-500 transition-colors"
-                            />
+                            <div className="flex-1 relative">
+                                <input
+                                    value={admissionNumber}
+                                    onChange={(e) => {
+                                        const val = e.target.value.toUpperCase();
+                                        setAdmissionNumber(val);
+                                        if (checkMode.includes('vehicle')) handlePlateSearch(val);
+                                    }}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleMainAction()}
+                                    placeholder={checkMode === 'person' ? "Enter Adm No..." : "Enter Plate (e.g. KCA 123)..."}
+                                    className="w-full p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] outline-none focus:border-primary-500 transition-colors uppercase font-mono"
+                                />
+                                {checkMode.includes('vehicle') && plateSuggestions.length > 0 && (
+                                    <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border border-[var(--border-color)] rounded-xl shadow-2xl max-h-60 overflow-y-auto">
+                                        {plateSuggestions.map((v: any) => (
+                                            <div key={v.id}
+                                                onClick={() => {
+                                                    setAdmissionNumber(v.plate_number);
+                                                    if (checkMode === 'vehicle_in') selectSuggestion(v);
+                                                    setPlateSuggestions([]);
+                                                }}
+                                                className="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-[var(--border-color)] last:border-0"
+                                            >
+                                                <div className="font-bold">{v.plate_number}</div>
+                                                <div className="text-xs text-gray-500">{v.driver_name || 'No Driver'}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                             <button
-                                onClick={handleManualScan}
-                                className="bg-primary-600 hover:bg-primary-500 text-white px-6 rounded-lg font-medium transition-colors"
+                                onClick={handleMainAction}
+                                className={`px-6 rounded-lg font-medium transition-colors text-white ${checkMode === 'vehicle_out' ? 'bg-red-600 hover:bg-red-700' :
+                                    checkMode === 'vehicle_in' ? 'bg-blue-600 hover:bg-blue-700' :
+                                        'bg-primary-600 hover:bg-primary-500'
+                                    }`}
                             >
-                                Verify
+                                {checkMode === 'vehicle_out' ? 'CHECKOUT' : checkMode === 'vehicle_in' ? 'LOG ENTRY' : 'VERIFY'}
                             </button>
                         </div>
                     </div>
@@ -592,15 +668,28 @@ export default function GateControl() {
                 {/* Recent Activity Table */}
                 <div className="glass-card overflow-hidden">
                     <div className="px-6 py-4 border-b border-[var(--border-color)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <h4 className="font-bold text-[var(--text-primary)]">Recent Vehicle Logs</h4>
-                        <div className="relative w-full sm:w-64">
+                        <div>
+                            <h4 className="font-bold text-[var(--text-primary)]">Recent Vehicle Logs</h4>
+                            <p className="text-xs text-[var(--text-secondary)] mt-1">
+                                {recentVehicles.filter(v => !v.exit_time).length} vehicles currently parked
+                            </p>
+                        </div>
+                        <div className="relative w-full sm:w-80">
                             <input
-                                className="w-full pl-9 pr-4 py-2 rounded-lg text-sm bg-[var(--bg-primary)] border border-[var(--border-color)] outline-none focus:border-blue-500 transition-colors"
-                                placeholder="Search Plate, Name..."
+                                className="w-full pl-9 pr-4 py-2.5 rounded-lg text-sm bg-[var(--bg-primary)] border-2 border-[var(--border-color)] outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
+                                placeholder="🔍 Search by Plate Number (e.g., KCA 123A)"
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                             />
-                            <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
+                            <Search className="absolute left-3 top-3 text-gray-400" size={16} />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                                >
+                                    <XCircle size={16} />
+                                </button>
+                            )}
                         </div>
                     </div>
                     <div className="overflow-x-auto">
@@ -610,8 +699,9 @@ export default function GateControl() {
                                     <th className="px-6 py-3 font-medium">Plate Number</th>
                                     <th className="px-6 py-3 font-medium">Driver</th>
                                     <th className="px-6 py-3 font-medium">Vehicle</th>
-                                    <th className="px-6 py-3 font-medium">Timing</th>
-                                    <th className="px-6 py-3 font-medium">Action</th>
+                                    <th className="px-6 py-3 font-medium">Entry Time</th>
+                                    <th className="px-6 py-3 font-medium">Exit Time</th>
+                                    <th className="px-6 py-3 font-medium text-center">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[var(--border-color)]">
@@ -620,57 +710,155 @@ export default function GateControl() {
                                     const q = searchQuery.toLowerCase();
                                     return log.plate?.toLowerCase().includes(q) || log.driver_name?.toLowerCase().includes(q) || log.make?.toLowerCase().includes(q);
                                 }).length === 0 ? (
-                                    <tr><td colSpan={5} className="px-6 py-8 text-center text-[var(--text-secondary)]">No matching activity</td></tr>
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <div className="flex flex-col items-center gap-3">
+                                                <Car className="text-gray-300" size={48} />
+                                                <div>
+                                                    <p className="font-bold text-[var(--text-primary)]">
+                                                        {searchQuery ? `No vehicles found matching "${searchQuery}"` : 'No vehicle activity yet'}
+                                                    </p>
+                                                    <p className="text-xs text-[var(--text-secondary)] mt-1">
+                                                        {searchQuery ? 'Try searching with a different plate number' : 'Vehicle entries will appear here'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 ) : (
                                     recentVehicles.filter(log => {
                                         if (!searchQuery) return true;
                                         const q = searchQuery.toLowerCase();
                                         return log.plate?.toLowerCase().includes(q) || log.driver_name?.toLowerCase().includes(q) || log.make?.toLowerCase().includes(q);
-                                    }).slice(0, 50).map((log: any, i) => (
-                                        <tr
-                                            key={log.id || i}
-                                            onClick={() => setSelectedVehicleLog(log)}
-                                            className="hover:bg-[var(--bg-primary)]/50 transition-colors cursor-pointer group"
-                                        >
-                                            <td className="px-6 py-4 font-mono font-bold text-lg">{log.plate}</td>
-                                            <td className="px-6 py-4">
-                                                <div className="font-bold">{log.driver_name || 'Unknown'}</div>
-                                                <div className="text-xs text-[var(--text-secondary)]">{log.driver_contact || log.role || ''}</div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[var(--text-primary)] font-medium">{log.make} {log.model}</span>
-                                                    <span className="text-xs text-[var(--text-secondary)]">{log.color !== 'Unknown' ? log.color : ''}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex flex-col text-sm">
-                                                    <div className="text-green-600 font-medium whitespace-nowrap">IN: {log.time}</div>
+                                    }).slice(0, 50).map((log: any, i) => {
+                                        const isParked = !log.exit_time
+                                        const isSearchMatch = searchQuery && log.plate?.toLowerCase().includes(searchQuery.toLowerCase())
+
+                                        return (
+                                            <tr
+                                                key={log.id || i}
+                                                onClick={() => setSelectedVehicleLog(log)}
+                                                className={`hover:bg-[var(--bg-primary)]/50 transition-all cursor-pointer group ${isSearchMatch ? 'bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-500' : ''
+                                                    } ${isParked ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-transparent'}`}
+                                            >
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono font-bold text-lg">{log.plate}</span>
+                                                        {isParked && (
+                                                            <span className="px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs font-bold rounded-full">
+                                                                PARKED
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold">{log.driver_name || 'Unknown'}</div>
+                                                    <div className="text-xs text-[var(--text-secondary)]">{log.driver_contact || log.role || ''}</div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[var(--text-primary)] font-medium">{log.make} {log.model}</span>
+                                                        <span className="text-xs text-[var(--text-secondary)]">{log.color !== 'Unknown' ? log.color : ''}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2 text-sm">
+                                                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                                        <span className="text-green-600 dark:text-green-400 font-medium whitespace-nowrap">{log.time}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
                                                     {log.exit_time ? (
-                                                        <div className="text-red-600 font-medium whitespace-nowrap">OUT: {log.exit_time}</div>
+                                                        <div className="flex items-center gap-2 text-sm">
+                                                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                                                            <span className="text-red-600 dark:text-red-400 font-medium whitespace-nowrap">{log.exit_time}</span>
+                                                        </div>
                                                     ) : (
-                                                        <div className="text-gray-400 italic">Inside</div>
+                                                        <span className="text-gray-400 italic text-sm">Still inside</span>
                                                     )}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {!log.exit_time ? (
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleExit(log.plate); }}
-                                                        className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded-lg text-xs font-bold uppercase transition-colors shadow-sm opacity-0 group-hover:opacity-100 focus:opacity-100"
-                                                    >
-                                                        Mark Exit
-                                                    </button>
-                                                ) : (
-                                                    <span className="text-gray-400 text-xs font-medium">COMPLETED</span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {!log.exit_time ? (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleExit(log.plate); }}
+                                                            className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-bold uppercase transition-all shadow-md hover:shadow-lg ${isSearchMatch
+                                                                ? 'bg-red-600 text-white hover:bg-red-700 animate-pulse'
+                                                                : 'bg-red-100 text-red-600 hover:bg-red-200 opacity-0 group-hover:opacity-100 focus:opacity-100'
+                                                                }`}
+                                                        >
+                                                            🚗 Checkout
+                                                        </button>
+                                                    ) : (
+                                                        <div className="text-center">
+                                                            <span className="inline-flex items-center gap-1 text-gray-400 text-xs font-medium px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full">
+                                                                <BadgeCheck size={14} />
+                                                                COMPLETED
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })
                                 )}
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+
+            {/* Registered Vehicles Directory */}
+            <div className="bg-white dark:bg-[var(--bg-surface)] rounded-2xl p-6 shadow-sm border border-[var(--border-color)] mt-6">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h3 className="text-lg font-bold">Registered Vehicles Directory</h3>
+                        <p className="text-sm text-[var(--text-secondary)]">
+                            {registeredVehicles.length} vehicles found in database
+                        </p>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="text-xs text-[var(--text-secondary)] border-b border-[var(--border-color)]">
+                                <th className="py-3 px-4 font-semibold uppercase tracking-wider">Plate Number</th>
+                                <th className="py-3 px-4 font-semibold uppercase tracking-wider">Vehicle</th>
+                                <th className="py-3 px-4 font-semibold uppercase tracking-wider">Driver Details</th>
+                            </tr>
+                        </thead>
+                        <tbody className="text-sm">
+                            {registeredVehicles.length === 0 ? (
+                                <tr>
+                                    <td colSpan={3} className="py-8 text-center text-gray-400">
+                                        <div className="flex flex-col items-center">
+                                            <Car size={32} className="mb-2 opacity-20" />
+                                            <span>No registered vehicles found</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                registeredVehicles.map((vehicle, i) => (
+                                    <tr key={i} className="border-b border-[var(--border-color)] last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                        <td className="py-3 px-4 font-medium font-mono">{vehicle.plate_number}</td>
+                                        <td className="py-3 px-4">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-2 h-2 rounded-full bg-gray-300" />
+                                                <span>{vehicle.make} {vehicle.model}</span>
+                                                <span className="text-xs text-gray-400">({vehicle.color})</span>
+                                            </div>
+                                        </td>
+                                        <td className="py-3 px-4">
+                                            <div className="flex flex-col">
+                                                <span className="font-medium">{vehicle.driver_name || "Unknown"}</span>
+                                                <span className="text-xs text-gray-500">{vehicle.driver_contact || "-"}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

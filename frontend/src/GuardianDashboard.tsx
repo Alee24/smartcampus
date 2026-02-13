@@ -48,7 +48,7 @@ export default function GuardianDashboard() {
                             <div className="flex items-start gap-4">
                                 <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border-2 border-white shadow">
                                     {ward.profile_image ? (
-                                        <img src={ward.profile_image} alt={ward.full_name} className="w-full h-full object-cover" />
+                                        <img src={ward.profile_image.startsWith('http') ? ward.profile_image : `http://localhost:8000${ward.profile_image}`} alt={ward.full_name} className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-gray-400"><User /></div>
                                     )}

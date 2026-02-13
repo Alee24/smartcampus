@@ -207,7 +207,6 @@ export default function BulkUpload() {
             const token = localStorage.getItem('token')
             let url = `/api/admin/bulk/${endpoint}` // Default
 
-            if (endpoint === 'students') url = '/api/users/bulk-upload'
             if (endpoint === 'registrations') url = '/api/users/registrations/bulk-upload'
 
             await new Promise((resolve, reject) => {

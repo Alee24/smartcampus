@@ -91,22 +91,22 @@ export default function ScanLogs() {
                                             )}
                                         </td>
                                         <td className="p-4">
-                                            {log.is_successful ? (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                                    <CheckCircle size={14} /> Success
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                                                    <XCircle size={14} /> Failed
-                                                </span>
-                                            )}
+                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${log.is_successful
+                                                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                                                    : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                                                }`}>
+                                                <QrCode size={14} /> Scanned
+                                                {!log.is_successful && <span className="opacity-50 text-[10px] ml-1">(Failed)</span>}
+                                            </span>
                                         </td>
                                         <td className="p-4 text-sm text-[var(--text-secondary)]">
-                                            {log.detected_location && (
-                                                <div className="flex items-center gap-1 text-xs">
-                                                    <MapPin size={12} />
+                                            {log.detected_location ? (
+                                                <div className="flex items-center gap-1 text-xs font-medium text-[var(--text-primary)]">
+                                                    <MapPin size={12} className="text-blue-500" />
                                                     {log.detected_location}
                                                 </div>
+                                            ) : (
+                                                <span className="text-xs text-gray-400 italic">Location unmapped</span>
                                             )}
                                         </td>
                                         <td className="p-4 text-sm">

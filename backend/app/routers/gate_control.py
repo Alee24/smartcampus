@@ -1,13 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Request
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 from app.database import get_session
-from app.models import User, EntryLog, Gate, Vehicle, VehicleLog, Visitor, Event
+from app.models import User, EntryLog, Gate, Vehicle, VehicleLog, Visitor, Event, GateScanLog
 from datetime import datetime
 import shutil
 import os
 import uuid
 import random # For mocking
+from typing import Optional
 
 router = APIRouter()
 
@@ -258,41 +259,34 @@ async def scan_vehicle_plate(
         }
     }
 
-@router.get("/vehicle-logs")
-async def get_vehicle_logs(
-    limit: int = 50,
-    session: AsyncSession = Depends(get_session)
-):
-    """
-    Fetch recent vehicle logs with AI insights.
-    """
-    query = select(VehicleLog, Vehicle).where(VehicleLog.vehicle_id == Vehicle.id).order_by(VehicleLog.entry_time.desc()).limit(limit)
-    results = (await session.exec(query)).all()
-    
-    logs = []
-    for log, vehicle in results:
-        ai_confidence = 0.85 + (hash(vehicle.plate_number) % 15) / 100.0
+# Duplicate get_vehicle_logs removed (Use the one below)
+
+@router.get("/vehicles")
+async def get_all_vehicles(limit: int = 100, session: AsyncSession = Depends(get_session)):
+    """Fetch all vehicles"""
+    try:
+        # Standard ORM Select
+        query = select(Vehicle) 
+        # Optional: .order_by(Vehicle.plate_number)
+        results = (await session.exec(query)).all()
         
-        logs.append({
-            "id": log.id,
-            "plate": vehicle.plate_number,
-            "make": f"{vehicle.make} {vehicle.model}",
-            "color": vehicle.color,
-            "image": log.vehicle_images.get("front") if log.vehicle_images else None,
-            "time": log.entry_time.strftime("%H:%M:%S"),
-            "status": "allowed" if log.status == "allowed" else "visitor",
-            "passengers": log.detected_passengers or 1,
-            "ai_data": {
-                "confidence": f"{ai_confidence:.0%}",
-                "analysis": {
-                    "size": "Medium" if (log.detected_passengers or 1) < 3 else "Large",
-                    "type": "Sedan" if "Toyota" in (vehicle.make or "") else "SUV",
-                    "plate_region": "Kenya"
-                }
-            }
-        })
-        
-    return logs
+        vehicles = []
+        for v in results:
+            vehicles.append({
+                "id": str(v.id),
+                "plate_number": v.plate_number,
+                "make": v.make or "Unknown",
+                "model": v.model or "Unknown",
+                "color": v.color or "Unknown",
+                "driver_name": v.driver_name,
+                "driver_contact": v.driver_contact,
+                "driver_id_number": v.driver_id_number
+            })
+        print(f"DEBUG: Found {len(vehicles)} registered vehicles via ORM")
+        return vehicles
+    except Exception as e:
+        print(f"Error fetching vehicles: {e}")
+        return []
 
 @router.get("/vehicles/search")
 async def search_vehicles(q: str, session: AsyncSession = Depends(get_session)):
@@ -405,47 +399,50 @@ async def get_vehicle_stats(session: AsyncSession = Depends(get_session)):
         "hourly_traffic": hourly_traffic
     }
 
-from sqlmodel import select, func
+from sqlmodel import select, func, text
 
 # ... imports ...
 
 @router.get("/vehicle-logs")
-async def get_vehicle_logs(
-    session: AsyncSession = Depends(get_session)
-):
+async def get_vehicle_logs(session: AsyncSession = Depends(get_session)):
     """
     Get all vehicle logs with vehicle details.
+    Uses the exact same robust query pattern as get_vehicle_stats.
     """
-    query = (
-        select(VehicleLog, Vehicle)
-        .join(Vehicle, VehicleLog.vehicle_id == Vehicle.id)
-        .order_by(VehicleLog.entry_time.desc())
-        .limit(50)
-    )
-    results = await session.exec(query)
-    
-    logs = []
-    for log, vehicle in results.all():
-        # Count total entries for this vehicle
-        count_q = select(func.count()).select_from(VehicleLog).where(VehicleLog.vehicle_id == vehicle.id)
-        count = (await session.exec(count_q)).one()
-
-        logs.append({
-            "id": log.id,
-            "plate": vehicle.plate_number,
-            "make": vehicle.make or "Unknown",
-            "model": vehicle.model or "Unknown",
-            "color": vehicle.color or "Unknown",
-            "driver_name": vehicle.driver_name,
-            "driver_contact": vehicle.driver_contact,
-            "driver_id_number": vehicle.driver_id_number,
-            "time": log.entry_time.strftime("%H:%M:%S") if log.entry_time else "-",
-            "exit_time": log.exit_time.strftime("%H:%M:%S") if log.exit_time else None,
-            "status": "allowed" if vehicle.make != "Unknown" else "flagged", # Heuristic
-            "image": log.vehicle_images.get("front") if log.vehicle_images else None,
-            "entry_count": count
-        })
-    return logs
+    try:
+        # Proven working query pattern (ORM Join)
+        query = select(VehicleLog, Vehicle).join(Vehicle).order_by(VehicleLog.entry_time.desc())
+        
+        results = (await session.exec(query)).all()
+        print(f"DEBUG: Found {len(results)} logs via ORM")
+        
+        logs = []
+        for log, vehicle in results:
+            # Handle timestamps details
+            # Return full ISO string for frontend parsing
+            t_entry = log.entry_time.isoformat() if log.entry_time else None
+            t_exit = log.exit_time.isoformat() if log.exit_time else None
+            
+            logs.append({
+                "id": str(log.id),
+                "plate": vehicle.plate_number,
+                "make": vehicle.make or "Unknown",
+                "model": vehicle.model or "Unknown",
+                "color": vehicle.color or "Unknown",
+                "driver_name": vehicle.driver_name,
+                "driver_contact": vehicle.driver_contact,
+                "driver_id_number": vehicle.driver_id_number,
+                "time": t_entry,
+                "entry_time": t_entry, 
+                "exit_time": t_exit,
+                "status": "allowed" if (vehicle.make != "Unknown") else "flagged",
+                "image": log.vehicle_images.get("front") if log.vehicle_images else None,
+                "passengers": log.detected_passengers or 1
+            })
+        return logs
+    except Exception as e:
+        print(f"Error fetching logs: {e}")
+        return []
 
 @router.post("/alarm")
 async def trigger_alarm(session: AsyncSession = Depends(get_session)):
@@ -566,3 +563,338 @@ async def get_gate_statistics(session: AsyncSession = Depends(get_session)):
         })
         
     return stats_data
+
+# --- Gate Management CRUD ---
+
+@router.get("/manage/gates")
+async def list_gates(session: AsyncSession = Depends(get_session)):
+    return (await session.exec(select(Gate))).all()
+
+@router.post("/manage/gates")
+async def create_gate(gate_data: dict, session: AsyncSession = Depends(get_session)):
+    # Basic validation
+    if not gate_data.get("name"): raise HTTPException(400, "Name required")
+    gate = Gate(name=gate_data["name"], location=gate_data.get("location"))
+    session.add(gate)
+    await session.commit()
+    await session.refresh(gate)
+    return gate
+
+@router.put("/manage/gates/{gate_id}")
+async def update_gate(gate_id: uuid.UUID, gate_data: dict, session: AsyncSession = Depends(get_session)):
+    gate = await session.get(Gate, gate_id)
+    if not gate: raise HTTPException(404, "Gate not found")
+    
+    if gate_data.get("name"): gate.name = gate_data["name"]
+    if gate_data.get("location"): gate.location = gate_data["location"]
+    if "is_active" in gate_data: gate.is_active = gate_data["is_active"]
+    
+    session.add(gate)
+    await session.commit()
+    await session.refresh(gate)
+    return gate
+
+@router.delete("/manage/gates/{gate_id}")
+async def delete_gate(gate_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    gate = await session.get(Gate, gate_id)
+    if gate:
+        session.delete(gate)
+        await session.commit()
+    return {"message": "Deleted"}
+
+# --- Public/Self-Service Access ---
+
+from sqlalchemy import desc
+
+# ... existing code ...
+
+@router.get("/recent-activity")
+async def get_global_recent_activity(session: AsyncSession = Depends(get_session)):
+    """Fetch live recent activity (Last 5) from ALL gates"""
+    return await fetch_recent_activity(session, None)
+
+@router.get("/recent-activity/{gate_id}")
+async def get_gate_recent_activity(gate_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    """Fetch live recent activity (Last 5) for a specific gate"""
+    return await fetch_recent_activity(session, gate_id)
+
+async def fetch_recent_activity(session: AsyncSession, gate_id: Optional[uuid.UUID]):
+    combined = []
+    
+    # helper for filtering
+    def apply_filter(stmt, model_col):
+        if gate_id: return stmt.where(model_col == gate_id)
+        return stmt
+
+    # 1. User Entries
+    q_users = (
+        select(EntryLog, User, Gate)
+        .join(User)
+        .join(Gate)
+        .order_by(desc(EntryLog.entry_time))
+        .limit(5)
+    )
+    if gate_id: q_users = q_users.where(EntryLog.gate_id == gate_id)
+    
+    user_logs = (await session.exec(q_users)).all()
+    for log, user, gate in user_logs:
+        combined.append({
+            "id": str(log.id),
+            "type": "user", 
+            "role": "Student/Staff", 
+            "name": user.full_name or user.first_name, 
+            "identifier": user.admission_number,
+            "gate": gate.name,
+            "time": log.entry_time,
+            "status": log.status,
+            "details": f"IP: {log.ip_address}" if log.ip_address else "QR Scan",
+            "verification_image": log.verification_image
+        })
+
+    # 2. Vehicles
+    q_vehicles = (
+        select(VehicleLog, Vehicle, Gate)
+        .join(Vehicle)
+        .join(Gate)
+        .order_by(desc(VehicleLog.entry_time))
+        .limit(5)
+    )
+    if gate_id: q_vehicles = q_vehicles.where(VehicleLog.gate_id == gate_id)
+    
+    vehicle_logs = (await session.exec(q_vehicles)).all()
+    for log, vehicle, gate in vehicle_logs:
+        combined.append({
+            "id": str(log.id),
+            "type": "vehicle",
+            "role": "Vehicle",
+            "name": vehicle.plate_number,
+            "identifier": vehicle.driver_name or "Unknown Driver",
+            "gate": gate.name,
+            "time": log.entry_time,
+            "status": "allowed",
+            "details": f"{log.detected_passengers} Passenger(s)"
+        })
+
+    # 3. Visitors
+    # Need to join Gate to get name
+    q_visitors = (
+        select(Visitor, Gate)
+        .join(Gate, isouter=True) # Left join just in case
+        .order_by(desc(Visitor.time_in))
+        .limit(5)
+    )
+    if gate_id: q_visitors = q_visitors.where(Visitor.gate_id == gate_id)
+    
+    visitors = (await session.exec(q_visitors)).all()
+    for v, gate in visitors:
+        combined.append({
+            "id": str(v.id),
+            "type": "visitor",
+            "role": (v.visitor_type or "visitor").title(),
+            "name": f"{v.first_name} {v.last_name}",
+            "identifier": v.id_number,
+            "gate": gate.name if gate else "Unknown",
+            "time": v.time_in,
+            "status": v.status,
+            "details": v.visit_details
+        })
+
+    # Sort and slice
+    combined.sort(key=lambda x: x['time'], reverse=True)
+    return combined[:5]
+
+@router.post("/public/access-request")
+async def public_access_request(
+    payload: dict, 
+    request: Request,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Handles self-service entry requests from QR Code scan pages.
+    Payload varies by role: { gate_id, role, data: {...} }
+    """
+    role = payload.get("role")
+    gate_id = payload.get("gate_id")
+    data = payload.get("data", {})
+    
+    # Verify Gate
+    gate = await session.get(Gate, gate_id)
+    if not gate: raise HTTPException(404, "Invalid Gate ID")
+
+    # Handle Logic based on Role
+    if role in ["taxi", "cab", "delivery", "visitor"]:
+         # Register Visitor / Vehicle
+         # 1. Vehicle if applicable
+         vehicle = None
+         if data.get("plate_number"):
+             # Normalize Plate
+             plate = data["plate_number"].strip().upper()
+             vehicle = (await session.exec(select(Vehicle).where(Vehicle.plate_number == plate))).first()
+             if not vehicle:
+                 vehicle = Vehicle(
+                     plate_number=plate,
+                     driver_name=data.get("name"),
+                     driver_id_number=data.get("id_number"),
+                     driver_contact=data.get("mobile"),
+                     make="Self-Reg",
+                     model=role.title(),
+                     color="Unknown"
+                 )
+                 session.add(vehicle)
+                 await session.commit()
+                 await session.refresh(vehicle)
+             
+             # Log Vehicle Entry
+             v_log = VehicleLog(
+                 vehicle_id=vehicle.id,
+                 gate_id=gate.id,
+                 entry_time=datetime.utcnow(),
+                 vehicle_images={},
+                 manual_override=True, # Flag as manual/self-service
+                 detected_passengers=int(data.get("passengers", 1))
+             )
+             session.add(v_log)
+         
+         # 2. Register Visitor Person (if no vehicle or driver details distinct)
+         if not vehicle:
+             visitor = Visitor(
+                 first_name=data.get("name", "").split(" ")[0],
+                 last_name=data.get("name", "").split(" ")[-1] if " " in data.get("name", "") else "",
+                 phone_number=data.get("mobile"),
+                 id_number=data.get("id_number"),
+                 visit_details=f"{role.title()}: {data.get('purpose') or data.get('delivery_details')}",
+                 status="checked_in",
+                 time_in=datetime.utcnow(),
+                 gate_id=gate.id, # LINK TO GATE
+                 visitor_type=role  # RECORD TYPE
+             )
+             session.add(visitor)
+
+         await session.commit()
+         return {"status": "success", "message": "Check-in Successful. You may proceed."}
+
+    elif role in ["student", "staff"]:
+        # Check IP Address
+        client_ip = request.client.host
+        # Define allowed University IPs (Mock Range + Localhost)
+        # Strictly enforces university IP for approval
+        ALLOWED_IPS = ["127.0.0.1", "::1", "localhost"] 
+        # In production, this would be the University's Public IP or Subnet, e.g., "196.201..."
+        
+        # Verify Image Metadata & Save
+        image_b64 = data.get("image")
+        saved_image_path = None
+        
+        if not image_b64:
+             raise HTTPException(400, "Verification photo required")
+             
+        try:
+            # Decode and Save Image
+            if "base64," in image_b64:
+                header, encoded = image_b64.split("base64,", 1)
+            else:
+                encoded = image_b64
+                
+            import base64
+            img_bytes = base64.b64decode(encoded)
+            
+            # TODO: Add deeper metadata verification here (e.g. check EXIF if available, though canvas usually strips it)
+            # For now, we trust the frontend enforced camera-only usage and analyze usage later.
+            
+            file_id = str(uuid.uuid4())
+            filename = f"{file_id}.jpg"
+            save_dir = "static/verifications"
+            os.makedirs(save_dir, exist_ok=True)
+            saved_image_path = f"{save_dir}/{filename}"
+            
+            with open(saved_image_path, "wb") as f:
+                f.write(img_bytes)
+                
+        except Exception as e:
+            print(f"Image processing failed: {e}")
+            raise HTTPException(500, "Failed to process verification image")
+        
+        # If IP is invalid, we flag it but might still record it as 'flagged' or reject?
+        # User said: "only approve scan from the univerwsitis ip"
+        is_ip_valid = client_ip in ALLOWED_IPS or client_ip.startswith("192.168.")
+        
+        entry_status = "allowed"
+        fail_reason = []
+        
+        if not is_ip_valid:
+            entry_status = "rejected"
+            fail_reason.append("Invalid Network Location")
+            
+        user_id = data.get("user_id")
+        if user_id:
+             user = await session.get(User, user_id)
+             if user:
+                 if user.status != "active":
+                     entry_status = "rejected"
+                     fail_reason.append(f"Account {user.status}")
+                 
+                 final_status = entry_status
+                 status_msg = f"Welcome back, {user.first_name}"
+                 
+                 if final_status == "rejected":
+                     status_msg = f"Entry Denied: {', '.join(fail_reason)}"
+                 
+                 log = EntryLog(
+                     user_id=user.id,
+                     gate_id=gate.id,
+                     entry_time=datetime.utcnow(),
+                     method="self_service_verification",
+                     status=final_status,
+                     ip_address=client_ip,
+                     verification_image=saved_image_path
+                 )
+                 session.add(log)
+                 await session.commit()
+                 
+                 if final_status == "rejected":
+                     return {"status": "rejected", "message": status_msg}
+                     
+                 return {"status": "success", "message": status_msg}
+             else:
+                  raise HTTPException(404, "User not found")
+        else:
+             raise HTTPException(400, "User ID required for student entry")
+        
+    return {"status": "pending", "message": "Request processed"}
+
+@router.get("/scan-logs")
+async def get_all_gate_scan_logs(limit: int = 100, session: AsyncSession = Depends(get_session)):
+    """Fetch all gate scan logs"""
+    query = select(GateScanLog, Gate).join(Gate, isouter=True).order_by(GateScanLog.timestamp.desc()).limit(limit)
+    results = (await session.exec(query)).all()
+    
+    logs = []
+    for log, gate in results:
+        logs.append({
+            "id": str(log.id),
+            "timestamp": log.timestamp.isoformat(),
+            "scan_type": log.scan_type,
+            "scanned_value": log.scanned_value,
+            "gate_name": gate.name if gate else "Unknown Gate",
+            "status": log.status,
+            "details": log.details,
+            "scanner": log.scanner_name or "System"
+        })
+    return logs
+
+async def create_scan_log(session: AsyncSession, gate_id: Optional[uuid.UUID], scan_type: str, value: str, status: str, details: str = None, guard_id: Optional[uuid.UUID] = None, scanner_name: str = None):
+    try:
+        log = GateScanLog(
+            gate_id=gate_id,
+            scan_type=scan_type,
+            scanned_value=value,
+            status=status,
+            details=details,
+            guard_id=guard_id,
+            scanner_name=scanner_name,
+            timestamp=datetime.utcnow()
+        )
+        session.add(log)
+        await session.commit()
+    except Exception as e:
+        print(f"Failed to log scan: {e}")

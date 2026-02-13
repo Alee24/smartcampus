@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import {
     UserPlus, Search, Filter, X, Edit, Trash2, Mail, Phone,
     Building, GraduationCap, Shield, ChevronLeft, ChevronRight,
-    MoreVertical, CheckCircle, XCircle, AlertCircle, Camera, Key, LayoutGrid, Users as UsersIcon
+    MoreVertical, CheckCircle, XCircle, AlertCircle, Camera, Key, LayoutGrid, Users as UsersIcon,
+    Ban, Power, Lock
 } from 'lucide-react'
 
 export default function Users() {
@@ -94,8 +95,48 @@ export default function Users() {
     const getStatusIcon = (status: string) => {
         switch (status?.toLowerCase()) {
             case 'active': return <CheckCircle size={14} />
-            case 'suspended': return <XCircle size={14} />
+            case 'suspended': return <Ban size={14} />
             default: return <AlertCircle size={14} />
+        }
+    }
+
+    const handleQuickStatusUpdate = async (user: any, newStatus: string) => {
+        if (!confirm(`Are you sure you want to change status to ${newStatus}?`)) return
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/users/${user.id}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            })
+            if (res.ok) {
+                fetchUsers() // Refresh
+            } else {
+                alert('Failed to update status')
+            }
+        } catch (e) { console.error(e) }
+    }
+
+    const handleQuickPasswordReset = async (user: any) => {
+        const newPassword = prompt(`Enter new password for ${user.full_name}:`, "Student123")
+        if (!newPassword) return
+
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/users/${user.id}/reset-password`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_password: newPassword })
+            })
+            if (res.ok) {
+                alert('Password reset successfully')
+            } else {
+                const data = await res.json().catch(() => ({}))
+                alert(`Failed to reset password: ${data.detail || 'Unknown error'}`)
+            }
+        } catch (e) {
+            console.error(e)
+            alert('Failed to reset password: Network error')
         }
     }
 
@@ -281,9 +322,17 @@ export default function Users() {
                                         >
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm">
-                                                        {user.full_name?.charAt(0) || '?'}
-                                                    </div>
+                                                    {user.profile_image ? (
+                                                        <img
+                                                            src={user.profile_image.startsWith('http') ? user.profile_image : `http://localhost:8000${user.profile_image}`}
+                                                            alt={user.full_name}
+                                                            className="w-10 h-10 rounded-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm">
+                                                            {user.full_name?.charAt(0) || '?'}
+                                                        </div>
+                                                    )}
                                                     <div>
                                                         <div className="font-medium text-gray-900 dark:text-gray-100">
                                                             {user.full_name || 'Unknown'}
@@ -384,13 +433,7 @@ export default function Users() {
                                 className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-[var(--border-color)] overflow-hidden cursor-pointer group flex flex-col items-center p-6 relative animate-fade-in"
                                 onClick={() => setSelectedUser(user)}
                             >
-                                {/* Actions Button */}
-                                <button className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all z-10" onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedUser(user);
-                                }}>
-                                    <MoreVertical size={18} />
-                                </button>
+
 
                                 {/* Status Indicator (Top Left) */}
                                 <div className={`absolute top-4 left-4 w-3 h-3 rounded-full ${user.status === 'active' ? 'bg-green-500' :
@@ -401,7 +444,7 @@ export default function Users() {
                                 <div className="mb-4 relative">
                                     {user.profile_image ? (
                                         <img
-                                            src={user.profile_image}
+                                            src={user.profile_image.startsWith('http') ? user.profile_image : `http://localhost:8000${user.profile_image}`}
                                             alt={user.full_name}
                                             className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md group-hover:scale-105 transition-transform duration-300"
                                         />
@@ -417,26 +460,53 @@ export default function Users() {
                                 </div>
 
                                 {/* Info */}
-                                <div className="text-center w-full mt-2">
+                                <div className="text-center w-full mt-2 mb-4">
                                     <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100 truncate group-hover:text-purple-600 transition-colors">
                                         {user.full_name}
                                     </h3>
-                                    <p className="text-sm text-gray-500 font-mono mb-4">{user.admission_number}</p>
+                                    <p className="text-sm text-gray-500 font-mono">{user.admission_number}</p>
 
-                                    <div className="space-y-2 w-full text-sm">
+                                    <div className="space-y-2 w-full text-sm mt-3">
                                         {user.school && (
                                             <div className="flex items-center gap-2 justify-center text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 py-1.5 rounded-lg">
                                                 <Building size={14} />
                                                 <span className="truncate max-w-[150px]">{user.school}</span>
                                             </div>
                                         )}
-                                        {user.email && (
-                                            <div className="flex items-center gap-2 justify-center text-gray-600 dark:text-gray-400">
-                                                <Mail size={14} />
-                                                <span className="truncate max-w-[180px]">{user.email}</span>
-                                            </div>
-                                        )}
                                     </div>
+                                </div>
+
+                                {/* Quick Actions Row */}
+                                <div className="grid grid-cols-3 gap-2 w-full mt-auto pt-4 border-t border-gray-100 dark:border-gray-700">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setSelectedUser(user) }}
+                                        className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-purple-600 transition-colors"
+                                        title="Edit Profile"
+                                    >
+                                        <Edit size={16} />
+                                        <span className="text-[10px] font-medium">Edit</span>
+                                    </button>
+
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleQuickStatusUpdate(user, user.status === 'active' ? 'suspended' : 'active')
+                                        }}
+                                        className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${user.status === 'active' ? 'text-red-500 hover:text-red-600' : 'text-green-500 hover:text-green-600'}`}
+                                        title={user.status === 'active' ? 'Suspend User' : 'Activate User'}
+                                    >
+                                        {user.status === 'active' ? <Ban size={16} /> : <Power size={16} />}
+                                        <span className="text-[10px] font-medium">{user.status === 'active' ? 'Suspend' : 'Activate'}</span>
+                                    </button>
+
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleQuickPasswordReset(user) }}
+                                        className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-blue-600 transition-colors"
+                                        title="Reset Password"
+                                    >
+                                        <Key size={16} />
+                                        <span className="text-[10px] font-medium">Reset</span>
+                                    </button>
                                 </div>
                             </div>
                         ))}
@@ -494,34 +564,42 @@ export default function Users() {
 
 // Side Panel Component
 function UserDetailPanel({ user, onClose, onRefresh }: any) {
-
-
     const [isEditing, setIsEditing] = useState(false)
     const [editForm, setEditForm] = useState(user)
 
     const handleUpdate = async () => {
         try {
             const token = localStorage.getItem('token')
-            // Map 'role' name to what API expects if needed, currently API handles role name update
+
+            // Sanitize payload (Fix date formats)
+            const payload = { ...editForm }
+            if (payload.admission_date && typeof payload.admission_date === 'string') {
+                payload.admission_date = payload.admission_date.split('T')[0]
+            }
+            if (payload.expiry_date && typeof payload.expiry_date === 'string') {
+                payload.expiry_date = payload.expiry_date.split('T')[0]
+            }
+
             const res = await fetch(`/api/users/${user.id}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(editForm)
+                body: JSON.stringify(payload)
             })
 
             if (res.ok) {
-                alert('User updated successfully!')
+                // alert('User updated successfully!')
                 setIsEditing(false)
                 onRefresh()
             } else {
-                alert('Failed to update user')
+                const data = await res.json()
+                alert(`Failed to update user: ${data.detail || res.statusText}`)
             }
         } catch (e) {
             console.error(e)
-            alert('Error updating user')
+            alert('Error updating user: Network or Server Error')
         }
     }
 
@@ -536,7 +614,6 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
             })
 
             if (res.ok) {
-                // alert('User deleted successfully!')
                 onRefresh()
                 onClose()
             } else {
@@ -550,165 +627,266 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
 
     const handleResetPassword = async () => {
         const newPassword = prompt("Enter new password for this user (leave empty to reset to default 'Student123'):")
-        if (newPassword === null) return // Cancelled
+        if (newPassword === null) return
 
         const passwordToSet = newPassword.trim() || 'Student123'
 
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch(`/api/users/${user.id}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ password: passwordToSet })
+            const res = await fetch(`/api/users/${user.id}/reset-password`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_password: passwordToSet })
             })
 
             if (res.ok) {
                 alert(`Password reset to: ${passwordToSet}`)
             } else {
-                alert('Failed to reset password')
+                const data = await res.json().catch(() => ({}))
+                alert(`Failed to reset password: ${data.detail || 'Unknown error'}`)
             }
         } catch (e) {
             console.error(e)
-            alert('Error resetting password')
+            alert('Failed to reset password: Network error')
         }
     }
 
+    const handleStatusToggle = async () => {
+        const newStatus = user.status === 'active' ? 'suspended' : 'active'
+        if (!confirm(`Change status to ${newStatus}?`)) return
+
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/users/${user.id}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            })
+            if (res.ok) {
+                onRefresh()
+                onClose()
+            }
+        } catch (e) { console.error(e) }
+    }
+
+    // Modern "Slide-over" with NO dark backdrop
     return (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-sm animate-fade-in">
+        <>
+            {/* Invisible overlay to catch clicks outside */}
             <div
-                className="w-full sm:w-96 bg-white dark:bg-gray-900 shadow-2xl overflow-y-auto animate-slide-in-right"
-                onClick={(e) => e.stopPropagation()}
-            >
-                {/* Header */}
-                <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-blue-600 p-4 flex items-center justify-between z-10">
-                    <h3 className="text-lg font-bold text-white">{isEditing ? 'Edit User' : 'User Details'}</h3>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-                    >
-                        <X size={20} className="text-white" />
-                    </button>
+                className="fixed inset-0 z-40 bg-transparent"
+                onClick={onClose}
+            ></div>
+
+            {/* The Panel */}
+            <div className="fixed inset-y-0 right-0 z-50 w-full md:w-[480px] bg-white dark:bg-gray-900 shadow-2xl border-l border-gray-100 dark:border-gray-800 transform transition-transform animate-slide-in-right flex flex-col">
+
+                {/* Header Actions */}
+                <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                        {isEditing ? 'Edit User Profile' : 'User Profile'}
+                    </h2>
+                    <div className="flex items-center gap-2">
+                        {isEditing ? (
+                            <button
+                                onClick={() => setIsEditing(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                title="Edit Profile"
+                            >
+                                <Edit size={20} />
+                            </button>
+                        )}
+                        <button
+                            onClick={onClose}
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
                 </div>
 
-                {/* Content */}
-                <div className="p-4 space-y-4">
-                    {/* Profile Picture */}
-                    <div className="flex flex-col items-center gap-3 py-4">
-                        {user.profile_image ? (
-                            <img
-                                src={user.profile_image}
-                                alt={user.full_name}
-                                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md relative z-0"
-                            />
-                        ) : (
-                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-3xl font-bold border-4 border-white shadow-md">
-                                {user.full_name?.charAt(0) || '?'}
-                            </div>
-                        )}
+                {/* Scrollable Content */}
+                <div className="flex-1 overflow-y-auto p-6">
+                    {/* Identity Section */}
+                    <div className="flex flex-col items-center mb-8">
+                        <div className="relative">
+                            {user.profile_image ? (
+                                <img
+                                    src={user.profile_image.startsWith('http') ? user.profile_image : `http://localhost:8000${user.profile_image}`}
+                                    alt={user.full_name}
+                                    className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg"
+                                />
+                            ) : (
+                                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-5xl font-bold shadow-lg">
+                                    {user.full_name?.charAt(0) || '?'}
+                                </div>
+                            )}
+                            <div className={`absolute bottom-1 right-1 w-6 h-6 border-4 border-white dark:border-gray-900 rounded-full ${user.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                        </div>
+
                         {!isEditing && (
-                            <div className="text-center">
-                                <h4 className="font-bold text-lg text-gray-900 dark:text-gray-100">{user.full_name}</h4>
-                                <p className="text-sm text-gray-500 font-mono">{user.admission_number}</p>
+                            <div className="text-center mt-4">
+                                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{user.full_name}</h3>
+                                <div className="flex items-center justify-center gap-2 mt-2">
+                                    <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-bold uppercase tracking-wide">
+                                        {user.role}
+                                    </span>
+                                    <span className="text-gray-500 dark:text-gray-400 font-mono text-sm">
+                                        {user.admission_number}
+                                    </span>
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Form or Details */}
                     {isEditing ? (
-                        <div className="space-y-4 animate-fade-in">
-                            <div>
-                                <label className="text-xs font-semibold text-gray-500 uppercase">Full Name</label>
-                                <input
-                                    type="text"
-                                    value={editForm.full_name || ''}
-                                    onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mt-1 dark:bg-gray-800 dark:border-gray-700"
-                                />
+                        /* EDIT FORM */
+                        <div className="space-y-5 animate-fade-in">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="col-span-2">
+                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.full_name || ''}
+                                        onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                                    <input
+                                        type="email"
+                                        value={editForm.email || ''}
+                                        onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.phone_number || ''}
+                                        onChange={e => setEditForm({ ...editForm, phone_number: e.target.value })}
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
+                                    />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">School / Department</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.school || ''}
+                                        onChange={e => setEditForm({ ...editForm, school: e.target.value })}
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <label className="text-xs font-semibold text-gray-500 uppercase">Email</label>
-                                <input
-                                    type="email"
-                                    value={editForm.email || ''}
-                                    onChange={e => setEditForm({ ...editForm, email: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mt-1 dark:bg-gray-800 dark:border-gray-700"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-semibold text-gray-500 uppercase">Phone</label>
-                                <input
-                                    type="text"
-                                    value={editForm.phone_number || ''}
-                                    onChange={e => setEditForm({ ...editForm, phone_number: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mt-1 dark:bg-gray-800 dark:border-gray-700"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-semibold text-gray-500 uppercase">School/Department</label>
-                                <input
-                                    type="text"
-                                    value={editForm.school || ''}
-                                    onChange={e => setEditForm({ ...editForm, school: e.target.value })}
-                                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 mt-1 dark:bg-gray-800 dark:border-gray-700"
-                                />
-                            </div>
-                            <div className="flex gap-2 pt-2">
+                            <div className="pt-4">
                                 <button
                                     onClick={handleUpdate}
-                                    className="flex-1 bg-purple-600 text-white py-2 rounded-lg font-bold hover:bg-purple-700 transition-colors"
+                                    className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
                                 >
                                     Save Changes
-                                </button>
-                                <button
-                                    onClick={() => setIsEditing(false)}
-                                    className="px-4 bg-gray-200 text-gray-700 py-2 rounded-lg font-bold hover:bg-gray-300 transition-colors dark:bg-gray-700 dark:text-gray-300"
-                                >
-                                    Cancel
                                 </button>
                             </div>
                         </div>
                     ) : (
-                        <div className="space-y-3 animate-fade-in">
-                            <DetailRow icon={<Mail size={16} />} label="Email" value={user.email || 'Not set'} />
-                            <DetailRow icon={<Phone size={16} />} label="Phone" value={user.phone_number || 'Not set'} />
-                            <DetailRow icon={<Building size={16} />} label="School" value={user.school || 'Not set'} />
-                            <DetailRow icon={<Shield size={16} />} label="Role" value={user.role || 'Not set'} />
-                            <DetailRow icon={<GraduationCap size={16} />} label="Status" value={user.status || 'Unknown'} />
-                        </div>
-                    )}
+                        /* READ ONLY DETAILS */
+                        <div className="space-y-6">
+                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Contact Information</h4>
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center text-blue-500 shadow-sm border border-gray-100 dark:border-gray-700">
+                                            <Mail size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500 font-medium">Email Address</p>
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{user.email || 'Not set'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center text-green-500 shadow-sm border border-gray-100 dark:border-gray-700">
+                                            <Phone size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500 font-medium">Phone Number</p>
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{user.phone_number || 'Not set'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-                    {/* Actions */}
-                    {!isEditing && (
-                        <div className="pt-4 space-y-2 border-t border-gray-200 dark:border-gray-700">
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="w-full flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-all"
-                            >
-                                <Edit size={16} />
-                                Edit User
-                            </button>
-                            <button
-                                onClick={handleResetPassword}
-                                className="w-full flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all"
-                            >
-                                <Key size={16} />
-                                Reset Password
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                className="w-full flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-all"
-                            >
-                                <Trash2 size={16} />
-                                Delete User
-                            </button>
+                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Academic & Status</h4>
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center text-purple-500 shadow-sm border border-gray-100 dark:border-gray-700">
+                                            <Building size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500 font-medium">School / Department</p>
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{user.school || 'Not set'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center text-orange-500 shadow-sm border border-gray-100 dark:border-gray-700">
+                                            <Shield size={18} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500 font-medium">Account Status</p>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`w-2 h-2 rounded-full ${user.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 capitalize">{user.status}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
+
+                {/* Footer Actions (Only visible when not editing) */}
+                {!isEditing && (
+                    <div className="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900">
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={handleStatusToggle}
+                                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold transition-all shadow-sm border ${user.status === 'active'
+                                    ? 'bg-white text-red-600 border-gray-200 hover:bg-red-50 hover:border-red-200'
+                                    : 'bg-green-600 text-white border-transparent hover:bg-green-700 shadow-green-500/20'
+                                    }`}
+                            >
+                                {user.status === 'active' ? <Ban size={18} /> : <Power size={18} />}
+                                {user.status === 'active' ? 'Suspend' : 'Activate'}
+                            </button>
+
+                            <button
+                                onClick={handleResetPassword}
+                                className="flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-xl font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm"
+                            >
+                                <Key size={18} />
+                                Reset Pwd
+                            </button>
+                        </div>
+                        <button
+                            onClick={handleDelete}
+                            className="w-full mt-3 flex items-center justify-center gap-2 text-gray-400 hover:text-red-500 text-sm font-medium transition-colors py-2"
+                        >
+                            <Trash2 size={16} />
+                            Permanently Delete User
+                        </button>
+                    </div>
+                )}
             </div>
-        </div>
+        </>
     )
 }
 

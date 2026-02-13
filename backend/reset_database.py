@@ -8,7 +8,7 @@ async def reset_database():
     """Clear all data and reset admin credentials"""
     
     # First, create the database if it doesn't exist
-    print("🔧 Ensuring database exists...")
+    print("Ensuring database exists...")
     try:
         # Connect to MySQL without specifying database
         connection = pymysql.connect(
@@ -18,17 +18,19 @@ async def reset_database():
             charset='utf8mb4'
         )
         cursor = connection.cursor()
-        cursor.execute("CREATE DATABASE IF NOT EXISTS gatepass")
-        cursor.execute("USE gatepass")
+        print("Dropping database 'gatepass_v2' if exists (to fix corruption)...")
+        cursor.execute("DROP DATABASE IF EXISTS gatepass_v2")
+        cursor.execute("CREATE DATABASE gatepass_v2")
+        cursor.execute("USE gatepass_v2")
         connection.commit()
         cursor.close()
         connection.close()
-        print("✅ Database 'gatepass' is ready!")
+        print("Database 'gatepass_v2' recreated successfully!")
     except Exception as e:
-        print(f"⚠️  Database creation note: {e}")
+        print(f"Database creation note: {e}")
     
     async with engine.begin() as conn:
-        print("\n🗑️  Clearing all database tables...")
+        print("\nClearing all database tables...")
         
         # Drop all tables in reverse order of dependencies
         tables = [
@@ -50,20 +52,20 @@ async def reset_database():
         for table in tables:
             try:
                 await conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
-                print(f"   ✓ Dropped table: {table}")
+                print(f"   Dropped table: {table}")
             except Exception as e:
-                print(f"   ⚠ Could not drop {table}: {e}")
+                print(f"   Could not drop {table}: {e}")
         
-        print("\n✅ Database cleared successfully!")
-        print("\n🔄 Recreating tables...")
+        print("\nDatabase cleared successfully!")
+        print("\nRecreating tables...")
         
     # Recreate tables using SQLModel
     from app.database import init_db
     await init_db()
-    print("✅ Tables recreated!")
+    print("Tables recreated!")
     
     # Seed fresh admin data
-    print("\n👤 Creating admin user...")
+    print("\nCreating admin user...")
     from app.database import get_session
     from app.models import Role, User, Gate
     from sqlmodel import select
@@ -117,19 +119,22 @@ async def reset_database():
         await session.commit()
         
         print("\n" + "="*60)
-        print("✅ DATABASE RESET COMPLETE!")
+        print("DATABASE RESET COMPLETE!")
         print("="*60)
-        print("\n🔑 NEW ADMIN CREDENTIALS:")
+        print("\nNEW ADMIN CREDENTIALS:")
         print(f"   Email:     admin@smartcampus.edu")
         print(f"   Password:  Admin123!")
         print(f"\n   OR")
         print(f"\n   Admission: ADMIN001")
         print(f"   Password:  Admin123!")
         print("\n" + "="*60)
-        print("⚠️  IMPORTANT: Change this password after first login!")
+        print("IMPORTANT: Change this password after first login!")
         print("="*60 + "\n")
         
         break  # Exit after first session
 
 if __name__ == "__main__":
+    import sys
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(reset_database())

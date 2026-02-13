@@ -93,6 +93,13 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                             Verify Student ID
                         </button>
                         <button
+                            onClick={() => window.location.href = '/gate-pass/entry'}
+                            className="px-6 py-2.5 rounded-xl border-2 border-primary-600 text-primary-600 font-bold hover:bg-primary-50 transition-all flex items-center gap-2"
+                        >
+                            <QrCode size={18} />
+                            Self Check-in
+                        </button>
+                        <button
                             onClick={onGetStarted}
                             className="px-6 py-2.5 rounded-xl bg-[image:var(--gradient-primary)] text-white font-bold hover:opacity-90 transition-all transform hover:scale-105 shadow-lg shadow-primary-500/30"
                         >

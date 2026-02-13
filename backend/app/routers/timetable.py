@@ -298,6 +298,51 @@ async def get_classrooms_detailed(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to fetch classrooms: {str(e)}")
 
+@router.put("/classrooms/{classroom_id}")
+async def update_classroom(
+    classroom_id: str,
+    update_data: dict,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Update classroom details"""
+    try:
+        # Get the classroom
+        classroom = await session.get(Classroom, classroom_id)
+        if not classroom:
+            raise HTTPException(status_code=404, detail="Classroom not found")
+        
+        # Update fields if provided
+        if "room_name" in update_data and update_data["room_name"]:
+            classroom.room_name = update_data["room_name"]
+        if "building" in update_data and update_data["building"]:
+            classroom.building = update_data["building"]
+        if "floor" in update_data and update_data["floor"]:
+            classroom.floor = update_data["floor"]
+        if "capacity" in update_data and update_data["capacity"]:
+            classroom.capacity = int(update_data["capacity"])
+        
+        session.add(classroom)
+        await session.commit()
+        await session.refresh(classroom)
+        
+        return {
+            "message": "Classroom updated successfully",
+            "classroom": {
+                "id": str(classroom.id),
+                "room_code": classroom.room_code,
+                "room_name": classroom.room_name,
+                "building": classroom.building,
+                "floor": classroom.floor,
+                "capacity": classroom.capacity
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error updating classroom: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update classroom: {str(e)}")
+
 @router.post("/generate-all-qr")
 async def generate_all_qr_codes(
     session: AsyncSession = Depends(get_session),
@@ -751,6 +796,45 @@ async def create_timetable_slot(
     await session.refresh(slot)
     
     return slot
+
+@router.put("/timetable/{slot_id}")
+async def update_timetable_slot(
+    slot_id: str,
+    slot_data: dict,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Update a timetable slot"""
+    slot = await session.get(TimetableSlot, uuid.UUID(slot_id))
+    if not slot:
+        raise HTTPException(status_code=404, detail="Timetable slot not found")
+    
+    # Update fields
+    if 'course_id' in slot_data:
+        slot.course_id = uuid.UUID(slot_data['course_id'])
+    if 'classroom_id' in slot_data:
+        slot.classroom_id = uuid.UUID(slot_data['classroom_id'])
+    if 'lecturer_id' in slot_data:
+        slot.lecturer_id = uuid.UUID(slot_data['lecturer_id'])
+    if 'day_of_week' in slot_data:
+        slot.day_of_week = slot_data['day_of_week']
+    if 'start_time' in slot_data:
+        slot.start_time = datetime.strptime(slot_data['start_time'], '%H:%M:%S').time()
+    if 'end_time' in slot_data:
+        slot.end_time = datetime.strptime(slot_data['end_time'], '%H:%M:%S').time()
+    if 'effective_from' in slot_data and slot_data['effective_from']:
+        slot.effective_from = datetime.strptime(slot_data['effective_from'], '%Y-%m-%d').date()
+    if 'effective_until' in slot_data and slot_data['effective_until']:
+        slot.effective_until = datetime.strptime(slot_data['effective_until'], '%Y-%m-%d').date()
+    
+    session.add(slot)
+    await session.commit()
+    await session.refresh(slot)
+    
+    return {
+        "message": "Timetable slot updated successfully",
+        "slot": slot
+    }
 
 @router.delete("/timetable/{slot_id}")
 async def delete_timetable_slot(

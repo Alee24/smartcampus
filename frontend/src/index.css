@@ -67,6 +67,28 @@
 
   body {
     @apply font-sans antialiased text-[var(--text-primary)] bg-[var(--bg-primary)] transition-colors duration-300;
+    /* Performance optimizations */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Performance hints for animations */
+  .glass-card,
+  .animate-fade-in,
+  .animate-scale-in,
+  .animate-slide-in-right {
+    will-change: transform, opacity;
+  }
+
+  /* Contain layout shifts */
+  main {
+    contain: layout style paint;
   }
 }
 
