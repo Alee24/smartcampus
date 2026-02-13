@@ -132,6 +132,7 @@ function App() {
     const [showSecurityCheck, setShowSecurityCheck] = useState(false)
     const [menuConfig, setMenuConfig] = useState<any>({})
     const [showProfileModal, setShowProfileModal] = useState(false)
+    const [activating, setActivating] = useState(false)
 
     // URL Deep Link Handler (QR Codes)
     useEffect(() => {
@@ -248,7 +249,7 @@ function App() {
                 'users': false,
                 'verification': true,
                 'attendance': false,
-                'live': false,
+                'live': true,
                 'gate': true,
                 'vehicles': true,
                 'timetable': false,
@@ -386,37 +387,46 @@ function App() {
     const fetchDashboardData = async () => {
         try {
             const token = localStorage.getItem('token')
-            const headers = { 'Authorization': `Bearer ${token}` }
+            const [sRes, kRes, lRes, aRes] = await Promise.all([
+                fetch('/api/dashboard/stats', { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch('/api/dashboard/kpi', { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch('/api/dashboard/recent-logs', { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch('/api/dashboard/analytics', { headers: { 'Authorization': `Bearer ${token}` } })
+            ])
 
-            const statsRes = await fetch('/api/dashboard/stats', { headers })
-            if (statsRes.ok) setStats(await statsRes.json())
+            if (sRes.ok) setStats(await sRes.json())
+            if (kRes.ok) setKpiData(await kRes.json())
+            if (lRes.ok) setRecentLogs(await lRes.json())
+            if (aRes.ok) setAnalytics(await aRes.json())
+        } catch (e) { console.error('Dashboard fetch error', e) }
+    }
 
-            const logsRes = await fetch('/api/dashboard/recent-logs', { headers })
-            if (logsRes.ok) setRecentLogs(await logsRes.json())
+    const handleActivateLive = async () => {
+        setActivating(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/attendance/sessions/activate-all', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
 
-            const kpiRes = await fetch('/api/dashboard/kpi', { headers })
-            if (kpiRes.ok) setKpiData(await kpiRes.json())
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            const result = await res.json()
 
-            const analRes = await fetch('/api/dashboard/analytics', { headers })
-            if (analRes.ok) setAnalytics(await analRes.json())
-
-            // Fetch today's classes
-            const timetableRes = await fetch('/api/timetable/timetable/weekly', { headers })
-            if (timetableRes.ok) {
-                const weekly = await timetableRes.json()
-                const today = new Date().toLocaleDateString('en-US', { weekday: 'long' })
-                setTodaySessions(weekly[today] || [])
+            if (result.status === 'success') {
+                alert(`✅ Live System Activated!\n${result.message}`)
+                fetchDashboardData()
+            } else {
+                alert(result.message || 'Activation failed')
             }
-
-            // Fetch camera status
-            const camRes = await fetch('/api/cameras/dashboard/stats', { headers })
-            if (camRes.ok) {
-                const camData = await camRes.json()
-                setCameraAlerts(camData.alerts || [])
-            }
-
-        } catch (e) {
-            console.error("Failed to fetch dashboard data", e)
+        } catch (e: any) {
+            console.error('Activation error', e)
+            alert(`❌ Activation Error: ${e.message}`)
+        } finally {
+            setActivating(false)
         }
     }
 
@@ -945,6 +955,43 @@ function App() {
                                 <StatCard title="Security Alerts" value={stats.security_alerts} change="-2%" trend="down" />
                                 <StatCard title="Vehicles Parked" value={stats.vehicles_parked} change="+4%" trend="up" />
                             </div>
+
+                            {/* Live Activation Banner for Admins */}
+                            {(role === 'SuperAdmin' || role === 'Admin') && (
+                                <div className="mb-6 p-6 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl text-white shadow-xl relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+                                        <Activity size={120} />
+                                    </div>
+                                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                        <div>
+                                            <h3 className="text-2xl font-black mb-1 flex items-center gap-2">
+                                                <Activity className="animate-pulse" />
+                                                Live System Control
+                                            </h3>
+                                            <p className="text-indigo-100 text-sm max-w-md">
+                                                Activate real-time monitoring for all classrooms and gates. This will populate the dashboard with live database updates.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={handleActivateLive}
+                                            disabled={activating}
+                                            className="px-8 py-4 bg-white text-indigo-700 rounded-xl font-black shadow-2xl hover:bg-indigo-50 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group"
+                                        >
+                                            {activating ? (
+                                                <>
+                                                    <div className="w-5 h-5 border-4 border-indigo-700/30 border-t-indigo-700 rounded-full animate-spin"></div>
+                                                    Activating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Play size={22} className="fill-current" />
+                                                    ENABLE LIVE TRACKING
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
                                 {/* Main Graph Area */}
