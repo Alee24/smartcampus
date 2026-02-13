@@ -355,10 +355,10 @@ async def generate_all_qr_codes(
     import base64
     
     # Get the current origin from the request
-    # This ensures the QR codes work for the domain/IP currently being used
-    scheme = request.url.scheme
-    netloc = request.url.netloc
-    origin = f"{scheme}://{netloc}"
+    # Detect if we're behind a proxy (like Apache/Nginx)
+    forwarded_proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    forwarded_host = request.headers.get("x-forwarded-host", request.url.netloc)
+    origin = f"{forwarded_proto}://{forwarded_host}"
     
     # Get all classrooms
     classrooms_result = await session.exec(select(Classroom))
