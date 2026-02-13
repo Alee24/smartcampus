@@ -84,24 +84,26 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                             Smart Campus
                         </span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 md:gap-3">
                         <button
                             onClick={() => setShowVerification(true)}
-                            className="px-6 py-2.5 rounded-xl border-2 border-primary-600 text-primary-600 font-bold hover:bg-primary-50 transition-all flex items-center gap-2"
+                            className="hidden sm:flex px-4 md:px-6 py-2 rounded-xl border-2 border-primary-600 text-primary-600 font-bold hover:bg-primary-50 transition-all items-center gap-2 text-sm md:text-base"
                         >
                             <UserCheck size={18} />
-                            Verify Student ID
+                            <span className="hidden lg:inline">Verify Student ID</span>
+                            <span className="lg:hidden">Verify</span>
                         </button>
                         <button
                             onClick={() => window.location.href = '/gate-pass/entry'}
-                            className="px-6 py-2.5 rounded-xl border-2 border-primary-600 text-primary-600 font-bold hover:bg-primary-50 transition-all flex items-center gap-2"
+                            className="hidden sm:flex px-4 md:px-6 py-2 rounded-xl border-2 border-primary-600 text-primary-600 font-bold hover:bg-primary-50 transition-all items-center gap-2 text-sm md:text-base"
                         >
                             <QrCode size={18} />
-                            Self Check-in
+                            <span className="hidden lg:inline">Self Check-in</span>
+                            <span className="lg:hidden">Check-in</span>
                         </button>
                         <button
                             onClick={onGetStarted}
-                            className="px-6 py-2.5 rounded-xl bg-[image:var(--gradient-primary)] text-white font-bold hover:opacity-90 transition-all transform hover:scale-105 shadow-lg shadow-primary-500/30"
+                            className="px-4 md:px-8 py-2 md:py-2.5 rounded-xl bg-[image:var(--gradient-primary)] text-white font-bold hover:opacity-90 transition-all transform hover:scale-105 shadow-lg shadow-primary-500/30 text-sm md:text-base whitespace-nowrap"
                         >
                             Sign In
                         </button>
@@ -131,14 +133,14 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                             <p className="text-xl text-[var(--text-secondary)] mb-8 leading-relaxed">
                                 Comprehensive gate control, attendance tracking, and real-time monitoring system designed for modern educational institutions.
                             </p>
-                            <div className="flex flex-wrap gap-4">
+                            <div className="flex flex-col sm:flex-row gap-4">
                                 <button
                                     onClick={onGetStarted}
-                                    className="px-8 py-4 rounded-xl bg-[image:var(--gradient-primary)] text-white font-bold hover:opacity-90 transition-all transform hover:scale-105 shadow-2xl shadow-primary-500/40 flex items-center gap-2"
+                                    className="w-full sm:w-auto px-8 py-4 rounded-xl bg-[image:var(--gradient-primary)] text-white font-bold hover:opacity-90 transition-all transform hover:scale-105 shadow-2xl shadow-primary-500/40 flex items-center justify-center gap-2"
                                 >
                                     Get Started <ArrowRight size={20} />
                                 </button>
-                                <button className="px-8 py-4 rounded-xl border-2 border-[var(--border-color)] text-[var(--text-primary)] font-bold hover:bg-[var(--bg-primary)] transition-all">
+                                <button className="w-full sm:w-auto px-8 py-4 rounded-xl border-2 border-[var(--border-color)] text-[var(--text-primary)] font-bold hover:bg-[var(--bg-primary)] transition-all">
                                     Watch Demo
                                 </button>
                             </div>
