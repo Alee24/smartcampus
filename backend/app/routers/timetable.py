@@ -345,7 +345,6 @@ async def update_classroom(
 
 @router.post("/generate-all-qr")
 async def generate_all_qr_codes(
-    request: Request,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
