@@ -35,7 +35,8 @@ export default function Login({ onLogin }: LoginProps) {
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}))
-                throw new Error(errData.detail || 'Invalid credentials')
+                const statusSuffix = ` (Error ${response.status})`
+                throw new Error((errData.detail || 'Invalid credentials') + statusSuffix)
             }
 
             const data = await response.json()
