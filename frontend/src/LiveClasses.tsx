@@ -191,7 +191,7 @@ export default function LiveClasses({ fullScreen = false }: { fullScreen?: boole
                 pdf.rect(0, 0, pageHeight, pageHeight, 'F'); // Square on left
 
                 // QR Generation
-                const content = room.qr_content || room.room_code;
+                const content = room.qr_content ? `${window.location.origin}${room.qr_content}` : `${window.location.origin}/?room=${room.room_code}`;
                 const qrDataUrl = await QRCode.toDataURL(content, {
                     width: 1000,
                     margin: 1,

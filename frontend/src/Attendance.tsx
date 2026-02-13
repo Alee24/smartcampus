@@ -145,6 +145,17 @@ function StudentView() {
     const handleScan = async (code: string) => {
         setStatus({ type: 'loading', msg: 'Verifying Attendance...' })
         try {
+            // Extract room code if the scanned text is a URL
+            let roomCode = code;
+            if (code.includes('?room=')) {
+                try {
+                    const url = new URL(code);
+                    roomCode = url.searchParams.get('room') || code;
+                } catch (e) {
+                    // Not a valid URL, use original code
+                }
+            }
+
             const meta = await gatherMetadata()
             const token = localStorage.getItem('token')
 
@@ -152,7 +163,7 @@ function StudentView() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
-                    room_code: code,
+                    room_code: roomCode,
                     latitude: meta.geolocation?.lat || null,
                     longitude: meta.geolocation?.lng || null,
                     metadata: meta
@@ -361,7 +372,7 @@ function LecturerView() {
                     ) : (
                         <div className="text-center space-y-4">
                             <div className="bg-white p-4 inline-block rounded-xl shadow-inner border border-slate-100">
-                                <QRCodeCanvas value={`${window.location.protocol}//${window.location.host}/?room=${activeSession.room_code}`} size={180} />
+                                <QRCodeCanvas value={`${window.location.origin}/?room=${activeSession.room_code}`} size={180} />
                             </div>
                             <div>
                                 <h2 className="text-2xl font-bold">{activeSession.room_unique_number}</h2>

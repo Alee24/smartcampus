@@ -345,6 +345,7 @@ async def update_classroom(
 
 @router.post("/generate-all-qr")
 async def generate_all_qr_codes(
+    request: Request,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
@@ -353,20 +354,11 @@ async def generate_all_qr_codes(
     from io import BytesIO
     import base64
     
-    # Detect Local IP for Production/LAN access
-    import socket
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        local_ip = s.getsockname()[0]
-        s.close()
-    except Exception:
-        # Fallback attempts
-        try:
-             local_ip = socket.gethostbyname(socket.gethostname())
-        except:
-             local_ip = "localhost"
-    
+    # Get the current origin from the request
+    # This ensures the QR codes work for the domain/IP currently being used
+    scheme = request.url.scheme
+    netloc = request.url.netloc
+    origin = f"{scheme}://{netloc}"
     
     # Get all classrooms
     classrooms_result = await session.exec(select(Classroom))
@@ -378,9 +370,9 @@ async def generate_all_qr_codes(
     generated_count = 0
     
     for room in classrooms:
-        # Generate QR code data as a URL for LAN access
-        # Format: http://<LAN_IP>:5173/?room=<ROOM_CODE>
-        qr_data = f"http://{local_ip}:5173/?room={room.room_code}"
+        # Generate QR code data as a URL
+        # Format: http://<DOMAIN_OR_IP>/?room=<ROOM_CODE>
+        qr_data = f"{origin}/?room={room.room_code}"
         
         # Create QR code
         qr = qrcode.QRCode(
@@ -407,7 +399,6 @@ async def generate_all_qr_codes(
         generated_count += 1
     
     await session.commit()
-    
     
     return {
         "success": True,

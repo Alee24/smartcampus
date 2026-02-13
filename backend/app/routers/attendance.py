@@ -671,7 +671,7 @@ async def get_room_qr_list(
             "building": room.building or "Main Building",
             "floor": room.floor or "Ground Floor",
             "capacity": room.capacity,
-            "qr_content": f"http://{local_ip}:5173/?room={room.room_code}",
+            "qr_content": f"/?room={room.room_code}",
             "schedule": final_schedules.get(room.id, [])
         }
         for room in classrooms
