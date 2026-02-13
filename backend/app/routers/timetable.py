@@ -349,16 +349,11 @@ async def generate_all_qr_codes(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Generate unique QR codes for all classrooms and save to database"""
-    import qrcode
-    from io import BytesIO
-    import base64
-    
-    # Get the current origin from the request
-    # Detect if we're behind a proxy (like Apache/Nginx)
-    forwarded_proto = request.headers.get("x-forwarded-proto", request.url.scheme)
-    forwarded_host = request.headers.get("x-forwarded-host", request.url.netloc)
-    origin = f"{forwarded_proto}://{forwarded_host}"
+    """
+    Switch to Dynamic QR Codes.
+    This endpoint now CLEARS the static 'qr_code' field from the database,
+    as the frontend now generates QR codes dynamically using the browser's current URL.
+    """
     
     # Get all classrooms
     classrooms_result = await session.exec(select(Classroom))
@@ -370,31 +365,9 @@ async def generate_all_qr_codes(
     generated_count = 0
     
     for room in classrooms:
-        # Generate QR code data as a URL
-        # Format: http://<DOMAIN_OR_IP>/?room=<ROOM_CODE>
-        qr_data = f"{origin}/?room={room.room_code}"
-        
-        # Create QR code
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(qr_data)
-        qr.make(fit=True)
-        
-        # Create image
-        img = qr.make_image(fill_color="black", back_color="white")
-        
-        # Convert to base64
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        img_str = base64.b64encode(buffer.getvalue()).decode()
-        qr_code_data_url = f"data:image/png;base64,{img_str}"
-        
-        # Save to database
-        room.qr_code = qr_code_data_url
+        # Clear the static QR code image to save space and prevent stale IPs
+        # The frontend now generates this on the fly.
+        room.qr_code = None
         session.add(room)
         generated_count += 1
     
@@ -403,7 +376,7 @@ async def generate_all_qr_codes(
     return {
         "success": True,
         "generated": generated_count,
-        "message": f"Successfully generated QR codes for {generated_count} classrooms"
+        "message": f"Successfully switched {generated_count} classrooms to Dynamic QR Codes (Static images cleared)"
     }
 
 @router.post("/deactivate-all")

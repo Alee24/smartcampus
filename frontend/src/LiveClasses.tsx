@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Clock, MapPin, Users, Activity, MonitorPlay, Printer, Download, BarChart2, School, UserCheck } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import { QRCodeCanvas } from 'qrcode.react';
 
 export default function LiveClasses({ fullScreen = false }: { fullScreen?: boolean }) {
     const [sessions, setSessions] = useState<any[]>([]);

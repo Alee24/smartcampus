@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import { QRCodeCanvas } from 'qrcode.react';
 
 interface Classroom {
     id: string
@@ -680,10 +681,16 @@ export default function ClassroomManagement() {
                                         )}
 
                                         {/* QR Code */}
-                                        {(!room.is_active && room.qr_code) && (
+                                        {!room.is_active && (
                                             <div className="mt-auto group" onClick={(e) => { e.stopPropagation(); downloadSinglePoster(room.room_code); }}>
-                                                <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm group-hover:shadow-md transition-all relative">
-                                                    <img src={room.qr_code} className="w-full h-32 object-contain opacity-80 group-hover:opacity-100 transition-opacity" alt="QR" />
+                                                <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm group-hover:shadow-md transition-all relative flex justify-center items-center">
+                                                    <QRCodeCanvas
+                                                        value={`${window.location.origin}/?room=${room.room_code}`}
+                                                        size={120}
+                                                        level="H"
+                                                        includeMargin={true}
+                                                        className="opacity-80 group-hover:opacity-100 transition-opacity"
+                                                    />
                                                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 rounded-xl">
                                                         <Printer className="text-black drop-shadow-sm" size={24} />
                                                     </div>
