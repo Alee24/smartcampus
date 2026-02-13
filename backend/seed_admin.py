@@ -1,11 +1,16 @@
 import asyncio
-from app.database import get_session
+from app.database import get_session, init_db
 from app.models import User, Role
 from app.auth import get_password_hash
 from sqlmodel import select
 
 async def seed_admin():
     print("--- Admin Account Seeder ---")
+    
+    # 0. Initialize Database (Create tables if they don't exist)
+    print("Initializing database tables...")
+    await init_db()
+    
     async for session in get_session():
         # 1. Ensure SuperAdmin role exists
         role_stmt = select(Role).where(Role.name == "SuperAdmin")
