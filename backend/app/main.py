@@ -208,10 +208,30 @@ async def seed_data():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    await init_db()
+    # Startup - Retry logic for DB connection to handle slow-starting DB containers
+    max_retries = 10
+    retry_delay = 5
+    for i in range(max_retries):
+        try:
+            print(f"Initializing database (Attempt {i+1}/{max_retries})...")
+            await init_db()
+            print("Database initialized successfully.")
+            break
+        except Exception as e:
+            print(f"Database initialization failed: {e}")
+            if i < max_retries - 1:
+                print(f"Retrying in {retry_delay} seconds...")
+                await asyncio.sleep(retry_delay)
+            else:
+                print("Max retries reached. Backend may crash.")
+                # We don't raise here to allow app to possibly start for debugging, 
+                # though most endpoints will fail.
+
     # Basic Seeder
-    await seed_data()
+    try:
+        await seed_data()
+    except Exception as e:
+        print(f"Seed data failed: {e}")
     
     # Start Scheduler
     try:
