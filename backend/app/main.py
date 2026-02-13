@@ -37,7 +37,7 @@ async def seed_data():
         else:
             role_id = existing_role.id
             
-        # Check User
+        # Check Primary User (mettoalex@gmail.com)
         user_stmt = select(User).where(User.email == "mettoalex@gmail.com")
         existing_user = (await session.exec(user_stmt)).first()
         
@@ -55,7 +55,27 @@ async def seed_data():
             )
             session.add(new_user)
             await session.commit()
-            print("Seeded SuperAdmin user.")
+            print("Seeded SuperAdmin user: mettoalex@gmail.com")
+
+        # Check SmartCampus Admin User (Requested: smartcampus@kkdes.co.ke)
+        sc_stmt = select(User).where(User.email == "smartcampus@kkdes.co.ke")
+        sc_user = (await session.exec(sc_stmt)).first()
+        
+        if not sc_user:
+            hashed_sc = get_password_hash("smartcampus")
+            new_sc = User(
+                admission_number="ADMIN002",
+                full_name="Smart Campus Admin",
+                school="Administration",
+                email="smartcampus@kkdes.co.ke",
+                hashed_password=hashed_sc,
+                role_id=role_id,
+                status="active",
+                has_smartphone=True
+            )
+            session.add(new_sc)
+            await session.commit()
+            print("Seeded Admin user: smartcampus@kkdes.co.ke")
 
         # Check Gate
         gate_stmt = select(Gate).where(Gate.name == "Main Gate")
