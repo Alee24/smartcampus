@@ -1,6 +1,6 @@
 {
-    "name": "Smart Campus GatePass",
-    "short_name": "GatePass",
+    "name": "Smart Campus",
+    "short_name": "Smart Campus",
     "description": "Smart Campus Attendance and Access Control System",
     "start_url": "/",
     "display": "standalone",
