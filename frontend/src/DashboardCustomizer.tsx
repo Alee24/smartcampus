@@ -24,14 +24,16 @@ const AVAILABLE_MENUS = [
     { id: 'projects', label: 'Projects', icon: Briefcase, description: 'Project management' },
     { id: 'bulk', label: 'Data Import', icon: Database, description: 'Bulk CSV uploads' },
     { id: 'settings', label: 'Settings', icon: Settings, description: 'System configuration' },
-    { id: 'integrations', label: 'Integrations', icon: Server, description: 'Third-party integrations' }
+    { id: 'integrations', label: 'Integrations', icon: Server, description: 'Third-party integrations' },
+    { id: 'fleet', label: 'Fleet Management', icon: Car, description: 'University fleet and transport' }
 ]
 
 const ROLES = [
     { id: 'Student', label: 'Student', color: 'bg-blue-500' },
     { id: 'Lecturer', label: 'Lecturer', color: 'bg-purple-500' },
     { id: 'Guardian', label: 'Guardian', color: 'bg-green-500' },
-    { id: 'Security', label: 'Security', color: 'bg-orange-500' }
+    { id: 'Security', label: 'Security', color: 'bg-orange-500' },
+    { id: 'FleetManager', label: 'Fleet Manager', color: 'bg-rose-500' }
 ]
 
 export default function DashboardCustomizer() {
@@ -126,7 +128,16 @@ export default function DashboardCustomizer() {
                 'projects': false,
                 'bulk': false,
                 'settings': false,
-                'integrations': false
+                'integrations': false,
+                'fleet': true
+            },
+            'FleetManager': {
+                'dashboard': true,
+                'fleet': true,
+                'users': true,
+                'vehicles': true,
+                'gate': true,
+                'bulk': true
             }
         }
     }

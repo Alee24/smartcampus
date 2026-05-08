@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { User, Lock, Bell, CheckCircle, Shield } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { User, Lock, Bell, CheckCircle, Shield, Cog } from 'lucide-react'
 
 export default function Settings() {
     const [activeSection, setActiveSection] = useState('profile')
@@ -7,6 +7,56 @@ export default function Settings() {
     const [email, setEmail] = useState('')
     const [status, setStatus] = useState('')
     const [loading, setLoading] = useState(false)
+    const [demoMode, setDemoMode] = useState(false)
+
+    useEffect(() => {
+        if (activeSection === 'system') {
+            fetchSystemSettings()
+        }
+    }, [activeSection])
+
+    const fetchSystemSettings = async () => {
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/admin/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setDemoMode(data.demo_mode === 'true')
+            }
+        } catch (err) {
+            console.error("Failed to fetch settings", err)
+        }
+    }
+
+    const toggleDemoMode = async () => {
+        setLoading(true)
+        try {
+            const token = localStorage.getItem('token')
+            const newValue = !demoMode
+
+            const res = await fetch('/api/admin/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ demo_mode: newValue ? 'true' : 'false' })
+            })
+
+            if (res.ok) {
+                setDemoMode(newValue)
+                setStatus(`Demo Mode ${newValue ? 'Enabled' : 'Disabled'}`)
+            } else {
+                setStatus('Failed to update setting')
+            }
+        } catch (err) {
+            setStatus('Error updating setting')
+        } finally {
+            setLoading(false)
+        }
+    }
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -68,6 +118,12 @@ export default function Settings() {
                     >
                         <Shield size={18} /> Security
                     </button>
+                    <button
+                        onClick={() => setActiveSection('system')}
+                        className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-colors ${activeSection === 'system' ? 'bg-[var(--primary-color)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-primary)]'}`}
+                    >
+                        <Cog size={18} /> System
+                    </button>
                 </div>
             </div>
 
@@ -121,8 +177,8 @@ export default function Settings() {
                             </div>
 
                             {status && (
-                                <div className={`p-3 rounded-lg text-sm ${status.includes('success') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                    {status.includes('success') && <CheckCircle size={14} className="inline mr-2" />}
+                                <div className={`p-3 rounded-lg text-sm ${status.includes('success') || status.includes('Enabled') || status.includes('Disabled') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    {(status.includes('success') || status.includes('Enabled') || status.includes('Disabled')) && <CheckCircle size={14} className="inline mr-2" />}
                                     {status}
                                 </div>
                             )}
@@ -145,6 +201,42 @@ export default function Settings() {
                         <Shield size={48} className="mx-auto mb-4 opacity-50" />
                         <h3 className="text-xl font-bold mb-2">Coming Soon</h3>
                         <p>This section is under development.</p>
+                    </div>
+                )}
+
+                {activeSection === 'system' && (
+                    <div className="glass-card p-8 max-w-2xl">
+                        <h2 className="text-2xl font-bold mb-6">System Settings</h2>
+
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between p-4 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-color)]">
+                                <div>
+                                    <h3 className="font-bold flex items-center gap-2">
+                                        <Shield size={18} className="text-purple-600" />
+                                        Demo Mode
+                                    </h3>
+                                    <p className="text-sm text-[var(--text-secondary)] mt-1">
+                                        Enable passwordless login for demo users on the login screen.
+                                        <br />
+                                        <span className="text-xs text-orange-500 font-bold">⚠️ Only enable for demonstration purposes!</span>
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={toggleDemoMode}
+                                    disabled={loading}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${demoMode ? 'bg-purple-600' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${demoMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+
+                            {status && (
+                                <div className={`p-3 rounded-lg text-sm ${status.includes('Enabled') || status.includes('Disabled') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    {(status.includes('Enabled') || status.includes('Disabled')) && <CheckCircle size={14} className="inline mr-2" />}
+                                    {status}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

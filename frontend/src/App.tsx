@@ -43,6 +43,7 @@ const StudentDashboard = lazy(() => import('./StudentDashboard'))
 const SelfServiceEntry = lazy(() => import('./SelfServiceEntry'))
 const Reports = lazy(() => import('./Reports'))
 const CampusCalendar = lazy(() => import('./CampusCalendar'))
+const FleetManagement = lazy(() => import('./FleetManagement'))
 
 // 3. Non-lazy components (small/critical)
 import InstallPWA from './components/InstallPWA'
@@ -126,7 +127,8 @@ function App() {
         settings: false,
         analytics: false,
         support: false,
-        legal: false
+        legal: false,
+        fleet: false
     })
     const toggleGroup = (key: string) => setOpenGroups((prev: any) => ({ ...prev, [key]: !prev[key] }))
     const [showSecurityCheck, setShowSecurityCheck] = useState(false)
@@ -272,7 +274,8 @@ function App() {
                 'projects': true,
                 'bulk': true,
                 'settings': true,
-                'integrations': true
+                'integrations': true,
+                'fleet': true
             }
         }
     }
@@ -672,16 +675,30 @@ function App() {
                         )}
 
                         {/* Analytics - Only for Admins */}
-                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
-                            <SidebarGroup title="Analytics" isOpen={openGroups.analytics} onToggle={() => toggleGroup('analytics')} isSidebarCollapsed={isSidebarCollapsed}>
+                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'fleetmanager') && (
+                            <SidebarGroup title="Fleet Management" isOpen={openGroups.fleet} onToggle={() => toggleGroup('fleet')} isSidebarCollapsed={isSidebarCollapsed}>
                                 <NavItem
-                                    icon={<BarChart3 size={18} />}
-                                    label="System Reports"
-                                    active={activeTab === 'reports'}
-                                    onClick={() => { setActiveTab('reports'); setSidebarOpen(false); }}
+                                    icon={<Car size={18} />}
+                                    label="Fleet Dashboard"
+                                    active={activeTab === 'fleet'}
+                                    onClick={() => { setActiveTab('fleet'); setSidebarOpen(false); }}
+                                />
+                                <NavItem
+                                    icon={<MapPin size={18} />}
+                                    label="Live Tracking"
+                                    active={activeTab === 'fleet-tracking'}
+                                    onClick={() => { setActiveTab('fleet-tracking'); setSidebarOpen(false); }}
+                                />
+                                <NavItem
+                                    icon={<Briefcase size={18} />}
+                                    label="Trips & Trips"
+                                    active={activeTab === 'fleet-trips'}
+                                    onClick={() => { setActiveTab('fleet-trips'); setSidebarOpen(false); }}
                                 />
                             </SidebarGroup>
                         )}
+
+                        {/* Analytics - Only for Admins */}
                     </nav>
                 </div>
 
@@ -1253,6 +1270,9 @@ function App() {
                     {activeTab === 'scan-logs' && <ScanLogs />}
                     {activeTab === 'gates-dashboard' && <GatesDashboard />}
                     {activeTab === 'student-dashboard' && <StudentDashboard />}
+                    {activeTab === 'fleet' && <FleetManagement />}
+                    {activeTab === 'fleet-tracking' && <FleetManagement initialTab="tracking" />}
+                    {activeTab === 'fleet-trips' && <FleetManagement initialTab="trips" />}
                     <footer className="mt-10 pt-6 border-t border-[var(--border-color)] text-center text-sm text-[var(--text-secondary)]">
                         <p>&copy; {new Date().getFullYear()} Smart Campus System.</p>
                     </footer>

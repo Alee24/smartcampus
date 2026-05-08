@@ -132,7 +132,28 @@ class Vehicle(UUIDModel, table=True):
     driver_contact: Optional[str] = None
     driver_id_number: Optional[str] = None
 
+    # Fleet specific fields
+    vehicle_type: str = "utility" # bus, staff, field, shuttle, utility
+    fuel_type: str = "petrol" # petrol, diesel, electric
+    fuel_capacity: float = 0.0
+    engine_number: Optional[str] = None
+    chassis_number: Optional[str] = None
+    year: Optional[int] = None
+    
+    # Status
+    status: str = "active" # active, maintenance, inactive, trip
+    
+    # Metadata
+    insurance_expiry: Optional[date] = None
+    last_service_date: Optional[date] = None
+    next_service_odometer: Optional[float] = None
+    current_odometer: float = 0.0
+
     logs: List["VehicleLog"] = Relationship(back_populates="vehicle")
+    trips: List["FleetTrip"] = Relationship(back_populates="vehicle")
+    fuel_logs: List["FleetFuelLog"] = Relationship(back_populates="vehicle")
+    maintenance_logs: List["FleetMaintenanceLog"] = Relationship(back_populates="vehicle")
+    gps_logs: List["FleetGPSLog"] = Relationship(back_populates="vehicle")
 
 class VehicleLog(UUIDModel, table=True):
     __tablename__ = "vehicle_logs"
@@ -146,6 +167,111 @@ class VehicleLog(UUIDModel, table=True):
     manual_override: bool = Field(default=False)
 
     vehicle: Vehicle = Relationship(back_populates="logs")
+
+# --- Fleet Management System Models ---
+
+class FleetTrip(UUIDModel, table=True):
+    __tablename__ = "fleet_trips"
+    vehicle_id: UUID = Field(foreign_key="vehicles.id")
+    driver_id: UUID = Field(foreign_key="users.id")
+    
+    purpose: str
+    origin: str
+    destination: str
+    planned_route: Optional[str] = None
+    
+    scheduled_departure: datetime
+    actual_departure: Optional[datetime] = None
+    actual_arrival: Optional[datetime] = None
+    eta: Optional[datetime] = None
+    
+    start_odometer: float = 0.0
+    end_odometer: Optional[float] = None
+    
+    status: str = "scheduled" # scheduled, ongoing, completed, cancelled
+    
+    notes: Optional[str] = None
+    
+    vehicle: Vehicle = Relationship(back_populates="trips")
+    driver: User = Relationship()
+    passengers: List["FleetPassengerManifest"] = Relationship(back_populates="trip")
+
+class FleetPassengerManifest(UUIDModel, table=True):
+    __tablename__ = "fleet_passenger_manifest"
+    trip_id: UUID = Field(foreign_key="fleet_trips.id")
+    user_id: Optional[UUID] = Field(foreign_key="users.id", nullable=True) # If student/staff
+    
+    # For visitors or if user_id is null
+    passenger_name: str
+    passenger_id_no: Optional[str] = None 
+    phone_number: Optional[str] = None
+    
+    pickup_location: Optional[str] = None
+    drop_off_location: Optional[str] = None
+    seat_number: Optional[str] = None
+    
+    check_in_time: Optional[datetime] = None
+    arrival_confirmed: bool = False
+    
+    trip: FleetTrip = Relationship(back_populates="passengers")
+
+class FleetFuelLog(UUIDModel, table=True):
+    __tablename__ = "fleet_fuel_logs"
+    vehicle_id: UUID = Field(foreign_key="vehicles.id")
+    driver_id: UUID = Field(foreign_key="users.id")
+    
+    amount_liters: float
+    cost: float
+    station_name: Optional[str] = None
+    odometer_reading: float
+    receipt_image: Optional[str] = None
+    
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    vehicle: Vehicle = Relationship(back_populates="fuel_logs")
+
+class FleetGPSLog(UUIDModel, table=True):
+    __tablename__ = "fleet_gps_logs"
+    vehicle_id: UUID = Field(foreign_key="vehicles.id")
+    
+    latitude: float
+    longitude: float
+    speed: float = 0.0
+    heading: Optional[float] = None
+    ignition_status: bool = False
+    
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    
+    vehicle: Vehicle = Relationship(back_populates="gps_logs")
+
+class FleetMaintenanceLog(UUIDModel, table=True):
+    __tablename__ = "fleet_maintenance_logs"
+    vehicle_id: UUID = Field(foreign_key="vehicles.id")
+    
+    service_type: str # regular, repair, tire_change, inspection
+    description: str
+    cost: float = 0.0
+    odometer_reading: float
+    
+    service_date: date
+    next_service_due_date: Optional[date] = None
+    next_service_due_odometer: Optional[float] = None
+    
+    performed_by: Optional[str] = None # Workshop name
+    
+    vehicle: Vehicle = Relationship(back_populates="maintenance_logs")
+
+class FleetNotification(UUIDModel, table=True):
+    __tablename__ = "fleet_notifications"
+    vehicle_id: Optional[UUID] = Field(foreign_key="vehicles.id", nullable=True)
+    trip_id: Optional[UUID] = Field(foreign_key="fleet_trips.id", nullable=True)
+    
+    alert_type: str # over_speed, route_deviation, fuel_theft, emergency, maintenance_due
+    message: str
+    severity: str = "info" # info, warning, critical
+    is_read: bool = False
+    
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 # Classroom/Room Management
 class Classroom(UUIDModel, table=True):

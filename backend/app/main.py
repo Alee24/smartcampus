@@ -22,216 +22,224 @@ if sys.platform == 'win32':
 os.makedirs("static/profiles", exist_ok=True)
 
 # Seed Data
-async def seed_data():
-    async for session in get_session():
-        # Check Role
-        role_stmt = select(Role).where(Role.name == "SuperAdmin")
-        existing_role = (await session.exec(role_stmt)).first()
-        
-        if not existing_role:
-            admin_role = Role(name="SuperAdmin", description="System Administrator")
-            session.add(admin_role)
-            await session.commit()
-            await session.refresh(admin_role)
-            role_id = admin_role.id
-        else:
-            role_id = existing_role.id
-            
-        # Check Primary User (mettoalex@gmail.com)
-        user_stmt = select(User).where(User.email == "mettoalex@gmail.com")
-        existing_user = (await session.exec(user_stmt)).first()
-        
-        if not existing_user:
-            hashed = get_password_hash("Digital2025")
-            new_user = User(
-                admission_number="ADMIN001",
-                full_name="Alex Metto",
-                school="Administration",
-                email="mettoalex@gmail.com",
-                hashed_password=hashed,
-                role_id=role_id,
-                status="active",
-                has_smartphone=True
-            )
-            session.add(new_user)
-            await session.commit()
-            print("Seeded SuperAdmin user: mettoalex@gmail.com")
-
-        # Check SmartCampus Admin User (Requested: smartcampus@kkdes.co.ke)
-        sc_stmt = select(User).where(User.email == "smartcampus@kkdes.co.ke")
-        sc_user = (await session.exec(sc_stmt)).first()
-        
-        if not sc_user:
-            hashed_sc = get_password_hash("smartcampus")
-            new_sc = User(
-                admission_number="ADMIN002",
-                full_name="Smart Campus Admin",
-                school="Administration",
-                email="smartcampus@kkdes.co.ke",
-                hashed_password=hashed_sc,
-                role_id=role_id,
-                status="active",
-                has_smartphone=True
-            )
-            session.add(new_sc)
-            await session.commit()
-            print("Seeded Admin user: smartcampus@kkdes.co.ke")
-
-        # Check Gate
-        gate_stmt = select(Gate).where(Gate.name == "Main Gate")
-        existing_gate = (await session.exec(gate_stmt)).first()
-        
-        if not existing_gate:
-            main_gate = Gate(name="Main Gate", location="Main Entrance")
-            session.add(main_gate)
-            await session.commit()
-            print("Seeded Main Gate.")
-
-        # --- Seed Sample Users for Testing ---
-        # 1. Lecturer
-        lecturer_role = (await session.exec(select(Role).where(Role.name == "Lecturer"))).first()
-        if not lecturer_role:
-            lecturer_role = Role(name="Lecturer", description="Academic Staff")
-            session.add(lecturer_role)
-            await session.commit()
-            await session.refresh(lecturer_role)
-        
-        lec_user = (await session.exec(select(User).where(User.email == "lecturer@test.com"))).first()
-        if not lec_user:
-            lec_user = User(
-                admission_number="LEC001",
-                full_name="Dr. Jane Smith",
-                email="lecturer@test.com",
-                hashed_password=get_password_hash("Pass123!"),
-                role_id=lecturer_role.id,
-                school="Science",
-                status="active"
-            )
-            session.add(lec_user)
-            print("Seeded Lecturer: lecturer@test.com / Pass123!")
-
-        # 2. Security Guard
-        guard_role = (await session.exec(select(Role).where(Role.name == "Security"))).first()
-        if not guard_role:
-            guard_role = Role(name="Security", description="Gate & Patrol")
-            session.add(guard_role)
-            await session.commit()
-            await session.refresh(guard_role)
-
-        guard_user = (await session.exec(select(User).where(User.email == "guard@test.com"))).first()
-        if not guard_user:
-            guard_user = User(
-                admission_number="SEC001",
-                full_name="Officer Bob Jones",
-                email="guard@test.com",
-                hashed_password=get_password_hash("Pass123!"),
-                role_id=guard_role.id,
-                school="Security Dept",
-                status="active"
-            )
-            session.add(guard_user)
-            print("Seeded Guard: guard@test.com")
-
-        # 3. Guardian (Parent)
-        guardian_role = (await session.exec(select(Role).where(Role.name == "Guardian"))).first()
-        if not guardian_role:
-            guardian_role = Role(name="Guardian", description="Parent or Guardian")
-            session.add(guardian_role)
-            await session.commit()
-            await session.refresh(guardian_role)
-
-        guardian_user = (await session.exec(select(User).where(User.email == "parent@test.com"))).first()
-        if not guardian_user:
-            guardian_user = User(
-                admission_number="PAR001", # Internal ID for parent
-                full_name="Parent Smith",
-                first_name="Parent", 
-                last_name="Smith",
-                phone_number="+254700000000",
-                email="parent@test.com",
-                hashed_password=get_password_hash("Parent123!"),
-                role_id=guardian_role.id,
-                school="N/A",
-                status="active"
-            )
-            session.add(guardian_user)
-            await session.commit()
-            await session.refresh(guardian_user)
-            print("Seeded Guardian: parent@test.com / Parent123!")
-
-            # Link a student to this guardian (Optional, if student exists)
-            # Find a student (e.g., student from bulk upload or create one)
-            # For now, let's update our simulated student if we had one, or created one.
-
-            print("Seeded Guard: guard@test.com / Pass123!")
-
-        # 3. Student
-        student_role = (await session.exec(select(Role).where(Role.name == "Student"))).first()
-        if not student_role:
-            student_role = Role(name="Student", description="Regular Student")
-            session.add(student_role)
-            await session.commit()
-            await session.refresh(student_role)
-
-        stud_user = (await session.exec(select(User).where(User.admission_number == "STD001"))).first()
-        if not stud_user:
-            stud_user = User(
-                admission_number="STD001",
-                full_name="Alice Student",
-                email="student@test.com",
-                hashed_password=get_password_hash("Pass123!"),
-                role_id=student_role.id,
-                school="Engineering",
-                status="active"
-            )
-            session.add(stud_user)
-            print("Seeded Student: STD001 / Pass123!")
-        
-        # 4. Sample Classrooms for QR Code Generation
-        sample_rooms = [
-            {"room_code": "LH1", "room_name": "Lecture Hall 1", "building": "Main Building", "floor": "Ground Floor", "capacity": 150},
-            {"room_code": "LH2", "room_name": "Lecture Hall 2", "building": "Main Building", "floor": "First Floor", "capacity": 120},
-            {"room_code": "LAB1", "room_name": "Computer Lab 1", "building": "ICT Block", "floor": "Ground Floor", "capacity": 40},
-            {"room_code": "LAB2", "room_name": "Science Lab", "building": "Science Block", "floor": "Second Floor", "capacity": 30},
-            {"room_code": "ROOM101", "room_name": "Tutorial Room 101", "building": "Academic Block", "floor": "First Floor", "capacity": 25}
-        ]
-        
-        for room_data in sample_rooms:
-            existing_room = (await session.exec(select(Classroom).where(Classroom.room_code == room_data["room_code"]))).first()
-            if not existing_room:
-                new_room = Classroom(**room_data)
-                session.add(new_room)
-        
-        print("Seeded sample classrooms for QR generation.")
-        
+async def seed_data(session: AsyncSession):
+    # Check Role
+    role_stmt = select(Role).where(Role.name == "SuperAdmin")
+    existing_role = (await session.exec(role_stmt)).first()
+    
+    if not existing_role:
+        admin_role = Role(name="SuperAdmin", description="System Administrator")
+        session.add(admin_role)
         await session.commit()
+        await session.refresh(admin_role)
+        role_id = admin_role.id
+    else:
+        role_id = existing_role.id
+        
+    # Check Primary User (mettoalex@gmail.com)
+    user_stmt = select(User).where(User.email == "mettoalex@gmail.com")
+    existing_user = (await session.exec(user_stmt)).first()
+    
+    if not existing_user:
+        hashed = get_password_hash("Digital2025")
+        new_user = User(
+            admission_number="ADMIN001",
+            full_name="Alex Metto",
+            school="Administration",
+            email="mettoalex@gmail.com",
+            hashed_password=hashed,
+            role_id=role_id,
+            status="active",
+            has_smartphone=True
+        )
+        session.add(new_user)
+        await session.commit()
+        print("Seeded SuperAdmin user: mettoalex@gmail.com")
+
+    # Check SmartCampus Admin User (Requested: smartcampus@kkdes.co.ke)
+    sc_stmt = select(User).where(User.email == "smartcampus@kkdes.co.ke")
+    sc_user = (await session.exec(sc_stmt)).first()
+    
+    if not sc_user:
+        hashed_sc = get_password_hash("smartcampus")
+        new_sc = User(
+            admission_number="ADMIN002",
+            full_name="Smart Campus Admin",
+            school="Administration",
+            email="smartcampus@kkdes.co.ke",
+            hashed_password=hashed_sc,
+            role_id=role_id,
+            status="active",
+            has_smartphone=True
+        )
+        session.add(new_sc)
+        await session.commit()
+        print("Seeded Admin user: smartcampus@kkdes.co.ke")
+
+    # Check Gate
+    gate_stmt = select(Gate).where(Gate.name == "Main Gate")
+    existing_gate = (await session.exec(gate_stmt)).first()
+    
+    if not existing_gate:
+        main_gate = Gate(name="Main Gate", location="Main Entrance")
+        session.add(main_gate)
+        await session.commit()
+        print("Seeded Main Gate.")
+
+    # --- Seed Sample Users for Testing ---
+    # 1. Lecturer
+    lecturer_role = (await session.exec(select(Role).where(Role.name == "Lecturer"))).first()
+    if not lecturer_role:
+        lecturer_role = Role(name="Lecturer", description="Academic Staff")
+        session.add(lecturer_role)
+        await session.commit()
+        await session.refresh(lecturer_role)
+    
+    lec_user = (await session.exec(select(User).where(User.email == "lecturer@test.com"))).first()
+    if not lec_user:
+        lec_user = User(
+            admission_number="LEC001",
+            full_name="Dr. Jane Smith",
+            email="lecturer@test.com",
+            hashed_password=get_password_hash("Pass123!"),
+            role_id=lecturer_role.id,
+            school="Science",
+            status="active"
+        )
+        session.add(lec_user)
+        print("Seeded Lecturer: lecturer@test.com / Pass123!")
+
+    # 2. Security Guard
+    guard_role = (await session.exec(select(Role).where(Role.name == "Security"))).first()
+    if not guard_role:
+        guard_role = Role(name="Security", description="Gate & Patrol")
+        session.add(guard_role)
+        await session.commit()
+        await session.refresh(guard_role)
+
+    guard_user = (await session.exec(select(User).where(User.email == "guard@test.com"))).first()
+    if not guard_user:
+        guard_user = User(
+            admission_number="SEC001",
+            full_name="Officer Bob Jones",
+            email="guard@test.com",
+            hashed_password=get_password_hash("Pass123!"),
+            role_id=guard_role.id,
+            school="Security Dept",
+            status="active"
+        )
+        session.add(guard_user)
+        print("Seeded Guard: guard@test.com")
+
+    # 3. Guardian (Parent)
+    guardian_role = (await session.exec(select(Role).where(Role.name == "Guardian"))).first()
+    if not guardian_role:
+        guardian_role = Role(name="Guardian", description="Parent or Guardian")
+        session.add(guardian_role)
+        await session.commit()
+        await session.refresh(guardian_role)
+
+    guardian_user = (await session.exec(select(User).where(User.email == "parent@test.com"))).first()
+    if not guardian_user:
+        guardian_user = User(
+            admission_number="PAR001", # Internal ID for parent
+            full_name="Parent Smith",
+            first_name="Parent", 
+            last_name="Smith",
+            phone_number="+254700000000",
+            email="parent@test.com",
+            hashed_password=get_password_hash("Parent123!"),
+            role_id=guardian_role.id,
+            school="N/A",
+            status="active"
+        )
+        session.add(guardian_user)
+        await session.commit()
+        await session.refresh(guardian_user)
+        print("Seeded Guardian: parent@test.com / Parent123!")
+
+    # 3. Student
+    student_role = (await session.exec(select(Role).where(Role.name == "Student"))).first()
+    if not student_role:
+        student_role = Role(name="Student", description="Regular Student")
+        session.add(student_role)
+        await session.commit()
+        await session.refresh(student_role)
+
+    # 4. Fleet Manager
+    fleet_manager_role = (await session.exec(select(Role).where(Role.name == "FleetManager"))).first()
+    if not fleet_manager_role:
+        fleet_manager_role = Role(name="FleetManager", description="Fleet Operations Manager")
+        session.add(fleet_manager_role)
+        await session.commit()
+        await session.refresh(fleet_manager_role)
+
+    # 5. Driver
+    driver_role = (await session.exec(select(Role).where(Role.name == "Driver"))).first()
+    if not driver_role:
+        driver_role = Role(name="Driver", description="Vehicle Driver")
+        session.add(driver_role)
+        await session.commit()
+        await session.refresh(driver_role)
+
+    stud_user = (await session.exec(select(User).where(User.admission_number == "STD001"))).first()
+    if not stud_user:
+        stud_user = User(
+            admission_number="STD001",
+            full_name="Alice Student",
+            email="student@test.com",
+            hashed_password=get_password_hash("Pass123!"),
+            role_id=student_role.id,
+            school="Engineering",
+            status="active"
+        )
+        session.add(stud_user)
+        print("Seeded Student: STD001 / Pass123!")
+    
+    # 4. Sample Classrooms for QR Code Generation
+    sample_rooms = [
+        {"room_code": "LH1", "room_name": "Lecture Hall 1", "building": "Main Building", "floor": "Ground Floor", "capacity": 150},
+        {"room_code": "LH2", "room_name": "Lecture Hall 2", "building": "Main Building", "floor": "First Floor", "capacity": 120},
+        {"room_code": "LAB1", "room_name": "Computer Lab 1", "building": "ICT Block", "floor": "Ground Floor", "capacity": 40},
+        {"room_code": "LAB2", "room_name": "Science Lab", "building": "Science Block", "floor": "Second Floor", "capacity": 30},
+        {"room_code": "ROOM101", "room_name": "Tutorial Room 101", "building": "Academic Block", "floor": "First Floor", "capacity": 25}
+    ]
+    
+    for room_data in sample_rooms:
+        existing_room = (await session.exec(select(Classroom).where(Classroom.room_code == room_data["room_code"]))).first()
+        if not existing_room:
+            new_room = Classroom(**room_data)
+            session.add(new_room)
+    
+    print("Seeded sample classrooms for QR generation.")
+    await session.commit()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup - Retry logic for DB connection to handle slow-starting DB containers
+    # Startup - Retry logic for DB connection
     max_retries = 10
     retry_delay = 5
+    db_ok = False
     for i in range(max_retries):
         try:
             print(f"Initializing database (Attempt {i+1}/{max_retries})...")
             await init_db()
             print("Database initialized successfully.")
+            db_ok = True
             break
         except Exception as e:
             print(f"Database initialization failed: {e}")
             if i < max_retries - 1:
-                print(f"Retrying in {retry_delay} seconds...")
                 await asyncio.sleep(retry_delay)
-            else:
-                print("Max retries reached. Backend may crash.")
-                # We don't raise here to allow app to possibly start for debugging, 
-                # though most endpoints will fail.
-
-    # Basic Seeder
-    try:
-        await seed_data()
-    except Exception as e:
-        print(f"Seed data failed: {e}")
+    
+    if db_ok:
+        try:
+            from app.database import get_session
+            async for session in get_session():
+                await seed_data(session)
+                break
+        except Exception as e:
+            print(f"Seed data failed: {e}")
     
     # Start Scheduler
     try:
@@ -239,7 +247,7 @@ async def lifespan(app: FastAPI):
         start_scheduler()
     except Exception as e:
         print(f"Scheduler failed to start: {e}")
-        
+    
     yield
     # Shutdown
     from app.scheduler import scheduler
@@ -265,18 +273,6 @@ app.add_middleware(
 os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
-@app.get("/api/debug/reset-admin")
-async def emergency_reset(session: AsyncSession = Depends(get_session)):
-    user = (await session.exec(select(User).where(User.email == "mettoalex@gmail.com"))).first()
-    if not user:
-        return {"status": "error", "message": "Admin user mettoalex@gmail.com not found"}
-    
-    user.hashed_password = get_password_hash("Digital2025")
-    user.status = "active"
-    session.add(user)
-    await session.commit()
-    return {"status": "success", "message": "Password reset to Digital2025"}
 
 # Auth Endpoint
 @app.post("/api/token")
@@ -489,6 +485,10 @@ app.include_router(gate_control.router, prefix="/api/gate", tags=["gate"])
 app.include_router(attendance.router, prefix="/api/attendance", tags=["attendance"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
+# Import and include fleet router
+from app.routers import fleet
+app.include_router(fleet.router, prefix="/api/fleet", tags=["fleet"])
+
 # Import and include notifications router
 from app.routers import notifications
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
@@ -520,3 +520,77 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "environment": "production-ready"}
+
+# --- Demo Mode Endpoints ---
+
+@app.get("/api/public/config")
+async def get_public_config(session: AsyncSession = Depends(get_session)):
+    """
+    Publicly accessible configuration (e.g., for Login page).
+    """
+    stmt = select(SystemConfig).where(SystemConfig.key == "demo_mode")
+    config = (await session.exec(stmt)).first()
+    
+    is_demo = False
+    if config and config.value.lower() == "true":
+        is_demo = True
+        
+    return {
+        "demo_mode": is_demo,
+        "system_name": "Smart Campus"
+    }
+
+class DemoLoginRequest(BaseModel):
+    role: str # admin, lecturer, security, student, guardian
+
+@app.post("/api/auth/demo-login")
+async def demo_login(req: DemoLoginRequest, session: AsyncSession = Depends(get_session)):
+    """
+    Passwordless login for Demo Mode.
+    ONLY works if 'demo_mode' system config is set to 'true'.
+    """
+    # 1. Check if Demo Mode is enabled
+    stmt = select(SystemConfig).where(SystemConfig.key == "demo_mode")
+    config = (await session.exec(stmt)).first()
+    
+    if not config or config.value.lower() != "true":
+        raise HTTPException(status_code=403, detail="Demo mode is not enabled")
+    
+    # 2. Select Target User based on Role
+    email_map = {
+        "admin": "smartcampus@kkdes.co.ke",
+        "lecturer": "lecturer@test.com",
+        "security": "guard@test.com",
+        "student": "student@test.com",
+        "guardian": "parent@test.com"
+    }
+    
+    target_email = email_map.get(req.role)
+    if not target_email:
+        raise HTTPException(status_code=400, detail="Invalid demo role")
+        
+    # 3. Find User
+    user = (await session.exec(select(User).where(User.email == target_email))).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"Demo user for {req.role} not found (Seed data missing?)")
+        
+    # 4. Generate Token (Bypass password check)
+    access_token = create_access_token(data={"sub": user.email or user.admission_number})
+    
+    # Get role name
+    role_name = "student"
+    if user.role:
+        role_name = user.role.name
+    
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "user": {
+            "id": str(user.id),
+            "full_name": user.full_name,
+            "email": user.email,
+            "admission_number": user.admission_number,
+            "role": role_name,
+            "profile_image": user.profile_image
+        }
+    }

@@ -12,10 +12,11 @@ RUN npm run build
 # Production stage
 FROM nginx:stable-alpine
 
+# Copy built files
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
-# Custom nginx config to handle SPA routing if needed
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy custom nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

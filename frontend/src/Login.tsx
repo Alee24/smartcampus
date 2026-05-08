@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface LoginProps {
     onLogin: () => void
@@ -10,6 +10,45 @@ export default function Login({ onLogin }: LoginProps) {
 
     const [error, setError] = useState('')
     const [isLoading, setIsLoading] = useState(false)
+    const [demoMode, setDemoMode] = useState(false)
+
+    useEffect(() => {
+        fetch('/api/public/config')
+            .then(res => res.json())
+            .then(data => {
+                if (data.demo_mode) setDemoMode(true)
+            })
+            .catch(err => console.error("Failed to fetch config", err))
+    }, [])
+
+    const handleDemoLogin = async (role: string) => {
+        setIsLoading(true)
+        setError('')
+        try {
+            const res = await fetch('/api/auth/demo-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role })
+            })
+            if (!res.ok) {
+                const data = await res.json()
+                throw new Error(data.detail || 'Demo login failed')
+            }
+            const data = await res.json()
+            localStorage.setItem('token', data.access_token)
+            if (data.user) {
+                localStorage.setItem('userRole', data.user.role || 'student')
+                localStorage.setItem('userName', data.user.full_name || '')
+                localStorage.setItem('userEmail', data.user.email || data.user.admission_number || '')
+                localStorage.setItem('userImage', data.user.profile_image || '')
+            }
+            onLogin()
+        } catch (err: any) {
+            setError(err.message)
+        } finally {
+            setIsLoading(false)
+        }
+    }
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -89,6 +128,11 @@ export default function Login({ onLogin }: LoginProps) {
                         Smart Campus
                     </h1>
                     <p className="text-[var(--text-secondary)] mt-2 font-medium">Secure Campus Entry System</p>
+                    {demoMode && (
+                        <span className="inline-block mt-2 px-3 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full border border-purple-200 animate-pulse">
+                            DEMO MODE ACTIVE
+                        </span>
+                    )}
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-6">
@@ -132,6 +176,21 @@ export default function Login({ onLogin }: LoginProps) {
                             </svg>
                         ) : 'Sign In'}
                     </button>
+
+                    {demoMode && (
+                        <div className="pt-4 border-t border-[var(--border-color)]">
+                            <p className="text-center text-xs font-bold text-[var(--text-secondary)] mb-3 uppercase tracking-wider">
+                                🚀 Demo Quick Access
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button type="button" onClick={() => handleDemoLogin('admin')} disabled={isLoading} className="p-2 text-xs font-semibold rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors">Admin</button>
+                                <button type="button" onClick={() => handleDemoLogin('lecturer')} disabled={isLoading} className="p-2 text-xs font-semibold rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors">Lecturer</button>
+                                <button type="button" onClick={() => handleDemoLogin('security')} disabled={isLoading} className="p-2 text-xs font-semibold rounded bg-green-100 text-green-700 hover:bg-green-200 transition-colors">Security</button>
+                                <button type="button" onClick={() => handleDemoLogin('student')} disabled={isLoading} className="p-2 text-xs font-semibold rounded bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors">Student</button>
+                            </div>
+                            <button type="button" onClick={() => handleDemoLogin('guardian')} disabled={isLoading} className="w-full mt-2 p-2 text-xs font-semibold rounded bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors">Guardian / Parent</button>
+                        </div>
+                    )}
 
                     <div className="relative flex py-2 items-center">
                         <div className="flex-grow border-t border-gray-700"></div>
