@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    Car, MapPin, Navigation, Fuel, Tool, AlertTriangle, 
+    Car, MapPin, Navigation, Fuel, Wrench, AlertTriangle, 
     Users, Plus, Search, Filter, ChevronRight, Activity, 
     Calendar, Clock, Shield, Download, FileText, Settings,
     Map as MapIcon, TrendingUp, DollarSign
@@ -74,7 +74,7 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                 <StatCard 
                     title="Maintenance Due" 
                     value={stats.maintenance_due || 0} 
-                    icon={<Tool className="text-red-600" />} 
+                    icon={<Wrench className="text-red-600" />} 
                     change="Requires Action"
                     color="red"
                 />
@@ -315,7 +315,7 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                     { id: 'tracking', label: 'Live Map', icon: MapPin },
                     { id: 'trips', label: 'Trips', icon: Navigation },
                     { id: 'fuel', label: 'Fuel Logs', icon: Fuel },
-                    { id: 'maintenance', label: 'Service', icon: Tool },
+                    { id: 'maintenance', label: 'Service', icon: Wrench },
                     { id: 'drivers', label: 'Drivers', icon: Users }
                 ].map(tab => (
                     <button
@@ -372,7 +372,7 @@ function StatCard({ title, value, icon, change, color }: any) {
 
 function AlertItem({ type, title, desc, time }: any) {
     const icons: any = {
-        maintenance: <Tool className="text-red-600" size={16} />,
+        maintenance: <Wrench className="text-red-600" size={16} />,
         speed: <Activity className="text-orange-600" size={16} />,
         fuel: <Fuel className="text-amber-600" size={16} />
     };
@@ -545,7 +545,7 @@ function MaintenanceManager({ vehicles }: { vehicles: any[] }) {
                 <div className="glass-card p-6 bg-gradient-to-br from-red-500 to-rose-600 text-white">
                     <div className="flex justify-between items-start mb-6">
                         <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                            <Tool size={24} />
+                            <Wrench size={24} />
                         </div>
                         <span className="text-[10px] font-bold bg-white/20 px-2 py-1 rounded-lg uppercase">Critical</span>
                     </div>
@@ -571,7 +571,7 @@ function MaintenanceManager({ vehicles }: { vehicles: any[] }) {
                                         <p className="text-[10px] font-bold text-gray-400">Current Odo</p>
                                         <p className="text-sm font-bold">{v.current_odometer || '42,100'} km</p>
                                     </div>
-                                    <button className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"><Tool size={18} /></button>
+                                    <button className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"><Wrench size={18} /></button>
                                 </div>
                             </div>
                         ))}
