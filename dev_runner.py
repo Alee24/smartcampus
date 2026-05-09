@@ -20,6 +20,13 @@ def stream_output(process, prefix, color_code):
 def main():
     print("--- Smart Campus Single-Terminal Dev Runner ---")
     
+    # Get absolute paths
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    backend_dir = os.path.join(script_dir, "backend")
+    frontend_dir = os.path.join(script_dir, "frontend")
+    
+    print(f"Project Root: {script_dir}")
+    
     # 1. Kill ports 8000 and 5173 logic
     print("Cleaning up old processes...")
     # Kill Node (Frontend)
@@ -36,7 +43,7 @@ def main():
     # Use python -u for unbuffered stdout
     backend = subprocess.Popen(
         [sys.executable, "-u", "-m", "uvicorn", "app.main:app", "--reload", "--host", "0.0.0.0"],
-        cwd="backend",
+        cwd=backend_dir,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -46,7 +53,7 @@ def main():
     # Frontend
     frontend = subprocess.Popen(
         ["npm", "run", "dev", "--", "--host"],
-        cwd="frontend",
+        cwd=frontend_dir,
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

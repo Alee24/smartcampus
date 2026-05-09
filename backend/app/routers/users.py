@@ -45,27 +45,67 @@ async def update_user(
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_admin_user)
 ):
-    """Update user details"""
-    user = await session.get(User, user_id)
+    """Update user details (admin only)"""
+    from uuid import UUID
+    
+    try:
+        user_uuid = UUID(user_id)
+        user = await session.get(User, user_uuid)
+    except ValueError:
+        user_stmt = select(User).where(User.id == user_id)
+        user = (await session.exec(user_stmt)).first()
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Update fields
-    for key, value in user_data.items():
-        if hasattr(user, key) and key not in ['id', 'hashed_password', 'role']:
-            setattr(user, key, value)
+    # Update allowed fields
+    if 'full_name' in user_data: user.full_name = user_data['full_name']
+    if 'first_name' in user_data: user.first_name = user_data['first_name']
+    if 'last_name' in user_data: user.last_name = user_data['last_name']
+    if 'admission_number' in user_data: user.admission_number = user_data['admission_number']
+    if 'email' in user_data: user.email = user_data['email']
+    if 'school' in user_data: user.school = user_data['school']
+    if 'phone_number' in user_data: user.phone_number = user_data['phone_number']
+    if 'gender' in user_data: user.gender = user_data['gender']
+    if 'program' in user_data: user.program = user_data['program']
+    
+    if 'admission_date' in user_data:
+        try:
+            if user_data['admission_date']:
+                user.admission_date = datetime.strptime(user_data['admission_date'], '%Y-%m-%d').date()
+            else:
+                user.admission_date = None
+        except ValueError: pass
             
-    # Handle Role update if role name provided
+    if 'status' in user_data:
+        user.status = user_data['status']
+            
+    if 'expiry_date' in user_data:
+        try:
+            if user_data['expiry_date']:
+                user.expiry_date = datetime.strptime(user_data['expiry_date'], '%Y-%m-%d').date()
+            else:
+                user.expiry_date = None
+        except ValueError: pass
+            
+    if 'guardian_id' in user_data:
+        if user_data['guardian_id']:
+            try: user.guardian_id = UUID(str(user_data['guardian_id']))
+            except ValueError: pass
+        else:
+            user.guardian_id = None
+            
     if 'role' in user_data:
         role_stmt = select(Role).where(Role.name == user_data['role'])
         role = (await session.exec(role_stmt)).first()
-        if role:
-            user.role_id = role.id
+        if role: user.role_id = role.id
 
-    session.add(user)
+    if 'profile_image' in user_data and user_data['profile_image']:
+         user.profile_image = user_data['profile_image']
+    
     await session.commit()
     await session.refresh(user)
-    return user
+    return {"message": "User updated successfully", "user": user}
 
 @router.delete("/{user_id}")
 async def delete_user(
@@ -100,6 +140,8 @@ async def get_current_user_info(
         "admission_number": current_user.admission_number,
         "school": current_user.school,
         "phone_number": current_user.phone_number,
+        "gender": current_user.gender,
+        "program": current_user.program,
         "profile_image": current_user.profile_image,
         "role": role.name if role else "Unknown",
         "role_id": current_user.role_id
@@ -194,6 +236,8 @@ async def create_user(
         school=new_user['school'],
         email=new_user.get('email'),
         phone_number=new_user.get('phone_number'),
+        gender=new_user.get('gender'),
+        program=new_user.get('program'),
         hashed_password=hashed_pwd,
         role_id=role.id,
         status="active",
@@ -297,6 +341,8 @@ async def bulk_upload_students(
                     phone_number=phone_val,
                     school=school_val,
                     email=email_val,
+                    gender=row.get('gender'),
+                    program=row.get('program'),
                     hashed_password=hashed,
                     role_id=student_role.id,
                     status="active"
@@ -581,82 +627,6 @@ async def upload_profile_image(
         "user_name": target_user.full_name
     }
 
-@router.put("/{user_id}")
-async def update_user(
-    user_id: str,
-    user_data: dict,
-    session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_admin_user)
-):
-    """Update user details (admin only)"""
-    from uuid import UUID
-    
-    try:
-        user_uuid = UUID(user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
-    
-    # Get user
-    user = await session.get(User, user_uuid)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Update allowed fields
-    if 'full_name' in user_data:
-        user.full_name = user_data['full_name']
-    if 'first_name' in user_data:
-        user.first_name = user_data['first_name']
-    if 'last_name' in user_data:
-        user.last_name = user_data['last_name']
-    if 'admission_number' in user_data:
-        user.admission_number = user_data['admission_number']
-    if 'email' in user_data:
-        user.email = user_data['email']
-    if 'school' in user_data:
-        user.school = user_data['school']
-    if 'phone_number' in user_data:
-        user.phone_number = user_data['phone_number']
-    if 'admission_date' in user_data:
-        # Expect YYYY-MM-DD
-        try:
-            if user_data['admission_date']:
-                user.admission_date = datetime.strptime(user_data['admission_date'], '%Y-%m-%d').date()
-            else:
-                user.admission_date = None
-        except ValueError:
-            pass # Ignore invalid date format for now or raise error
-            
-    if 'status' in user_data:
-        # Validate status
-        valid_statuses = ['active', 'suspended', 'deceased', 'graduated', 'notice']
-        if user_data['status'] in valid_statuses:
-            user.status = user_data['status']
-            
-    if 'expiry_date' in user_data:
-        try:
-            if user_data['expiry_date']:
-                user.expiry_date = datetime.strptime(user_data['expiry_date'], '%Y-%m-%d').date()
-            else:
-                user.expiry_date = None
-        except ValueError:
-            pass
-            
-    if 'guardian_id' in user_data:
-        if user_data['guardian_id']:
-            try:
-                user.guardian_id = UUID(str(user_data['guardian_id']))
-            except ValueError:
-                pass # Ignore invalid UUID
-        else:
-            user.guardian_id = None
-            
-    if 'profile_image' in user_data and user_data['profile_image']:
-         user.profile_image = user_data['profile_image']
-    
-    await session.commit()
-    await session.refresh(user)
-    
-    return {"message": "User updated successfully", "user": user}
 
 @router.post("/{user_id}/reset-password")
 async def reset_user_password(
@@ -791,6 +761,8 @@ async def create_user_complete(
         last_name=data.get('last_name'),
         email=data.get('email'),
         phone_number=data.get('phone_number'),
+        gender=data.get('gender'),
+        program=data.get('program'),
         school=data.get('school', 'General'),
         role_id=role_obj.id,
         hashed_password=hashed,

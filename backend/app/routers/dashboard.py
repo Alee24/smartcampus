@@ -83,8 +83,9 @@ async def get_recent_logs(session: AsyncSession = Depends(get_session), current_
     p_stm = select(EntryLog).order_by(EntryLog.entry_time.desc()).limit(10)
     p_logs = (await session.exec(p_stm)).all()
     
-    # 2. Vehicle Entries
-    v_stm = select(VehicleLog).order_by(VehicleLog.entry_time.desc()).limit(10)
+    # 2. Vehicle Entries - Join with Vehicle to get plate_number
+    from sqlalchemy.orm import selectinload
+    v_stm = select(VehicleLog).options(selectinload(VehicleLog.vehicle)).order_by(VehicleLog.entry_time.desc()).limit(10)
     v_logs = (await session.exec(v_stm)).all()
     
     combined = []
@@ -103,8 +104,9 @@ async def get_recent_logs(session: AsyncSession = Depends(get_session), current_
 
     # Process Vehicle Logs
     for v in v_logs:
+         plate = v.vehicle.plate_number if v.vehicle else "Unknown Vehicle"
          combined.append({
-             "user": f"{v.plate_number}",
+             "user": f"{plate}",
              "time_obj": v.entry_time,
              "time": v.entry_time.strftime("%H:%M %p"),
              "status": "Vehicle Entry",

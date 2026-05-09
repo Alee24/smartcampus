@@ -24,7 +24,7 @@ class User(UUIDModel, table=True):
     email: Optional[str] = Field(default=None, unique=True, index=True)
     hashed_password: str
     role_id: UUID = Field(foreign_key="roles.id")
-    status: str = Field(default="active") # active, cleared, suspended, Unregistered
+    status: str = Field(default="Active") # Active, Graduated, Suspended, Registered, Deferred, Unregistered
     has_smartphone: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
@@ -37,6 +37,8 @@ class User(UUIDModel, table=True):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone_number: Optional[str] = None
+    gender: Optional[str] = None # male, female, other
+    program: Optional[str] = None # e.g. B.Sc Computer Science
     guardian_id: Optional[UUID] = Field(default=None, foreign_key="users.id", nullable=True)
 
     role: Role = Relationship(back_populates="users")

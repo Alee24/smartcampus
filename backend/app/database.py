@@ -17,6 +17,10 @@ async def init_db():
     async with engine.begin() as conn:
         # await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
+    
+    # Run manual migrations for existing tables
+    await migrate_users()
+    await migrate_fleet()
 
 async def get_session() -> AsyncSession:
     async_session = sessionmaker(
@@ -26,8 +30,38 @@ async def get_session() -> AsyncSession:
         yield session
 
 from sqlalchemy import text
+async def migrate_users():
+    """Manual migration to add columns for extended user profiles."""
+    print("Checking users table schema...")
+    new_cols = {
+        "gender": "VARCHAR(255)",
+        "program": "VARCHAR(255)",
+        "first_name": "VARCHAR(255)",
+        "last_name": "VARCHAR(255)",
+        "phone_number": "VARCHAR(255)"
+    }
+    
+    try:
+        async with engine.begin() as conn:
+            def get_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                return [c['name'] for c in inspector.get_columns('users')]
+            
+            columns = await conn.run_sync(get_cols)
+            
+            for col, type_ in new_cols.items():
+                if col not in columns:
+                    print(f"Adding column {col} to users table...")
+                    await conn.execute(text(f"ALTER TABLE users ADD COLUMN {col} {type_}"))
+            
+            print("User profile migration checked/applied.")
+    except Exception as e:
+        print(f"User migration skipped/failed: {e}")
+
 async def migrate_fleet():
     """Manual migration to add columns for Fleet Management if they don't exist."""
+    print("Checking vehicles table schema...")
     new_vehicle_cols = {
         "vehicle_type": "VARCHAR(255) DEFAULT 'utility'",
         "fuel_type": "VARCHAR(255) DEFAULT 'petrol'",
@@ -42,18 +76,21 @@ async def migrate_fleet():
         "current_odometer": "FLOAT DEFAULT 0.0"
     }
     
-    async with engine.begin() as conn:
-        # Check columns
-        from sqlalchemy import inspect
-        def get_cols(connection):
-            inspector = inspect(connection)
-            return [c['name'] for c in inspector.get_columns('vehicles')]
-        
-        columns = await conn.run_sync(get_cols)
-        
-        for col, type_ in new_vehicle_cols.items():
-            if col not in columns:
-                print(f"Adding column {col} to vehicles table...")
-                await conn.execute(text(f"ALTER TABLE vehicles ADD COLUMN {col} {type_}"))
-        
-        print("Fleet migration checked/applied.")
+    try:
+        async with engine.begin() as conn:
+            # Check columns
+            def get_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                return [c['name'] for c in inspector.get_columns('vehicles')]
+            
+            columns = await conn.run_sync(get_cols)
+            
+            for col, type_ in new_vehicle_cols.items():
+                if col not in columns:
+                    print(f"Adding column {col} to vehicles table...")
+                    await conn.execute(text(f"ALTER TABLE vehicles ADD COLUMN {col} {type_}"))
+            
+            print("Fleet migration checked/applied.")
+    except Exception as e:
+        print(f"Fleet migration skipped/failed: {e}")

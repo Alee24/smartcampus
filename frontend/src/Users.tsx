@@ -3,7 +3,7 @@ import {
     UserPlus, Search, Filter, X, Edit, Trash2, Mail, Phone,
     Building, GraduationCap, Shield, ChevronLeft, ChevronRight,
     MoreVertical, CheckCircle, XCircle, AlertCircle, Camera, Key, LayoutGrid, Users as UsersIcon,
-    Ban, Power, Lock
+    Ban, Power, Lock, RefreshCw, Calendar
 } from 'lucide-react'
 
 export default function Users() {
@@ -85,17 +85,22 @@ export default function Users() {
 
     const getStatusColor = (status: string) => {
         switch (status?.toLowerCase()) {
-            case 'active': return 'bg-green-100 text-green-700 border-green-200'
+            case 'active': 
+            case 'registered': return 'bg-green-100 text-green-700 border-green-200'
             case 'suspended': return 'bg-red-100 text-red-700 border-red-200'
-            case 'cleared': return 'bg-blue-100 text-blue-700 border-blue-200'
-            default: return 'bg-yellow-100 text-yellow-700 border-yellow-200'
+            case 'graduated': return 'bg-blue-100 text-blue-700 border-blue-200'
+            case 'deferred': return 'bg-orange-100 text-orange-700 border-orange-200'
+            default: return 'bg-gray-100 text-gray-700 border-gray-200'
         }
     }
 
     const getStatusIcon = (status: string) => {
         switch (status?.toLowerCase()) {
-            case 'active': return <CheckCircle size={14} />
+            case 'active': 
+            case 'registered': return <CheckCircle size={14} />
             case 'suspended': return <Ban size={14} />
+            case 'graduated': return <GraduationCap size={14} />
+            case 'deferred': return <Calendar size={14} />
             default: return <AlertCircle size={14} />
         }
     }
@@ -143,9 +148,9 @@ export default function Users() {
     // Calculate Stats
     const stats = {
         total: users.length,
-        active: users.filter(u => u.status === 'active').length,
+        active: users.filter(u => ['active', 'Active', 'Registered'].includes(u.status)).length,
         students: users.filter(u => u.role === 'Student').length,
-        staff: users.filter(u => u.role === 'Lecturer' || u.role === 'Admin').length
+        staff: users.filter(u => u.role === 'Lecturer' || u.role === 'Admin' || u.role === 'Security').length
     }
 
     if (loading) {
@@ -268,8 +273,10 @@ export default function Users() {
                         >
                             <option value="all">All Status</option>
                             <option value="active">Active</option>
+                            <option value="registered">Registered</option>
                             <option value="suspended">Suspended</option>
-                            <option value="cleared">Cleared</option>
+                            <option value="graduated">Graduated</option>
+                            <option value="deferred">Deferred</option>
                         </select>
                     </div>
                 </div>
@@ -490,13 +497,16 @@ export default function Users() {
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handleQuickStatusUpdate(user, user.status === 'active' ? 'suspended' : 'active')
+                                            const statuses = ['Active', 'Suspended', 'Graduated', 'Registered', 'Deferred'];
+                                            const currentIndex = statuses.indexOf(user.status || 'Active');
+                                            const nextStatus = statuses[(currentIndex + 1) % statuses.length];
+                                            handleQuickStatusUpdate(user, nextStatus)
                                         }}
-                                        className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${user.status === 'active' ? 'text-red-500 hover:text-red-600' : 'text-green-500 hover:text-green-600'}`}
-                                        title={user.status === 'active' ? 'Suspend User' : 'Activate User'}
+                                        className="flex flex-col items-center justify-center gap-1 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600"
+                                        title="Cycle Status"
                                     >
-                                        {user.status === 'active' ? <Ban size={16} /> : <Power size={16} />}
-                                        <span className="text-[10px] font-medium">{user.status === 'active' ? 'Suspend' : 'Activate'}</span>
+                                        <RefreshCw size={16} />
+                                        <span className="text-[10px] font-medium">Cycle Status</span>
                                     </button>
 
                                     <button
@@ -750,16 +760,25 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                         /* EDIT FORM */
                         <div className="space-y-5 animate-fade-in">
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="col-span-2">
-                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">First Name</label>
                                     <input
                                         type="text"
-                                        value={editForm.full_name || ''}
-                                        onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
+                                        value={editForm.first_name || ''}
+                                        onChange={e => setEditForm({ ...editForm, first_name: e.target.value })}
                                         className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
                                     />
                                 </div>
                                 <div>
+                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.last_name || ''}
+                                        onChange={e => setEditForm({ ...editForm, last_name: e.target.value })}
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
+                                    />
+                                </div>
+                                <div className="col-span-2">
                                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Email</label>
                                     <input
                                         type="email"
@@ -774,6 +793,28 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                                         type="text"
                                         value={editForm.phone_number || ''}
                                         onChange={e => setEditForm({ ...editForm, phone_number: e.target.value })}
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Gender</label>
+                                    <select
+                                        value={editForm.gender || ''}
+                                        onChange={e => setEditForm({ ...editForm, gender: e.target.value })}
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
+                                    >
+                                        <option value="">Select Gender</option>
+                                        <option value="male">Male</option>
+                                        <option value="female">Female</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Program / Course</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.program || ''}
+                                        onChange={e => setEditForm({ ...editForm, program: e.target.value })}
                                         className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
                                     />
                                 </div>
@@ -907,10 +948,14 @@ function DetailRow({ icon, label, value }: any) {
 function AddUserModal({ onClose, onRefresh }: any) {
     const [formData, setFormData] = useState({
         admission_number: '',
-        full_name: '',
+        first_name: '',
+        last_name: '',
         email: '',
+        phone_number: '',
         school: '',
-        role: 'Student'
+        program: '',
+        gender: '',
+        role_name: 'Student'
     })
 
     const handleSubmit = async (e: any) => {
@@ -962,23 +1007,86 @@ function AddUserModal({ onClose, onRefresh }: any) {
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Full Name</label>
-                            <input
-                                type="text"
-                                required
-                                value={formData.full_name}
-                                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">First Name</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.first_name}
+                                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Last Name</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={formData.last_name}
+                                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Phone</label>
+                                <input
+                                    type="text"
+                                    value={formData.phone_number}
+                                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Gender</label>
+                                <select
+                                    value={formData.gender}
+                                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                                >
+                                    <option value="">Select</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Role</label>
+                                <select
+                                    value={formData.role_name}
+                                    onChange={(e) => setFormData({ ...formData, role_name: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                                >
+                                    <option value="Student">Student</option>
+                                    <option value="Lecturer">Lecturer</option>
+                                    <option value="Admin">Admin</option>
+                                    <option value="Security">Security</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1">Email</label>
+                            <label className="block text-sm font-medium mb-1">Program / Course</label>
                             <input
-                                type="email"
-                                value={formData.email}
-                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                type="text"
+                                placeholder="e.g. B.Sc Computer Science"
+                                value={formData.program}
+                                onChange={(e) => setFormData({ ...formData, program: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                             />
                         </div>
@@ -991,20 +1099,6 @@ function AddUserModal({ onClose, onRefresh }: any) {
                                 onChange={(e) => setFormData({ ...formData, school: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                             />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium mb-1">Role</label>
-                            <select
-                                value={formData.role}
-                                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                            >
-                                <option value="Student">Student</option>
-                                <option value="Lecturer">Lecturer</option>
-                                <option value="Admin">Admin</option>
-                                <option value="Security">Security</option>
-                            </select>
                         </div>
 
                         <div className="flex gap-3 pt-4">

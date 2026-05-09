@@ -25,14 +25,17 @@ const AVAILABLE_MENUS = [
     { id: 'bulk', label: 'Data Import', icon: Database, description: 'Bulk CSV uploads' },
     { id: 'settings', label: 'Settings', icon: Settings, description: 'System configuration' },
     { id: 'integrations', label: 'Integrations', icon: Server, description: 'Third-party integrations' },
-    { id: 'fleet', label: 'Fleet Management', icon: Car, description: 'University fleet and transport' }
+    { id: 'fleet', label: 'Fleet Management', icon: Car, description: 'University fleet and transport' },
+    { id: 'visitors', label: 'Visitor Log', icon: Users, description: 'Guest registration and tracking' }
 ]
 
 const ROLES = [
     { id: 'Student', label: 'Student', color: 'bg-blue-500' },
     { id: 'Lecturer', label: 'Lecturer', color: 'bg-purple-500' },
+    { id: 'Staff', label: 'Staff', color: 'bg-indigo-500' },
     { id: 'Guardian', label: 'Guardian', color: 'bg-green-500' },
     { id: 'Security', label: 'Security', color: 'bg-orange-500' },
+    { id: 'Visitor', label: 'Visitor', color: 'bg-gray-500' },
     { id: 'FleetManager', label: 'Fleet Manager', color: 'bg-rose-500' }
 ]
 
@@ -119,17 +122,30 @@ export default function DashboardCustomizer() {
                 'dashboard': true,
                 'gate': true,
                 'vehicles': true,
-                'cameras': true,
+                'visitors': true,
+                'verification': true,
+                'cameras': false,
                 'users': false,
                 'attendance': false,
-                'verification': true,
                 'live': false,
                 'timetable': false,
                 'projects': false,
                 'bulk': false,
                 'settings': false,
                 'integrations': false,
-                'fleet': true
+                'fleet': false
+            },
+            'Staff': {
+                'dashboard': true,
+                'attendance': true,
+                'timetable': true,
+                'projects': true,
+                'users': true
+            },
+            'Visitor': {
+                'dashboard': true,
+                'gate': false,
+                'fleet': false
             },
             'FleetManager': {
                 'dashboard': true,

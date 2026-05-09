@@ -9,9 +9,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.database import get_session
 from app.models import User
 
+import os
 # Configuration
-SECRET_KEY = "supersecretkey" # Change in production
-ALGORITHM = "HS256"
+SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey") # Change in production
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30 # 30 Days (Persistent Login)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

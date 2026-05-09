@@ -29,7 +29,7 @@ services:
       - ./backend/static:/app/static
       - ./backend/uploads:/app/uploads
     environment:
-      DATABASE_URL: mysql+aiomysql://gatepass_user:user_password@db:3306/gatepass_v2
+      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-gatepass_user}:${MYSQL_PASSWORD:-user_password}@db:3306/gatepass_v2
       REDIS_URL: redis://redis:6379
       SECRET_KEY: ${SECRET_KEY}
       ALGORITHM: HS256

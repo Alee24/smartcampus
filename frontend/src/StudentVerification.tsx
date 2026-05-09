@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Search, CheckCircle, XCircle, Shield, Calendar, User, Building, Sparkles } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Search, CheckCircle, XCircle, Shield, Calendar, User, Building, Sparkles, UploadCloud, Loader2, Camera, QrCode } from 'lucide-react'
+import { Html5Qrcode } from 'html5-qrcode'
 
 export default function StudentVerification() {
     const [query, setQuery] = useState('')
@@ -10,9 +11,31 @@ export default function StudentVerification() {
         company_name: 'Riara University',
         logo_url: ''
     })
+    const [currentUser, setCurrentUser] = useState<any>(null)
+    const [statusUpdating, setStatusUpdating] = useState(false)
+    const [uploadingImage, setUploadingImage] = useState(false)
+    const [isScanning, setIsScanning] = useState(false)
+    const qrScannerRef = useRef<Html5Qrcode | null>(null)
 
-    // Fetch company settings on mount
+    // Fetch current user and company settings on mount
     useEffect(() => {
+        const fetchUserData = async () => {
+            const token = localStorage.getItem('token')
+            if (token) {
+                try {
+                    const res = await fetch('/api/users/me', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                    if (res.ok) {
+                        const data = await res.json()
+                        setCurrentUser(data)
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch user', e)
+                }
+            }
+        }
+
         const fetchCompanySettings = async () => {
             try {
                 const res = await fetch('/api/users/public-company-settings')
@@ -25,9 +48,9 @@ export default function StudentVerification() {
                 }
             } catch (e) {
                 console.error(e)
-                // Use default settings if fetch fails
             }
         }
+        fetchUserData()
         fetchCompanySettings()
     }, [])
 
@@ -111,6 +134,127 @@ export default function StudentVerification() {
         }
     }
 
+    const handleStatusUpdate = async (newStatus: string) => {
+        if (!result || !currentUser || !['SuperAdmin', 'Security'].includes(currentUser.role)) return
+        
+        setStatusUpdating(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/users/${result.id}`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({ status: newStatus })
+            })
+
+            if (res.ok) {
+                setResult({ ...result, status: newStatus })
+                // Maybe a small toast or success indicator
+            } else {
+                const data = await res.json()
+                alert(data.detail || 'Failed to update status')
+            }
+        } catch (e) {
+            console.error(e)
+            alert('Network error updating status')
+        } finally {
+            setStatusUpdating(false)
+        }
+    }
+
+    const handleImageUpload = async (file: File) => {
+        if (!result || !currentUser || !['SuperAdmin', 'Security'].includes(currentUser.role)) return
+        
+        setUploadingImage(true)
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('user_id', result.id)
+
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/users/upload-profile-image', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            })
+
+            if (res.ok) {
+                const data = await res.json()
+                setResult({ ...result, profile_image: data.image_url })
+            } else {
+                const data = await res.json()
+                alert(data.detail || 'Failed to upload image')
+            }
+        } catch (e) {
+            console.error(e)
+            alert('Network error uploading image')
+        } finally {
+            setUploadingImage(false)
+        }
+    }
+
+    const startScanner = async () => {
+        setIsScanning(true)
+        // Short delay to ensure the container is in the DOM
+        setTimeout(async () => {
+            try {
+                const scanner = new Html5Qrcode("qr-reader")
+                qrScannerRef.current = scanner
+                
+                await scanner.start(
+                    { facingMode: "environment" },
+                    {
+                        fps: 10,
+                        qrbox: { width: 250, height: 250 },
+                    },
+                    (decodedText) => {
+                        setQuery(decodedText)
+                        stopScanner()
+                        // Auto-verify after scan
+                        setTimeout(() => {
+                            const btn = document.getElementById('verify-btn')
+                            btn?.click()
+                        }, 500)
+                    },
+                    () => {
+                        // Silent error for no QR code found in frame
+                    }
+                )
+            } catch (err) {
+                console.error("Scanner start error:", err)
+                alert("Could not start camera. Please ensure you have given permission.")
+                setIsScanning(false)
+            }
+        }, 300)
+    }
+
+    const stopScanner = async () => {
+        if (qrScannerRef.current) {
+            try {
+                await qrScannerRef.current.stop()
+                qrScannerRef.current = null
+            } catch (err) {
+                console.error("Scanner stop error:", err)
+            }
+        }
+        setIsScanning(false)
+    }
+
+    // Cleanup scanner on unmount
+    useEffect(() => {
+        return () => {
+            if (qrScannerRef.current) {
+                qrScannerRef.current.stop().catch(console.error)
+            }
+        }
+    }, [])
+
+    const statusOptions = ['Active', 'Graduated', 'Suspended', 'Registered', 'Deferred']
+    const isStaff = currentUser && ['SuperAdmin', 'Security', 'Lecturer'].includes(currentUser.role)
+    const canEdit = currentUser && ['SuperAdmin', 'Security'].includes(currentUser.role)
+
     return (
         <div className="min-h-screen p-4 md:p-8 relative overflow-hidden">
             {/* Animated Background */}
@@ -163,20 +307,73 @@ export default function StudentVerification() {
                                     className="w-full pl-12 pr-4 py-4 bg-transparent text-lg font-medium focus:outline-none"
                                 />
                             </div>
-                            <button
-                                onClick={handleVerify}
-                                disabled={loading || !query.trim()}
-                                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {loading ? (
-                                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                    'Verify'
-                                )}
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    id="verify-btn"
+                                    onClick={handleVerify}
+                                    disabled={loading || !query.trim()}
+                                    className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]"
+                                >
+                                    {loading ? (
+                                        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                    ) : (
+                                        'Verify'
+                                    )}
+                                </button>
+                                <button
+                                    onClick={startScanner}
+                                    className="px-4 py-4 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl shadow-md transition-all flex items-center gap-2"
+                                    title="Scan QR Code"
+                                >
+                                    <QrCode size={24} />
+                                    <span className="hidden sm:inline">Scan</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                {/* QR Scanner Modal */}
+                {isScanning && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+                        <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 w-full max-w-md shadow-2xl relative">
+                            <button 
+                                onClick={stopScanner}
+                                className="absolute -top-4 -right-4 bg-red-500 text-white p-2 rounded-full shadow-lg hover:bg-red-600 transition-colors"
+                            >
+                                <XCircle size={24} />
+                            </button>
+                            
+                            <div className="text-center mb-6">
+                                <h3 className="text-2xl font-bold mb-1">Scan Student QR</h3>
+                                <p className="text-gray-500 text-sm">Position the QR code within the frame</p>
+                            </div>
+
+                            <div className="relative overflow-hidden rounded-2xl bg-black aspect-square border-4 border-purple-500/30">
+                                <div id="qr-reader" className="w-full h-full"></div>
+                                
+                                {/* Scanning Overlay */}
+                                <div className="absolute inset-0 pointer-events-none">
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-2 border-white/50 rounded-xl">
+                                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-purple-500 rounded-tl-lg"></div>
+                                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-purple-500 rounded-tr-lg"></div>
+                                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-purple-500 rounded-bl-lg"></div>
+                                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-purple-500 rounded-br-lg"></div>
+                                        
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-purple-500/50 animate-scan-line shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={stopScanner}
+                                className="w-full mt-6 py-4 bg-slate-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* 3D ID Card */}
                 {result && !result.error && (
@@ -232,7 +429,7 @@ export default function StudentVerification() {
                                                     <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl blur-xl opacity-50 group-hover:opacity-75 transition-opacity"></div>
 
                                                     {/* Photo Frame - Large */}
-                                                    <div className="relative w-72 h-80 rounded-3xl overflow-hidden border-4 border-white shadow-2xl transform group-hover:scale-105 transition-transform">
+                                                    <div className="relative w-72 h-80 rounded-3xl overflow-hidden border-4 border-white shadow-2xl transform group-hover:scale-105 transition-transform bg-slate-200">
                                                         {result.profile_image ? (
                                                             <img
                                                                 src={result.profile_image.startsWith('http') ? result.profile_image : `http://localhost:8000${result.profile_image}`}
@@ -240,16 +437,48 @@ export default function StudentVerification() {
                                                                 className="w-full h-full object-cover"
                                                             />
                                                         ) : (
-                                                            <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center">
-                                                                <User size={100} className="text-white" />
+                                                            <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-400 flex flex-col items-center justify-center p-4">
+                                                                <User size={100} className="text-white opacity-50" />
+                                                                {canEdit && (
+                                                                    <div className="mt-4">
+                                                                        <label className="bg-white text-purple-600 px-4 py-2 rounded-xl font-bold cursor-pointer hover:bg-purple-50 transition-colors flex items-center gap-2">
+                                                                            <UploadCloud size={16} /> Upload Photo
+                                                                            <input 
+                                                                                type="file" 
+                                                                                accept="image/*" 
+                                                                                className="hidden" 
+                                                                                onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} 
+                                                                            />
+                                                                        </label>
+                                                                    </div>
+                                                                )}
                                                             </div>
+                                                        )}
+                                                        
+                                                        {uploadingImage && (
+                                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                                                <Loader2 className="text-white animate-spin" size={48} />
+                                                            </div>
+                                                        )}
+
+                                                        {/* Re-upload button if image exists but staff wants to change it */}
+                                                        {result.profile_image && canEdit && (
+                                                            <label className="absolute bottom-4 right-4 bg-white/20 backdrop-blur-md text-white p-2 rounded-full cursor-pointer hover:bg-white/40 transition-colors">
+                                                                <Camera size={20} />
+                                                                <input 
+                                                                    type="file" 
+                                                                    accept="image/*" 
+                                                                    className="hidden" 
+                                                                    onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} 
+                                                                />
+                                                            </label>
                                                         )}
                                                     </div>
 
                                                     {/* Verified Badge on Photo */}
                                                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-green-500 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg flex items-center gap-2 whitespace-nowrap">
                                                         <CheckCircle size={14} />
-                                                        {result.status?.toUpperCase() || 'ACTIVE'}
+                                                        {(result.status || 'ACTIVE').toUpperCase()}
                                                     </div>
                                                 </div>
                                             </div>
@@ -282,8 +511,22 @@ export default function StudentVerification() {
                                                             <span className="text-xs font-bold uppercase">Account Status</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
-                                                            <div className={`w-3 h-3 rounded-full ${result.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                                                            <p className="font-bold text-xl capitalize">{result.status || 'Active'}</p>
+                                                            <div className={`w-3 h-3 rounded-full ${['Active', 'Registered'].includes(result.status) || result.status === 'active' ? 'bg-green-500 animate-pulse' : result.status === 'Suspended' ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
+                                                            {canEdit ? (
+                                                                <select 
+                                                                    value={result.status || 'Active'}
+                                                                    onChange={(e) => handleStatusUpdate(e.target.value)}
+                                                                    disabled={statusUpdating}
+                                                                    className="bg-transparent font-bold text-xl capitalize focus:outline-none cursor-pointer border-b border-blue-200"
+                                                                >
+                                                                    {statusOptions.map(opt => (
+                                                                        <option key={opt} value={opt} className="text-black">{opt}</option>
+                                                                    ))}
+                                                                </select>
+                                                            ) : (
+                                                                <p className="font-bold text-xl capitalize">{result.status || 'Active'}</p>
+                                                            )}
+                                                            {statusUpdating && <Loader2 size={16} className="animate-spin text-blue-600" />}
                                                         </div>
                                                     </div>
 
@@ -362,6 +605,11 @@ export default function StudentVerification() {
                     25% { transform: translateX(-10px); }
                     75% { transform: translateX(10px); }
                 }
+
+                @keyframes scan-line {
+                    0% { top: 0; }
+                    100% { top: 100%; }
+                }
                 
                 .animate-float {
                     animation: float linear infinite;
@@ -377,6 +625,10 @@ export default function StudentVerification() {
                 
                 .animate-shake {
                     animation: shake 0.5s;
+                }
+
+                .animate-scan-line {
+                    animation: scan-line 2s ease-in-out infinite;
                 }
                 
                 .perspective-1000 {

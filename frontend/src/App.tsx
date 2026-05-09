@@ -91,8 +91,10 @@ function App() {
         switch (userRole.toLowerCase()) {
             case 'student': return 'student-dashboard'
             case 'admin': return 'dashboard'
-            case 'security': return 'gates-dashboard'
+            case 'security': return 'dashboard'
             case 'lecturer': return 'live'
+            case 'staff': return 'dashboard'
+            case 'visitor': return 'dashboard'
             default: return 'dashboard'
         }
     }

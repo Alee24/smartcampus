@@ -108,6 +108,8 @@ export default function Login({ onLogin }: LoginProps) {
             console.error(err)
             if (err.name === 'AbortError') {
                 setError('Login timed out. Server is not responding.')
+            } else if (err.message.includes('Error 502')) {
+                setError('System is offline (Bad Gateway). Please contact administrator or restart the server.')
             } else {
                 setError(err.message || 'Login failed')
             }

@@ -131,6 +131,22 @@ async def seed_data(session: AsyncSession):
         session.add(guard_user)
         print("Seeded Guard: guard@test.com")
 
+    # 2b. Official Security Admin (Requested)
+    official_security = (await session.exec(select(User).where(User.email == "security@ru.ac.ke"))).first()
+    if not official_security:
+        official_security = User(
+            admission_number="SEC-ADMIN-01",
+            full_name="Security Operations Center",
+            email="security@ru.ac.ke",
+            hashed_password=get_password_hash("Security@2050"),
+            role_id=guard_role.id,
+            school="Security Dept",
+            status="active"
+        )
+        session.add(official_security)
+        await session.commit()
+        print("Seeded Official Security: security@ru.ac.ke / Security@2050")
+
     # 3. Guardian (Parent)
     guardian_role = (await session.exec(select(Role).where(Role.name == "Guardian"))).first()
     if not guardian_role:
