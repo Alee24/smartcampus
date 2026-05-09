@@ -396,7 +396,7 @@ export default function StudentVerification() {
                                         {/* University Logo & Name - Compact */}
                                         <div className="relative h-full flex items-center justify-between px-6">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-14 h-14 bg-white rounded-xl p-2 shadow-lg">
+                                                <div className="w-14 h-14 bg-white rounded-xl p-1 shadow-inner flex items-center justify-center overflow-hidden">
                                                     <img
                                                         src={companySettings.logo_url || "/api/placeholder/56/56"}
                                                         alt="University Logo"
@@ -404,8 +404,8 @@ export default function StudentVerification() {
                                                     />
                                                 </div>
                                                 <div className="text-white">
-                                                    <h2 className="text-lg font-black tracking-tight">{companySettings.company_name?.toUpperCase() || 'UNIVERSITY'}</h2>
-                                                    <p className="text-purple-100 font-medium text-xs">Official Student ID Card</p>
+                                                    <h2 className="text-xl font-black tracking-tight leading-none">{companySettings.company_name?.toUpperCase() || 'UNIVERSITY'}</h2>
+                                                    <p className="text-purple-100 font-bold text-[10px] mt-0.5 tracking-widest">OFFICIAL STUDENT ID CARD</p>
                                                 </div>
                                             </div>
 

@@ -228,6 +228,30 @@ async def seed_data(session: AsyncSession):
             session.add(new_room)
     
     print("Seeded sample classrooms for QR generation.")
+
+    # Seed Company Settings
+    import json
+    settings_stmt = select(SystemConfig).where(SystemConfig.key == "company_settings")
+    existing_settings = (await session.exec(settings_stmt)).first()
+    
+    settings_value = json.dumps({
+        "company_name": "Riara University",
+        "logo_url": "/static/university_logo.png"
+    })
+    
+    if not existing_settings:
+        new_settings = SystemConfig(
+            key="company_settings",
+            value=settings_value,
+            category="general"
+        )
+        session.add(new_settings)
+        print("Seeded Company Settings.")
+    else:
+        existing_settings.value = settings_value
+        session.add(existing_settings)
+        print("Updated Company Settings with new logo.")
+
     await session.commit()
 
 @asynccontextmanager
