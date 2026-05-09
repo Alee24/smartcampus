@@ -206,6 +206,7 @@ async def log_user_access(
     await session.commit()
     return {"status": "recorded"}
 
+@router.post("", response_model=User)
 @router.post("/create", response_model=User)
 async def create_user(
     new_user: dict, 
@@ -214,18 +215,28 @@ async def create_user(
 ):
     # Check if user exists
     query = select(User).where((User.admission_number == new_user['admission_number']) | (User.email == new_user.get('email')))
+    if new_user.get('email'):
+        query = select(User).where((User.admission_number == new_user['admission_number']) | (User.email == new_user['email']))
+    else:
+        query = select(User).where(User.admission_number == new_user['admission_number'])
+
     existing = await session.exec(query)
     if existing.first():
         raise HTTPException(status_code=400, detail="User already exists")
     
     # Get Role ID
-    role_query = select(Role).where(Role.name == new_user['role_name'])
+    role_name = new_user.get('role_name', 'Student')
+    role_query = select(Role).where(Role.name == role_name)
     role = (await session.exec(role_query)).first()
     if not role:
-         raise HTTPException(status_code=400, detail="Invalid Role")
+         # Auto-create role if it doesn't exist
+         role = Role(name=role_name, description=f"{role_name} Role")
+         session.add(role)
+         await session.commit()
+         await session.refresh(role)
 
     # Hash default password if not provided
-    pwd = new_user.get('password', 'Student123') # Default password for bulk/admin creation
+    pwd = new_user.get('password', 'Student123') 
     hashed_pwd = get_password_hash(pwd)
 
     db_user = User(
@@ -233,7 +244,7 @@ async def create_user(
         full_name=new_user.get('full_name', f"{new_user.get('first_name', '')} {new_user.get('last_name', '')}".strip()),
         first_name=new_user.get('first_name'),
         last_name=new_user.get('last_name'),
-        school=new_user['school'],
+        school=new_user.get('school', 'General'),
         email=new_user.get('email'),
         phone_number=new_user.get('phone_number'),
         gender=new_user.get('gender'),
@@ -242,7 +253,7 @@ async def create_user(
         role_id=role.id,
         status="active",
         has_smartphone=new_user.get('has_smartphone', False),
-        admission_date=datetime.strptime(new_user['admission_date'], '%Y-%m-%d').date() if new_user.get('admission_date') else None
+        admission_date=datetime.strptime(new_user['admission_date'], '%Y-%m-%d').date() if new_user.get('admission_date') else datetime.utcnow().date()
     )
     
     session.add(db_user)
@@ -328,6 +339,7 @@ async def bulk_upload_students(
                 existing_user.school = school_val
                 existing_user.email = email_val or existing_user.email
                 existing_user.status = "active"  # Reactivate if was inactive
+                if row.get('profile_image'): existing_user.profile_image = row.get('profile_image').strip()
                 session.add(existing_user)
                 updated_count += 1
             else:
@@ -345,7 +357,8 @@ async def bulk_upload_students(
                     program=row.get('program'),
                     hashed_password=hashed,
                     role_id=student_role.id,
-                    status="active"
+                    status="active",
+                    profile_image=row.get('profile_image').strip() if row.get('profile_image') else None
                 )
                 session.add(new_student)
                 added_count += 1

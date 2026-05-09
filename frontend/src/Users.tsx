@@ -955,7 +955,8 @@ function AddUserModal({ onClose, onRefresh }: any) {
         school: '',
         program: '',
         gender: '',
-        role_name: 'Student'
+        role_name: 'Student',
+        password: ''
     })
 
     const handleSubmit = async (e: any) => {
@@ -1099,6 +1100,19 @@ function AddUserModal({ onClose, onRefresh }: any) {
                                 onChange={(e) => setFormData({ ...formData, school: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-1">Password</label>
+                            <input
+                                type="password"
+                                required
+                                placeholder="Initial Password"
+                                value={formData.password}
+                                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 bg-purple-50/30"
+                            />
+                            <p className="text-[10px] text-gray-500 mt-1 italic">* Users can change this after their first login</p>
                         </div>
 
                         <div className="flex gap-3 pt-4">

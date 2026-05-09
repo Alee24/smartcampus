@@ -26,7 +26,7 @@ export default function BulkUpload() {
             endpoint: 'lecturers',
             icon: <UserCheck size={24} />,
             color: 'bg-purple-500',
-            example: 'full_name,email,admission_number,school\nDr. Smith,smith@demo.com,LEC001,Computing',
+            example: 'full_name,email,admission_number,school,phone_number,profile_image\nDr. Smith,smith@demo.com,LEC001,Computing,+254700123456,https://example.com/photo.jpg',
             status: 'pending'
         },
         {
@@ -66,7 +66,7 @@ export default function BulkUpload() {
             endpoint: 'students',
             icon: <Users size={24} />,
             color: 'bg-blue-500',
-            example: 'admission_number,first_name,last_name,email,school,status\nSTD202,Jane,Doe,jane@example.com,ICT,Active\n\nOptions: Active, Graduated, Suspended, Registered, Deferred',
+            example: 'admission_number,first_name,last_name,email,school,status,phone_number,profile_image\nSTD202,Jane,Doe,jane@example.com,ICT,Active,+254711223344,/static/profiles/jane.jpg\n\nOptions: Active, Graduated, Suspended, Registered, Deferred',
             status: 'pending'
         },
         {

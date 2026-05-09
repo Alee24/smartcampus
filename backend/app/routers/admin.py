@@ -211,8 +211,10 @@ async def bulk_upload_lecturers(
                     # UPDATE - Ensure role is set to Lecturer
                     existing.full_name = name
                     existing.school = school
-                    existing.role_id = lecturer_role.id  # FIX: Update role to Lecturer
+                    existing.role_id = lecturer_role.id
                     existing.status = "active"
+                    if row.get('phone_number'): existing.phone_number = row.get('phone_number').strip()
+                    if row.get('profile_image'): existing.profile_image = row.get('profile_image').strip()
                     session.add(existing)
                     updated_count += 1
                 else:
@@ -224,7 +226,9 @@ async def bulk_upload_lecturers(
                         admission_number=adm or f"LEC{uuid.uuid4().hex[:6].upper()}",
                         hashed_password=get_password_hash("Digital2025"),
                         role_id=lecturer_role.id,
-                        status="active"
+                        status="active",
+                        phone_number=row.get('phone_number').strip() if row.get('phone_number') else None,
+                        profile_image=row.get('profile_image').strip() if row.get('profile_image') else None
                     )
                     session.add(new_user)
                     added_count += 1
@@ -312,6 +316,8 @@ async def bulk_upload_students(
                     existing.status = "active"
                     if email:
                         existing.email = email
+                    if row.get('phone_number'): existing.phone_number = row.get('phone_number').strip()
+                    if row.get('profile_image'): existing.profile_image = row.get('profile_image').strip()
                     session.add(existing)
                     updated_count += 1
                 else:
@@ -323,7 +329,9 @@ async def bulk_upload_students(
                         admission_number=adm,
                         hashed_password=get_password_hash("Digital2025"),
                         role_id=student_role.id,
-                        status="active"
+                        status="active",
+                        phone_number=row.get('phone_number').strip() if row.get('phone_number') else None,
+                        profile_image=row.get('profile_image').strip() if row.get('profile_image') else None
                     )
                     session.add(new_user)
                     added_count += 1
