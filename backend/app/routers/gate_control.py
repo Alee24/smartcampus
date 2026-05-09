@@ -162,9 +162,68 @@ async def scan_entry(
             "name": user.full_name,
             "role": user.school, # Mapping school to role logic for display, or fetch real role
             "time": new_log.entry_time.strftime("%I:%M %p"),
-            "image": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png" # Placeholder
+            "image": user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
         }
     }
+
+@router.post("/check-in/{admission_number}")
+async def check_in_user(admission_number: str, session: AsyncSession = Depends(get_session)):
+    user = (await session.exec(select(User).where(User.admission_number == admission_number))).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # 1. Close any open sessions
+    open_logs = (await session.exec(select(EntryLog).where(EntryLog.user_id == user.id).where(EntryLog.exit_time == None))).all()
+    for log in open_logs:
+        log.exit_time = datetime.utcnow()
+        session.add(log)
+    
+    # 2. Create new Entry
+    gate = (await session.exec(select(Gate).where(Gate.name == "Main Gate"))).first()
+    if not gate:
+         gate = Gate(name="Main Gate", location="Main Entrance")
+         session.add(gate)
+         await session.commit()
+         await session.refresh(gate)
+
+    new_log = EntryLog(
+        user_id=user.id,
+        gate_id=gate.id,
+        entry_time=datetime.utcnow(),
+        method="manual",
+        status="allowed"
+    )
+    session.add(new_log)
+    await session.commit()
+    return {"message": "Check-in successful", "time": new_log.entry_time.strftime("%H:%M %p")}
+
+@router.post("/check-out/{admission_number}")
+async def check_out_user(admission_number: str, session: AsyncSession = Depends(get_session)):
+    user = (await session.exec(select(User).where(User.admission_number == admission_number))).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Find last open entry
+    log = (await session.exec(select(EntryLog).where(EntryLog.user_id == user.id).where(EntryLog.exit_time == None).order_by(EntryLog.entry_time.desc()))).first()
+    
+    if not log:
+        # Create a mock entry if none found, to allow checking out? Or just error.
+        # User wants to log them.
+        gate = (await session.exec(select(Gate).where(Gate.name == "Main Gate"))).first()
+        log = EntryLog(
+            user_id=user.id,
+            gate_id=gate.id,
+            entry_time=datetime.utcnow(),
+            exit_time=datetime.utcnow(),
+            method="manual",
+            status="allowed"
+        )
+    else:
+        log.exit_time = datetime.utcnow()
+    
+    session.add(log)
+    await session.commit()
+    return {"message": "Check-out successful", "time": log.exit_time.strftime("%H:%M %p")}
 
 @router.post("/scan-vehicle")
 async def scan_vehicle_plate(

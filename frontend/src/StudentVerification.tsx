@@ -15,6 +15,7 @@ export default function StudentVerification() {
     const [statusUpdating, setStatusUpdating] = useState(false)
     const [uploadingImage, setUploadingImage] = useState(false)
     const [isScanning, setIsScanning] = useState(false)
+    const [actionLoading, setActionLoading] = useState<'check-in' | 'check-out' | null>(null)
     const qrScannerRef = useRef<Html5Qrcode | null>(null)
 
     // Fetch current user and company settings on mount
@@ -90,6 +91,32 @@ export default function StudentVerification() {
             osc2.start(audioContext.currentTime)
             osc2.stop(audioContext.currentTime + 0.3)
         }, 100)
+    }
+
+    const handleGateAction = async (action: 'check-in' | 'check-out') => {
+        if (!result || !result.admission_number) return
+        setActionLoading(action)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/gate/${action}/${result.admission_number}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                playSuccessSound()
+                alert(`${action === 'check-in' ? 'Check-in' : 'Check-out'} recorded at ${data.time}`)
+                // Refresh data to show updated last accessed if needed
+                handleVerify()
+            } else {
+                const err = await res.json()
+                alert(err.detail || `Failed to ${action}`)
+            }
+        } catch (e) {
+            alert(`Network error during ${action}`)
+        } finally {
+            setActionLoading(null)
+        }
     }
 
     const handleVerify = async () => {
@@ -256,7 +283,7 @@ export default function StudentVerification() {
     const canEdit = currentUser && ['SuperAdmin', 'Security'].includes(currentUser.role)
 
     return (
-        <div className="min-h-screen p-4 md:p-8 relative overflow-hidden">
+        <div className="p-3 md:p-6 relative overflow-hidden">
             {/* Animated Background */}
             <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 dark:from-gray-900 dark:via-purple-900/20 dark:to-blue-900/20"></div>
 
@@ -278,21 +305,20 @@ export default function StudentVerification() {
 
             <div className="relative max-w-6xl mx-auto">
                 {/* Header */}
-                <div className="text-center mb-12 animate-fade-in">
-                    <div className="flex items-center justify-center gap-3 mb-4">
-                        <Shield className="text-purple-600" size={48} />
-                        <h1 className="text-5xl font-black bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
-                            Student ID Verification
+                <div className="text-center mb-6 animate-fade-in">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                        <Shield className="text-purple-600" size={32} />
+                        <h1 className="text-3xl font-black bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
+                            ID Verification
                         </h1>
-                        <Sparkles className="text-pink-600 animate-pulse" size={48} />
                     </div>
-                    <p className="text-lg text-gray-600 dark:text-gray-300">
-                        Enter your Admission Number or Email to verify your student account
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                        Enter Admission Number or Email to verify student
                     </p>
                 </div>
 
                 {/* Search Bar */}
-                <div className="max-w-2xl mx-auto mb-12">
+                <div className="max-w-2xl mx-auto mb-8">
                     <div className="relative group">
                         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl blur-xl opacity-50 group-hover:opacity-75 transition-opacity"></div>
                         <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-2 flex gap-2">
@@ -398,7 +424,7 @@ export default function StudentVerification() {
                                             <div className="flex items-center gap-3">
                                                 <div className="w-14 h-14 bg-white rounded-xl p-1 shadow-inner flex items-center justify-center overflow-hidden">
                                                     <img
-                                                        src={companySettings.logo_url || "/api/placeholder/56/56"}
+                                                        src="/logo.png"
                                                         alt="University Logo"
                                                         className="w-full h-full object-contain"
                                                     />
@@ -432,26 +458,17 @@ export default function StudentVerification() {
                                                     <div className="relative w-72 h-80 rounded-3xl overflow-hidden border-4 border-white shadow-2xl transform group-hover:scale-105 transition-transform bg-slate-200">
                                                         {result.profile_image ? (
                                                             <img
-                                                                src={result.profile_image.startsWith('http') ? result.profile_image : `http://localhost:8000${result.profile_image}`}
+                                                                src={result.profile_image.startsWith('http') ? result.profile_image : result.profile_image}
                                                                 alt={result.full_name}
                                                                 className="w-full h-full object-cover"
+                                                                onError={(e: any) => {
+                                                                    // Fallback if image fails
+                                                                    e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                                                                }}
                                                             />
                                                         ) : (
                                                             <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-400 flex flex-col items-center justify-center p-4">
                                                                 <User size={100} className="text-white opacity-50" />
-                                                                {canEdit && (
-                                                                    <div className="mt-4">
-                                                                        <label className="bg-white text-purple-600 px-4 py-2 rounded-xl font-bold cursor-pointer hover:bg-purple-50 transition-colors flex items-center gap-2">
-                                                                            <UploadCloud size={16} /> Upload Photo
-                                                                            <input 
-                                                                                type="file" 
-                                                                                accept="image/*" 
-                                                                                className="hidden" 
-                                                                                onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} 
-                                                                            />
-                                                                        </label>
-                                                                    </div>
-                                                                )}
                                                             </div>
                                                         )}
                                                         
@@ -461,10 +478,15 @@ export default function StudentVerification() {
                                                             </div>
                                                         )}
 
-                                                        {/* Re-upload button if image exists but staff wants to change it */}
-                                                        {result.profile_image && canEdit && (
-                                                            <label className="absolute bottom-4 right-4 bg-white/20 backdrop-blur-md text-white p-2 rounded-full cursor-pointer hover:bg-white/40 transition-colors">
-                                                                <Camera size={20} />
+                                                        {/* Re-upload button overlay removed - moved below */}
+                                                    </div>
+
+                                                    {/* Upload Button BELOW the image */}
+                                                    {canEdit && (
+                                                        <div className="mt-4 flex justify-center">
+                                                            <label className="bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 px-6 py-2.5 rounded-2xl font-bold cursor-pointer hover:bg-purple-50 dark:hover:bg-gray-600 transition-all border border-purple-100 dark:border-purple-900 shadow-sm flex items-center gap-2 active:scale-95">
+                                                                <Camera size={18} />
+                                                                {result.profile_image ? "Update Photo" : "Upload Photo"}
                                                                 <input 
                                                                     type="file" 
                                                                     accept="image/*" 
@@ -472,8 +494,8 @@ export default function StudentVerification() {
                                                                     onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} 
                                                                 />
                                                             </label>
-                                                        )}
-                                                    </div>
+                                                        </div>
+                                                    )}
 
                                                     {/* Verified Badge on Photo */}
                                                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-green-500 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg flex items-center gap-2 whitespace-nowrap">
@@ -540,11 +562,24 @@ export default function StudentVerification() {
                                                 </div>
 
                                                 {/* Footer Note - Compact */}
-                                                <div className="bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 rounded-lg p-3 border-l-4 border-purple-600">
-                                                    <p className="text-xs text-gray-700 dark:text-gray-300">
-                                                        <span className="font-bold">⚠️ Official Document:</span> This card is property of Riara University.
-                                                        If found, please return to Security Office.
-                                                    </p>
+                                                {/* Gate Actions Section */}
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <button 
+                                                        onClick={() => handleGateAction('check-in')}
+                                                        disabled={!!actionLoading}
+                                                        className="flex items-center justify-center gap-2 py-4 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black shadow-lg shadow-green-500/20 transition-all active:scale-95 disabled:opacity-50"
+                                                    >
+                                                        {actionLoading === 'check-in' ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
+                                                        CHECK IN
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleGateAction('check-out')}
+                                                        disabled={!!actionLoading}
+                                                        className="flex items-center justify-center gap-2 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black shadow-lg shadow-red-500/20 transition-all active:scale-95 disabled:opacity-50"
+                                                    >
+                                                        {actionLoading === 'check-out' ? <Loader2 className="animate-spin" size={20} /> : <LogOut size={20} />}
+                                                        CHECK OUT
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>

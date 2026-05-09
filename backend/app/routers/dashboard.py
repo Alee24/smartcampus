@@ -26,11 +26,16 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session), curr
     vehicles_query = select(func.count(VehicleLog.id)).where(VehicleLog.exit_time == None)
     vehicles_parked = (await session.exec(vehicles_query)).one()
 
+    # Students in school (EntryLog with no exit_time)
+    students_in_school_query = select(func.count(func.distinct(EntryLog.user_id))).where(EntryLog.exit_time == None)
+    students_in_school = (await session.exec(students_in_school_query)).one()
+
     return {
         "active_students": total_users,
         "gate_entries_today": total_entries, 
         "security_alerts": rejected_entries,
-        "vehicles_parked": vehicles_parked
+        "vehicles_parked": vehicles_parked,
+        "students_in_school": students_in_school
     }
 
 @router.get("/kpi")

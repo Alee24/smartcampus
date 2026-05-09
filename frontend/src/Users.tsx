@@ -451,7 +451,7 @@ export default function Users() {
                                 <div className="mb-4 relative">
                                     {user.profile_image ? (
                                         <img
-                                            src={user.profile_image.startsWith('http') ? user.profile_image : `http://localhost:8000${user.profile_image}`}
+                                            src={user.profile_image.startsWith('http') ? user.profile_image : user.profile_image}
                                             alt={user.full_name}
                                             className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md group-hover:scale-105 transition-transform duration-300"
                                         />

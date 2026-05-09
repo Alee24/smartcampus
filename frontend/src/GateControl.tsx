@@ -314,7 +314,7 @@ export default function GateControl() {
     }
 
     return (
-        <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-[450px_1fr] gap-4">
             <canvas ref={canvasRef} className="hidden" />
 
             {/* Control Panel */}
@@ -439,7 +439,7 @@ export default function GateControl() {
             </div>
 
             {/* Live Feed / Result */}
-            <div className={`glass-card p-6 min-h-[500px] flex flex-col ${scanStatus === 'scanning' ? 'bg-black' : ''}`}>
+            <div className={`glass-card p-6 h-fit min-h-[400px] flex flex-col ${scanStatus === 'scanning' ? 'bg-black' : ''}`}>
                 <h3 className={`text-xl font-bold mb-4 ${scanStatus === 'scanning' ? 'text-white' : ''}`}>
                     {scanStatus === 'scanning' ? (scanMode === 'plate' ? 'Align Number Plate' : 'Scan QR Code') : 'Verification Result'}
                 </h3>
@@ -601,9 +601,9 @@ export default function GateControl() {
                 {/* Traffic Analytics Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 animate-fade-in delay-100">
                     {/* Hourly Traffic Trend */}
-                    <div className="lg:col-span-2 bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl p-6 rounded-2xl border border-[var(--border-color)] shadow-sm">
-                        <h4 className="font-bold text-[var(--text-primary)] mb-4">Hourly Traffic Trends</h4>
-                        <div className="h-[300px] w-full">
+                    <div className="lg:col-span-2 bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
+                        <h4 className="font-bold text-[var(--text-primary)] mb-3">Hourly Traffic Trends</h4>
+                        <div className="h-[240px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={vehicleStats.hourly_traffic || []}>
                                     <defs>
@@ -632,9 +632,9 @@ export default function GateControl() {
                     </div>
 
                     {/* Entry Composition */}
-                    <div className="bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl p-6 rounded-2xl border border-[var(--border-color)] shadow-sm flex flex-col items-center justify-center">
-                        <h4 className="font-bold text-[var(--text-primary)] mb-4 w-full text-left">Current Status</h4>
-                        <div className="h-[250px] w-full relative">
+                    <div className="bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl p-5 rounded-2xl border border-[var(--border-color)] shadow-sm flex flex-col items-center justify-center">
+                        <h4 className="font-bold text-[var(--text-primary)] mb-3 w-full text-left">Current Status</h4>
+                        <div className="h-[200px] w-full relative">
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                     <Pie
@@ -751,7 +751,7 @@ export default function GateControl() {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4">
+                                                <td className="px-4 py-2.5">
                                                     <div className="font-bold">{log.driver_name || 'Unknown'}</div>
                                                     <div className="text-xs text-[var(--text-secondary)]">{log.driver_contact || log.role || ''}</div>
                                                 </td>
@@ -938,8 +938,8 @@ export default function GateControl() {
 
             {/* Manual Vehicle Modal (Existing code follows) */}
             {showManualVehicle && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in relative">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-xl shadow-2xl animate-fade-in relative border border-white/20">
                         <button
                             onClick={() => setShowManualVehicle(false)}
                             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"

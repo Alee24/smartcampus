@@ -61,6 +61,7 @@ interface DashboardStats {
     gate_entries_today: number
     security_alerts: number
     vehicles_parked: number
+    students_in_school: number
 }
 
 interface LogEntry {
@@ -486,8 +487,6 @@ function App() {
 
     return (
         <div className="min-h-screen flex bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300 font-sans">
-            <InstallPWA />
-            <PermissionsModal />
             {/* Security Check Modal */}
             {showSecurityCheck && <SecurityCheckModal onGrant={handleSecurityGrant} />}
 
@@ -771,10 +770,10 @@ function App() {
 
 
             {/* Main Content */}
-            <main className={`flex-1 p-3 sm:p-4 lg:p-8 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
+            <main className={`flex-1 p-2 sm:p-3 lg:p-4 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
                 <Suspense fallback={<PageLoader />}>
                     {/* Top Header - 2 Row Layout */}
-                    <header className="flex flex-col gap-4 mb-6 pt-4 pb-2">
+                    <header className="flex flex-col gap-2 mb-4 pt-1 pb-1">
                         {/* Row 1: Primary Navigation */}
                         <div className="flex justify-between items-center w-full">
                             <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -970,8 +969,8 @@ function App() {
                             {/* Stats Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                                 <StatCard title="Total Students" value={stats.active_students} change="+6%" trend="up" />
-                                <StatCard title="New Entries" value={stats.gate_entries_today} change="+12%" trend="up" />
-                                <StatCard title="Security Alerts" value={stats.security_alerts} change="-2%" trend="down" />
+                                <StatCard title="Total Entries" value={stats.gate_entries_today} change="+12%" trend="up" />
+                                <StatCard title="In School" value={stats.students_in_school} change="Live" trend="up" />
                                 <StatCard title="Vehicles Parked" value={stats.vehicles_parked} change="+4%" trend="up" />
                             </div>
 
