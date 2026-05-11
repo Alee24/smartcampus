@@ -319,73 +319,70 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 from fastapi import Request
 @app.post("/api/token")
 async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_session)):
-    print(f"Login Attempt: {form_data.username}")
-    
-    # Query with eager loading of role relationship
-    query = select(User).where(
-        (User.email == form_data.username) | (User.admission_number == form_data.username)
-    ).options(selectinload(User.role))
-    
-    result = await session.exec(query)
-    user = result.first()
-    
-    if not user:
-        print("Login Failed: User not found")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    try:
+        print(f"Login Attempt: {form_data.username}")
         
-    is_valid = verify_password(form_data.password, user.hashed_password)
-    print(f"User Found: {user.email}, Password Valid: {is_valid}")
-    
-    if not is_valid:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
+        # Query with eager loading of role relationship
+        query = select(User).where(
+            (User.email == form_data.username) | (User.admission_number == form_data.username)
+        ).options(selectinload(User.role))
+        
+        result = await session.exec(query)
+        user = result.first()
+        
+        if not user:
+            print(f"Login Failed: User {form_data.username} not found")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            
+        is_valid = verify_password(form_data.password, user.hashed_password)
+        
+        if not is_valid:
+            print(f"Login Failed: Password incorrect for {form_data.username}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Get role name
+        role_name = user.role.name if user.role else "student"
+        
+        # Create token
+        access_token = create_access_token(data={"sub": user.email or user.admission_number})
+        
+        # Log the successful login
+        await log_action(
+            session=session,
+            action_type="login",
+            user=user,
+            description=f"User {user.full_name} logged in from {role_name} panel",
+            new_values={"role": role_name},
+            request=request
         )
-    
-    access_token = create_access_token(data={"sub": user.email or user.admission_number})
-    
-    # Get role name - fetch from database if not loaded
-    role_name = "student"  # Default
-    if user.role:
-        role_name = user.role.name
-    else:
-        # Fallback: fetch role separately if not loaded
-        role_query = select(Role).where(Role.id == user.role_id)
-        role_result = await session.exec(role_query)
-        role = role_result.first()
-        if role:
-            role_name = role.name
-    
-    print(f"User role: {role_name}")
-    
-    # Log the successful login
-    await log_action(
-        session=session,
-        action_type="login",
-        user=user,
-        description=f"User {user.full_name} logged in from {role_name} panel",
-        new_values={"role": role_name},
-        request=request
-    )
 
-    # Return user info including role
-    return {
-        "access_token": access_token, 
-        "token_type": "bearer",
-        "user": {
-            "id": str(user.id),
-            "full_name": user.full_name,
-            "email": user.email,
-            "admission_number": user.admission_number,
-            "role": role_name,
-            "profile_image": user.profile_image
+        return {
+            "access_token": access_token, 
+            "token_type": "bearer",
+            "user": {
+                "id": str(user.id),
+                "full_name": user.full_name,
+                "email": user.email,
+                "admission_number": user.admission_number,
+                "role": role_name,
+                "profile_image": user.profile_image
+            }
         }
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"CRITICAL LOGIN ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @app.post("/api/auth/register")
 async def register(

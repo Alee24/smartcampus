@@ -65,6 +65,8 @@ rebuild_app() {
         log "✅ [SUCCESS] System is back online and healthy."
     else
         log "❌ [ERROR] System rebuild completed but health check still failing."
+        log "📜 [DEBUG] Last 50 lines of backend logs:"
+        sudo docker logs --tail 50 gatepass_backend >> "$LOG_FILE"
     fi
 }
 
