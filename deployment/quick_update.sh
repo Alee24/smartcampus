@@ -2,11 +2,9 @@
 # =============================================================
 # Smart Campus - FAST Production Update Script
 # =============================================================
-# This script updates the VPS WITHOUT re-downloading base images
-# or reinstalling dependencies. It uses Docker's build cache
-# to only rebuild layers that actually changed (your code).
-#
-# Usage: cd ~/gatepass && chmod +x deployment/quick_update.sh && ./deployment/quick_update.sh
+# Compatible with docker-compose v1 (1.29.x) on Ubuntu VPS
+# Uses stop+rm+up instead of --force-recreate to avoid
+# the 'ContainerConfig' KeyError bug in v1.
 # =============================================================
 
 set -e
@@ -15,7 +13,12 @@ echo ""
 echo "⚡ Smart Campus - Fast Update"
 echo "================================"
 
-# 1. Fix DNS if needed (common VPS issue)
+COMPOSE_FILE="docker-compose.prod.yml"
+
+# Use sudo docker-compose (v1 on this VPS)
+DC="sudo docker-compose -f $COMPOSE_FILE"
+
+# 1. Fix DNS if needed
 if ! ping -c 1 -W 3 github.com &> /dev/null; then
     echo "🔧 Fixing DNS..."
     echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
@@ -27,35 +30,30 @@ echo "📥 Pulling latest code..."
 git fetch origin main
 git reset --hard origin/main
 
-# 3. Stop only the app containers (keep db & redis running for zero-downtime)
-echo "🔄 Rebuilding changed services..."
+# 3. Build new images (uses Docker layer cache - fast!)
+echo "🔨 Building updated images..."
+$DC build backend frontend
 
-# Use docker-compose v1 or v2 depending on what's installed
-if command -v docker-compose &> /dev/null; then
-    DC="sudo docker-compose"
-else
-    DC="sudo docker compose"
-fi
+# 4. Stop and remove ONLY backend & frontend (db & redis stay up)
+echo "🔄 Replacing backend & frontend containers..."
+$DC stop backend frontend 2>/dev/null || true
+$DC rm -f backend frontend 2>/dev/null || true
 
-COMPOSE_FILE="docker-compose.prod.yml"
+# 5. Start fresh containers with new images
+$DC up -d
 
-# Rebuild ONLY backend and frontend (the services with code changes)
-# This uses Docker build cache - unchanged layers are NOT re-downloaded
-$DC -f $COMPOSE_FILE build --parallel backend frontend
-
-# 4. Recreate only the changed containers (db & redis stay untouched)
-echo "🚀 Restarting updated services..."
-$DC -f $COMPOSE_FILE up -d --no-deps --force-recreate backend frontend
-
-# 5. Quick cleanup (only dangling images, keeps cache)
-echo "🧹 Cleaning up old layers..."
+# 6. Quick cleanup
+echo "🧹 Cleaning up old images..."
 sudo docker image prune -f --filter "dangling=true" 2>/dev/null || true
 
-# 6. Verify
+# 7. Verify
 echo ""
 echo "✅ Status:"
-$DC -f $COMPOSE_FILE ps
+$DC ps
 
 echo ""
-echo "⚡ Update complete! Only changed code was rebuilt."
+echo "⚡ Update complete!"
+echo ""
+echo "If you need to fix the database/admin login, run:"
+echo "  sudo docker exec -it gatepass_backend python fix_db_and_admin.py"
 echo ""
