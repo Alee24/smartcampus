@@ -1,18 +1,22 @@
-"""
-Migration script for Timetable System
-- Drops old tables (classes)
-- Creates new tables (classrooms, timetable_slots)
-- Modifies courses and class_sessions tables
-"""
 import asyncio
 from sqlalchemy import text
 from app.database import engine
+from app.models import User, Role
+from sqlmodel import select
 
 async def migrate_timetable_system():
     async with engine.begin() as conn:
         print("🔄 Migrating to new Timetable System...")
         
-        # Step 1: Drop old tables that are being replaced
+        # Helper to check columns
+        def get_columns(connection, table_name):
+            from sqlalchemy import inspect
+            inspector = inspect(connection)
+            if not inspector.has_table(table_name):
+                return []
+            return [c['name'] for c in inspector.get_columns(table_name)]
+
+        # Step 1: Drop old tables
         print("\n📋 Step 1: Dropping old tables...")
         try:
             await conn.execute(text("DROP TABLE IF EXISTS classes CASCADE"))
@@ -41,36 +45,36 @@ async def migrate_timetable_system():
         
         # Step 3: Modify courses table
         print("\n📋 Step 3: Modifying 'courses' table...")
-        try:
-            # Add new columns to courses
-            await conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS department VARCHAR(100)"))
-            await conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS credits INT DEFAULT 3"))
-            await conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS semester VARCHAR(50)"))
-            await conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS classroom_id CHAR(36)"))
-            await conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS lecturer_id CHAR(36)"))
-            
-            # Drop old room_number column if exists
+        cols = await conn.run_sync(get_columns, 'courses')
+        new_cols = {
+            "department": "VARCHAR(100)",
+            "credits": "INT DEFAULT 3",
+            "semester": "VARCHAR(50)",
+            "classroom_id": "CHAR(36)",
+            "lecturer_id": "CHAR(36)"
+        }
+        for col, type_ in new_cols.items():
+            if col not in cols:
+                print(f"   Adding column {col} to courses...")
+                try:
+                    await conn.execute(text(f"ALTER TABLE courses ADD COLUMN {col} {type_}"))
+                except Exception as e:
+                    print(f"   ⚠ Failed to add {col}: {e}")
+        
+        # Drop old room_number
+        if "room_number" in cols:
             try:
                 await conn.execute(text("ALTER TABLE courses DROP COLUMN room_number"))
-            except:
-                pass
-            
-            # Add foreign keys
-            await conn.execute(text("""
-                ALTER TABLE courses 
-                ADD CONSTRAINT fk_courses_classroom 
-                FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL
-            """))
-            
-            await conn.execute(text("""
-                ALTER TABLE courses 
-                ADD CONSTRAINT fk_courses_lecturer 
-                FOREIGN KEY (lecturer_id) REFERENCES users(id) ON DELETE SET NULL
-            """))
-            
-            print("   ✓ Modified 'courses' table")
-        except Exception as e:
-            print(f"   ⚠ Courses table modification: {e}")
+                print("   ✓ Dropped room_number from courses")
+            except: pass
+
+        # Add foreign keys (using try-except to avoid error if they exist)
+        try:
+            await conn.execute(text("ALTER TABLE courses ADD CONSTRAINT fk_courses_classroom FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL"))
+        except: pass
+        try:
+            await conn.execute(text("ALTER TABLE courses ADD CONSTRAINT fk_courses_lecturer FOREIGN KEY (lecturer_id) REFERENCES users(id) ON DELETE SET NULL"))
+        except: pass
         
         # Step 4: Create timetable_slots table
         print("\n📋 Step 4: Creating 'timetable_slots' table...")
@@ -96,61 +100,45 @@ async def migrate_timetable_system():
         
         # Step 5: Modify class_sessions table
         print("\n📋 Step 5: Modifying 'class_sessions' table...")
-        try:
-            # Drop old foreign key to classes
-            try:
-                await conn.execute(text("ALTER TABLE class_sessions DROP FOREIGN KEY class_sessions_ibfk_1"))
-            except:
-                pass
-            
-            # Rename class_id to course_id if it exists
+        cols = await conn.run_sync(get_columns, 'class_sessions')
+        
+        # Rename class_id to course_id if exists
+        if "class_id" in cols:
             try:
                 await conn.execute(text("ALTER TABLE class_sessions CHANGE COLUMN class_id course_id CHAR(36)"))
-            except:
-                # If column doesn't exist or already renamed
-                await conn.execute(text("ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS course_id CHAR(36)"))
-            
-            # Add new columns
-            await conn.execute(text("ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS timetable_slot_id CHAR(36)"))
-            await conn.execute(text("ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS classroom_id CHAR(36)"))
-            await conn.execute(text("ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS lecturer_id CHAR(36)"))
-            await conn.execute(text("ALTER TABLE class_sessions ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'scheduled'"))
-            
-            # Add foreign keys
-            await conn.execute(text("""
-                ALTER TABLE class_sessions 
-                ADD CONSTRAINT fk_sessions_course 
-                FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
-            """))
-            
-            await conn.execute(text("""
-                ALTER TABLE class_sessions 
-                ADD CONSTRAINT fk_sessions_timetable 
-                FOREIGN KEY (timetable_slot_id) REFERENCES timetable_slots(id) ON DELETE SET NULL
-            """))
-            
-            await conn.execute(text("""
-                ALTER TABLE class_sessions 
-                ADD CONSTRAINT fk_sessions_classroom 
-                FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE SET NULL
-            """))
-            
-            await conn.execute(text("""
-                ALTER TABLE class_sessions 
-                ADD CONSTRAINT fk_sessions_lecturer 
-                FOREIGN KEY (lecturer_id) REFERENCES users(id) ON DELETE SET NULL
-            """))
-            
-            print("   ✓ Modified 'class_sessions' table")
-        except Exception as e:
-            print(f"   ⚠ Class sessions modification: {e}")
-        
+                print("   ✓ Renamed class_id to course_id")
+            except: pass
+        elif "course_id" not in cols:
+            await conn.execute(text("ALTER TABLE class_sessions ADD COLUMN course_id CHAR(36)"))
+            print("   ✓ Added course_id to class_sessions")
+
+        new_session_cols = {
+            "timetable_slot_id": "CHAR(36)",
+            "classroom_id": "CHAR(36)",
+            "lecturer_id": "CHAR(36)",
+            "status": "VARCHAR(50) DEFAULT 'scheduled'"
+        }
+        for col, type_ in new_session_cols.items():
+            if col not in cols and col != "course_id": # course_id handled above
+                print(f"   Adding column {col} to class_sessions...")
+                try:
+                    await conn.execute(text(f"ALTER TABLE class_sessions ADD COLUMN {col} {type_}"))
+                except Exception as e:
+                    print(f"   ⚠ Failed to add {col}: {e}")
+
+        # Add constraints
+        constraints = [
+            ("fk_sessions_course", "course_id", "courses(id)", "CASCADE"),
+            ("fk_sessions_timetable", "timetable_slot_id", "timetable_slots(id)", "SET NULL"),
+            ("fk_sessions_classroom", "classroom_id", "classrooms(id)", "SET NULL"),
+            ("fk_sessions_lecturer", "lecturer_id", "users(id)", "SET NULL")
+        ]
+        for name, col, ref, on_delete in constraints:
+            try:
+                await conn.execute(text(f"ALTER TABLE class_sessions ADD CONSTRAINT {name} FOREIGN KEY ({col}) REFERENCES {ref} ON DELETE {on_delete}"))
+            except: pass
+
         print("\n✅ Timetable System Migration Complete!")
-        print("\n📊 New Structure:")
-        print("   - classrooms: Room management with amenities")
-        print("   - courses: Enhanced with department, credits, semester")
-        print("   - timetable_slots: Weekly recurring schedule")
-        print("   - class_sessions: Individual session instances")
 
 if __name__ == "__main__":
     asyncio.run(migrate_timetable_system())

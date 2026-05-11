@@ -33,7 +33,9 @@ async def main():
         "migrate_system_config.py",
         "migrate_timetable.py",
         "migrate_user_status.py",
-        "migrate_cameras.py"
+        "migrate_cameras.py",
+        "seed_db.py",
+        "diagnose_500.py"
     ]
     
     success = True
