@@ -4,11 +4,13 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List, Optional
 from app.database import get_session
-from app.models import User, Role
+from app.models import User, Role, SystemConfig, EntryLog
 from app.auth import get_current_user, get_password_hash
+from app.utils.audit import log_action
 import csv
 import codecs
 import io
+import json
 
 router = APIRouter()
 
@@ -16,7 +18,7 @@ router = APIRouter()
 async def get_current_admin_user(current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)):
     # Fetch role name
     role = await session.get(Role, current_user.role_id)
-    if not role or role.name != "SuperAdmin":
+    if not role or role.name not in ["SuperAdmin", "Security"]:
         raise HTTPException(status_code=403, detail="Not authorized")
     return current_user
 
@@ -40,6 +42,7 @@ async def get_all_users(
 
 @router.put("/{user_id}")
 async def update_user(
+    request: Request,
     user_id: str,
     user_data: dict,
     session: AsyncSession = Depends(get_session),
@@ -105,10 +108,24 @@ async def update_user(
     
     await session.commit()
     await session.refresh(user)
+
+    # Log the update
+    await log_action(
+        session=session,
+        action_type="update",
+        user=admin,
+        table_name="users",
+        record_id=str(user.id),
+        description=f"Updated user {user.full_name} ({user.admission_number})",
+        new_values=user_data,
+        request=request
+    )
+
     return {"message": "User updated successfully", "user": user}
 
 @router.delete("/{user_id}")
 async def delete_user(
+    request: Request,
     user_id: str,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_admin_user)
@@ -120,6 +137,18 @@ async def delete_user(
         
     await session.delete(user)
     await session.commit()
+
+    # Log the deletion
+    await log_action(
+        session=session,
+        action_type="delete",
+        user=admin,
+        table_name="users",
+        record_id=str(user_id),
+        description=f"Deleted user {user.full_name} ({user.admission_number})",
+        request=request
+    )
+
     return {"status": "success", "message": "User deleted"}
 
 @router.get("/me")
@@ -143,6 +172,7 @@ async def get_current_user_info(
         "gender": current_user.gender,
         "program": current_user.program,
         "profile_image": current_user.profile_image,
+        "pin_setup_required": current_user.pin_setup_required,
         "role": role.name if role else "Unknown",
         "role_id": current_user.role_id
     }
@@ -154,40 +184,14 @@ async def log_user_access(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ):
-    from app.models import AuditLog
-    import json
-    
-    # Extract IP
-    client_ip = request.client.host
-    # If behind proxy (Docker/Nginx), headers might be needed, but host is fine for now
-    
-    # Store metadata
-    metadata = {
-        "gps": access_data.get('gps'),
-        "network": access_data.get('network'), # Type: wifi/4g etc
-        "ip": client_ip,
-        "device": access_data.get('device')
-    }
-    
-    log = AuditLog(
-        user_id=current_user.id,
-        action="LOGIN_METADATA",
-        timestamp=datetime.utcnow(),
-        details=json.dumps(metadata) # We need to update AuditLog model to support details or store in action?
-        # AuditLog structure: user_id, action, timestamp. 
-        # Action is string. We can append metadata to action string or add column.
-        # User said "record".
-        # Let's format action string: f"LOGIN: IP={client_ip} | LOC={gps}"
+    await log_action(
+        session=session,
+        action_type="login_metadata",
+        user=current_user,
+        description=f"Recorded browser metadata for {current_user.full_name}",
+        new_values=access_data,
+        request=request
     )
-    # Re-eval AuditLog model: 
-    # class AuditLog(UUIDModel, table=True):
-    #    user_id: Optional[UUID]
-    #    action: str
-    
-    # I'll modify action string to contain JSON if no details column.
-    log.action = f"LOGIN_METADATA: {json.dumps(metadata)}"
-    
-    session.add(log)
     
     # Also log to UserLocationLog for real-time tracking (Attendance Fallback)
     from app.models import UserLocationLog
@@ -196,7 +200,7 @@ async def log_user_access(
         user_id=current_user.id,
         latitude=gps.get('lat') if isinstance(gps, dict) else None,
         longitude=gps.get('lng') if isinstance(gps, dict) else None,
-        ip_address=client_ip,
+        ip_address=request.client.host if request.client else "unknown",
         network_type=access_data.get('network'),
         device_info=access_data.get('device'),
         context_type="login_audit"
@@ -209,6 +213,7 @@ async def log_user_access(
 @router.post("", response_model=User)
 @router.post("/create", response_model=User)
 async def create_user(
+    request: Request,
     new_user: dict, 
     session: AsyncSession = Depends(get_session), 
     admin: User = Depends(get_current_admin_user)
@@ -259,6 +264,18 @@ async def create_user(
     session.add(db_user)
     await session.commit()
     await session.refresh(db_user)
+    
+    await log_action(
+        session=session,
+        action_type="create",
+        user=admin,
+        table_name="users",
+        record_id=str(db_user.id),
+        description=f"Created user {db_user.full_name} ({db_user.admission_number})",
+        new_values=new_user,
+        request=request
+    )
+    
     return db_user
 
 @router.post("/bulk-upload")
@@ -541,6 +558,11 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
     # Get role information
     role = await session.get(Role, user.role_id)
     
+    # Check Gate Status (In/Out)
+    gate_status_query = select(EntryLog).where(EntryLog.user_id == user.id).where(EntryLog.exit_time == None).order_by(EntryLog.entry_time.desc())
+    open_log = (await session.exec(gate_status_query)).first()
+    gate_status = "In" if open_log else "Out"
+    
     return {
         "id": str(user.id),
         "full_name": user.full_name,
@@ -551,8 +573,111 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
         "profile_image": user.profile_image,
         "admission_date": user.admission_date.isoformat() if user.admission_date else None,
         "expiry_date": user.expiry_date.isoformat() if user.expiry_date else None,
-        "role": role.name if role else "Unknown"
+        "role": role.name if role else "Unknown",
+        "gate_status": gate_status
     }
+
+@router.post("/verify-supervisor-pin")
+async def verify_supervisor_pin(
+    payload: dict,
+    session: AsyncSession = Depends(get_session)
+):
+    pin = payload.get("pin")
+    if not pin:
+        raise HTTPException(status_code=400, detail="PIN is required")
+        
+    stmt = select(SystemConfig).where(SystemConfig.key == "supervisor_pin")
+    config = (await session.exec(stmt)).first()
+    if not config or config.value != pin:
+        raise HTTPException(status_code=401, detail="Invalid Supervisor PIN")
+        
+    return {"status": "success", "message": "PIN verified"}
+
+@router.put("/me/update-pin")
+async def update_my_pin(
+    pin_data: dict,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Allow user to update their security PIN"""
+    new_pin = pin_data.get('pin')
+    if not new_pin or not str(new_pin).isdigit() or len(str(new_pin)) != 4:
+        raise HTTPException(status_code=400, detail="PIN must be 4 digits")
+    
+    current_user.pin = str(new_pin)
+    current_user.pin_setup_required = False # PIN has been set/updated
+    
+    await session.commit()
+    await session.refresh(current_user)
+    
+    return {"message": "PIN updated successfully", "pin_setup_required": False}
+
+@router.post("/verify-pin")
+async def verify_user_pin(
+    pin_data: dict,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Verify user security PIN"""
+    input_pin = pin_data.get('pin')
+    if input_pin == current_user.pin:
+        return {"status": "success"}
+    raise HTTPException(status_code=401, detail="Invalid Security PIN")
+
+@router.post("/secure-profile-image-update")
+async def secure_profile_image_update(
+    request: Request,
+    file: UploadFile = File(...),
+    user_id: str = Form(...),
+    supervisor_pin: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    if current_user.pin != supervisor_pin:
+        raise HTTPException(status_code=401, detail="Invalid Authorization PIN")
+        
+    # 2. Get Target User
+    from uuid import UUID
+    target_user = await session.get(User, UUID(user_id))
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # 3. Save Image
+    import os
+    import shutil
+    import uuid
+    
+    os.makedirs("static/profiles", exist_ok=True)
+    file_ext = file.filename.split('.')[-1].lower()
+    if file_ext not in ['jpg', 'jpeg', 'png', 'webp', 'gif']:
+         raise HTTPException(status_code=400, detail="Invalid image format")
+         
+    filename = f"{target_user.id}_{uuid.uuid4().hex[:8]}.{file_ext}"
+    file_path = f"static/profiles/{filename}"
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    image_url = f"/static/profiles/{filename}"
+    old_image = target_user.profile_image
+    target_user.profile_image = image_url
+    session.add(target_user)
+    
+    # 4. Log to Audit Trail
+    await log_action(
+        session=session,
+        action_type="update",
+        user=current_user,
+        table_name="users",
+        record_id=str(target_user.id),
+        description=f"Profile picture for {target_user.full_name} updated with Supervisor PIN",
+        old_values={"profile_image": old_image},
+        new_values={"profile_image": image_url},
+        request=request
+    )
+    
+    await session.commit()
+    return {"status": "success", "image_url": image_url}
 
 @router.post("/upload-profile-image")
 async def upload_profile_image(
@@ -605,7 +730,7 @@ async def upload_profile_image(
     import os
     
     file_ext = file.filename.split('.')[-1].lower()
-    if file_ext not in ['jpg', 'jpeg', 'png', 'webp']:
+    if file_ext not in ['jpg', 'jpeg', 'png', 'webp', 'gif']:
          raise HTTPException(status_code=400, detail="Invalid image format")
     
     import uuid
@@ -643,6 +768,7 @@ async def upload_profile_image(
 
 @router.post("/{user_id}/reset-password")
 async def reset_user_password(
+    request: Request,
     user_id: str,
     password_data: dict,
     session: AsyncSession = Depends(get_session),
@@ -671,6 +797,15 @@ async def reset_user_password(
     
     await session.commit()
     
+    await log_action(
+        session=session,
+        action_type="reset_password",
+        user=admin,
+        table_name="users",
+        record_id=str(user.id),
+        description=f"Reset password for user {user.full_name} ({user.admission_number})",
+        request=request
+    )
     
     return {"message": f"Password reset successfully for {user.full_name}"}
 

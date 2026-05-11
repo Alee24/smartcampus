@@ -3,6 +3,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 from app.database import get_session
 from app.models import User, EntryLog, Gate, Vehicle, VehicleLog, Visitor, Event, GateScanLog
+from app.utils.audit import log_action
 from datetime import datetime
 import shutil
 import os
@@ -14,6 +15,7 @@ router = APIRouter()
 
 @router.post("/manual-vehicle-entry")
 async def manual_vehicle_entry(
+    request: Request,
     payload: dict,
     session: AsyncSession = Depends(get_session)
 ):
@@ -71,6 +73,16 @@ async def manual_vehicle_entry(
     await session.commit()
     await session.refresh(log)
 
+    # Log manual vehicle entry
+    await log_action(
+        session=session,
+        action_type="create",
+        table_name="vehicle_logs",
+        record_id=str(log.id),
+        description=f"Manual vehicle entry logged for {plate} ({passengers} passengers)",
+        request=request
+    )
+
     return {
         "status": status,
         "message": f"Vehicle {plate} logged manually",
@@ -85,6 +97,7 @@ async def manual_vehicle_entry(
 
 @router.post("/scan")
 async def scan_entry(
+    request: Request,
     scan_data: dict, # { "admission_number": "...", "gate_id": "optional" }
     session: AsyncSession = Depends(get_session)
 ):
@@ -149,6 +162,16 @@ async def scan_entry(
     await session.commit()
     await session.refresh(new_log)
     
+    # Log the scan
+    await log_action(
+        session=session,
+        action_type="gate_scan",
+        table_name="entry_logs",
+        record_id=str(new_log.id),
+        description=f"Gate scan for {user.full_name} ({adm_no}) at {gate.name} - Status: {status}",
+        request=request
+    )
+    
     # Return enriched data for Frontend
     role_name = "Unknown"
     if user.role_id:
@@ -167,7 +190,11 @@ async def scan_entry(
     }
 
 @router.post("/check-in/{admission_number}")
-async def check_in_user(admission_number: str, session: AsyncSession = Depends(get_session)):
+async def check_in_user(
+    request: Request,
+    admission_number: str, 
+    session: AsyncSession = Depends(get_session)
+):
     user = (await session.exec(select(User).where(User.admission_number == admission_number))).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -195,10 +222,25 @@ async def check_in_user(admission_number: str, session: AsyncSession = Depends(g
     )
     session.add(new_log)
     await session.commit()
+
+    # Log manual student check-in
+    await log_action(
+        session=session,
+        action_type="create",
+        table_name="entry_logs",
+        record_id=str(new_log.id),
+        description=f"Manual check-in for student {user.full_name} ({admission_number})",
+        request=request
+    )
+
     return {"message": "Check-in successful", "time": new_log.entry_time.strftime("%H:%M %p")}
 
 @router.post("/check-out/{admission_number}")
-async def check_out_user(admission_number: str, session: AsyncSession = Depends(get_session)):
+async def check_out_user(
+    request: Request,
+    admission_number: str, 
+    session: AsyncSession = Depends(get_session)
+):
     user = (await session.exec(select(User).where(User.admission_number == admission_number))).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -223,10 +265,22 @@ async def check_out_user(admission_number: str, session: AsyncSession = Depends(
     
     session.add(log)
     await session.commit()
+
+    # Log manual student check-out
+    await log_action(
+        session=session,
+        action_type="update",
+        table_name="entry_logs",
+        record_id=str(log.id),
+        description=f"Manual check-out for student {user.full_name} ({admission_number})",
+        request=request
+    )
+
     return {"message": "Check-out successful", "time": log.exit_time.strftime("%H:%M %p")}
 
 @router.post("/scan-vehicle")
 async def scan_vehicle_plate(
+    request: Request,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session)
 ):
@@ -259,8 +313,13 @@ async def scan_vehicle_plate(
     else:
         detected_text = f"KCA {random.randint(100, 999)}{random.choice(['A','B','C'])}"
         
-    # 4. Lookup Vehicle
-    vehicle = (await session.exec(select(Vehicle).where(Vehicle.plate_number == detected_text))).first()
+    # 4. Lookup Vehicle with Owner details
+    from sqlalchemy.orm import selectinload
+    vehicle = (await session.exec(
+        select(Vehicle)
+        .where(Vehicle.plate_number == detected_text)
+        .options(selectinload(Vehicle.owner))
+    )).first()
     
     status = "allowed" if vehicle else "flagged" # Flagged if unknown
     
@@ -273,6 +332,14 @@ async def scan_vehicle_plate(
         await session.commit()
     
     # 6. Log Entry
+    owner_data = None
+    if vehicle and vehicle.owner:
+        owner_data = {
+            "name": vehicle.owner.full_name,
+            "image": vehicle.owner.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+            "school": vehicle.owner.school or "N/A"
+        }
+
     if not vehicle:
         # Auto-register as Visitor (Simulate AI Detection of Make/Color)
         ai_colors = ["White", "Silver", "Black", "Blue", "Red", "Grey"]
@@ -289,6 +356,13 @@ async def scan_vehicle_plate(
         await session.commit()
         await session.refresh(vehicle)
         status = "visitor"
+    elif not vehicle.owner:
+        # We have a vehicle but no registered system owner (e.g. staff car not linked yet)
+        owner_data = {
+            "name": vehicle.driver_name or "Unknown Owner",
+            "image": "https://cdn-icons-png.flaticon.com/512/3202/3202926.png", # Car Icon
+            "school": "Guest/External"
+        }
 
     # Log with AI Insights (Passengers)
     log = VehicleLog(
@@ -304,6 +378,15 @@ async def scan_vehicle_plate(
     await session.commit()
     await session.refresh(log)
     
+    await log_action(
+        session=session,
+        action_type="vehicle_scan",
+        table_name="vehicle_logs",
+        record_id=str(log.id),
+        description=f"AI Vehicle scan for {detected_text} at {gate.name} - Status: {status}",
+        request=request
+    )
+    
     return {
         "status": status,
         "message": f"Vehicle {detected_text} processed",
@@ -313,8 +396,9 @@ async def scan_vehicle_plate(
             "model": vehicle.model,
             "color": vehicle.color,
             "passengers": log.detected_passengers,
-            "entry_time": log.entry_time.strftime("%H:%M:%S"),
-            "image_url": f"/{filepath}" 
+            "entry_time": log.entry_time.strftime("%I:%M %p"),
+            "image_url": f"/{filepath}",
+            "owner": owner_data
         }
     }
 
@@ -519,6 +603,7 @@ async def list_visitors(session: AsyncSession = Depends(get_session)):
 
 @router.post("/visitors/check-in")
 async def check_in_visitor(
+    request: Request,
     payload: dict, # { first_name, last_name, phone_number, id_number, visit_details }
     session: AsyncSession = Depends(get_session)
 ):
@@ -535,12 +620,24 @@ async def check_in_visitor(
         session.add(visitor)
         await session.commit()
         await session.refresh(visitor)
+
+        # Log visitor check-in
+        await log_action(
+            session=session,
+            action_type="create",
+            table_name="visitors",
+            record_id=str(visitor.id),
+            description=f"Visitor {visitor.first_name} {visitor.last_name} checked in",
+            request=request
+        )
+
         return visitor
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Check-in failed: {str(e)}")
 
 @router.post("/visitors/check-out")
 async def check_out_visitor(
+    request: Request,
     payload: dict, # { visitor_id }
     session: AsyncSession = Depends(get_session)
 ):
@@ -561,6 +658,17 @@ async def check_out_visitor(
     session.add(visitor)
     await session.commit()
     await session.refresh(visitor)
+
+    # Log visitor check-out
+    await log_action(
+        session=session,
+        action_type="update",
+        table_name="visitors",
+        record_id=str(visitor_id),
+        description=f"Visitor {visitor.first_name} {visitor.last_name} checked out",
+        request=request
+    )
+
     return visitor
 
 @router.get("/visitor-stats")
@@ -834,7 +942,7 @@ async def public_access_request(
 
     elif role in ["student", "staff"]:
         # Check IP Address
-        client_ip = request.client.host
+        client_ip = request.client.host if request.client else "unknown"
         # Define allowed University IPs (Mock Range + Localhost)
         # Strictly enforces university IP for approval
         ALLOWED_IPS = ["127.0.0.1", "::1", "localhost"] 

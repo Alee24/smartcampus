@@ -82,11 +82,11 @@ export default function BulkUpload() {
         {
             id: 'photos',
             title: 'Step 7: Student Photos',
-            description: 'Bulk upload profile images for ID cards.',
+            description: 'Bulk sync profile images using a ZIP file and mapping CSV.',
             endpoint: 'photos',
             icon: <Image size={24} />,
             color: 'bg-teal-500',
-            example: 'ZIP FILE REQUIRED\n\nOPTION A (Recommended): Name images as Admission Number (e.g. STD001.jpg)\nOPTION B: Upload CSV Mapping + Random filenames\n\n1. Select all images\n2. Zip them into a single file\n3. Upload the .zip file',
+            example: 'CSV FORMAT (Admission Number, Photo ID/Suffix):\n23ZAD107643, 2847\n23ZAD107639, 2848\n\nZIP FILE:\nShould contain photos like DSCN2847.JPG, DSCN2848.JPG, etc.\n\nLOGIC:\nThe system matches the Admission Number to any image file that ENDS with the corresponding Photo ID/Suffix.',
             status: 'pending'
         }
     ]

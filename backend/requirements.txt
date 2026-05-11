@@ -22,3 +22,5 @@ qrcode
 openai
 google-cloud-vision
 boto3
+apscheduler
+fastapi-mail

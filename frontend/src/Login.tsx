@@ -57,7 +57,7 @@ export default function Login({ onLogin }: LoginProps) {
 
         try {
             const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 15000) // 15s timeout
+            const timeoutId = setTimeout(() => controller.abort(), 120000) // 120 seconds
 
             const searchParams = new URLSearchParams()
             searchParams.append('username', email.trim())
@@ -79,7 +79,6 @@ export default function Login({ onLogin }: LoginProps) {
             }
 
             const data = await response.json()
-            console.log('Login response:', data) // Debug: see what backend returns
             // Validate response structure
             if (!data.access_token) {
                 throw new Error('Invalid response: missing access token')

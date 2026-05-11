@@ -1,15 +1,13 @@
-// Minimal Service Worker for PWA Criteria
 self.addEventListener('install', (e) => {
-    e.waitUntil(
-        caches.open('gatepass-store').then((cache) => cache.addAll([
-            '/',
-            '/index.html',
-        ])),
-    );
+    self.skipWaiting();
 });
 
-self.addEventListener('fetch', (e) => {
-    e.respondWith(
-        caches.match(e.request).then((response) => response || fetch(e.request)),
+self.addEventListener('activate', (e) => {
+    e.waitUntil(
+        self.registration.unregister()
+            .then(() => self.clients.matchAll())
+            .then((clients) => {
+                clients.forEach((client) => client.navigate(client.url));
+            })
     );
 });

@@ -13,6 +13,7 @@
         "axios": "^1.6.7",
         "clsx": "^2.1.0",
         "framer-motion": "^11.0.8",
+        "html2canvas": "^1.4.1",
         "html5-qrcode": "^2.3.8",
         "jspdf": "^2.5.2",
         "lucide-react": "^0.344.0",

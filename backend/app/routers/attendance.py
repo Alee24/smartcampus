@@ -233,8 +233,6 @@ async def mark_attendance(
         import io
 
         # Capture Client IP
-        client_ip = request.client.host
-        # If behind proxy (Nginx/Docker), you might need request.headers.get("X-Forwarded-For")
         client_ip = request.client.host if request.client else "unknown"
         
         # 1. Fetch live session
@@ -463,7 +461,7 @@ async def scan_room_qr(
     try: meta = json.loads(metadata)
     except: pass
     
-    client_ip = request.client.host
+    client_ip = request.client.host if request.client else "unknown"
     if not meta.get('ip_address') or meta.get('ip_address') == 'unknown':
         meta['ip_address'] = client_ip
         

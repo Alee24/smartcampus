@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, CheckCircle, XCircle, Shield, Calendar, User, Building, Sparkles, UploadCloud, Loader2, Camera, QrCode } from 'lucide-react'
+import { useNotification } from './components/Notification'
+import { Search, CheckCircle, XCircle, Shield, Calendar, User, Building, Sparkles, UploadCloud, Loader2, Camera, QrCode, LogIn, LogOut, RefreshCcw, Printer, AlertTriangle } from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
+import { QRCodeSVG } from 'qrcode.react'
 
 export default function StudentVerification() {
+    const { showNotification } = useNotification()
     const [query, setQuery] = useState('')
     const [result, setResult] = useState<any>(null)
     const [loading, setLoading] = useState(false)
@@ -16,6 +19,17 @@ export default function StudentVerification() {
     const [uploadingImage, setUploadingImage] = useState(false)
     const [isScanning, setIsScanning] = useState(false)
     const [actionLoading, setActionLoading] = useState<'check-in' | 'check-out' | null>(null)
+    const [pinModal, setPinModal] = useState<{show: boolean, pin: string, file: File | null}>({
+        show: false,
+        pin: '',
+        file: null
+    })
+    const [isFlipped, setIsFlipped] = useState(false)
+    const [isEditing, setIsEditing] = useState(false)
+    const [editData, setEditData] = useState({ full_name: '', school: '' })
+    const [saveLoading, setSaveLoading] = useState(false)
+    const [rotation, setRotation] = useState(0)
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const qrScannerRef = useRef<Html5Qrcode | null>(null)
 
     // Fetch current user and company settings on mount
@@ -51,8 +65,18 @@ export default function StudentVerification() {
                 console.error(e)
             }
         }
+        const requestCameraPermission = async () => {
+            try {
+                await navigator.mediaDevices.getUserMedia({ video: true })
+                console.log('Camera permission granted')
+            } catch (err) {
+                console.warn('Camera permission denied or not available', err)
+            }
+        }
+
         fetchUserData()
         fetchCompanySettings()
+        requestCameraPermission()
     }, [])
 
     // Success sound effect
@@ -105,15 +129,15 @@ export default function StudentVerification() {
             if (res.ok) {
                 const data = await res.json()
                 playSuccessSound()
-                alert(`${action === 'check-in' ? 'Check-in' : 'Check-out'} recorded at ${data.time}`)
+                showNotification(`${action === 'check-in' ? 'Check-in' : 'Check-out'} recorded at ${data.time}`, 'success')
                 // Refresh data to show updated last accessed if needed
                 handleVerify()
             } else {
                 const err = await res.json()
-                alert(err.detail || `Failed to ${action}`)
+                showNotification(err.detail || `Failed to ${action}`, 'error')
             }
         } catch (e) {
-            alert(`Network error during ${action}`)
+            showNotification(`Network error during ${action}`, 'error')
         } finally {
             setActionLoading(null)
         }
@@ -140,6 +164,7 @@ export default function StudentVerification() {
                 // Trigger animations and sound
                 setTimeout(() => {
                     setShowCard(true)
+                    setEditData({ full_name: data.full_name, school: data.school })
                     playSuccessSound()
                 }, 300)
             } else {
@@ -152,12 +177,6 @@ export default function StudentVerification() {
             setResult({ error: 'Verification failed. Please try again.' })
         } finally {
             setLoading(false)
-        }
-    }
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleVerify()
         }
     }
 
@@ -178,7 +197,6 @@ export default function StudentVerification() {
 
             if (res.ok) {
                 setResult({ ...result, status: newStatus })
-                // Maybe a small toast or success indicator
             } else {
                 const data = await res.json()
                 alert(data.detail || 'Failed to update status')
@@ -191,17 +209,95 @@ export default function StudentVerification() {
         }
     }
 
-    const handleImageUpload = async (file: File) => {
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleVerify()
+        }
+    }
+
+    const handleSaveEdits = async () => {
         if (!result || !currentUser || !['SuperAdmin', 'Security'].includes(currentUser.role)) return
         
-        setUploadingImage(true)
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('user_id', result.id)
-
+        setSaveLoading(true)
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch('/api/users/upload-profile-image', {
+            const res = await fetch(`/api/users/${result.id}`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify(editData)
+            })
+
+            if (res.ok) {
+                setResult({ ...result, ...editData })
+                setIsEditing(false)
+                alert('Details updated successfully')
+            } else {
+                const data = await res.json()
+                alert(data.detail || 'Failed to update details')
+            }
+        } catch (e) {
+            console.error(e)
+            alert('Network error updating details')
+        } finally {
+            setSaveLoading(false)
+        }
+    }
+
+    const handleImageUpload = (file: File) => {
+        if (!result || !currentUser || !['SuperAdmin', 'Security'].includes(currentUser.role)) return
+        const url = URL.createObjectURL(file)
+        setPreviewUrl(url)
+        setRotation(0)
+        setPinModal({ show: true, pin: '', file })
+    }
+
+    const rotateImage = () => {
+        setRotation((prev) => (prev + 90) % 360)
+    }
+
+    const getRotatedBlob = async (file: File, deg: number): Promise<Blob> => {
+        if (deg === 0) return file
+        
+        return new Promise((resolve) => {
+            const img = new Image()
+            img.onload = () => {
+                const canvas = document.createElement('canvas')
+                const ctx = canvas.getContext('2d')!
+                
+                if (deg === 90 || deg === 270) {
+                    canvas.width = img.height
+                    canvas.height = img.width
+                } else {
+                    canvas.width = img.width
+                    canvas.height = img.height
+                }
+                
+                ctx.translate(canvas.width / 2, canvas.height / 2)
+                ctx.rotate((deg * Math.PI) / 180)
+                ctx.drawImage(img, -img.width / 2, -img.height / 2)
+                
+                canvas.toBlob((blob) => resolve(blob!), file.type)
+            }
+            img.src = URL.createObjectURL(file)
+        })
+    }
+
+    const submitSecureImageUpdate = async () => {
+        if (!pinModal.file || !result) return
+        
+        setUploadingImage(true)
+        try {
+            const finalBlob = await getRotatedBlob(pinModal.file, rotation)
+            const formData = new FormData()
+            formData.append('file', finalBlob, pinModal.file.name)
+            formData.append('user_id', result.id)
+            formData.append('supervisor_pin', pinModal.pin)
+
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/users/secure-profile-image-update', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
@@ -210,13 +306,16 @@ export default function StudentVerification() {
             if (res.ok) {
                 const data = await res.json()
                 setResult({ ...result, profile_image: data.image_url })
+                setPinModal({ show: false, pin: '', file: null })
+                setPreviewUrl(null)
+                showNotification('Profile picture updated and logged successfully', 'success')
             } else {
                 const data = await res.json()
-                alert(data.detail || 'Failed to upload image')
+                showNotification(data.detail || 'Invalid Supervisor PIN or failed to upload', 'error')
             }
         } catch (e) {
             console.error(e)
-            alert('Network error uploading image')
+            showNotification('Network error updating image', 'error')
         } finally {
             setUploadingImage(false)
         }
@@ -251,7 +350,7 @@ export default function StudentVerification() {
                 )
             } catch (err) {
                 console.error("Scanner start error:", err)
-                alert("Could not start camera. Please ensure you have given permission.")
+                showNotification("Could not start camera. Please ensure you have given permission.", "warning")
                 setIsScanning(false)
             }
         }, 300)
@@ -404,7 +503,67 @@ export default function StudentVerification() {
                 {/* 3D ID Card */}
                 {result && !result.error && (
                     <div className={`perspective-1000 ${showCard ? 'animate-card-flip' : 'opacity-0'}`}>
-                        <div className="max-w-4xl mx-auto transform-gpu hover:scale-105 transition-transform duration-500">
+                        {/* Action Bar Above Card */}
+                        <div className="max-w-4xl mx-auto mb-6 flex flex-wrap gap-4 items-center justify-between animate-fade-in delay-200">
+                            <div className="flex gap-3 flex-1">
+                                {result.gate_status === 'In' ? (
+                                    <button 
+                                        onClick={() => handleGateAction('check-out')}
+                                        disabled={!!actionLoading}
+                                        className="flex-1 md:flex-none flex items-center justify-center gap-3 py-4 px-8 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black shadow-lg shadow-red-500/20 transition-all active:scale-95 disabled:opacity-50 text-lg"
+                                    >
+                                        {actionLoading === 'check-out' ? <Loader2 className="animate-spin" size={24} /> : <LogOut size={24} />}
+                                        CHECK OUT
+                                    </button>
+                                ) : (
+                                    <button 
+                                        onClick={() => handleGateAction('check-in')}
+                                        disabled={!!actionLoading}
+                                        className="flex-1 md:flex-none flex items-center justify-center gap-3 py-4 px-8 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black shadow-lg shadow-green-500/20 transition-all active:scale-95 disabled:opacity-50 text-lg"
+                                    >
+                                        {actionLoading === 'check-in' ? <Loader2 className="animate-spin" size={24} /> : <LogIn size={24} />}
+                                        CHECK IN
+                                    </button>
+                                )}
+                                
+                                <button 
+                                    onClick={() => showNotification('Printing student ID...', 'info')}
+                                    className="flex items-center justify-center gap-2 py-4 px-6 bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-slate-200 rounded-2xl font-bold border border-slate-200 dark:border-gray-700 hover:bg-slate-200 transition-all"
+                                >
+                                    <Printer size={20} />
+                                    <span className="hidden sm:inline">Print ID</span>
+                                </button>
+
+                                <button 
+                                    onClick={() => setIsFlipped(!isFlipped)}
+                                    className="flex items-center justify-center gap-2 py-4 px-6 bg-purple-600 text-white rounded-2xl font-bold shadow-lg shadow-purple-500/20 hover:bg-purple-700 transition-all"
+                                >
+                                    <RefreshCcw size={20} />
+                                    <span>Flip Card</span>
+                                </button>
+                            </div>
+
+                            <div className="flex gap-3">
+                                {canEdit && !isEditing && (
+                                    <button 
+                                        onClick={() => setIsEditing(true)}
+                                        className="flex items-center justify-center gap-2 py-4 px-6 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-2xl font-bold border border-purple-200 dark:border-purple-800 transition-all hover:bg-purple-200"
+                                    >
+                                        <RefreshCcw size={20} />
+                                        <span className="hidden sm:inline">Edit Details</span>
+                                    </button>
+                                )}
+                                <button 
+                                    onClick={() => showNotification('Report filed for supervisor review', 'warning')}
+                                    className="flex items-center justify-center gap-2 py-4 px-6 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-2xl font-bold border border-orange-200 dark:border-orange-900/30 hover:bg-orange-100 transition-all"
+                                >
+                                    <AlertTriangle size={20} />
+                                    <span className="hidden sm:inline">Report</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="max-w-4xl mx-auto transform-gpu hover:scale-[1.02] transition-transform duration-500">
                             {/* Card Container with 3D effect */}
                             <div className="relative">
                                 {/* Glow Effect */}
@@ -424,7 +583,7 @@ export default function StudentVerification() {
                                             <div className="flex items-center gap-3">
                                                 <div className="w-14 h-14 bg-white rounded-xl p-1 shadow-inner flex items-center justify-center overflow-hidden">
                                                     <img
-                                                        src="/logo.png"
+                                                        src={companySettings.logo_url || "/logo.png"}
                                                         alt="University Logo"
                                                         className="w-full h-full object-contain"
                                                     />
@@ -445,14 +604,20 @@ export default function StudentVerification() {
                                         </div>
                                     </div>
 
-                                    {/* Card Body - Responsive Layout: Stacked on Mobile, Horizontal on Desktop */}
-                                    <div className="p-6">
-                                        <div className="flex flex-col md:flex-row gap-6 items-center md:items-start text-center md:text-left">
-                                            {/* Left: Large Photo */}
-                                            <div className="flex-shrink-0">
-                                                <div className="relative group">
-                                                    {/* Photo Glow */}
-                                                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl blur-xl opacity-50 group-hover:opacity-75 transition-opacity"></div>
+                                    {/* Card Content with 3D Flip */}
+                                    <div 
+                                        className={`relative transition-all duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}
+                                        style={{ transformStyle: 'preserve-3d' }}
+                                    >
+                                        {/* Front Side */}
+                                        <div className="backface-hidden w-full h-full">
+                                            <div className="p-6">
+                                                <div className="flex flex-col md:flex-row gap-6 items-center md:items-start text-center md:text-left">
+                                                    {/* Left: Large Photo */}
+                                                    <div className="flex-shrink-0">
+                                                        <div className="relative group">
+                                                            {/* Photo Glow */}
+                                                            <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl blur-xl opacity-50 group-hover:opacity-75 transition-opacity"></div>
 
                                                     {/* Photo Frame - Large */}
                                                     <div className="relative w-72 h-80 rounded-3xl overflow-hidden border-4 border-white shadow-2xl transform group-hover:scale-105 transition-transform bg-slate-200">
@@ -472,46 +637,50 @@ export default function StudentVerification() {
                                                             </div>
                                                         )}
                                                         
-                                                        {uploadingImage && (
-                                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                                                <Loader2 className="text-white animate-spin" size={48} />
-                                                            </div>
-                                                        )}
+                                                            {uploadingImage && (
+                                                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                                                    <Loader2 className="text-white animate-spin" size={48} />
+                                                                </div>
+                                                            )}
 
-                                                        {/* Re-upload button overlay removed - moved below */}
-                                                    </div>
-
-                                                    {/* Upload Button BELOW the image */}
-                                                    {canEdit && (
-                                                        <div className="mt-4 flex justify-center">
-                                                            <label className="bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 px-6 py-2.5 rounded-2xl font-bold cursor-pointer hover:bg-purple-50 dark:hover:bg-gray-600 transition-all border border-purple-100 dark:border-purple-900 shadow-sm flex items-center gap-2 active:scale-95">
-                                                                <Camera size={18} />
-                                                                {result.profile_image ? "Update Photo" : "Upload Photo"}
-                                                                <input 
-                                                                    type="file" 
-                                                                    accept="image/*" 
-                                                                    className="hidden" 
-                                                                    onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} 
-                                                                />
-                                                            </label>
+                                                            {/* Upload Button ONTO the image */}
+                                                            {canEdit && (
+                                                                <label className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-md text-white py-4 font-black cursor-pointer hover:bg-black/60 transition-all flex items-center justify-center gap-3 group/btn border-t border-white/20">
+                                                                    <div className="bg-white/20 p-2 rounded-full group-hover/btn:scale-110 transition-transform">
+                                                                        <Camera size={20} />
+                                                                    </div>
+                                                                    <span className="tracking-widest text-xs uppercase">{result.profile_image ? "Update Photo" : "Upload Photo"}</span>
+                                                                    <input 
+                                                                        type="file" 
+                                                                        accept="image/*" 
+                                                                        className="hidden" 
+                                                                        onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} 
+                                                                    />
+                                                                </label>
+                                                            )}
                                                         </div>
-                                                    )}
 
-                                                    {/* Verified Badge on Photo */}
-                                                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-green-500 text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg flex items-center gap-2 whitespace-nowrap">
-                                                        <CheckCircle size={14} />
-                                                        {(result.status || 'ACTIVE').toUpperCase()}
+
+
                                                     </div>
                                                 </div>
-                                            </div>
 
-                                            {/* Right: Details Section */}
+                                                {/* Right: Details Section */}
                                             <div className="flex-1 space-y-4 w-full">
                                                 {/* Name & ID */}
                                                 <div>
-                                                    <h3 className="text-3xl md:text-4xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-1 break-words">
-                                                        {result.full_name}
-                                                    </h3>
+                                                    {isEditing ? (
+                                                        <input 
+                                                            type="text"
+                                                            value={editData.full_name}
+                                                            onChange={(e) => setEditData({ ...editData, full_name: e.target.value })}
+                                                            className="text-3xl md:text-4xl font-black bg-white/50 dark:bg-gray-800/50 rounded-lg px-2 py-1 w-full border border-purple-300 focus:outline-none"
+                                                        />
+                                                    ) : (
+                                                        <h3 className="text-3xl md:text-4xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-1 break-words">
+                                                            {result.full_name}
+                                                        </h3>
+                                                    )}
                                                     <p className="text-xl md:text-2xl font-bold text-purple-600">
                                                         {result.admission_number}
                                                     </p>
@@ -519,12 +688,21 @@ export default function StudentVerification() {
 
                                                 {/* Info Grid - Compact */}
                                                 <div className="grid grid-cols-1 gap-3">
-                                                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-700">
+                                                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-700 relative">
                                                         <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 mb-1">
                                                             <Building size={18} />
                                                             <span className="text-xs font-bold uppercase">School/Department</span>
                                                         </div>
-                                                        <p className="font-bold text-xl">{result.school || 'N/A'}</p>
+                                                        {isEditing ? (
+                                                            <input 
+                                                                type="text"
+                                                                value={editData.school}
+                                                                onChange={(e) => setEditData({ ...editData, school: e.target.value })}
+                                                                className="font-bold text-xl bg-white/50 dark:bg-gray-800/50 rounded-lg px-2 py-1 w-full border border-purple-200 focus:outline-none"
+                                                            />
+                                                        ) : (
+                                                            <p className="font-bold text-xl">{result.school || 'N/A'}</p>
+                                                        )}
                                                     </div>
 
                                                     <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-700">
@@ -534,7 +712,7 @@ export default function StudentVerification() {
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <div className={`w-3 h-3 rounded-full ${['Active', 'Registered'].includes(result.status) || result.status === 'active' ? 'bg-green-500 animate-pulse' : result.status === 'Suspended' ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
-                                                            {canEdit ? (
+                                                            {currentUser && currentUser.role === 'SuperAdmin' ? (
                                                                 <select 
                                                                     value={result.status || 'Active'}
                                                                     onChange={(e) => handleStatusUpdate(e.target.value)}
@@ -559,31 +737,74 @@ export default function StudentVerification() {
                                                         </div>
                                                         <p className="font-bold text-xl">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                                                     </div>
+                                                    </div>
                                                 </div>
 
-                                                {/* Footer Note - Compact */}
-                                                {/* Gate Actions Section */}
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <button 
-                                                        onClick={() => handleGateAction('check-in')}
-                                                        disabled={!!actionLoading}
-                                                        className="flex items-center justify-center gap-2 py-4 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black shadow-lg shadow-green-500/20 transition-all active:scale-95 disabled:opacity-50"
-                                                    >
-                                                        {actionLoading === 'check-in' ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
-                                                        CHECK IN
-                                                    </button>
-                                                    <button 
-                                                        onClick={() => handleGateAction('check-out')}
-                                                        disabled={!!actionLoading}
-                                                        className="flex items-center justify-center gap-2 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black shadow-lg shadow-red-500/20 transition-all active:scale-95 disabled:opacity-50"
-                                                    >
-                                                        {actionLoading === 'check-out' ? <Loader2 className="animate-spin" size={20} /> : <LogOut size={20} />}
-                                                        CHECK OUT
-                                                    </button>
-                                                </div>
+                                                {/* Edit Toggle / Save Button */}
+                                                {canEdit && isEditing && (
+                                                    <div className="mt-4 flex gap-2">
+                                                        <button 
+                                                            onClick={handleSaveEdits}
+                                                            disabled={saveLoading}
+                                                            className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
+                                                        >
+                                                            {saveLoading ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />}
+                                                            Save Changes
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => { setIsEditing(false); setEditData({ full_name: result.full_name, school: result.school }); }}
+                                                            className="px-4 py-3 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold transition-all"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {/* Action buttons removed from inside the card */}
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Back Side - QR Code */}
+                                        <div 
+                                            className="absolute inset-0 backface-hidden rotate-y-180 bg-white dark:bg-gray-800 p-8 flex flex-col items-center justify-center"
+                                            style={{ transform: 'rotateY(180deg)', backfaceVisibility: 'hidden' }}
+                                        >
+                                        <div className="text-center mb-6">
+                                            <h4 className="text-xl font-bold text-gray-800 dark:text-white uppercase tracking-widest">Digital Identity Token</h4>
+                                            <p className="text-gray-500 text-xs">Scan to verify at any checkpoint</p>
+                                        </div>
+                                        
+                                        <div className="p-4 bg-white rounded-3xl shadow-inner border-2 border-purple-100 flex items-center justify-center">
+                                            <QRCodeSVG 
+                                                value={result.admission_number} 
+                                                size={220} 
+                                                level="H"
+                                                includeMargin={true}
+                                                imageSettings={{
+                                                    src: companySettings.logo_url || "/logo.png",
+                                                    x: undefined,
+                                                    y: undefined,
+                                                    height: 40,
+                                                    width: 40,
+                                                    excavate: true,
+                                                }}
+                                            />
+                                        </div>
+                                        
+                                        <div className="mt-8 text-center">
+                                            <p className="text-2xl font-black text-purple-600 tracking-wider">{result.admission_number}</p>
+                                            <p className="text-[10px] text-gray-400 mt-2 uppercase">Official Gatepass Authentication System</p>
+                                        </div>
+
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setIsFlipped(false); }}
+                                            className="mt-6 flex items-center gap-2 text-purple-600 font-bold hover:bg-purple-50 px-4 py-2 rounded-xl transition-colors"
+                                        >
+                                            <RefreshCcw size={16} /> Flip to Front
+                                        </button>
+                                    </div>
+                                </div>
 
                                     {/* Card Footer - Compact */}
                                     <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 px-6 py-3">
@@ -600,6 +821,66 @@ export default function StudentVerification() {
                         </div>
                     </div>
                 )}
+                {/* Supervisor PIN Modal for Photo Update */}
+                {pinModal.show && (
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-lg shadow-2xl border border-white/20">
+                            <div className="text-center mb-6">
+                                <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                    <Shield className="text-purple-600" size={32} />
+                                </div>
+                                <h3 className="text-2xl font-bold">Image Preview & Authorization</h3>
+                                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Review, rotate and enter PIN to save</p>
+                            </div>
+
+                            {/* Image Preview with Rotation */}
+                            <div className="mb-6 flex flex-col items-center">
+                                <div className="relative w-48 h-56 rounded-2xl overflow-hidden border-2 border-purple-300 shadow-inner bg-slate-100">
+                                    {previewUrl && (
+                                        <img 
+                                            src={previewUrl} 
+                                            className="w-full h-full object-cover transition-transform duration-300"
+                                            style={{ transform: `rotate(${rotation}deg)` }}
+                                        />
+                                    )}
+                                </div>
+                                <button 
+                                    onClick={rotateImage}
+                                    className="mt-4 flex items-center gap-2 px-4 py-2 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg font-bold hover:bg-purple-100 transition-colors"
+                                >
+                                    <RefreshCcw size={18} />
+                                    Rotate 90°
+                                </button>
+                            </div>
+
+                            <input 
+                                type="password"
+                                value={pinModal.pin}
+                                onChange={(e) => setPinModal({...pinModal, pin: e.target.value})}
+                                placeholder="Enter Supervisor PIN"
+                                className="w-full px-6 py-4 bg-gray-100 dark:bg-gray-700 rounded-xl text-center text-2xl tracking-[1em] font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 mb-6"
+                                maxLength={4}
+                            />
+
+                            <div className="flex gap-3">
+                                <button 
+                                    onClick={() => { setPinModal({show: false, pin: '', file: null}); setPreviewUrl(null); }}
+                                    className="flex-1 py-4 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-300 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={submitSecureImageUpdate}
+                                    disabled={pinModal.pin.length < 4 || uploadingImage}
+                                    className="flex-1 py-4 bg-purple-600 text-white font-bold rounded-xl shadow-lg hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                                >
+                                    {uploadingImage ? <Loader2 className="animate-spin" size={20} /> : "Verify & Save"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
 
                 {/* Error State */}
                 {result && result.error && (
@@ -668,6 +949,19 @@ export default function StudentVerification() {
                 
                 .perspective-1000 {
                     perspective: 1000px;
+                }
+
+                .preserve-3d {
+                    transform-style: preserve-3d;
+                }
+
+                .backface-hidden {
+                    backface-visibility: hidden;
+                    -webkit-backface-visibility: hidden;
+                }
+
+                .rotate-y-180 {
+                    transform: rotateY(180deg);
                 }
             `}</style>
         </div>

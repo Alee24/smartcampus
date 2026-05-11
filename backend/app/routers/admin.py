@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 from app.database import get_session
 from app.models import SystemConfig, User, Role, Course, Classroom, TimetableSlot, ScanLog
 from app.auth import get_current_user, get_password_hash
+from app.utils.audit import log_action
 import csv
 import io
 import uuid
@@ -13,8 +14,11 @@ from datetime import datetime
 router = APIRouter()
 
 # Dependency: Ensure Admin
-async def ensure_admin(current_user: User = Depends(get_current_user)):
-    # In production, check role
+async def ensure_admin(current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)):
+    # Fetch role name
+    role = await session.get(Role, current_user.role_id)
+    if not role or role.name not in ["SuperAdmin", "Admin"]:
+        raise HTTPException(status_code=403, detail="Administrator access required")
     return current_user
 
 @router.get("/")
@@ -24,6 +28,7 @@ async def get_settings(session: AsyncSession = Depends(get_session), admin: User
 
 @router.post("/")
 async def update_settings(
+    request: Request,
     settings: dict, 
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(ensure_admin)
@@ -40,6 +45,17 @@ async def update_settings(
             session.add(new_config)
             
     await session.commit()
+    
+    await log_action(
+        session=session,
+        action_type="update_settings",
+        user=admin,
+        table_name="system_configs",
+        description="Updated system settings",
+        new_values=settings,
+        request=request
+    )
+    
     return {"status": "success"}
 
 @router.get("/dashboard-config")
@@ -60,6 +76,7 @@ async def get_dashboard_config(
 
 @router.post("/dashboard-config")
 async def save_dashboard_config(
+    request: Request,
     payload: dict,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(ensure_admin)
@@ -83,6 +100,17 @@ async def save_dashboard_config(
         session.add(new_config)
     
     await session.commit()
+    
+    await log_action(
+        session=session,
+        action_type="update_dashboard_config",
+        user=admin,
+        table_name="system_configs",
+        description="Updated dashboard menu configuration",
+        new_values=payload,
+        request=request
+    )
+    
     return {"status": "success"}
 
 @router.get("/company-settings")
@@ -103,6 +131,7 @@ async def get_company_settings(
 
 @router.post("/company-settings")
 async def save_company_settings(
+    request: Request,
     payload: dict,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(ensure_admin)
@@ -126,10 +155,22 @@ async def save_company_settings(
         session.add(new_config)
     
     await session.commit()
+    
+    await log_action(
+        session=session,
+        action_type="update_company_settings",
+        user=admin,
+        table_name="system_configs",
+        description="Updated company/university settings",
+        new_values=payload,
+        request=request
+    )
+    
     return {"status": "success"}
 
 @router.post("/upload-logo")
 async def upload_logo(
+    request: Request,
     logo: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(ensure_admin)
@@ -158,6 +199,17 @@ async def upload_logo(
     
     # Return URL
     logo_url = f"/uploads/logos/{filename}"
+    
+    await log_action(
+        session=session,
+        action_type="upload_logo",
+        user=admin,
+        table_name="system_configs",
+        description=f"Uploaded new company logo: {filename}",
+        new_values={"logo_url": logo_url},
+        request=request
+    )
+    
     return {"logo_url": logo_url}
 
 # --- Robust Bulk Uploads ---
@@ -744,29 +796,42 @@ async def bulk_upload_photos(
     all_users = (await session.exec(select(User))).all()
     user_map = {u.admission_number.strip().upper(): u for u in all_users if u.admission_number}
     
-    if not user_map:
-        raise HTTPException(status_code=400, detail="No users found in database to map photos to.")
+    # Pre-fetch Student Role for auto-creation
+    student_role = (await session.exec(select(Role).where(Role.name == "Student"))).first()
+    if not student_role:
+        student_role = Role(name="Student", description="Regular Student")
+        session.add(student_role)
+        await session.commit()
+        await session.refresh(student_role)
+    student_role_id = student_role.id
 
     # 1. Parse CSV Mapping (If provided)
-    mapping = {} # Filename -> Admission Number
+    mapping = {} # Suffix/Filename -> Admission Number
     if csv_file:
         try:
             content = await csv_file.read()
             csv_text = content.decode('utf-8')
-            reader = csv.reader(StringIO(csv_text))
+            
+            # Detect delimiter (handle semi-colon for Excel CSVs)
+            delimiter = ','
+            if ';' in csv_text and ',' not in csv_text:
+                delimiter = ';'
+            
+            reader = csv.reader(StringIO(csv_text), delimiter=delimiter)
             rows = list(reader)
+            
             if rows:
-                # Heuristic for header
-                start_idx = 0
-                if rows[0][0].lower().startswith("admission") or rows[0][0].lower() == "adm_no":
-                    start_idx = 1
-                
-                for row in rows[start_idx:]:
+                # Find columns: Usually Col A (0) is Admission, Col B (1) is Suffix/ID
+                for row in rows:
                     if len(row) >= 2:
                         adm = row[0].strip()
-                        fname = row[1].strip()
-                        if adm and fname:
-                            mapping[fname] = adm
+                        suffix = row[1].strip()
+                        # Skip header rows
+                        if not adm or adm.lower() in ["admission", "adm_no", "admission number", "reg_no"]:
+                            continue
+                        mapping[suffix.upper()] = adm
+                        # Also store as lowercase just in case
+                        mapping[suffix.lower()] = adm
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid CSV file: {str(e)}")
 
@@ -791,48 +856,70 @@ async def bulk_upload_photos(
             files = [f for f in zip_ref.namelist() if not f.startswith('__MACOSX') and not f.endswith('/')]
             
             for file_name in files:
-                name_only = os.path.basename(file_name) # e.g. "STD001.jpg"
+                if file_name.startswith('__MACOSX'): continue
+                name_only = os.path.basename(file_name)
+                if not name_only: continue
                 
-                # A. Check CSV Mapping
-                adm_no = mapping.get(name_only)
+                stem = Path(name_only).stem.strip().upper()
                 user = None
                 
-                if adm_no:
-                    user = user_map.get(adm_no.strip().upper())
-                
-                # B. Auto-Match by Filename (Stem)
-                if not user:
-                    stem = Path(name_only).stem.strip().upper() # "IMG_1234"
+                # A. Match by CSV Mapping (Suffix Match)
+                if mapping:
+                    # Check exact filename first
+                    adm_no = mapping.get(name_only) or mapping.get(stem)
                     
-                    # 1. Exact Match
+                    if not adm_no:
+                        # Check if any suffix in mapping matches the end of this filename
+                        for suffix, mapped_adm in mapping.items():
+                            if stem.endswith(suffix.upper()):
+                                adm_no = mapped_adm
+                                break
+                    
+                    if adm_no:
+                        adm_no_norm = adm_no.strip().upper()
+                        user = user_map.get(adm_no_norm)
+                        
+                        # C. Auto-Create Missing User (Data Entry Mode)
+                        if not user:
+                            # Use Admission Number as default for name/email if not provided
+                            new_user = User(
+                                admission_number=adm_no_norm,
+                                full_name=adm_no_norm,
+                                school="General",
+                                role_id=student_role_id,
+                                status="Active",
+                                hashed_password=get_password_hash(adm_no_norm) # Default password is their Admission Number
+                            )
+                            session.add(new_user)
+                            # Flush to get ID if needed, but SQLModel/SQLAlchemy handles it on commit
+                            # To avoid multiple flushes, we can just use the object
+                            user = new_user
+                            user_map[adm_no_norm] = user
+                            all_users.append(user)
+                
+                # B. Auto-Match by Filename (Fallback)
+                if not user:
+                    # 1. Exact Admission Number match
                     user = user_map.get(stem)
                     
-                    # 2. Suffix/Digit Match (Heuristic)
+                    # 2. Suffix/Digit Match (Heuristic for images like "IMG_2847")
                     if not user:
-                        # Find users whose Adm No (or its digits) match the end of the filename
                         candidates = []
                         for u in all_users:
                             adm = u.admission_number.strip().upper()
-                            # Clean digits from Adm No (e.g. "STD-001" -> "001")
                             adm_digits = "".join([c for c in adm if c.isdigit()])
-                            
-                            # Safety: require at least 3 digits to match to avoid generic "1" or "2"
-                            if len(adm_digits) >= 3:
-                                # Check if stem ends with full Adm or just Digits
-                                if stem.endswith(adm) or stem.endswith(adm_digits):
-                                    # Score by length of digits (More specific = better)
+                            if len(adm_digits) >= 4: # Require 4 digits for safety
+                                if stem.endswith(adm_digits):
                                     candidates.append((u, len(adm_digits)))
                         
-                        # Sort candidates: Longest match first
-                        candidates.sort(key=lambda x: x[1], reverse=True)
-                        
                         if candidates:
+                            candidates.sort(key=lambda x: x[1], reverse=True)
                             user = candidates[0][0]
                 
                 if user:
                     # Move/Save file
                     ext = os.path.splitext(name_only)[1].lower()
-                    if ext not in ['.jpg', '.jpeg', '.png', '.webp']:
+                    if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
                         errors.append(f"Skipped {name_only}: Invalid format")
                         failed_count += 1
                         continue
@@ -846,6 +933,22 @@ async def bulk_upload_photos(
                     
                     user.profile_image = f"/static/profiles/{new_filename}"
                     session.add(user)
+                    
+                    # Audit Trail Logging
+                    from app.models import AuditLog
+                    from datetime import datetime
+                    log = AuditLog(
+                        timestamp=datetime.utcnow(),
+                        user_id=admin.id,
+                        user_name=admin.full_name,
+                        action_type="BULK_PHOTO_UPDATE",
+                        table_name="users",
+                        record_id=str(user.id),
+                        description=f"Bulk updated profile photo for {user.full_name} via ZIP sync",
+                        new_values={"profile_image": user.profile_image}
+                    )
+                    session.add(log)
+                    
                     success_count += 1
                 else:
                     failed_count += 1

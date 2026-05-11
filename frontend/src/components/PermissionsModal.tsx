@@ -2,9 +2,6 @@ import { useState, useEffect } from 'react'
 import { Camera, MapPin, Bell, Check, Shield, ArrowRight, Lock, RefreshCw, XCircle } from 'lucide-react'
 
 export default function PermissionsModal() {
-    // Disabled - permissions popup not working properly
-    return null;
-
     const [permissions, setPermissions] = useState({
         camera: false,
         location: false,

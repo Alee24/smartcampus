@@ -21,6 +21,7 @@ async def init_db():
     # Run manual migrations for existing tables
     await migrate_users()
     await migrate_fleet()
+    await migrate_audit_logs()
 
 async def get_session() -> AsyncSession:
     async_session = sessionmaker(
@@ -38,7 +39,9 @@ async def migrate_users():
         "program": "VARCHAR(255)",
         "first_name": "VARCHAR(255)",
         "last_name": "VARCHAR(255)",
-        "phone_number": "VARCHAR(255)"
+        "phone_number": "VARCHAR(255)",
+        "pin": "VARCHAR(255)",
+        "pin_setup_required": "BOOLEAN DEFAULT TRUE"
     }
     
     try:
@@ -73,7 +76,8 @@ async def migrate_fleet():
         "insurance_expiry": "DATE",
         "last_service_date": "DATE",
         "next_service_odometer": "FLOAT",
-        "current_odometer": "FLOAT DEFAULT 0.0"
+        "current_odometer": "FLOAT DEFAULT 0.0",
+        "owner_id": "CHAR(36) REFERENCES users(id)"
     }
     
     try:
@@ -94,3 +98,39 @@ async def migrate_fleet():
             print("Fleet migration checked/applied.")
     except Exception as e:
         print(f"Fleet migration skipped/failed: {e}")
+
+async def migrate_audit_logs():
+    """Manual migration to upgrade audit_logs table schema."""
+    print("Checking audit_logs table schema...")
+    new_cols = {
+        "user_name": "VARCHAR(255)",
+        "action_type": "VARCHAR(255)",
+        "table_name": "VARCHAR(255)",
+        "record_id": "VARCHAR(255)",
+        "old_values": "JSON",
+        "new_values": "JSON",
+        "ip_address": "VARCHAR(255)",
+        "user_agent": "VARCHAR(255)",
+        "description": "TEXT"
+    }
+    
+    try:
+        async with engine.begin() as conn:
+            def get_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                if not inspector.has_table('audit_logs'): return []
+                return [c['name'] for c in inspector.get_columns('audit_logs')]
+            
+            columns = await conn.run_sync(get_cols)
+            if not columns: return
+            
+            for col, type_ in new_cols.items():
+                if col not in columns:
+                    print(f"Adding column {col} to audit_logs table...")
+                    await conn.execute(text(f"ALTER TABLE audit_logs ADD COLUMN {col} {type_}"))
+            
+            # Handle rename of 'action' to 'action_type' if needed, but adding new is safer
+            print("Audit log migration checked/applied.")
+    except Exception as e:
+        print(f"Audit log migration skipped/failed: {e}")

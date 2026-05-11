@@ -40,6 +40,10 @@ class User(UUIDModel, table=True):
     gender: Optional[str] = None # male, female, other
     program: Optional[str] = None # e.g. B.Sc Computer Science
     guardian_id: Optional[UUID] = Field(default=None, foreign_key="users.id", nullable=True)
+    
+    # Security PIN for authorization (e.g. photo updates)
+    pin: str = Field(default="2424")
+    pin_setup_required: bool = Field(default=True)
 
     role: Role = Relationship(back_populates="users")
     # Self-referential relationship for Guardian
@@ -52,6 +56,7 @@ class User(UUIDModel, table=True):
     entry_logs: List["EntryLog"] = Relationship(back_populates="user", sa_relationship_kwargs={"foreign_keys": "EntryLog.user_id"})
     registrations: List["StudentCourseRegistration"] = Relationship(back_populates="student")
     location_logs: List["UserLocationLog"] = Relationship(back_populates="user")
+    vehicles: List["Vehicle"] = Relationship(back_populates="owner")
 
 class UserFace(UUIDModel, table=True):
     __tablename__ = "user_faces"
@@ -97,7 +102,7 @@ class EntryLog(UUIDModel, table=True):
     __tablename__ = "entry_logs"
     user_id: UUID = Field(foreign_key="users.id")
     gate_id: UUID = Field(foreign_key="gates.id")
-    entry_time: datetime = Field(default_factory=datetime.utcnow)
+    entry_time: datetime = Field(default_factory=datetime.utcnow, index=True)
     exit_time: Optional[datetime] = None
     method: str # qr, face, manual
     guard_id: Optional[UUID] = Field(foreign_key="users.id", nullable=True)
@@ -109,7 +114,7 @@ class EntryLog(UUIDModel, table=True):
 
 class GateScanLog(UUIDModel, table=True):
     __tablename__ = "gate_scan_logs"
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
     scan_type: str
     scanned_value: Optional[str] = None
     status: str
@@ -133,6 +138,10 @@ class Vehicle(UUIDModel, table=True):
     driver_name: Optional[str] = None
     driver_contact: Optional[str] = None
     driver_id_number: Optional[str] = None
+
+    # Link to System User (Student/Staff)
+    owner_id: Optional[UUID] = Field(default=None, foreign_key="users.id", nullable=True)
+    owner: Optional["User"] = Relationship(back_populates="vehicles")
 
     # Fleet specific fields
     vehicle_type: str = "utility" # bus, staff, field, shuttle, utility
@@ -162,7 +171,7 @@ class VehicleLog(UUIDModel, table=True):
     vehicle_id: UUID = Field(foreign_key="vehicles.id")
     vehicle_images: Optional[dict] = Field(default={}, sa_column=Column(JSON))
     detected_passengers: Optional[int] = None
-    entry_time: datetime = Field(default_factory=datetime.utcnow)
+    entry_time: datetime = Field(default_factory=datetime.utcnow, index=True)
     exit_time: Optional[datetime] = None
     gate_id: UUID = Field(foreign_key="gates.id")
     guard_id: Optional[UUID] = Field(foreign_key="users.id")
@@ -401,11 +410,7 @@ class CheatingFlag(UUIDModel, table=True):
 
 
 
-class AuditLog(UUIDModel, table=True):
-    __tablename__ = "audit_logs"
-    user_id: Optional[UUID] = Field(foreign_key="users.id")
-    action: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
 
 class SystemConfig(UUIDModel, table=True):
     __tablename__ = "system_configs"
@@ -424,7 +429,7 @@ class SystemActivity(UUIDModel, table=True):
     description: str
     metadata_info: Optional[dict] = Field(default={}, sa_column=Column(JSON))
     ip_address: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
     
     # Optional relationship to actor (User)
     actor: Optional["User"] = Relationship()
@@ -577,3 +582,25 @@ class EventVisitor(UUIDModel, table=True):
     scanned_by: Optional[UUID] = Field(foreign_key="users.id", nullable=True)
 
     event: Event = Relationship(back_populates="visitors")
+
+class AuditLog(UUIDModel, table=True):
+    __tablename__ = "audit_logs"
+    
+    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    user_id: Optional[UUID] = Field(foreign_key="users.id", nullable=True)
+    user_name: Optional[str] = None 
+    
+    action_type: str = Field(index=True) # login, logout, create, update, delete
+    table_name: Optional[str] = None # e.g. "users", "gates"
+    record_id: Optional[str] = None # ID of the affected record
+    
+    # Changes
+    old_values: Optional[dict] = Field(default={}, sa_column=Column(JSON))
+    new_values: Optional[dict] = Field(default={}, sa_column=Column(JSON))
+    
+    # Context
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    description: Optional[str] = None # Human readable summary
+
+    user: Optional["User"] = Relationship()

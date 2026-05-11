@@ -1,0 +1,96 @@
+INFO:     Started server process [11968]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+ERROR:    [Errno 10048] error while attempting to bind on address ('0.0.0.0', 8000): [winerror 10048] only one usage of each socket address (protocol/network address/port) is normally permitted
+INFO:     Waiting for application shutdown.
+ERROR:    Traceback (most recent call last):
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\starlette\routing.py", line 638, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+               ~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\venv\Lib\site-packages\fastapi\routing.py", line 216, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+               ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Python314\Lib\contextlib.py", line 221, in __aexit__
+    await anext(self.gen)
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\app\main.py", line 294, in lifespan
+    from app.scheduler import scheduler
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\app\scheduler.py", line 6, in <module>
+    from app.email_utils import send_attendance_email
+  File "C:\Users\Metto\Desktop\Codes\gatepass\backend\app\email_utils.py", line 1, in <module>
+    from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+ModuleNotFoundError: No module named 'fastapi_mail'
+
+ERROR:    Application shutdown failed. Exiting.
+Initializing database (Attempt 1/10)...
+Checking users table schema...
+User profile migration checked/applied.
+Checking vehicles table schema...
+Fleet migration checked/applied.
+Checking audit_logs table schema...
+Audit log migration checked/applied.
+Database initialized successfully.
+Seeded sample classrooms for QR generation.
+Updated Company Settings with new logo.
+Scheduler failed to start: No module named 'fastapi_mail'

@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles # Import StaticFiles
 from app.database import init_db, get_session
 from app.models import * 
 from app.auth import create_access_token, get_password_hash, verify_password, verify_ldap_login, verify_google_token, get_current_user
+from app.utils.audit import log_action
 from app.routers import dashboard, users, gate_control, attendance, admin
 from pydantic import BaseModel
 from sqlmodel import select
@@ -315,8 +316,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Auth Endpoint
+from fastapi import Request
 @app.post("/api/token")
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_session)):
+async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_session)):
     print(f"Login Attempt: {form_data.username}")
     
     # Query with eager loading of role relationship
@@ -361,6 +363,16 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     
     print(f"User role: {role_name}")
     
+    # Log the successful login
+    await log_action(
+        session=session,
+        action_type="login",
+        user=user,
+        description=f"User {user.full_name} logged in from {role_name} panel",
+        new_values={"role": role_name},
+        request=request
+    )
+
     # Return user info including role
     return {
         "access_token": access_token, 
@@ -377,6 +389,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
 @app.post("/api/auth/register")
 async def register(
+    request: Request,
     user_data: dict, 
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
@@ -470,6 +483,18 @@ async def register(
     try:
         await session.commit()
         await session.refresh(new_user)
+        
+        # Log the creation
+        await log_action(
+            session=session,
+            action_type="create",
+            user=current_user,
+            table_name="users",
+            record_id=str(new_user.id),
+            description=f"Created new user {new_user.full_name} ({new_user.admission_number})",
+            new_values=user_data,
+            request=request
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database Creation Error: {str(e)}")
     
@@ -499,6 +524,15 @@ async def google_login(req: SSOLoginRequest, session: AsyncSession = Depends(get
          raise HTTPException(status_code=400, detail=f"User {email} not registered in Smart Campus")
 
     access_token = create_access_token(data={"sub": user.email})
+    
+    await log_action(
+        session=session,
+        action_type="login_google",
+        user=user,
+        description=f"User {user.full_name} logged in via Google SSO",
+        request=request
+    )
+    
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/api/auth/ldap")
@@ -517,6 +551,15 @@ async def ldap_login(req: LDAPLoginRequest, session: AsyncSession = Depends(get_
          raise HTTPException(status_code=400, detail="LDAP User not mapped to local account")
 
     access_token = create_access_token(data={"sub": user.email or user.admission_number})
+    
+    await log_action(
+        session=session,
+        action_type="login_ldap",
+        user=user,
+        description=f"User {user.full_name} logged in via LDAP",
+        request=request
+    )
+    
     return {"access_token": access_token, "token_type": "bearer"}
 
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
@@ -552,6 +595,10 @@ app.include_router(events.router)
 # Import and include reports router
 from app.routers import reports
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
+
+# Import and include audit router
+from app.routers import audit
+app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 
 @app.get("/")
 async def root():
@@ -613,14 +660,23 @@ async def demo_login(req: DemoLoginRequest, session: AsyncSession = Depends(get_
     user = (await session.exec(select(User).where(User.email == target_email))).first()
     if not user:
         raise HTTPException(status_code=404, detail=f"Demo user for {req.role} not found (Seed data missing?)")
-        
+
     # 4. Generate Token (Bypass password check)
     access_token = create_access_token(data={"sub": user.email or user.admission_number})
     
     # Get role name
     role_name = "student"
-    if user.role:
-        role_name = user.role.name
+    role = await session.get(Role, user.role_id)
+    if role:
+        role_name = role.name
+    
+    await log_action(
+        session=session,
+        action_type="login_demo",
+        user=user,
+        description=f"User {user.full_name} logged in via Demo Mode ({req.role})",
+        request=request
+    )
     
     return {
         "access_token": access_token, 

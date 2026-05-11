@@ -55,9 +55,10 @@ services:
     # Primary entry point for the entire application
     ports:
       - "80:80"
-      - "443:443" # For future SSL
+      - "443:443"
     depends_on:
       - backend
+      - ai-face
     networks:
       - gatepass-net
     restart: always

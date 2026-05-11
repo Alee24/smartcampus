@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { Scan, ShieldAlert, BadgeCheck, XCircle, Camera, Car, RefreshCw, StopCircle, Clock, TrendingUp, Activity, Search, Calendar } from 'lucide-react'
+import { Scan, ShieldAlert, BadgeCheck, XCircle, Camera, Car, RefreshCw, StopCircle, Clock, TrendingUp, Activity, Search, Calendar, User as UserIcon, Loader2 } from 'lucide-react'
+import { Html5Qrcode } from 'html5-qrcode'
+import { useNotification } from './components/Notification'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 
 export default function GateControl() {
+    const { showNotification } = useNotification()
     const [admissionNumber, setAdmissionNumber] = useState('')
     const [scanStatus, setScanStatus] = useState<'idle' | 'success' | 'rejected' | 'scanning'>('idle')
     const [lastScan, setLastScan] = useState<any>(null)
@@ -125,6 +128,7 @@ export default function GateControl() {
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
+    const qrScannerRef = useRef<Html5Qrcode | null>(null)
 
     const handleManualScan = async () => {
         try {
@@ -211,12 +215,41 @@ export default function GateControl() {
 
     const startCamera = async (mode: 'qr' | 'plate') => {
         setPermissionError('');
+        setScanMode(mode)
+        
+        if (mode === 'qr') {
+            setScanStatus('scanning')
+            // QR Scanning using html5-qrcode
+            setTimeout(async () => {
+                try {
+                    const scanner = new Html5Qrcode("gate-qr-reader")
+                    qrScannerRef.current = scanner
+                    await scanner.start(
+                        { facingMode: "environment" },
+                        { fps: 10, qrbox: { width: 250, height: 250 } },
+                        (decodedText) => {
+                            setAdmissionNumber(decodedText)
+                            stopCamera()
+                            // Auto-process QR
+                            processQR(decodedText)
+                        },
+                        () => {}
+                    )
+                } catch (err) {
+                    console.error("QR Start Error", err)
+                    showNotification("Could not start QR scanner", "error")
+                    setScanStatus('idle')
+                }
+            }, 300)
+            return
+        }
+
+        // Plate mode uses the custom video stream for capture
         try {
             const s = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment' }
             })
             setStream(s)
-            setScanMode(mode)
             setScanStatus('scanning')
             setShowPermissionModal(false)
         } catch (err: any) {
@@ -235,7 +268,13 @@ export default function GateControl() {
         }
     }
 
-    const stopCamera = () => {
+    const stopCamera = async () => {
+        if (qrScannerRef.current) {
+            try {
+                await qrScannerRef.current.stop()
+                qrScannerRef.current = null
+            } catch (e) {}
+        }
         if (stream) {
             stream.getTracks().forEach(track => track.stop())
         }
@@ -249,6 +288,42 @@ export default function GateControl() {
             videoRef.current.srcObject = stream
         }
     }, [stream])
+
+    const processQR = async (code: string) => {
+        setScanStatus('scanning')
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/gate/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ admission_number: code })
+            })
+
+            const result = await res.json()
+            if (result.status === 'allowed') {
+                setScanStatus('success')
+                setLastScan(result.data)
+                showNotification(`Access granted for ${result.data.name}`, 'success')
+            } else if (result.status === 'event_pass') {
+                setEventData(result.data)
+                setShowEventModal(true)
+                setScanStatus('idle')
+            } else {
+                setScanStatus('rejected')
+                setLastScan(result.data || {
+                    name: 'Unknown / Not Found',
+                    role: 'N/A',
+                    time: new Date().toLocaleTimeString()
+                })
+                showNotification('Access Denied', 'error')
+            }
+        } catch (err) {
+            setScanStatus('rejected')
+        }
+    }
 
     const captureAndProcess = () => {
         if (!videoRef.current || !canvasRef.current) return
@@ -286,28 +361,30 @@ export default function GateControl() {
                         setScanStatus('success')
                         setLastScan({
                             name: data.data.plate,
-                            role: `Vehicle (${data.data.make})`,
+                            role: `${data.data.make} ${data.data.model} (${data.data.color})`,
                             time: data.data.entry_time,
                             image: data.data.image_url,
-                            isVehicle: true
+                            isVehicle: true,
+                            passengers: data.data.passengers
                         })
+                        showNotification(`Vehicle ${data.data.plate} logged successfully`, 'success')
                     } else {
                         setScanStatus('rejected')
                         setLastScan({
                             name: data.data.plate || "Unknown",
-                            role: "Vehicle",
+                            role: "Unauthorized Vehicle",
                             time: new Date().toLocaleTimeString(),
                             isVehicle: true,
                             image: data.data.image_url,
                         })
+                        showNotification('Unauthorized vehicle flagged', 'warning')
                     }
                 } catch (e) {
-                    alert("Error processing plate")
+                    showNotification("Error processing plate", "error")
                     setScanStatus('idle')
                 }
             } else {
-                // QR Logic implementation (Client side decoding or server)
-                alert("QR Code captured (Logic Pending)")
+                // QR handled by live library, but this is a fallback if needed
                 setScanStatus('idle')
             }
         }, 'image/jpeg')
@@ -466,50 +543,91 @@ export default function GateControl() {
                                 className="w-full h-full object-cover absolute inset-0 rounded-xl"
                             />
                             {/* Overlay */}
-                            <div className="relative z-10 w-64 h-32 border-2 border-white/50 rounded-lg flex flex-col justify-between p-2 backdrop-blur-[2px]">
-                                <div className="flex justify-between">
-                                    <div className="w-4 h-4 border-l-2 border-t-2 border-white"></div>
-                                    <div className="w-4 h-4 border-r-2 border-t-2 border-white"></div>
-                                </div>
-                                <div className="text-center text-white/80 text-xs font-mono animate-pulse">
-                                    SEARCHING...
-                                </div>
-                                <div className="flex justify-between">
-                                    <div className="w-4 h-4 border-l-2 border-b-2 border-white"></div>
-                                    <div className="w-4 h-4 border-r-2 border-b-2 border-white"></div>
-                                </div>
+                            <div className="relative z-10 w-full max-w-sm aspect-video flex flex-col items-center justify-center p-4">
+                                {scanMode === 'qr' ? (
+                                    <div id="gate-qr-reader" className="w-full h-full rounded-2xl overflow-hidden border-4 border-purple-500 shadow-[0_0_50px_rgba(168,85,247,0.3)]"></div>
+                                ) : (
+                                    <div className="w-full h-full border-2 border-white/50 rounded-lg flex flex-col justify-between p-2 backdrop-blur-[2px]">
+                                        <div className="flex justify-between">
+                                            <div className="w-8 h-8 border-l-4 border-t-4 border-blue-500 rounded-tl-lg"></div>
+                                            <div className="w-8 h-8 border-r-4 border-t-4 border-blue-500 rounded-tr-lg"></div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-white font-black text-lg tracking-widest animate-pulse flex items-center justify-center gap-2">
+                                                <Car size={24} className="text-blue-400" />
+                                                READING PLATE...
+                                            </div>
+                                            <p className="text-white/60 text-[10px] mt-1 font-bold uppercase">Center vehicle plate in frame</p>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <div className="w-8 h-8 border-l-4 border-b-4 border-blue-500 rounded-bl-lg"></div>
+                                            <div className="w-8 h-8 border-r-4 border-b-4 border-blue-500 rounded-br-lg"></div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="absolute bottom-6 flex gap-4 z-20">
                                 <button
                                     onClick={stopCamera}
-                                    className="p-3 rounded-full bg-red-500/80 text-white hover:bg-red-600 transition-colors"
+                                    className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/30 transition-all font-bold flex items-center gap-2"
                                 >
-                                    <StopCircle size={24} />
+                                    <StopCircle size={20} />
+                                    CANCEL
                                 </button>
-                                <button
-                                    onClick={captureAndProcess}
-                                    className="p-4 rounded-full bg-white text-primary-600 shadow-xl hover:scale-105 transition-transform"
-                                >
-                                    <Camera size={32} />
-                                </button>
+                                {scanMode === 'plate' && (
+                                    <button
+                                        onClick={captureAndProcess}
+                                        className="px-8 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-500/30 transition-all font-black flex items-center gap-2 active:scale-95"
+                                    >
+                                        <Camera size={24} />
+                                        CAPTURE PLATE
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
 
                     {/* SUCCESS */}
                     {scanStatus === 'success' && (
-                        <div className="text-center animate-fade-in w-full">
-                            <div className={`w-36 h-36 rounded-full border-4 ${lastScan.isVehicle ? 'border-blue-500' : 'border-green-500'} p-1 mx-auto mb-6 shadow-lg overflow-hidden`}>
-                                <img src={lastScan.image} className="w-full h-full object-cover rounded-full bg-white" alt="Result" />
-                            </div>
-                            <div className={`inline-flex items-center gap-2 ${lastScan.isVehicle ? 'bg-blue-500/10 text-blue-500' : 'bg-green-500/10 text-green-500'} px-4 py-1 rounded-full text-sm font-bold mb-4`}>
-                                <BadgeCheck size={16} /> ACCESS GRANTED
-                            </div>
-                            <h2 className="text-3xl font-bold mb-1">{lastScan.name}</h2>
-                            <p className="text-[var(--text-secondary)]">{lastScan.role} • {lastScan.time}</p>
+                        <div className="text-center animate-fade-in w-full px-4">
+                            {lastScan.isVehicle && lastScan.owner ? (
+                                <div className="flex flex-col items-center">
+                                    <div className="flex gap-4 mb-6">
+                                        {/* Vehicle Image */}
+                                        <div className="w-28 h-28 rounded-2xl border-2 border-blue-500 p-1 shadow-lg overflow-hidden bg-white">
+                                            <img src={lastScan.image} className="w-full h-full object-cover rounded-xl" alt="Vehicle" />
+                                        </div>
+                                        {/* Owner Image */}
+                                        <div className="w-28 h-28 rounded-full border-2 border-primary-500 p-1 shadow-lg overflow-hidden bg-white -ml-8 mt-4">
+                                            <img src={lastScan.owner.image} className="w-full h-full object-cover rounded-full" alt="Owner" />
+                                        </div>
+                                    </div>
+                                    <div className="inline-flex items-center gap-2 bg-blue-500/10 text-blue-500 px-4 py-1 rounded-full text-sm font-bold mb-4">
+                                        <BadgeCheck size={16} /> VEHICLE AUTHORIZED
+                                    </div>
+                                    <h2 className="text-3xl font-black mb-1">{lastScan.name}</h2>
+                                    <p className="text-primary-600 font-bold mb-1">{lastScan.owner.name}</p>
+                                    <p className="text-gray-500 text-sm font-medium">{lastScan.owner.school} • {lastScan.role}</p>
+                                    <div className="mt-4 flex gap-4 text-xs font-bold text-gray-400">
+                                        <span>🕒 {lastScan.time}</span>
+                                        <span>👥 {lastScan.passengers || 1} Passengers</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className={`w-36 h-36 rounded-full border-4 ${lastScan.isVehicle ? 'border-blue-500' : 'border-green-500'} p-1 mx-auto mb-6 shadow-lg overflow-hidden`}>
+                                        <img src={lastScan.image} className="w-full h-full object-cover rounded-full bg-white" alt="Result" />
+                                    </div>
+                                    <div className={`inline-flex items-center gap-2 ${lastScan.isVehicle ? 'bg-blue-500/10 text-blue-500' : 'bg-green-500/10 text-green-500'} px-4 py-1 rounded-full text-sm font-bold mb-4`}>
+                                        <BadgeCheck size={16} /> ACCESS GRANTED
+                                    </div>
+                                    <h2 className="text-3xl font-bold mb-1">{lastScan.name}</h2>
+                                    <p className="text-[var(--text-secondary)]">{lastScan.role} • {lastScan.time}</p>
+                                </>
+                            )}
 
-                            <button onClick={() => setScanStatus('idle')} className="mt-8 text-sm text-[var(--text-secondary)] hover:text-primary-500 flex items-center justify-center gap-2 mx-auto">
+                            <button onClick={() => setScanStatus('idle')} className="mt-8 px-6 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm text-[var(--text-secondary)] hover:text-primary-500 flex items-center justify-center gap-2 mx-auto transition-all">
                                 <RefreshCw size={14} /> Scan Next
                             </button>
                         </div>

@@ -2,11 +2,12 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import {
     LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut,
     Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode,
-    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, X, Activity, BarChart3, Play
+    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, X, Activity, BarChart3, Play, History, Printer
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts'
+import { useNotification } from './components/Notification'
 
 
 // 1. Critical Components (Load immediately for FCP)
@@ -44,6 +45,8 @@ const SelfServiceEntry = lazy(() => import('./SelfServiceEntry'))
 const Reports = lazy(() => import('./Reports'))
 const CampusCalendar = lazy(() => import('./CampusCalendar'))
 const FleetManagement = lazy(() => import('./FleetManagement'))
+const AuditLogs = lazy(() => import('./AuditLogs'))
+const IDPrinting = lazy(() => import('./IDPrinting'))
 
 // 3. Non-lazy components (small/critical)
 import InstallPWA from './components/InstallPWA'
@@ -71,6 +74,7 @@ interface LogEntry {
     isAlert: boolean
 }
 function App() {
+    const { showNotification } = useNotification()
     // Public Route Check
     const path = window.location.pathname
     if (path.startsWith('/gate-pass/')) {
@@ -124,20 +128,38 @@ function App() {
     const [openGroups, setOpenGroups] = useState<any>({
         overview: true,
         events: false,
-        people: true,
-        security: true,
+        people: false,
+        gate_ops: false,
+        security_monitor: false,
         academics: false,
         settings: false,
         analytics: false,
         support: false,
         legal: false,
-        fleet: false
+        fleet: false,
+        admin: false
     })
-    const toggleGroup = (key: string) => setOpenGroups((prev: any) => ({ ...prev, [key]: !prev[key] }))
+    const toggleGroup = (key: string) => {
+        setOpenGroups((prev: any) => {
+            // If the clicked group is already open, just close it
+            if (prev[key]) {
+                return { ...prev, [key]: false };
+            }
+            // Close all others and open the clicked one
+            const nextState: any = {};
+            Object.keys(prev).forEach(groupKey => {
+                nextState[groupKey] = groupKey === key;
+            });
+            return nextState;
+        });
+    }
     const [showSecurityCheck, setShowSecurityCheck] = useState(false)
     const [menuConfig, setMenuConfig] = useState<any>({})
     const [showProfileModal, setShowProfileModal] = useState(false)
     const [activating, setActivating] = useState(false)
+    const [showPinSetup, setShowPinSetup] = useState(false)
+    const [setupPin, setSetupPin] = useState('')
+    const hasValidated = useState(false)[0] // Simple mount check
 
     // URL Deep Link Handler (QR Codes)
     useEffect(() => {
@@ -154,6 +176,7 @@ function App() {
 
     // Persistent Login: Validate Session on Load
     useEffect(() => {
+        let isMounted = true;
         const validateSession = async () => {
             if (!isAuthenticated) return
             try {
@@ -167,16 +190,21 @@ function App() {
                     localStorage.removeItem('token')
                     setIsAuthenticated(false)
                     setShowLanding(true)
-                } else if (res.ok) {
+                } else if (res.ok && isMounted) {
                     const user = await res.json()
                     setCurrentUser(user)
                     setRole(user.role)
+                    localStorage.setItem('currentUser', JSON.stringify(user))
+                    if (user.pin_setup_required) {
+                        setShowPinSetup(true)
+                    }
                 }
             } catch (e) {
                 console.error("Session check error", e)
             }
         }
         validateSession()
+        return () => { isMounted = false }
     }, [isAuthenticated])
 
     // Fetch menu configuration
@@ -535,7 +563,7 @@ function App() {
 
                         {/* Gate Operations - Core Functionality */}
                         {(isMenuEnabled('gate') || isMenuEnabled('vehicles')) && (
-                            <SidebarGroup title="Gate Operations" isOpen={openGroups.security} onToggle={() => toggleGroup('security')} isSidebarCollapsed={isSidebarCollapsed}>
+                            <SidebarGroup title="Gate Operations" isOpen={openGroups.gate_ops} onToggle={() => toggleGroup('gate_ops')} isSidebarCollapsed={isSidebarCollapsed}>
                                 {isMenuEnabled('gate') && (
                                     <NavItem
                                         icon={<Shield size={18} />}
@@ -581,7 +609,7 @@ function App() {
 
                         {/* Security Monitor */}
                         {(isMenuEnabled('live') || isMenuEnabled('cameras')) && (
-                            <SidebarGroup title="Security Monitor" isOpen={openGroups.security} onToggle={() => toggleGroup('security')} isSidebarCollapsed={isSidebarCollapsed}>
+                            <SidebarGroup title="Security Monitor" isOpen={openGroups.security_monitor} onToggle={() => toggleGroup('security_monitor')} isSidebarCollapsed={isSidebarCollapsed}>
                                 {isMenuEnabled('live') && (
                                     <NavItem
                                         icon={<MonitorPlay size={18} />}
@@ -620,6 +648,12 @@ function App() {
                                         onClick={() => { setActiveTab('verification'); setSidebarOpen(false); }}
                                     />
                                 )}
+                                <NavItem
+                                    icon={<Printer size={18} />}
+                                    label="ID Printing"
+                                    active={activeTab === 'id-printing'}
+                                    onClick={() => { setActiveTab('id-printing'); setSidebarOpen(false); }}
+                                />
                             </SidebarGroup>
                         )}
 
@@ -720,6 +754,7 @@ function App() {
                                 <NavItem icon={<Brain size={18} />} label="AI Configuration" active={activeTab === 'ai-settings'} onClick={() => { setActiveTab('ai-settings'); setSidebarOpen(false); }} />
                                 <NavItem icon={<Sliders size={18} />} label="Design System" active={activeTab === 'dashboard-designer'} onClick={() => { setActiveTab('dashboard-designer'); setSidebarOpen(false); }} />
                                 <NavItem icon={<Server size={18} />} label="API Integrations" active={activeTab === 'integrations'} onClick={() => { setActiveTab('integrations'); setSidebarOpen(false); }} />
+                                <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => { setActiveTab('audit'); setSidebarOpen(false); }} />
                             </SidebarGroup>
                         )}
                         <SidebarGroup title="Support" isOpen={openGroups.support} onToggle={() => toggleGroup('support')} isSidebarCollapsed={isSidebarCollapsed}>
@@ -799,6 +834,7 @@ function App() {
                                             { id: 'ai-settings', label: 'AI', icon: Brain },
                                             { id: 'dashboard-designer', label: 'Design', icon: Sliders },
                                             { id: 'integrations', label: 'APIs', icon: Server },
+                                            { id: 'audit', label: 'Logs', icon: History },
                                             { id: 'calendar', label: 'Calendar', icon: Calendar }
                                         ].map(item => (
                                             <button
@@ -1274,6 +1310,8 @@ function App() {
                     {activeTab === 'fleet' && <FleetManagement />}
                     {activeTab === 'fleet-tracking' && <FleetManagement initialTab="tracking" />}
                     {activeTab === 'fleet-trips' && <FleetManagement initialTab="trips" />}
+                    {activeTab === 'audit' && <AuditLogs />}
+                    {activeTab === 'id-printing' && <IDPrinting />}
                     <footer className="mt-10 pt-6 border-t border-[var(--border-color)] text-center text-sm text-[var(--text-secondary)]">
                         <p>&copy; {new Date().getFullYear()} Smart Campus System.</p>
                     </footer>
@@ -1359,6 +1397,100 @@ function App() {
                                     className="px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
                                 >
                                     Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PIN Setup Modal */}
+            {showPinSetup && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-md shadow-2xl border border-white/20">
+                        <div className="text-center mb-6">
+                            <div className="w-20 h-20 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-purple-200 dark:border-purple-800">
+                                <ShieldCheck className="text-purple-600" size={40} />
+                            </div>
+                            <h3 className="text-2xl font-bold">Secure Your Account</h3>
+                            <p className="text-gray-500 dark:text-gray-400 mt-2">
+                                For your security, please set a 4-digit Authorization PIN. This PIN is used for sensitive actions.
+                            </p>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="relative">
+                                <input 
+                                    type="password"
+                                    value={setupPin}
+                                    onChange={(e) => setSetupPin(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            // Optional: trigger save logic
+                                        }
+                                    }}
+                                    placeholder="Set 4-Digit PIN"
+                                    name="account_security_pin"
+                                    id="account_security_pin"
+                                    className="w-full px-6 py-5 bg-gray-100 dark:bg-gray-700 rounded-2xl text-center text-3xl tracking-[1em] font-bold focus:outline-none focus:ring-4 focus:ring-purple-500/20 border-2 border-transparent focus:border-purple-500 transition-all"
+                                    maxLength={4}
+                                    autoComplete="new-password"
+                                    inputMode="numeric"
+                                />
+                                {setupPin.length === 4 && (
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500">
+                                        <CheckCircle size={24} />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowPinSetup(false)}
+                                    className="flex-1 py-5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold rounded-2xl hover:bg-gray-200 transition-colors"
+                                >
+                                    SKIP FOR NOW
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={async (e) => {
+                                        e.preventDefault();
+                                        if (setupPin.length !== 4 || !/^\d+$/.test(setupPin)) {
+                                            showNotification('PIN must be exactly 4 digits', 'warning');
+                                            return;
+                                        }
+                                        try {
+                                            const token = localStorage.getItem('token');
+                                            const res = await fetch('/api/users/me/update-pin', {
+                                                method: 'PUT',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'Authorization': `Bearer ${token}`
+                                                },
+                                                body: JSON.stringify({ pin: setupPin })
+                                            });
+                                            if (res.ok) {
+                                                setShowPinSetup(false);
+                                                showNotification('Security PIN updated successfully', 'success');
+                                                // Update local user state
+                                                if (currentUser) {
+                                                    const updated = { ...currentUser, pin_setup_required: false };
+                                                    setCurrentUser(updated);
+                                                    localStorage.setItem('currentUser', JSON.stringify(updated));
+                                                }
+                                            } else {
+                                                showNotification('Failed to set PIN', 'error');
+                                            }
+                                        } catch (e) {
+                                            showNotification('Error connecting to server', 'error');
+                                        }
+                                    }}
+                                    disabled={setupPin.length < 4}
+                                    className="flex-[2] py-5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black text-lg shadow-xl shadow-purple-500/30 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale"
+                                >
+                                    SAVE SECURITY PIN
                                 </button>
                             </div>
                         </div>

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import select, Session, func
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List, Optional
@@ -12,6 +12,7 @@ from app.models import (
     FleetNotification, User, Role
 )
 from app.auth import get_current_user
+from app.utils.audit import log_action
 
 router = APIRouter()
 
@@ -23,10 +24,27 @@ async def get_vehicles(session: AsyncSession = Depends(get_session)):
     return result.all()
 
 @router.post("/vehicles", response_model=Vehicle)
-async def create_vehicle(vehicle: Vehicle, session: AsyncSession = Depends(get_session)):
+async def create_vehicle(
+    request: Request,
+    vehicle: Vehicle, 
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+):
     session.add(vehicle)
     await session.commit()
     await session.refresh(vehicle)
+    
+    await log_action(
+        session=session,
+        action_type="create",
+        user=admin,
+        table_name="vehicles",
+        record_id=str(vehicle.id),
+        description=f"Registered new vehicle: {vehicle.plate_number} ({vehicle.make} {vehicle.model})",
+        new_values=vehicle.dict(),
+        request=request
+    )
+    
     return vehicle
 
 @router.get("/vehicles/{vehicle_id}", response_model=Vehicle)
@@ -44,14 +62,37 @@ async def get_trips(session: AsyncSession = Depends(get_session)):
     return result.all()
 
 @router.post("/trips", response_model=FleetTrip)
-async def create_trip(trip: FleetTrip, session: AsyncSession = Depends(get_session)):
+async def create_trip(
+    request: Request,
+    trip: FleetTrip, 
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+):
     session.add(trip)
     await session.commit()
     await session.refresh(trip)
+    
+    await log_action(
+        session=session,
+        action_type="create",
+        user=admin,
+        table_name="fleet_trips",
+        record_id=str(trip.id),
+        description=f"Scheduled new trip: {trip.destination}",
+        new_values=trip.dict(),
+        request=request
+    )
+    
     return trip
 
 @router.post("/trips/{trip_id}/start")
-async def start_trip(trip_id: UUID, odometer: float, session: AsyncSession = Depends(get_session)):
+async def start_trip(
+    request: Request,
+    trip_id: UUID, 
+    odometer: float, 
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+):
     trip = await session.get(FleetTrip, trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
@@ -62,10 +103,28 @@ async def start_trip(trip_id: UUID, odometer: float, session: AsyncSession = Dep
     
     session.add(trip)
     await session.commit()
+    
+    await log_action(
+        session=session,
+        action_type="update",
+        user=admin,
+        table_name="fleet_trips",
+        record_id=str(trip_id),
+        description=f"Started trip to {trip.destination} (Odometer: {odometer})",
+        request=request
+    )
+    
     return {"status": "success", "message": "Trip started"}
 
 @router.post("/trips/{trip_id}/end")
-async def end_trip(trip_id: UUID, odometer: float, notes: Optional[str] = None, session: AsyncSession = Depends(get_session)):
+async def end_trip(
+    request: Request,
+    trip_id: UUID, 
+    odometer: float, 
+    notes: Optional[str] = None, 
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+):
     trip = await session.get(FleetTrip, trip_id)
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
@@ -83,12 +142,28 @@ async def end_trip(trip_id: UUID, odometer: float, notes: Optional[str] = None, 
     
     session.add(trip)
     await session.commit()
+    
+    await log_action(
+        session=session,
+        action_type="update",
+        user=admin,
+        table_name="fleet_trips",
+        record_id=str(trip_id),
+        description=f"Ended trip to {trip.destination} (End Odometer: {odometer})",
+        request=request
+    )
+    
     return {"status": "success", "message": "Trip ended"}
 
 # --- Fuel Logging ---
 
 @router.post("/fuel-logs", response_model=FleetFuelLog)
-async def create_fuel_log(log: FleetFuelLog, session: AsyncSession = Depends(get_session)):
+async def create_fuel_log(
+    request: Request,
+    log: FleetFuelLog, 
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+):
     session.add(log)
     
     # Update vehicle odometer if provided
@@ -99,6 +174,18 @@ async def create_fuel_log(log: FleetFuelLog, session: AsyncSession = Depends(get
         
     await session.commit()
     await session.refresh(log)
+    
+    await log_action(
+        session=session,
+        action_type="create",
+        user=admin,
+        table_name="fleet_fuel_logs",
+        record_id=str(log.id),
+        description=f"Logged fuel for vehicle (Liters: {log.liters}, Amount: {log.amount})",
+        new_values=log.dict(),
+        request=request
+    )
+    
     return log
 
 # --- GPS Tracking (Real-time updates) ---
