@@ -4,13 +4,12 @@ Run inside the backend container:
   docker exec -it gatepass_backend python fix_db_and_admin.py
 """
 import asyncio
-from sqlalchemy import text
-from sqlmodel import select
+from sqlalchemy import text, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import sessionmaker
 from app.database import engine
 from app.models import User, Role, SQLModel
 from app.auth import get_password_hash
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import sessionmaker
 
 # All columns that may be missing from the 'users' table
 USER_COLUMNS = [
@@ -25,14 +24,6 @@ USER_COLUMNS = [
     ("guardian_id", "CHAR(32) DEFAULT NULL"),
     ("pin", "VARCHAR(50) DEFAULT '2424'"),
     ("pin_setup_required", "TINYINT(1) DEFAULT 1"),
-]
-
-# Columns for other tables that may be missing
-OTHER_COLUMNS = [
-    ("entry_logs", "entry_time", "DATETIME DEFAULT NULL"),
-    ("gate_scan_logs", "timestamp", "DATETIME DEFAULT NULL"),
-    ("vehicle_logs", "entry_time", "DATETIME DEFAULT NULL"),
-    ("system_activities", "timestamp", "DATETIME DEFAULT NULL"),
 ]
 
 async def fix_database():
@@ -62,7 +53,7 @@ async def fix_database():
                 else:
                     print(f"   ⚠️  users.{col_name}: {e}")
 
-        # Step 3: Add indexes to timestamp columns
+        # Step 3: Add indexes
         print("\n📊 Step 3: Adding performance indexes...")
         index_targets = [
             ("idx_entry_logs_entry_time", "entry_logs", "entry_time"),
@@ -84,22 +75,24 @@ async def fix_database():
                 else:
                     print(f"   ⚠️  {idx_name}: {e}")
 
-    # Step 4: Reset admin user
+    # Step 4: Reset admin user (using SQLAlchemy execute, not SQLModel exec)
     print("\n👤 Step 4: Resetting admin credentials...")
     async with async_session() as session:
         # Find existing admin
-        result = await session.exec(
+        result = await session.execute(
             select(User).where(
                 (User.admission_number == "ADMIN001") | 
                 (User.email == "mettoalex@gmail.com") |
                 (User.email == "admin@smartcampus.edu")
             )
         )
-        admin = result.first()
+        admin = result.scalars().first()
         
         # Ensure SuperAdmin role exists
-        role_result = await session.exec(select(Role).where(Role.name == "SuperAdmin"))
-        role = role_result.first()
+        role_result = await session.execute(
+            select(Role).where(Role.name == "SuperAdmin")
+        )
+        role = role_result.scalars().first()
         if not role:
             role = Role(name="SuperAdmin", description="Full system access")
             session.add(role)
@@ -131,6 +124,8 @@ async def fix_database():
             await session.commit()
             print("   ✅ Created new admin user")
         
+    await engine.dispose()
+    
     print("\n" + "=" * 60)
     print("  ✅ ALL DONE!")
     print("  Login: mettoalex@gmail.com / Digital2025")
