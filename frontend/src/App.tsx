@@ -157,8 +157,6 @@ function App() {
     const [menuConfig, setMenuConfig] = useState<any>({})
     const [showProfileModal, setShowProfileModal] = useState(false)
     const [activating, setActivating] = useState(false)
-    const [showPinSetup, setShowPinSetup] = useState(false)
-    const [setupPin, setSetupPin] = useState('')
     const hasValidated = useState(false)[0] // Simple mount check
 
     // URL Deep Link Handler (QR Codes)
