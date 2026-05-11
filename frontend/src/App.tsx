@@ -195,9 +195,6 @@ function App() {
                     setCurrentUser(user)
                     setRole(user.role)
                     localStorage.setItem('currentUser', JSON.stringify(user))
-                    if (user.pin_setup_required) {
-                        setShowPinSetup(true)
-                    }
                 }
             } catch (e) {
                 console.error("Session check error", e)
@@ -1404,99 +1401,6 @@ function App() {
                 </div>
             )}
 
-            {/* PIN Setup Modal */}
-            {showPinSetup && (
-                <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
-                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-md shadow-2xl border border-white/20">
-                        <div className="text-center mb-6">
-                            <div className="w-20 h-20 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-purple-200 dark:border-purple-800">
-                                <ShieldCheck className="text-purple-600" size={40} />
-                            </div>
-                            <h3 className="text-2xl font-bold">Secure Your Account</h3>
-                            <p className="text-gray-500 dark:text-gray-400 mt-2">
-                                For your security, please set a 4-digit Authorization PIN. This PIN is used for sensitive actions.
-                            </p>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="relative">
-                                <input 
-                                    type="password"
-                                    value={setupPin}
-                                    onChange={(e) => setSetupPin(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            // Optional: trigger save logic
-                                        }
-                                    }}
-                                    placeholder="Set 4-Digit PIN"
-                                    name="account_security_pin"
-                                    id="account_security_pin"
-                                    className="w-full px-6 py-5 bg-gray-100 dark:bg-gray-700 rounded-2xl text-center text-3xl tracking-[1em] font-bold focus:outline-none focus:ring-4 focus:ring-purple-500/20 border-2 border-transparent focus:border-purple-500 transition-all"
-                                    maxLength={4}
-                                    autoComplete="new-password"
-                                    inputMode="numeric"
-                                />
-                                {setupPin.length === 4 && (
-                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500">
-                                        <CheckCircle size={24} />
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex gap-3">
-                                <button 
-                                    type="button"
-                                    onClick={() => setShowPinSetup(false)}
-                                    className="flex-1 py-5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold rounded-2xl hover:bg-gray-200 transition-colors"
-                                >
-                                    SKIP FOR NOW
-                                </button>
-                                <button 
-                                    type="button"
-                                    onClick={async (e) => {
-                                        e.preventDefault();
-                                        if (setupPin.length !== 4 || !/^\d+$/.test(setupPin)) {
-                                            showNotification('PIN must be exactly 4 digits', 'warning');
-                                            return;
-                                        }
-                                        try {
-                                            const token = localStorage.getItem('token');
-                                            const res = await fetch('/api/users/me/update-pin', {
-                                                method: 'PUT',
-                                                headers: {
-                                                    'Content-Type': 'application/json',
-                                                    'Authorization': `Bearer ${token}`
-                                                },
-                                                body: JSON.stringify({ pin: setupPin })
-                                            });
-                                            if (res.ok) {
-                                                setShowPinSetup(false);
-                                                showNotification('Security PIN updated successfully', 'success');
-                                                // Update local user state
-                                                if (currentUser) {
-                                                    const updated = { ...currentUser, pin_setup_required: false };
-                                                    setCurrentUser(updated);
-                                                    localStorage.setItem('currentUser', JSON.stringify(updated));
-                                                }
-                                            } else {
-                                                showNotification('Failed to set PIN', 'error');
-                                            }
-                                        } catch (e) {
-                                            showNotification('Error connecting to server', 'error');
-                                        }
-                                    }}
-                                    disabled={setupPin.length < 4}
-                                    className="flex-[2] py-5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black text-lg shadow-xl shadow-purple-500/30 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale"
-                                >
-                                    SAVE SECURITY PIN
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             <InstallPWA />
             <PermissionsModal />
