@@ -787,7 +787,6 @@ export default function StudentVerification() {
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
 
                                         {/* Back Side */}
                                         <div 
@@ -864,7 +863,6 @@ export default function StudentVerification() {
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
