@@ -157,6 +157,11 @@ async def end_trip(
 
 # --- Fuel Logging ---
 
+@router.get("/fuel-logs", response_model=List[FleetFuelLog])
+async def get_fuel_logs(session: AsyncSession = Depends(get_session)):
+    result = await session.exec(select(FleetFuelLog).order_by(FleetFuelLog.timestamp.desc()))
+    return result.all()
+
 @router.post("/fuel-logs", response_model=FleetFuelLog)
 async def create_fuel_log(
     request: Request,
@@ -181,11 +186,52 @@ async def create_fuel_log(
         user=admin,
         table_name="fleet_fuel_logs",
         record_id=str(log.id),
-        description=f"Logged fuel for vehicle (Liters: {log.liters}, Amount: {log.amount})",
+        description=f"Logged fuel for vehicle (Liters: {log.amount_liters}, Cost: {log.cost})",
         new_values=log.dict(),
         request=request
     )
     
+    return log
+
+# --- Maintenance Management ---
+
+@router.get("/maintenance-logs", response_model=List[FleetMaintenanceLog])
+async def get_maintenance_logs(session: AsyncSession = Depends(get_session)):
+    result = await session.exec(select(FleetMaintenanceLog).order_by(FleetMaintenanceLog.service_date.desc()))
+    return result.all()
+
+@router.post("/maintenance-logs", response_model=FleetMaintenanceLog)
+async def create_maintenance_log(
+    request: Request,
+    log: FleetMaintenanceLog,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+) :
+    session.add(log)
+    
+    # Update vehicle status and odometer
+    vehicle = await session.get(Vehicle, log.vehicle_id)
+    if vehicle:
+        vehicle.status = "active"
+        if log.odometer_reading > vehicle.current_odometer:
+            vehicle.current_odometer = log.odometer_reading
+        if log.next_service_due_odometer:
+            vehicle.next_service_odometer = log.next_service_due_odometer
+        session.add(vehicle)
+        
+    await session.commit()
+    await session.refresh(log)
+    
+    await log_action(
+        session=session,
+        action_type="create",
+        user=admin,
+        table_name="fleet_maintenance_logs",
+        record_id=str(log.id),
+        description=f"Logged maintenance for vehicle: {log.service_type}",
+        new_values=log.dict(),
+        request=request
+    )
     return log
 
 # --- GPS Tracking (Real-time updates) ---
@@ -195,6 +241,31 @@ async def log_gps(log: FleetGPSLog, session: AsyncSession = Depends(get_session)
     session.add(log)
     await session.commit()
     return {"status": "success"}
+
+@router.get("/locations")
+async def get_all_latest_locations(session: AsyncSession = Depends(get_session)):
+    """Fetch the latest GPS location for every vehicle in the fleet."""
+    # Subquery to find the latest timestamp for each vehicle
+    subquery = select(
+        FleetGPSLog.vehicle_id, 
+        func.max(FleetGPSLog.timestamp).label("max_ts")
+    ).group_by(FleetGPSLog.vehicle_id).subquery()
+    
+    # Join GPS logs with the subquery and vehicle info
+    statement = select(FleetGPSLog, Vehicle.plate_number).join(
+        subquery, 
+        (FleetGPSLog.vehicle_id == subquery.c.vehicle_id) & 
+        (FleetGPSLog.timestamp == subquery.c.max_ts)
+    ).join(Vehicle, FleetGPSLog.vehicle_id == Vehicle.id)
+    
+    result = await session.exec(statement)
+    locations = []
+    for log, plate in result:
+        loc_dict = log.dict()
+        loc_dict["plate_number"] = plate
+        locations.append(loc_dict)
+        
+    return locations
 
 @router.get("/vehicles/{vehicle_id}/location")
 async def get_latest_location(vehicle_id: UUID, session: AsyncSession = Depends(get_session)):
@@ -213,7 +284,7 @@ async def get_fleet_stats(session: AsyncSession = Depends(get_session)):
     total_vehicles = (await session.exec(select(func.count(Vehicle.id)))).first()
     # Active trips
     active_trips = (await session.exec(select(func.count(FleetTrip.id)).where(FleetTrip.status == "ongoing"))).first()
-    # Maintenance due (placeholder logic)
+    # Maintenance due
     maintenance_due = (await session.exec(select(func.count(Vehicle.id)).where(Vehicle.status == "maintenance"))).first()
     
     return {

@@ -3,13 +3,36 @@ import {
     Car, MapPin, Navigation, Fuel, Wrench, AlertTriangle, 
     Users, Plus, Search, Filter, ChevronRight, Activity, 
     Calendar, Clock, Shield, Download, FileText, Settings,
-    Map as MapIcon, TrendingUp, DollarSign
+    Map as MapIcon, TrendingUp, DollarSign, X, Check, Loader2,
+    RefreshCw
 } from 'lucide-react';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
-    ResponsiveContainer, LineChart, Line, AreaChart, Area,
-    PieChart, Pie, Cell 
+    ResponsiveContainer, AreaChart, Area
 } from 'recharts';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet icon issue
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// @ts-ignore
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: markerIcon2x,
+    iconUrl: markerIcon,
+    shadowUrl: markerShadow,
+});
+
+const vehicleIcon = new L.Icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/3202/3202926.png',
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32]
+});
 
 interface FleetManagementProps {
     initialTab?: string;
@@ -19,6 +42,9 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
     const [activeTab, setActiveTab] = useState(initialTab);
     const [vehicles, setVehicles] = useState<any[]>([]);
     const [trips, setTrips] = useState<any[]>([]);
+    const [fuelLogs, setFuelLogs] = useState<any[]>([]);
+    const [maintenanceLogs, setMaintenanceLogs] = useState<any[]>([]);
+    const [locations, setLocations] = useState<any[]>([]);
     const [stats, setStats] = useState<any>({
         total_vehicles: 0,
         active_trips: 0,
@@ -26,24 +52,35 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
         fuel_usage: 0
     });
     const [loading, setLoading] = useState(true);
+    const [showAddVehicle, setShowAddVehicle] = useState(false);
 
     useEffect(() => {
         fetchData();
+        const interval = setInterval(fetchLocations, 10000); // Update locations every 10s
+        return () => clearInterval(interval);
     }, []);
 
     const fetchData = async () => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const [vRes, tRes, sRes] = await Promise.all([
-                fetch('/api/fleet/vehicles', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('/api/fleet/trips', { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch('/api/fleet/stats', { headers: { 'Authorization': `Bearer ${token}` } })
+            const headers = { 'Authorization': `Bearer ${token}` };
+            
+            const [vRes, tRes, sRes, fRes, mRes, lRes] = await Promise.all([
+                fetch('/api/fleet/vehicles', { headers }),
+                fetch('/api/fleet/trips', { headers }),
+                fetch('/api/fleet/stats', { headers }),
+                fetch('/api/fleet/fuel-logs', { headers }),
+                fetch('/api/fleet/maintenance-logs', { headers }),
+                fetch('/api/fleet/locations', { headers })
             ]);
 
             if (vRes.ok) setVehicles(await vRes.json());
             if (tRes.ok) setTrips(await tRes.json());
             if (sRes.ok) setStats(await sRes.json());
+            if (fRes.ok) setFuelLogs(await fRes.json());
+            if (mRes.ok) setMaintenanceLogs(await mRes.json());
+            if (lRes.ok) setLocations(await lRes.json());
         } catch (error) {
             console.error('Error fetching fleet data:', error);
         } finally {
@@ -51,7 +88,15 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
         }
     };
 
-    const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+    const fetchLocations = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/fleet/locations', { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
+            if (res.ok) setLocations(await res.json());
+        } catch (e) {}
+    };
 
     const renderDashboard = () => (
         <div className="space-y-6 animate-fade-in">
@@ -61,7 +106,7 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                     title="Total Fleet" 
                     value={stats.total_vehicles || 0} 
                     icon={<Car className="text-blue-600" />} 
-                    change="+2 this month"
+                    change="Registered Units"
                     color="blue"
                 />
                 <StatCard 
@@ -79,10 +124,10 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                     color="red"
                 />
                 <StatCard 
-                    title="Fuel Efficiency" 
-                    value="8.5 km/L" 
-                    icon={<Fuel className="text-orange-600" />} 
-                    change="-5% vs last month"
+                    title="Active Drivers" 
+                    value={stats.active_drivers || 0} 
+                    icon={<Users className="text-orange-600" />} 
+                    change="On Duty"
                     color="orange"
                 />
             </div>
@@ -92,11 +137,11 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                 <div className="glass-card p-6">
                     <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                         <TrendingUp size={20} className="text-primary-600" />
-                        Fuel Consumption Trends
+                        Fuel Consumption History
                     </h3>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={mockFuelData}>
+                            <AreaChart data={fuelLogs.slice(0, 7).reverse().map(l => ({ name: new Date(l.timestamp).toLocaleDateString(), liters: l.amount_liters }))}>
                                 <defs>
                                     <linearGradient id="colorFuel" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.3}/>
@@ -104,11 +149,9 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#6B7280'}} />
                                 <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} />
-                                <Tooltip 
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                                />
+                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
                                 <Area type="monotone" dataKey="liters" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorFuel)" />
                             </AreaChart>
                         </ResponsiveContainer>
@@ -118,60 +161,63 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                 <div className="glass-card p-6">
                     <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                         <Activity size={20} className="text-green-600" />
-                        Vehicle Utilization
+                        Fleet Utilization
                     </h3>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={mockUtilizationData}>
+                            <BarChart data={[
+                                { name: 'Active', val: stats.active_trips },
+                                { name: 'Idle', val: stats.total_vehicles - stats.active_trips - stats.maintenance_due },
+                                { name: 'Repair', val: stats.maintenance_due }
+                            ]}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} />
                                 <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} />
-                                <Tooltip 
-                                    cursor={{fill: '#F3F4F6'}}
-                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                                />
-                                <Bar dataKey="usage" fill="#10B981" radius={[6, 6, 0, 0]} barSize={40} />
+                                <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
+                                <Bar dataKey="val" fill="#10B981" radius={[6, 6, 0, 0]} barSize={40} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
             </div>
 
-            {/* Live Alerts & Recent Trips */}
+            {/* Bottom Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 glass-card p-6">
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-bold">Ongoing Trips</h3>
-                        <button className="text-sm text-primary-600 font-semibold hover:underline">View All</button>
+                        <h3 className="text-lg font-bold">Live Trip Log</h3>
+                        <button onClick={() => setActiveTab('trips')} className="text-sm text-primary-600 font-semibold hover:underline">View All</button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
                                 <tr className="text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
                                     <th className="pb-4">Vehicle</th>
-                                    <th className="pb-4">Driver</th>
                                     <th className="pb-4">Destination</th>
                                     <th className="pb-4">Status</th>
-                                    <th className="pb-4">ETA</th>
+                                    <th className="pb-4">Departure</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {trips.filter(t => t.status === 'ongoing').map((trip, i) => (
+                                {trips.slice(0, 5).map((trip, i) => (
                                     <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                        <td className="py-4 font-bold text-sm">{trip.vehicle_id.slice(0,8)}</td>
-                                        <td className="py-4 text-sm text-gray-600">John Doe</td>
+                                        <td className="py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-gray-100 rounded-lg"><Car size={16} /></div>
+                                                <span className="font-bold text-sm">{vehicles.find(v => v.id === trip.vehicle_id)?.plate_number || 'Vehicle'}</span>
+                                            </div>
+                                        </td>
                                         <td className="py-4 text-sm text-gray-600">{trip.destination}</td>
                                         <td className="py-4">
-                                            <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded-full uppercase">Ongoing</span>
+                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                                trip.status === 'ongoing' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                                            }`}>{trip.status}</span>
                                         </td>
-                                        <td className="py-4 text-sm font-semibold text-primary-600">14:30</td>
+                                        <td className="py-4 text-xs font-semibold text-gray-500">
+                                            {new Date(trip.scheduled_departure).toLocaleString()}
+                                        </td>
                                     </tr>
                                 ))}
-                                {trips.filter(t => t.status === 'ongoing').length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="py-8 text-center text-gray-500 italic">No active trips at the moment.</td>
-                                    </tr>
-                                )}
                             </tbody>
                         </table>
                     </div>
@@ -180,27 +226,24 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                 <div className="glass-card p-6">
                     <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                         <AlertTriangle size={20} className="text-red-600" />
-                        Critical Alerts
+                        Vehicle Alerts
                     </h3>
                     <div className="space-y-4">
-                        <AlertItem 
-                            type="maintenance" 
-                            title="Brake Service Required" 
-                            desc="Bus KAB 123G - 500km overdue" 
-                            time="2h ago" 
-                        />
-                        <AlertItem 
-                            type="speed" 
-                            title="Over-speeding Detected" 
-                            desc="Shuttle KCD 445L - 95 km/h" 
-                            time="15m ago" 
-                        />
-                        <AlertItem 
-                            type="fuel" 
-                            title="Fuel Level Low" 
-                            desc="Utility Van KBA 900P - 12%" 
-                            time="Just Now" 
-                        />
+                        {vehicles.filter(v => v.status === 'maintenance').map((v, i) => (
+                            <div key={i} className="flex gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">
+                                <Wrench className="text-red-600 shrink-0" size={18} />
+                                <div>
+                                    <p className="text-sm font-bold text-red-900">{v.plate_number} Overdue</p>
+                                    <p className="text-xs text-red-700">Immediate service required.</p>
+                                </div>
+                            </div>
+                        ))}
+                        {vehicles.filter(v => v.status === 'maintenance').length === 0 && (
+                            <div className="text-center py-8">
+                                <Shield className="mx-auto text-green-500 mb-2" size={32} />
+                                <p className="text-sm font-bold text-gray-600">All vehicles healthy</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -208,80 +251,77 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
     );
 
     const renderTracking = () => (
-        <div className="glass-card h-[calc(100vh-200px)] flex flex-col lg:flex-row overflow-hidden animate-fade-in">
+        <div className="glass-card h-[calc(100vh-220px)] flex flex-col lg:flex-row overflow-hidden animate-fade-in relative">
             {/* Sidebar for vehicle list */}
-            <div className="w-full lg:w-80 border-r border-gray-100 flex flex-col">
+            <div className="w-full lg:w-80 border-r border-gray-100 flex flex-col bg-white/80 backdrop-blur-md z-10">
                 <div className="p-4 border-b border-gray-100">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <input 
                             type="text" 
-                            placeholder="Search vehicle..." 
-                            className="w-full pl-10 pr-4 py-2 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-primary-500/20 text-sm outline-none"
+                            placeholder="Search fleet..." 
+                            className="w-full pl-10 pr-4 py-2 bg-gray-50 border-none rounded-xl text-sm outline-none"
                         />
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                    {vehicles.map((v, i) => (
-                        <div key={i} className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors group">
-                            <div className="flex justify-between items-start mb-2">
-                                <h4 className="font-bold text-sm group-hover:text-primary-600 transition-colors">{v.plate_number}</h4>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                                    v.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                                }`}>
-                                    {v.status}
-                                </span>
+                    {vehicles.map((v, i) => {
+                        const loc = locations.find(l => l.vehicle_id === v.id);
+                        return (
+                            <div key={i} className="p-4 border-b border-gray-50 hover:bg-primary-50/30 cursor-pointer transition-all group">
+                                <div className="flex justify-between items-start mb-1">
+                                    <h4 className="font-bold text-sm">{v.plate_number}</h4>
+                                    <span className={`w-2 h-2 rounded-full ${loc ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+                                </div>
+                                <p className="text-[10px] text-gray-500 uppercase font-black">{v.vehicle_type}</p>
+                                <div className="mt-3 flex justify-between items-center text-[10px] font-bold">
+                                    <div className="flex items-center gap-1 text-blue-600">
+                                        <Activity size={10} /> {loc ? `${loc.speed} km/h` : 'Stopped'}
+                                    </div>
+                                    <div className="text-gray-400">{loc ? 'Live' : 'Offline'}</div>
+                                </div>
                             </div>
-                            <div className="text-xs text-gray-500 flex items-center gap-1">
-                                <MapPin size={12} />
-                                {v.current_location || 'Main Campus Gate'}
-                            </div>
-                            <div className="mt-3 flex justify-between items-center">
-                                <div className="text-[10px] font-bold text-gray-400">Driver: John Doe</div>
-                                <div className="text-[10px] font-bold text-blue-600">45 km/h</div>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
-            {/* Map Placeholder */}
-            <div className="flex-1 bg-gray-100 relative group">
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-                    <MapIcon size={64} className="mb-4 animate-bounce" />
-                    <p className="font-bold">Live Map Tracking Interface</p>
-                    <p className="text-xs max-w-xs text-center mt-2">Integrating with Google Maps API for real-time fleet visualization and traffic analytics.</p>
-                </div>
+            {/* Live Map */}
+            <div className="flex-1 relative">
+                <MapContainer center={[-1.286389, 36.817223]} zoom={13} style={{ height: '100%', width: '100%' }}>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                    {locations.map((loc, i) => (
+                        <Marker 
+                            key={i} 
+                            position={[loc.latitude, loc.longitude]} 
+                            icon={vehicleIcon}
+                        >
+                            <Popup>
+                                <div className="p-2">
+                                    <h3 className="font-bold border-b pb-1 mb-2">{loc.plate_number}</h3>
+                                    <p className="text-xs">Speed: <strong>{loc.speed} km/h</strong></p>
+                                    <p className="text-xs">Status: <span className="text-green-600 font-bold">Active Trip</span></p>
+                                    <button className="mt-2 w-full py-1 bg-primary-600 text-white rounded text-[10px] font-bold">Track Individual</button>
+                                </div>
+                            </Popup>
+                        </Marker>
+                    ))}
+                    <MapResizer />
+                </MapContainer>
                 
-                {/* Map Overlay Controls */}
-                <div className="absolute top-4 right-4 flex flex-col gap-2">
-                    <button className="p-2 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-all text-gray-600"><Plus size={20} /></button>
-                    <button className="p-2 bg-white rounded-lg shadow-lg hover:bg-gray-50 transition-all text-gray-600"><Shield size={20} /></button>
-                </div>
-
-                <div className="absolute bottom-6 left-6 right-6 lg:left-auto lg:right-6 lg:w-96 glass-card p-4 shadow-2xl border-t-4 border-primary-600 animate-slide-up">
-                    <div className="flex items-center gap-4 mb-4">
-                        <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center text-primary-600">
-                            <Car size={24} />
+                {/* Floating Stats */}
+                <div className="absolute bottom-6 right-6 z-[1000] glass-card p-4 shadow-2xl border-l-4 border-primary-600 w-64">
+                    <h4 className="font-black text-xs uppercase text-gray-400 mb-3 tracking-widest">Fleet Status</h4>
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-gray-600">Active Units</span>
+                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-[10px] font-black">{locations.length}</span>
                         </div>
-                        <div>
-                            <h4 className="font-bold">Bus KAB 123G</h4>
-                            <p className="text-xs text-gray-500">Route: Nairobi - Main Campus</p>
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs font-bold text-gray-600">Total Fleet</span>
+                            <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-[10px] font-black">{vehicles.length}</span>
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div className="bg-gray-50 p-2 rounded-lg">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase">Speed</p>
-                            <p className="font-bold text-lg">62 km/h</p>
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded-lg">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase">Passengers</p>
-                            <p className="font-bold text-lg">42/60</p>
-                        </div>
-                    </div>
-                    <button className="w-full py-2.5 bg-primary-600 text-white font-bold rounded-xl shadow-lg shadow-primary-500/20 hover:opacity-90 transition-all">
-                        View Trip Details
-                    </button>
                 </div>
             </div>
         </div>
@@ -297,21 +337,25 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                     <p className="text-gray-500 font-medium">Real-time university transport monitoring</p>
                 </div>
                 <div className="flex gap-2">
-                    <button className="px-4 py-2 bg-white border border-gray-200 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-2">
-                        <Download size={18} />
-                        Export
+                    <button onClick={fetchData} className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition-all">
+                        <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                     </button>
-                    <button className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20 hover:scale-105 transition-all flex items-center gap-2">
-                        <Plus size={18} />
-                        Add Vehicle
+                    <button className="px-4 py-2 bg-white border border-gray-200 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-2">
+                        <Download size={18} /> Export
+                    </button>
+                    <button 
+                        onClick={() => setShowAddVehicle(true)}
+                        className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20 hover:scale-105 transition-all flex items-center gap-2"
+                    >
+                        <Plus size={18} /> Add Vehicle
                     </button>
                 </div>
             </header>
 
             {/* Navigation Tabs */}
-            <div className="flex gap-1 bg-white p-1 rounded-2xl border border-gray-100 w-fit">
+            <div className="flex gap-1 bg-white p-1 rounded-2xl border border-gray-100 w-fit overflow-x-auto no-scrollbar">
                 {[
-                    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboardIcon },
+                    { id: 'dashboard', label: 'Dashboard', icon: Activity },
                     { id: 'tracking', label: 'Live Map', icon: MapPin },
                     { id: 'trips', label: 'Trips', icon: Navigation },
                     { id: 'fuel', label: 'Fuel Logs', icon: Fuel },
@@ -321,7 +365,7 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
+                        className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shrink-0 ${
                             activeTab === tab.id 
                             ? 'bg-primary-600 text-white shadow-md' 
                             : 'text-gray-500 hover:bg-gray-100'
@@ -334,18 +378,46 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
             </div>
 
             {/* Content Area */}
-            {activeTab === 'dashboard' && renderDashboard()}
-            {activeTab === 'tracking' && renderTracking()}
-            {activeTab === 'trips' && <TripsManager trips={trips} />}
-            {activeTab === 'fuel' && <FuelManagement vehicles={vehicles} />}
-            {activeTab === 'maintenance' && <MaintenanceManager vehicles={vehicles} />}
-            {activeTab === 'drivers' && <DriverManager />}
+            {loading ? (
+                <div className="h-96 flex flex-col items-center justify-center text-gray-400">
+                    <Loader2 size={48} className="animate-spin mb-4" />
+                    <p className="font-bold">Syncing Fleet Data...</p>
+                </div>
+            ) : (
+                <>
+                    {activeTab === 'dashboard' && renderDashboard()}
+                    {activeTab === 'tracking' && renderTracking()}
+                    {activeTab === 'trips' && <TripsManager trips={trips} vehicles={vehicles} onUpdate={fetchData} />}
+                    {activeTab === 'fuel' && <FuelManagement vehicles={vehicles} logs={fuelLogs} onUpdate={fetchData} />}
+                    {activeTab === 'maintenance' && <MaintenanceManager vehicles={vehicles} logs={maintenanceLogs} onUpdate={fetchData} />}
+                    {activeTab === 'drivers' && <DriverManager />}
+                </>
+            )}
+
+            {/* Add Vehicle Modal */}
+            {showAddVehicle && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-3xl p-8 w-full max-w-lg animate-slide-up shadow-2xl relative">
+                        <button onClick={() => setShowAddVehicle(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-900"><X size={24} /></button>
+                        <h2 className="text-2xl font-black mb-6">Register New Vehicle</h2>
+                        <VehicleForm onSuccess={() => { setShowAddVehicle(false); fetchData(); }} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
-// Helper Components
+// Map Helper
+function MapResizer() {
+    const map = useMap();
+    useEffect(() => {
+        setTimeout(() => map.invalidateSize(), 500);
+    }, [map]);
+    return null;
+}
 
+// Helper Components
 function StatCard({ title, value, icon, change, color }: any) {
     const colors: any = {
         blue: 'border-blue-500 text-blue-600',
@@ -353,16 +425,11 @@ function StatCard({ title, value, icon, change, color }: any) {
         red: 'border-red-500 text-red-600',
         orange: 'border-orange-500 text-orange-600'
     };
-
     return (
         <div className={`glass-card p-6 border-l-4 ${colors[color]}`}>
             <div className="flex justify-between items-start mb-4">
-                <div className="p-3 bg-white shadow-sm rounded-xl border border-gray-50">
-                    {icon}
-                </div>
-                <span className="text-xs font-bold bg-white/50 px-2 py-1 rounded-lg text-gray-500 uppercase tracking-tighter">
-                    {change}
-                </span>
+                <div className="p-3 bg-white shadow-sm rounded-xl border border-gray-50">{icon}</div>
+                <span className="text-[10px] font-bold bg-gray-50 px-2 py-1 rounded-lg text-gray-500 uppercase tracking-tighter">{change}</span>
             </div>
             <h4 className="text-gray-500 font-bold text-sm mb-1">{title}</h4>
             <div className="text-2xl font-black text-gray-900">{value}</div>
@@ -370,75 +437,51 @@ function StatCard({ title, value, icon, change, color }: any) {
     );
 }
 
-function AlertItem({ type, title, desc, time }: any) {
-    const icons: any = {
-        maintenance: <Wrench className="text-red-600" size={16} />,
-        speed: <Activity className="text-orange-600" size={16} />,
-        fuel: <Fuel className="text-amber-600" size={16} />
-    };
-    const bgColors: any = {
-        maintenance: 'bg-red-50 border-red-100',
-        speed: 'bg-orange-50 border-orange-100',
-        fuel: 'bg-amber-50 border-amber-100'
-    };
-
-    return (
-        <div className={`flex gap-4 p-4 rounded-2xl border ${bgColors[type]} transition-transform hover:scale-[1.02] cursor-pointer`}>
-            <div className="mt-1 p-2 bg-white rounded-lg shadow-sm">
-                {icons[type]}
-            </div>
-            <div className="flex-1">
-                <div className="flex justify-between items-start">
-                    <h5 className="font-bold text-sm">{title}</h5>
-                    <span className="text-[10px] font-bold text-gray-400">{time}</span>
-                </div>
-                <p className="text-xs text-gray-600 mt-1">{desc}</p>
-            </div>
-            <ChevronRight size={16} className="text-gray-400 mt-1" />
-        </div>
-    );
-}
-
-function LayoutDashboardIcon({ size }: { size: number }) {
-    return <Activity size={size} />;
-}
-
 // Sub-Managers
-
-function TripsManager({ trips }: { trips: any[] }) {
+function TripsManager({ trips, vehicles, onUpdate }: any) {
+    const [showForm, setShowForm] = useState(false);
     return (
         <div className="glass-card p-6 animate-fade-in">
-            <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold">Trip Logs & Manifests</h3>
-                <div className="flex gap-2">
-                    <button className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50"><Filter size={18} /></button>
-                    <button className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20">Schedule Trip</button>
-                </div>
+            <div className="flex justify-between items-center mb-8">
+                <h3 className="text-xl font-black">Trip Manifests</h3>
+                <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20 flex items-center gap-2">
+                    <Plus size={18} /> Schedule Trip
+                </button>
             </div>
+            
+            {showForm && (
+                <div className="mb-8 p-6 bg-gray-50 rounded-2xl border border-gray-200">
+                    <h4 className="font-bold mb-4">New Trip Details</h4>
+                    <TripForm vehicles={vehicles} onSuccess={() => { setShowForm(false); onUpdate(); }} />
+                </div>
+            )}
+
             <div className="space-y-4">
-                {trips.map((trip, i) => (
-                    <div key={i} className="p-6 bg-gray-50 rounded-2xl border border-gray-100 hover:border-primary-300 transition-all group">
+                {trips.map((trip: any, i: number) => (
+                    <div key={i} className="p-6 bg-white rounded-2xl border border-gray-100 hover:border-primary-300 transition-all shadow-sm">
                         <div className="flex flex-col lg:flex-row justify-between gap-6">
                             <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
+                                <div className="flex items-center gap-3 mb-3">
                                     <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${
-                                        trip.status === 'completed' ? 'bg-gray-200 text-gray-600' : 'bg-green-100 text-green-700'
-                                    }`}>
-                                        {trip.status}
-                                    </span>
-                                    <span className="text-xs font-bold text-gray-400">{new Date(trip.scheduled_departure).toLocaleDateString()}</span>
+                                        trip.status === 'completed' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'
+                                    }`}>{trip.status}</span>
+                                    <span className="text-xs font-bold text-gray-400">{new Date(trip.scheduled_departure).toLocaleString()}</span>
                                 </div>
-                                <h4 className="text-lg font-bold mb-4">{trip.origin} → {trip.destination}</h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                    <TripMeta label="Vehicle" value={trip.vehicle_id.slice(0,8)} icon={<Car size={14} />} />
-                                    <TripMeta label="Driver" value="John Doe" icon={<Users size={14} />} />
-                                    <TripMeta label="Passengers" value="45 Check-ins" icon={<Activity size={14} />} />
-                                    <TripMeta label="Purpose" value={trip.purpose} icon={<FileText size={14} />} />
+                                <h4 className="text-xl font-black text-gray-900 mb-4">{trip.origin} <ChevronRight className="inline text-gray-300" /> {trip.destination}</h4>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Vehicle</p>
+                                        <p className="text-sm font-bold">{vehicles.find((v: any) => v.id === trip.vehicle_id)?.plate_number || 'Unit'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Purpose</p>
+                                        <p className="text-sm font-bold">{trip.purpose}</p>
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                <button className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50">View Manifest</button>
-                                <button className="px-4 py-2 bg-primary-50 text-primary-600 rounded-xl text-sm font-bold hover:bg-primary-100">Live Track</button>
+                                {trip.status === 'scheduled' && <button className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold">Start Trip</button>}
+                                <button className="px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100">Manifest</button>
                             </div>
                         </div>
                     </div>
@@ -448,87 +491,82 @@ function TripsManager({ trips }: { trips: any[] }) {
     );
 }
 
-function TripMeta({ label, value, icon }: any) {
-    return (
-        <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1 flex items-center gap-1">
-                {icon}
-                {label}
-            </p>
-            <p className="text-xs font-bold text-gray-700 truncate">{value}</p>
-        </div>
-    );
-}
+function FuelManagement({ vehicles, logs, onUpdate }: any) {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formData, setFormData] = useState({
+        vehicle_id: '',
+        amount_liters: '',
+        cost: '',
+        odometer_reading: '',
+        station_name: ''
+    });
 
-function FuelManagement({ vehicles }: { vehicles: any[] }) {
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/fleet/fuel-logs', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({
+                    ...formData,
+                    amount_liters: parseFloat(formData.amount_liters),
+                    cost: parseFloat(formData.cost),
+                    odometer_reading: parseFloat(formData.odometer_reading),
+                    timestamp: new Date().toISOString()
+                })
+            });
+            if (res.ok) {
+                setFormData({ vehicle_id: '', amount_liters: '', cost: '', odometer_reading: '', station_name: '' });
+                onUpdate();
+            }
+        } catch (e) {} finally { setIsSubmitting(false); }
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
             <div className="lg:col-span-1 glass-card p-6">
-                <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                    <Fuel size={20} className="text-orange-600" />
-                    Log Fuel Refill
-                </h3>
-                <form className="space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Vehicle</label>
-                        <select className="w-full p-3 bg-gray-50 border-none rounded-xl text-sm outline-none font-bold">
-                            {vehicles.map(v => <option key={v.id} value={v.id}>{v.plate_number}</option>)}
-                        </select>
-                    </div>
+                <h3 className="text-lg font-black mb-6">Log Refill</h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <select 
+                        required 
+                        value={formData.vehicle_id}
+                        onChange={e => setFormData({...formData, vehicle_id: e.target.value})}
+                        className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none"
+                    >
+                        <option value="">Select Vehicle</option>
+                        {vehicles.map((v: any) => <option key={v.id} value={v.id}>{v.plate_number}</option>)}
+                    </select>
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Liters</label>
-                            <input type="number" placeholder="0.00" className="w-full p-3 bg-gray-50 border-none rounded-xl text-sm outline-none font-bold" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Cost (KES)</label>
-                            <input type="number" placeholder="0.00" className="w-full p-3 bg-gray-50 border-none rounded-xl text-sm outline-none font-bold" />
-                        </div>
+                        <input type="number" step="0.01" required placeholder="Liters" value={formData.amount_liters} onChange={e => setFormData({...formData, amount_liters: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                        <input type="number" step="0.01" required placeholder="Cost (KES)" value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
                     </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Current Odometer</label>
-                        <input type="number" placeholder="Km" className="w-full p-3 bg-gray-50 border-none rounded-xl text-sm outline-none font-bold" />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Fuel Station</label>
-                        <input type="text" placeholder="e.g. Shell" className="w-full p-3 bg-gray-50 border-none rounded-xl text-sm outline-none font-bold" />
-                    </div>
-                    <div className="p-8 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center text-gray-400 hover:border-primary-300 transition-colors cursor-pointer">
-                        <Download size={32} className="mb-2" />
-                        <p className="text-xs font-bold">Upload Receipt Image</p>
-                    </div>
-                    <button className="w-full py-3 bg-primary-600 text-white font-bold rounded-xl shadow-lg shadow-primary-500/20 hover:opacity-90">
-                        Submit Fuel Log
+                    <input type="number" required placeholder="Odometer Reading" value={formData.odometer_reading} onChange={e => setFormData({...formData, odometer_reading: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                    <input type="text" required placeholder="Fuel Station" value={formData.station_name} onChange={e => setFormData({...formData, station_name: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                    <button disabled={isSubmitting} className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl hover:opacity-90 disabled:opacity-50">
+                        {isSubmitting ? 'Logging...' : 'Save Fuel Log'}
                     </button>
                 </form>
             </div>
-            
             <div className="lg:col-span-2 glass-card p-6">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold">Recent Fuel Logs</h3>
-                    <div className="flex items-center gap-4">
-                        <div className="text-right">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase">Total Monthly Cost</p>
-                            <p className="font-bold text-primary-600">KES 145,200</p>
-                        </div>
-                        <button className="p-2 bg-gray-50 rounded-lg text-gray-500"><Download size={18} /></button>
-                    </div>
-                </div>
+                <h3 className="text-lg font-black mb-6">Refill History</h3>
                 <div className="space-y-3">
-                    {[1,2,3,4,5].map(i => (
-                        <div key={i} className="p-4 rounded-xl border border-gray-100 flex items-center justify-between hover:bg-gray-50 transition-all cursor-pointer">
+                    {logs.map((log: any, i: number) => (
+                        <div key={i} className="p-4 bg-white border border-gray-100 rounded-2xl flex items-center justify-between shadow-sm">
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600">
-                                    <Fuel size={20} />
-                                </div>
+                                <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><Fuel size={20} /></div>
                                 <div>
-                                    <h4 className="font-bold text-sm">KAB 123G • Shell Station</h4>
-                                    <p className="text-xs text-gray-400">45.5 Liters • 2h ago</p>
+                                    <h4 className="font-bold text-sm">{vehicles.find((v: any) => v.id === log.vehicle_id)?.plate_number || 'Unit'} • {log.station_name}</h4>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase">{log.amount_liters}L • {new Date(log.timestamp).toLocaleDateString()}</p>
                                 </div>
                             </div>
                             <div className="text-right">
-                                <div className="font-bold text-sm">KES 9,450</div>
-                                <div className="text-[10px] font-bold text-green-600">Receipt Verified</div>
+                                <p className="font-black text-gray-900">KES {log.cost.toLocaleString()}</p>
+                                <p className="text-[10px] font-bold text-green-600">Verified</p>
                             </div>
                         </div>
                     ))}
@@ -538,87 +576,35 @@ function FuelManagement({ vehicles }: { vehicles: any[] }) {
     );
 }
 
-function MaintenanceManager({ vehicles }: { vehicles: any[] }) {
+function MaintenanceManager({ vehicles, logs, onUpdate }: any) {
+    const [showForm, setShowForm] = useState(false);
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="glass-card p-6 bg-gradient-to-br from-red-500 to-rose-600 text-white">
-                    <div className="flex justify-between items-start mb-6">
-                        <div className="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
-                            <Wrench size={24} />
-                        </div>
-                        <span className="text-[10px] font-bold bg-white/20 px-2 py-1 rounded-lg uppercase">Critical</span>
-                    </div>
-                    <h3 className="text-lg font-bold mb-1">Overdue Service</h3>
-                    <p className="text-red-100 text-xs mb-4">4 vehicles have exceeded their service intervals.</p>
-                    <button className="w-full py-2.5 bg-white text-red-600 font-bold rounded-xl text-sm shadow-xl">Schedule Now</button>
-                </div>
-                
-                <div className="lg:col-span-2 glass-card p-6">
-                    <h3 className="text-lg font-bold mb-6">Maintenance Schedule</h3>
-                    <div className="space-y-3">
-                        {vehicles.map((v, i) => (
-                            <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-2 h-2 rounded-full ${i % 3 === 0 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`} />
-                                    <div>
-                                        <h4 className="font-bold text-sm">{v.plate_number}</h4>
-                                        <p className="text-[10px] text-gray-400">Next service: {v.next_service_odometer || '45,000'} km</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-6">
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-bold text-gray-400">Current Odo</p>
-                                        <p className="text-sm font-bold">{v.current_odometer || '42,100'} km</p>
-                                    </div>
-                                    <button className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"><Wrench size={18} /></button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+            <div className="flex justify-between items-center">
+                <h3 className="text-xl font-black">Maintenance & Service</h3>
+                <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold text-sm shadow-lg flex items-center gap-2">
+                    <Wrench size={18} /> Log Service
+                </button>
             </div>
-        </div>
-    );
-}
+            
+            {showForm && (
+                <div className="p-8 bg-white border-2 border-red-100 rounded-3xl shadow-xl">
+                    <MaintenanceForm vehicles={vehicles} onSuccess={() => { setShowForm(false); onUpdate(); }} />
+                </div>
+            )}
 
-function DriverManager() {
-    return (
-        <div className="glass-card p-6 animate-fade-in">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                <h3 className="text-xl font-bold">Driver Directory</h3>
-                <div className="flex w-full sm:w-auto gap-2">
-                    <div className="relative flex-1 sm:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input type="text" placeholder="Search drivers..." className="w-full pl-10 pr-4 py-2 bg-gray-50 border-none rounded-xl text-sm outline-none" />
-                    </div>
-                    <button className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20">Add Driver</button>
-                </div>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1,2,3,4,5,6].map(i => (
-                    <div key={i} className="group p-6 bg-white border border-gray-100 rounded-3xl hover:shadow-2xl hover:border-primary-200 transition-all cursor-pointer text-center relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4">
-                            <span className="w-3 h-3 bg-green-500 rounded-full border-2 border-white block" />
+                {logs.map((log: any, i: number) => (
+                    <div key={i} className="glass-card p-6 border-t-4 border-red-500">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="p-2 bg-red-50 text-red-600 rounded-lg"><Shield size={20} /></div>
+                            <span className="text-[10px] font-black bg-gray-100 px-2 py-1 rounded text-gray-500 uppercase">{log.service_type}</span>
                         </div>
-                        <div className="w-20 h-20 bg-primary-100 rounded-full mx-auto mb-4 flex items-center justify-center text-primary-600 border-4 border-white shadow-xl group-hover:scale-110 transition-transform">
-                            <Users size={32} />
-                        </div>
-                        <h4 className="font-bold text-lg">John Driver Doe</h4>
-                        <p className="text-xs text-gray-500 mb-4">Senior Fleet Driver • Staff ID: DRV-00{i}</p>
-                        <div className="flex justify-center gap-2 mb-6">
-                            <span className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded uppercase">Class BCE</span>
-                            <span className="px-2 py-1 bg-green-50 text-green-600 text-[10px] font-bold rounded uppercase">Active</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 border-t border-gray-50 pt-4">
-                            <div className="text-center border-r border-gray-50">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase">Trips</p>
-                                <p className="text-sm font-bold">142</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase">Rating</p>
-                                <p className="text-sm font-bold text-orange-500">4.9/5</p>
-                            </div>
+                        <h4 className="font-black text-gray-900 mb-1">{vehicles.find((v: any) => v.id === log.vehicle_id)?.plate_number || 'Unit'}</h4>
+                        <p className="text-xs text-gray-500 mb-4">{log.description}</p>
+                        <div className="pt-4 border-t border-gray-50 flex justify-between text-[10px] font-bold uppercase tracking-wider">
+                            <span className="text-gray-400">Next Service</span>
+                            <span className="text-red-600">{log.next_service_due_odometer} KM</span>
                         </div>
                     </div>
                 ))}
@@ -627,21 +613,149 @@ function DriverManager() {
     );
 }
 
-// Mock Data
-const mockFuelData = [
-    { name: 'Mon', liters: 400 },
-    { name: 'Tue', liters: 300 },
-    { name: 'Wed', liters: 600 },
-    { name: 'Thu', liters: 200 },
-    { name: 'Fri', liters: 900 },
-    { name: 'Sat', liters: 300 },
-    { name: 'Sun', liters: 150 },
-];
+function DriverManager() {
+    return (
+        <div className="glass-card p-8 animate-fade-in text-center py-20">
+            <Users className="mx-auto text-gray-200 mb-4" size={64} />
+            <h3 className="text-2xl font-black text-gray-900 mb-2">Driver Management Module</h3>
+            <p className="text-gray-500 max-w-sm mx-auto">Please go to the 'People' section to manage drivers and assign vehicle privileges.</p>
+        </div>
+    );
+}
 
-const mockUtilizationData = [
-    { name: 'Buses', usage: 85 },
-    { name: 'Staff', usage: 65 },
-    { name: 'Field', usage: 45 },
-    { name: 'Shuttle', usage: 92 },
-    { name: 'Utility', usage: 30 },
-];
+// Form Components
+function VehicleForm({ onSuccess }: { onSuccess: () => void }) {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [formData, setFormData] = useState({
+        plate_number: '', make: '', model: '', vehicle_type: 'bus', fuel_type: 'diesel', fuel_capacity: 0, year: 2024
+    });
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/fleet/vehicles', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(formData)
+            });
+            if (res.ok) onSuccess();
+        } catch (e) {} finally { setIsSubmitting(false); }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <input required placeholder="Plate Number (e.g. KAB 123G)" value={formData.plate_number} onChange={e => setFormData({...formData, plate_number: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+            <div className="grid grid-cols-2 gap-4">
+                <input required placeholder="Make" value={formData.make} onChange={e => setFormData({...formData, make: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                <input required placeholder="Model" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <select value={formData.vehicle_type} onChange={e => setFormData({...formData, vehicle_type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
+                    <option value="bus">Bus</option>
+                    <option value="shuttle">Shuttle</option>
+                    <option value="staff">Staff Car</option>
+                    <option value="utility">Utility</option>
+                </select>
+                <select value={formData.fuel_type} onChange={e => setFormData({...formData, fuel_type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
+                    <option value="diesel">Diesel</option>
+                    <option value="petrol">Petrol</option>
+                </select>
+            </div>
+            <button disabled={isSubmitting} className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl hover:opacity-90">
+                {isSubmitting ? 'Registering...' : 'Complete Registration'}
+            </button>
+        </form>
+    );
+}
+
+function TripForm({ vehicles, onSuccess }: any) {
+    const [formData, setFormData] = useState({
+        vehicle_id: '', origin: '', destination: '', purpose: '', scheduled_departure: ''
+    });
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/fleet/trips', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({...formData, status: 'scheduled'})
+            });
+            if (res.ok) onSuccess();
+        } catch (e) {}
+    };
+    return (
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <select required value={formData.vehicle_id} onChange={e => setFormData({...formData, vehicle_id: e.target.value})} className="p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm">
+                <option value="">Select Vehicle</option>
+                {vehicles.map((v: any) => <option key={v.id} value={v.id}>{v.plate_number}</option>)}
+            </select>
+            <input required placeholder="Origin" value={formData.origin} onChange={e => setFormData({...formData, origin: e.target.value})} className="p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
+            <input required placeholder="Destination" value={formData.destination} onChange={e => setFormData({...formData, destination: e.target.value})} className="p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
+            <input required placeholder="Purpose" value={formData.purpose} onChange={e => setFormData({...formData, purpose: e.target.value})} className="p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
+            <input required type="datetime-local" value={formData.scheduled_departure} onChange={e => setFormData({...formData, scheduled_departure: e.target.value})} className="p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
+            <button className="py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl">Confirm Schedule</button>
+        </form>
+    );
+}
+
+function MaintenanceForm({ vehicles, onSuccess }: any) {
+    const [formData, setFormData] = useState({
+        vehicle_id: '', service_type: 'regular', description: '', cost: '', odometer_reading: '', service_date: '', next_service_due_odometer: ''
+    });
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/fleet/maintenance-logs', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({...formData, cost: parseFloat(formData.cost), odometer_reading: parseFloat(formData.odometer_reading), next_service_due_odometer: parseFloat(formData.next_service_due_odometer)})
+            });
+            if (res.ok) onSuccess();
+        } catch (e) {}
+    };
+    return (
+        <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase mb-2">Vehicle</label>
+                    <select required value={formData.vehicle_id} onChange={e => setFormData({...formData, vehicle_id: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
+                        <option value="">Select Unit</option>
+                        {vehicles.map((v: any) => <option key={v.id} value={v.id}>{v.plate_number}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase mb-2">Service Category</label>
+                    <select value={formData.service_type} onChange={e => setFormData({...formData, service_type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
+                        <option value="regular">Regular Service</option>
+                        <option value="repair">Mechanical Repair</option>
+                        <option value="tire_change">Tire Replacement</option>
+                        <option value="inspection">Safety Inspection</option>
+                    </select>
+                </div>
+            </div>
+            <textarea required placeholder="Service Description..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-3xl text-sm font-bold outline-none h-32" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase mb-2">Cost</label>
+                    <input required type="number" value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                </div>
+                <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase mb-2">Current Odo</label>
+                    <input required type="number" value={formData.odometer_reading} onChange={e => setFormData({...formData, odometer_reading: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                </div>
+                <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase mb-2">Next Service (Km)</label>
+                    <input required type="number" value={formData.next_service_due_odometer} onChange={e => setFormData({...formData, next_service_due_odometer: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                </div>
+            </div>
+            <div className="flex gap-4">
+                <input required type="date" value={formData.service_date} onChange={e => setFormData({...formData, service_date: e.target.value})} className="flex-1 p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                <button className="px-10 bg-red-600 text-white font-black rounded-2xl shadow-xl">Post Record</button>
+            </div>
+        </form>
+    );
+}
