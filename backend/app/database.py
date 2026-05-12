@@ -22,6 +22,7 @@ async def init_db():
     await migrate_users()
     await migrate_fleet()
     await migrate_audit_logs()
+    await migrate_external_sync()
 
 async def get_session() -> AsyncSession:
     async_session = sessionmaker(
@@ -134,3 +135,26 @@ async def migrate_audit_logs():
             print("Audit log migration checked/applied.")
     except Exception as e:
         print(f"Audit log migration skipped/failed: {e}")
+
+async def migrate_external_sync():
+    """Manual migration to seed the external sync API key."""
+    print("Checking external sync configuration...")
+    try:
+        from app.models import SystemConfig
+        async with engine.begin() as conn:
+            # Check if config exists
+            stmt = text("SELECT * FROM system_configs WHERE `key` = 'external_sync_api_key'")
+            res = await conn.execute(stmt)
+            config = res.fetchone()
+            
+            if not config:
+                print("Seeding default External Sync API Key...")
+                await conn.execute(text(
+                    "INSERT INTO system_configs (`id`, `key`, `value`, `category`, `is_encrypted`) "
+                    "VALUES (UUID(), 'external_sync_api_key', 'SmartCampusSync2026', 'api', 0)"
+                ))
+                print("External Sync API Key seeded.")
+            else:
+                print("External Sync API Key already exists.")
+    except Exception as e:
+        print(f"External sync migration skipped/failed: {e}")

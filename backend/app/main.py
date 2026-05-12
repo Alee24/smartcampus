@@ -5,7 +5,7 @@ from app.database import init_db, get_session
 from app.models import * 
 from app.auth import create_access_token, get_password_hash, verify_password, verify_ldap_login, verify_google_token, get_current_user
 from app.utils.audit import log_action
-from app.routers import dashboard, users, gate_control, attendance, admin
+from app.routers import dashboard, users, gate_control, attendance, admin, external_sync
 from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -596,6 +596,7 @@ app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 # Import and include audit router
 from app.routers import audit
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
+app.include_router(external_sync.router, prefix="/api/external-sync", tags=["external_sync"])
 
 @app.get("/")
 async def root():
