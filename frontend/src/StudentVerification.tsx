@@ -868,7 +868,7 @@ export default function StudentVerification() {
                         </div>
                     </div>
                 )}
-                {/* Supervisor PIN Modal for Photo Update */}
+                {/* Supervisor PIN Modal for Photo Update */}
                 {pinModal.show && (
                     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
                         <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-lg shadow-2xl border border-white/20">
@@ -900,29 +900,34 @@ export default function StudentVerification() {
                                 </button>
                             </div>
 
-                            <input 
-                                type="password"
-                                value={pinModal.pin}
-                                onChange={(e) => setPinModal({...pinModal, pin: e.target.value})}
-                                placeholder="Enter Supervisor PIN"
-                                className="w-full px-6 py-4 bg-gray-100 dark:bg-gray-700 rounded-xl text-center text-2xl tracking-[1em] font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 mb-6"
-                                maxLength={4}
-                            />
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Supervisor PIN</label>
+                                    <input 
+                                        type="password" 
+                                        maxLength={4}
+                                        value={pinModal.pin}
+                                        onChange={(e) => setPinModal({...pinModal, pin: e.target.value})}
+                                        placeholder="••••"
+                                        className="w-full text-center text-3xl tracking-[1em] py-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-purple-500 transition-all outline-none"
+                                    />
+                                </div>
 
-                            <div className="flex gap-3">
-                                <button 
-                                    onClick={() => { setPinModal({show: false, pin: '', file: null}); setPreviewUrl(null); }}
-                                    className="flex-1 py-4 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-300 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    onClick={submitSecureImageUpdate}
-                                    disabled={pinModal.pin.length < 4 || uploadingImage}
-                                    className="flex-1 py-4 bg-purple-600 text-white font-bold rounded-xl shadow-lg hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center justify-center"
-                                >
-                                    {uploadingImage ? <Loader2 className="animate-spin" size={20} /> : "Verify & Save"}
-                                </button>
+                                <div className="flex gap-3 pt-2">
+                                    <button 
+                                        onClick={() => { setPinModal({show: false, pin: '', file: null}); setPreviewUrl(null); }}
+                                        className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-bold rounded-2xl hover:bg-gray-200 transition-all"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        onClick={confirmImageUpdate}
+                                        disabled={pinModal.pin.length < 4 || uploadingImage}
+                                        className="flex-2 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-2xl hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed px-8"
+                                    >
+                                        {uploadingImage ? <Loader2 className="animate-spin" size={20} /> : "Authorize & Save"}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -951,123 +956,6 @@ export default function StudentVerification() {
                         </div>
                     </div>
                 )}
-            </div>
-
-            <style>{`
-                @keyframes float {
-                    0%, 100% { transform: translateY(0px) translateX(0px); }
-                    50% { transform: translateY(-20px) translateX(10px); }
-                }
-                
-                @keyframes slide {
-                    0% { transform: translateX(0); }
-                    100% { transform: translateX(60px); }
-                }
-                
-                @keyframes card-flip {
-                    0% { 
-                        opacity: 0;
-                        transform: perspective(1000px) rotateY(-15deg) scale(0.9);
-                    }
-                    100% { 
-                        opacity: 1;
-                        transform: perspective(1000px) rotateY(0deg) scale(1);
-                    }
-                }
-                
-                @keyframes shake {
-                    0%, 100% { transform: translateX(0); }
-                    25% { transform: translateX(-10px); }
-                    75% { transform: translateX(10px); }
-                }
-
-                @keyframes scan-line {
-                    0% { top: 0; }
-                    100% { top: 100%; }
-                }
-                
-                .animate-float {
-                    animation: float linear infinite;
-                }
-                
-                .animate-slide {
-                    animation: slide 20s linear infinite;
-                }
-                
-                .animate-card-flip {
-                    animation: card-flip 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
-                }
-                
-                .animate-shake {
-                    animation: shake 0.5s;
-                }
-
-                .animate-scan-line {
-                    animation: scan-line 2s ease-in-out infinite;
-                }
-                
-                .perspective-1000 {
-                    perspective: 1000px;
-                }
-
-                .preserve-3d {
-                    transform-style: preserve-3d;
-                }
-
-                .backface-hidden {
-                    backface-visibility: hidden;
-                    -webkit-backface-visibility: hidden;
-                }
-
-                .rotate-y-180 {
-                    transform: rotateY(180deg);
-                }
-            `}</style>
-        </div>
-    )
-}
-
-// Sub-components for high-resolution printing (Matching the requested premium design)
-function PrintableIDCardFront({ student, companySettings }: any) {
-    return (
-        <div 
-            className="w-[1011px] h-[638px] bg-white overflow-hidden relative"
-            style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
-        >
-            {/* Header */}
-            <div className="h-[150px] bg-gradient-to-r from-purple-700 to-indigo-800 flex items-center px-12 justify-between">
-                <div className="flex items-center gap-6">
-                    <div className="w-24 h-24 bg-white rounded-2xl p-2 shadow-xl">
-                        <img src={companySettings.logo_url || "/logo.png"} className="w-full h-full object-contain" />
-                    </div>
-                    <div className="text-white">
-                        <h2 className="text-[32px] font-black uppercase tracking-tight leading-none">{companySettings.company_name}</h2>
-                        <p className="text-[18px] font-bold opacity-80 tracking-[0.3em] mt-2">OFFICIAL STUDENT ID CARD</p>
-                    </div>
-                </div>
-                <div className="text-white text-[20px] font-black border-2 border-white/30 px-6 py-2 rounded-xl bg-white/10 uppercase tracking-widest flex items-center gap-2">
-                    <CheckCircle size={24} className="text-green-400" />
-                    Verified
-                </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-12 flex gap-12 items-start">
-                <div className="w-[320px] h-[380px] bg-gray-100 rounded-[40px] overflow-hidden border-8 border-gray-50 shadow-2xl shrink-0">
-                    {student.profile_image ? (
-                        <img src={student.profile_image} className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-300"><User size={120} /></div>
-                    )}
-                </div>
-                <div className="flex-1 pt-4">
-                    <h3 className="text-indigo-950 text-[56px] font-black leading-tight break-words uppercase tracking-tighter">{student.full_name}</h3>
-                    <p className="text-purple-600 text-[42px] font-black mt-2 tracking-wider">{student.admission_number}</p>
-                    
-                    <div className="mt-12 space-y-6">
-                        <div className="bg-purple-50 p-6 rounded-3xl border border-purple-100">
-                            <p className="text-[16px] text-purple-400 font-black uppercase tracking-widest mb-1">School/Department</p>
-                            <p className="text-[28px] font-black text-gray-900">{student.school || 'General Studies'}</p>
                         </div>
                         <div className="flex justify-between items-end gap-6">
                             <div className="flex-1 bg-green-50 p-6 rounded-3xl border border-green-100">
