@@ -335,62 +335,71 @@ export default function IDPrinting() {
     )
 }
 
-// Sub-components for actual ID rendering (High Resolution)
+// Sub-components for actual ID rendering (High Resolution Professional Design)
 function IDCardFront({ student, companySettings }: any) {
     return (
         <div 
             id={`id-card-front-${student.id}`}
-            className="w-[340px] h-[216px] bg-white rounded-[15px] overflow-hidden relative shadow-2xl"
-            style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
+            className="w-[340px] h-[216px] bg-white border border-gray-200 shadow-xl relative overflow-hidden"
+            style={{ fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
         >
-            {/* Header */}
-            <div className="h-[60px] bg-gradient-to-r from-purple-700 to-indigo-800 flex items-center px-4 justify-between">
-                <div className="flex items-center gap-2">
-                    <div className="w-10 h-10 bg-white rounded-lg p-1">
-                        <img src={companySettings.logo_url || "/logo.png"} className="w-full h-full object-contain" />
-                    </div>
-                    <div className="text-white">
-                        <h2 className="text-[12px] font-black uppercase tracking-tight leading-none">{companySettings.company_name}</h2>
-                        <p className="text-[7px] font-bold opacity-80 tracking-widest mt-0.5">OFFICIAL STUDENT ID</p>
+            {/* Top Security Bar */}
+            <div className="h-2 bg-indigo-900 w-full"></div>
+            
+            {/* Main Header */}
+            <div className="h-[55px] bg-white border-b border-gray-100 flex items-center px-4 justify-between">
+                <div className="flex items-center gap-3">
+                    <img src={companySettings.logo_url || "/logo.png"} className="h-10 w-auto object-contain" />
+                    <div className="h-8 w-[1px] bg-gray-200"></div>
+                    <div>
+                        <h2 className="text-[11px] font-black text-indigo-900 uppercase leading-none tracking-tight">{companySettings.company_name}</h2>
+                        <p className="text-[8px] font-bold text-gray-500 uppercase mt-0.5 tracking-widest">Student Identity Card</p>
                     </div>
                 </div>
-                <div className="text-white text-[8px] font-black border border-white/30 px-2 py-1 rounded bg-white/10 uppercase">Verified</div>
+                <div className="text-[7px] font-black text-indigo-900 border-2 border-indigo-900 px-2 py-0.5 rounded-sm uppercase tracking-tighter italic">Official</div>
             </div>
 
-            {/* Content */}
-            <div className="p-4 flex gap-4">
-                <div className="w-[100px] h-[120px] bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-100 shadow-sm">
+            {/* Body Content */}
+            <div className="p-3 flex gap-4">
+                <div className="w-[105px] h-[125px] bg-gray-50 border-2 border-gray-200 rounded-sm overflow-hidden shadow-sm relative">
                     {student.profile_image ? (
                         <img src={student.profile_image} className="w-full h-full object-cover" />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-300"><User size={40} /></div>
+                        <div className="w-full h-full flex items-center justify-center text-gray-200"><User size={48} /></div>
                     )}
                 </div>
                 <div className="flex-1 pt-1">
-                    <h3 className="text-indigo-900 text-[18px] font-black leading-tight break-words">{student.full_name.toUpperCase()}</h3>
-                    <p className="text-purple-600 text-[14px] font-black mt-1">{student.admission_number}</p>
+                    <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest mb-1">Full Name</p>
+                    <h3 className="text-gray-900 text-[16px] font-black leading-tight uppercase mb-3 border-b border-gray-100 pb-1">{student.full_name}</h3>
                     
-                    <div className="mt-4 space-y-2">
+                    <div className="grid grid-cols-2 gap-2 mt-2">
                         <div>
-                            <p className="text-[7px] text-gray-400 font-bold uppercase">School/Dept</p>
-                            <p className="text-[10px] font-bold text-gray-800">{student.school || 'General Studies'}</p>
+                            <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Admission No.</p>
+                            <p className="text-[12px] font-black text-indigo-900 tracking-tight">{student.admission_number}</p>
                         </div>
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <p className="text-[7px] text-gray-400 font-bold uppercase">Status</p>
-                                <p className="text-[9px] font-black text-green-600">ACTIVE</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[7px] text-gray-400 font-bold uppercase">Expiry</p>
-                                <p className="text-[9px] font-bold text-gray-800">DEC 2026</p>
-                            </div>
+                        <div>
+                            <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest mb-0.5">School / Dept.</p>
+                            <p className="text-[9px] font-bold text-gray-800 uppercase leading-none">{student.school || 'Academics'}</p>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-2">
+                        <div>
+                            <p className="text-[7px] font-black text-green-600 uppercase tracking-widest">Status: ACTIVE</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Valid Thru: 2026</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Footer Accent */}
-            <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
+            {/* Bottom Security Element */}
+            <div className="absolute bottom-0 left-0 w-full h-[6px] flex">
+                <div className="flex-1 bg-indigo-900"></div>
+                <div className="flex-1 bg-purple-700"></div>
+                <div className="flex-1 bg-indigo-900"></div>
+            </div>
         </div>
     )
 }
@@ -399,18 +408,18 @@ function IDCardBack({ student, companySettings }: any) {
     return (
         <div 
             id={`id-card-back-${student.id}`}
-            className="w-[340px] h-[216px] bg-white rounded-[15px] overflow-hidden relative shadow-2xl flex flex-col items-center justify-center"
-            style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
+            className="w-[340px] h-[216px] bg-white border border-gray-200 shadow-xl relative overflow-hidden flex flex-col items-center pt-8"
+            style={{ fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
         >
-            <div className="absolute top-4 left-0 w-full text-center">
-                <h4 className="text-[12px] font-black text-gray-800 uppercase tracking-[0.2em]">Security Authorization</h4>
-                <p className="text-[8px] text-gray-400 font-medium">Valid only within the university premises</p>
-            </div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-indigo-900"></div>
+            
+            <h4 className="text-[11px] font-black text-gray-800 uppercase tracking-[0.25em] mb-1">Security & Access Control</h4>
+            <p className="text-[7px] text-gray-400 font-bold uppercase mb-4">Verification Required for Campus Entry</p>
 
-            <div className="p-3 bg-white rounded-2xl shadow-inner border border-gray-100">
+            <div className="p-2 bg-white border-2 border-gray-100 shadow-sm rounded-sm">
                 <QRCodeSVG 
                     value={student.admission_number} 
-                    size={110} 
+                    size={105} 
                     level="H" 
                     imageSettings={{
                         src: companySettings.logo_url || "/logo.png",
@@ -421,14 +430,18 @@ function IDCardBack({ student, companySettings }: any) {
                 />
             </div>
 
-            <div className="mt-3 text-center">
-                <p className="text-[12px] font-black text-purple-600 tracking-wider">{student.admission_number}</p>
-                <p className="text-[6px] text-gray-400 mt-1 uppercase max-w-[200px]">This card remains property of the university. If found, please return to the nearest security office.</p>
+            <div className="mt-3 text-center px-8">
+                <p className="text-[11px] font-black text-indigo-900 tracking-[0.1em]">{student.admission_number}</p>
+                <p className="text-[6px] text-gray-400 mt-2 font-bold uppercase leading-tight">
+                    This card is the property of the university. If found, please return it to the University Security Office or nearest Police Station.
+                </p>
             </div>
 
-            <div className="absolute bottom-4 right-6 opacity-30">
-                <img src={companySettings.logo_url || "/logo.png"} className="w-12 h-12 object-contain grayscale" />
+            <div className="absolute bottom-3 right-4 opacity-10">
+                <img src={companySettings.logo_url || "/logo.png"} className="w-16 h-16 object-contain grayscale" />
             </div>
+            
+            <div className="absolute bottom-0 left-0 w-full h-1 bg-indigo-900"></div>
         </div>
     )
 }
