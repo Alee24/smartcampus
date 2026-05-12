@@ -21,5 +21,5 @@ RUN mkdir -p static/profiles uploads
 
 EXPOSE 8000
 
-# Standard worker for better stability on varied environments
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--timeout-keep-alive", "60"]
+# Standard worker with extended timeouts for massive bulk uploads
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--timeout-keep-alive", "3600", "--timeout-graceful-shutdown", "3600"]

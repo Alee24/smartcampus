@@ -836,22 +836,15 @@ async def bulk_upload_photos(
             raise HTTPException(status_code=400, detail=f"Invalid CSV file: {str(e)}")
 
     # 2. Process ZIP
-    if not zip_file.filename.endswith('.zip'):
-        raise HTTPException(status_code=400, detail="File must be a ZIP archive")
-        
-    temp_dir = Path("temp_uploads")
-    temp_dir.mkdir(exist_ok=True)
-    zip_path = temp_dir / f"photos_{uuid.uuid4()}.zip"
-    
     try:
-        with open(zip_path, "wb") as buffer:
-            shutil.copyfileobj(zip_file.file, buffer)
-            
+        # Stream ZIP directly from the upload file object to save disk space
+        zip_ref_io = io.BytesIO(await zip_file.read())
+        
         success_count = 0
         failed_count = 0
         errors = []
         
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_ref_io, 'r') as zip_ref:
             # List files (ignoring __MACOSX)
             files = [f for f in zip_ref.namelist() if not f.startswith('__MACOSX') and not f.endswith('/')]
             
@@ -942,11 +935,6 @@ async def bulk_upload_photos(
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Bulk photo upload failed: {str(e)}")
-    finally:
-        if zip_path.exists():
-            os.remove(zip_path)
-        if csv_path and csv_path.exists():
-            os.remove(csv_path)
             
     return {
         "status": "success", 
