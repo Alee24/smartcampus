@@ -3,6 +3,8 @@ import { useNotification } from './components/Notification'
 import { Search, CheckCircle, XCircle, Shield, Calendar, User, Building, Sparkles, UploadCloud, Loader2, Camera, QrCode, LogIn, LogOut, RefreshCcw, Printer, AlertTriangle } from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { QRCodeSVG } from 'qrcode.react'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 
 export default function StudentVerification() {
     const { showNotification } = useNotification()
@@ -30,7 +32,9 @@ export default function StudentVerification() {
     const [saveLoading, setSaveLoading] = useState(false)
     const [rotation, setRotation] = useState(0)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+    const [isPrinting, setIsPrinting] = useState(false)
     const qrScannerRef = useRef<Html5Qrcode | null>(null)
+    const printRef = useRef<HTMLDivElement>(null)
 
     // Fetch current user and company settings on mount
     useEffect(() => {
@@ -218,6 +222,56 @@ export default function StudentVerification() {
             alert('Network error updating status')
         } finally {
             setStatusUpdating(false)
+        }
+    }
+
+    const handlePrint = async () => {
+        if (!result) return
+        setIsPrinting(true)
+        showNotification('Generating high-resolution ID card...', 'info', 'info')
+        
+        try {
+            const front = document.getElementById(`printable-front-${result.id}`)
+            const back = document.getElementById(`printable-back-${result.id}`)
+            
+            if (!front || !back) {
+                showNotification('Error: Printable elements not found', 'error', 'error')
+                return
+            }
+
+            // Capture Front and Back
+            const canvasFront = await html2canvas(front, { scale: 3, useCORS: true, backgroundColor: null })
+            const canvasBack = await html2canvas(back, { scale: 3, useCORS: true, backgroundColor: null })
+            
+            const pdf = new jsPDF('p', 'mm', 'a4')
+            const margin = 20
+            const cardWidth = 85.6 // Standard ID card size in mm
+            const cardHeight = 53.98
+            
+            // Add Front
+            pdf.setFontSize(10)
+            pdf.text("Student ID Card (Front)", margin, margin - 5)
+            pdf.addImage(canvasFront.toDataURL('image/png'), 'PNG', margin, margin, cardWidth, cardHeight)
+            
+            // Add Back
+            pdf.text("Student ID Card (Back)", margin, margin + cardHeight + 15)
+            pdf.addImage(canvasBack.toDataURL('image/png'), 'PNG', margin, margin + cardHeight + 20, cardWidth, cardHeight)
+            
+            // Add Instructions
+            pdf.setFontSize(8)
+            pdf.setTextColor(150)
+            pdf.text("Instructions:", margin, margin + (cardHeight * 2) + 35)
+            pdf.text("1. Print this document on high-quality A4 cardstock.", margin, margin + (cardHeight * 2) + 40)
+            pdf.text("2. Cut along the card edges.", margin, margin + (cardHeight * 2) + 45)
+            pdf.text("3. Fold and laminate for durability.", margin, margin + (cardHeight * 2) + 50)
+            
+            pdf.save(`ID_Card_${result.admission_number}.pdf`)
+            showNotification('ID Card downloaded successfully!', 'success', 'success')
+        } catch (e) {
+            console.error(e)
+            showNotification('Failed to generate PDF', 'error', 'error')
+        } finally {
+            setIsPrinting(false)
         }
     }
 
@@ -568,10 +622,11 @@ export default function StudentVerification() {
                                 )}
                                 
                                 <button 
-                                    onClick={() => showNotification('Printing student ID...', 'info')}
-                                    className="flex items-center justify-center gap-2 py-4 px-6 bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-slate-200 rounded-2xl font-bold border border-slate-200 dark:border-gray-700 hover:bg-slate-200 transition-all"
+                                    onClick={handlePrint}
+                                    disabled={isPrinting}
+                                    className="flex items-center justify-center gap-2 py-4 px-6 bg-slate-100 dark:bg-gray-800 text-slate-700 dark:text-slate-200 rounded-2xl font-bold border border-slate-200 dark:border-gray-700 hover:bg-slate-200 transition-all disabled:opacity-50"
                                 >
-                                    <Printer size={20} />
+                                    {isPrinting ? <Loader2 className="animate-spin" size={20} /> : <Printer size={20} />}
                                     <span className="hidden sm:inline">Print ID</span>
                                 </button>
 
@@ -647,213 +702,166 @@ export default function StudentVerification() {
 
                                     {/* Card Content with 3D Flip */}
                                     <div 
-                                        className={`relative transition-all duration-700 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}
+                                        className={`relative transition-all duration-700 preserve-3d min-h-[450px] ${isFlipped ? 'rotate-y-180' : ''}`}
                                         style={{ transformStyle: 'preserve-3d' }}
                                     >
                                         {/* Front Side */}
-                                        <div className="backface-hidden w-full h-full">
-                                            <div className="p-6">
-                                                <div className="flex flex-col md:flex-row gap-6 items-center md:items-start text-center md:text-left">
-                                                    {/* Left: Large Photo */}
-                                                    <div className="flex-shrink-0">
-                                                        <div className="relative group">
-                                                            {/* Photo Glow */}
-                                                            <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-pink-500 rounded-3xl blur-xl opacity-50 group-hover:opacity-75 transition-opacity"></div>
-
-                                                    {/* Photo Frame - Large */}
-                                                    <div className="relative w-72 h-80 rounded-3xl overflow-hidden border-4 border-white shadow-2xl transform group-hover:scale-105 transition-transform bg-slate-200">
-                                                        {result.profile_image ? (
-                                                            <img
-                                                                src={result.profile_image.startsWith('http') ? result.profile_image : result.profile_image}
-                                                                alt={result.full_name}
-                                                                className="w-full h-full object-cover"
-                                                                onError={(e: any) => {
-                                                                    // Fallback if image fails
-                                                                    e.target.src = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
-                                                                }}
-                                                            />
-                                                        ) : (
-                                                            <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-400 flex flex-col items-center justify-center p-4">
-                                                                <User size={100} className="text-white opacity-50" />
-                                                            </div>
-                                                        )}
-                                                        
-                                                            {uploadingImage && (
-                                                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                                                    <Loader2 className="text-white animate-spin" size={48} />
-                                                                </div>
-                                                            )}
-
-                                                            {/* Upload Button ONTO the image */}
-                                                            {canEdit && (
-                                                                <label className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-md text-white py-4 font-black cursor-pointer hover:bg-black/60 transition-all flex items-center justify-center gap-3 group/btn border-t border-white/20">
-                                                                    <div className="bg-white/20 p-2 rounded-full group-hover/btn:scale-110 transition-transform">
-                                                                        <Camera size={20} />
-                                                                    </div>
-                                                                    <span className="tracking-widest text-xs uppercase">{result.profile_image ? "Update Photo" : "Upload Photo"}</span>
-                                                                    <input 
-                                                                        type="file" 
-                                                                        accept="image/*" 
-                                                                        className="hidden" 
-                                                                        onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} 
-                                                                    />
-                                                                </label>
-                                                            )}
+                                        <div className="absolute inset-0 backface-hidden bg-white dark:bg-gray-800 flex flex-col">
+                                            {/* Header */}
+                                            <div className="relative h-20 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 overflow-hidden shrink-0">
+                                                <div className="absolute inset-0 opacity-20">
+                                                    <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] animate-slide"></div>
+                                                </div>
+                                                <div className="relative h-full flex items-center justify-between px-6">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-14 h-14 bg-white rounded-xl p-1 shadow-inner flex items-center justify-center overflow-hidden">
+                                                            <img src={companySettings.logo_url || "/logo.png"} alt="Logo" className="w-full h-full object-contain" />
                                                         </div>
-
-
-
+                                                        <div className="text-white text-left">
+                                                            <h2 className="text-xl font-black tracking-tight leading-none">{companySettings.company_name?.toUpperCase()}</h2>
+                                                            <p className="text-purple-100 font-bold text-[10px] mt-0.5 tracking-widest">OFFICIAL STUDENT ID CARD</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white/20 backdrop-blur-md rounded-xl px-4 py-2 border border-white/30">
+                                                        <div className="flex items-center gap-1 text-white">
+                                                            <CheckCircle className="text-green-300" size={16} />
+                                                            <span className="font-bold text-sm">VERIFIED</span>
+                                                        </div>
                                                     </div>
                                                 </div>
+                                            </div>
 
-                                                {/* Right: Details Section */}
-                                            <div className="flex-1 space-y-4 w-full">
-                                                {/* Name & ID */}
-                                                <div>
-                                                    {isEditing ? (
-                                                        <input 
-                                                            type="text"
-                                                            value={editData.full_name}
-                                                            onChange={(e) => setEditData({ ...editData, full_name: e.target.value })}
-                                                            className="text-3xl md:text-4xl font-black bg-white/50 dark:bg-gray-800/50 rounded-lg px-2 py-1 w-full border border-purple-300 focus:outline-none"
-                                                        />
+                                            {/* Body */}
+                                            <div className="p-6 flex flex-col md:flex-row gap-6 items-center md:items-start flex-1">
+                                                <div className="relative w-48 h-56 md:w-56 md:h-64 rounded-3xl overflow-hidden border-4 border-white shadow-2xl bg-slate-200 shrink-0">
+                                                    {result.profile_image ? (
+                                                        <img src={result.profile_image} alt={result.full_name} className="w-full h-full object-cover" />
                                                     ) : (
-                                                        <h3 className="text-3xl md:text-4xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-1 break-words">
+                                                        <div className="w-full h-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center">
+                                                            <User size={60} className="text-white opacity-50" />
+                                                        </div>
+                                                    )}
+                                                    {canEdit && (
+                                                        <label className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-md text-white py-3 font-black cursor-pointer hover:bg-black/60 transition-all flex items-center justify-center gap-2 border-t border-white/20">
+                                                            <Camera size={16} />
+                                                            <span className="text-[10px] uppercase">Update Photo</span>
+                                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
+                                                        </label>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex-1 space-y-4 w-full text-left">
+                                                    <div>
+                                                        <h3 className="text-3xl md:text-4xl font-black bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent break-words">
                                                             {result.full_name}
                                                         </h3>
-                                                    )}
-                                                    <p className="text-xl md:text-2xl font-bold text-purple-600">
-                                                        {result.admission_number}
-                                                    </p>
-                                                </div>
-
-                                                {/* Info Grid - Compact */}
-                                                <div className="grid grid-cols-1 gap-3">
-                                                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-700 relative">
-                                                        <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400 mb-1">
-                                                            <Building size={18} />
-                                                            <span className="text-xs font-bold uppercase">School/Department</span>
-                                                        </div>
-                                                        {isEditing ? (
-                                                            <input 
-                                                                type="text"
-                                                                value={editData.school}
-                                                                onChange={(e) => setEditData({ ...editData, school: e.target.value })}
-                                                                className="font-bold text-xl bg-white/50 dark:bg-gray-800/50 rounded-lg px-2 py-1 w-full border border-purple-200 focus:outline-none"
-                                                            />
-                                                        ) : (
-                                                            <p className="font-bold text-xl">{result.school || 'N/A'}</p>
-                                                        )}
+                                                        <p className="text-xl font-bold text-purple-600 mt-1">{result.admission_number}</p>
                                                     </div>
-
-                                                    <div className="bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-700">
-                                                        <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
-                                                            <Shield size={18} />
-                                                            <span className="text-xs font-bold uppercase">Account Status</span>
+                                                    <div className="grid grid-cols-1 gap-2">
+                                                        <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-xl border border-purple-100 dark:border-purple-800">
+                                                            <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest block mb-1">School/Department</span>
+                                                            <p className="font-bold text-gray-800 dark:text-gray-200">{result.school || 'General Studies'}</p>
                                                         </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className={`w-3 h-3 rounded-full ${['Active', 'Registered'].includes(result.status) || result.status === 'active' ? 'bg-green-500 animate-pulse' : result.status === 'Suspended' ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
-                                                            {currentUser && currentUser.role === 'SuperAdmin' ? (
-                                                                <select 
-                                                                    value={result.status || 'Active'}
-                                                                    onChange={(e) => handleStatusUpdate(e.target.value)}
-                                                                    disabled={statusUpdating}
-                                                                    className="bg-transparent font-bold text-xl capitalize focus:outline-none cursor-pointer border-b border-blue-200"
-                                                                >
-                                                                    {statusOptions.map(opt => (
-                                                                        <option key={opt} value={opt} className="text-black">{opt}</option>
-                                                                    ))}
-                                                                </select>
-                                                            ) : (
-                                                                <p className="font-bold text-xl capitalize">{result.status || 'Active'}</p>
-                                                            )}
-                                                            {statusUpdating && <Loader2 size={16} className="animate-spin text-blue-600" />}
+                                                        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-800 flex justify-between items-center">
+                                                            <div>
+                                                                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-1">Status</span>
+                                                                <p className="font-bold text-green-600 uppercase">ACTIVE</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest block mb-1">Expiry Date</span>
+                                                                <p className="font-bold text-gray-800 dark:text-gray-200">DEC 2026</p>
+                                                            </div>
                                                         </div>
-                                                    </div>
-
-                                                    <div className="bg-gradient-to-br from-pink-50 to-purple-50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-xl p-4 border border-pink-200 dark:border-pink-700">
-                                                        <div className="flex items-center gap-2 text-pink-600 dark:text-pink-400 mb-1">
-                                                            <Calendar size={18} />
-                                                            <span className="text-xs font-bold uppercase">Last Accessed</span>
-                                                        </div>
-                                                        <p className="font-bold text-xl">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                                                    </div>
                                                     </div>
                                                 </div>
+                                            </div>
 
-                                                {/* Edit Toggle / Save Button */}
-                                                {canEdit && isEditing && (
-                                                    <div className="mt-4 flex gap-2">
-                                                        <button 
-                                                            onClick={handleSaveEdits}
-                                                            disabled={saveLoading}
-                                                            className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
-                                                        >
-                                                            {saveLoading ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />}
-                                                            Save Changes
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => { setIsEditing(false); setEditData({ full_name: result.full_name, school: result.school }); }}
-                                                            className="px-4 py-3 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold transition-all"
-                                                        >
-                                                            Cancel
-                                                        </button>
+                                            {/* Footer */}
+                                            <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 px-6 py-3 mt-auto shrink-0">
+                                                <div className="flex justify-between items-center text-white">
+                                                    <p className="text-[10px] font-medium">© 2026 {companySettings.company_name}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                                                        <span className="text-[10px] font-black uppercase tracking-wider">Verified & Active</span>
                                                     </div>
-                                                )}
-
-                                                {/* Action buttons removed from inside the card */}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Back Side - QR Code */}
+                                        {/* Back Side */}
                                         <div 
-                                            className="absolute inset-0 backface-hidden rotate-y-180 bg-white dark:bg-gray-800 p-8 flex flex-col items-center justify-center"
+                                            className="absolute inset-0 backface-hidden rotate-y-180 bg-white dark:bg-gray-800 flex flex-col"
                                             style={{ transform: 'rotateY(180deg)', backfaceVisibility: 'hidden' }}
                                         >
-                                        <div className="text-center mb-6">
-                                            <h4 className="text-xl font-bold text-gray-800 dark:text-white uppercase tracking-widest">Digital Identity Token</h4>
-                                            <p className="text-gray-500 text-xs">Scan to verify at any checkpoint</p>
-                                        </div>
-                                        
-                                        <div className="p-4 bg-white rounded-3xl shadow-inner border-2 border-purple-100 flex items-center justify-center">
-                                            <QRCodeSVG 
-                                                value={result.admission_number} 
-                                                size={220} 
-                                                level="H"
-                                                includeMargin={true}
-                                                imageSettings={{
-                                                    src: companySettings.logo_url || "/logo.png",
-                                                    x: undefined,
-                                                    y: undefined,
-                                                    height: 40,
-                                                    width: 40,
-                                                    excavate: true,
-                                                }}
-                                            />
-                                        </div>
-                                        
-                                        <div className="mt-8 text-center">
-                                            <p className="text-2xl font-black text-purple-600 tracking-wider">{result.admission_number}</p>
-                                            <p className="text-[10px] text-gray-400 mt-2 uppercase">Official Gatepass Authentication System</p>
-                                        </div>
+                                            {/* Header */}
+                                            <div className="relative h-20 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 shrink-0">
+                                                <div className="relative h-full flex items-center justify-between px-6">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-14 h-14 bg-white rounded-xl p-1 flex items-center justify-center">
+                                                            <img src={companySettings.logo_url || "/logo.png"} alt="Logo" className="w-full h-full object-contain" />
+                                                        </div>
+                                                        <div className="text-white text-left">
+                                                            <h2 className="text-xl font-black tracking-tight leading-none">{companySettings.company_name?.toUpperCase()}</h2>
+                                                            <p className="text-purple-100 font-bold text-[10px] mt-0.5 tracking-widest">OFFICIAL STUDENT ID CARD</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-white/20 backdrop-blur-md rounded-xl px-4 py-2 border border-white/30">
+                                                        <div className="flex items-center gap-1 text-white">
+                                                            <CheckCircle className="text-green-300" size={16} />
+                                                            <span className="font-bold text-sm">VERIFIED</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
 
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); setIsFlipped(false); }}
-                                            className="mt-6 flex items-center gap-2 text-purple-600 font-bold hover:bg-purple-50 px-4 py-2 rounded-xl transition-colors"
-                                        >
-                                            <RefreshCcw size={16} /> Flip to Front
-                                        </button>
-                                    </div>
-                                </div>
+                                            {/* Body */}
+                                            <div className="flex-1 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+                                                <div className="text-center mb-6 z-10">
+                                                    <h4 className="text-2xl font-black text-gray-800 dark:text-white uppercase tracking-tight mb-1">Digital Identity Token</h4>
+                                                    <p className="text-gray-400 text-sm font-medium">Scan to verify at any checkpoint</p>
+                                                </div>
+                                                
+                                                <div className="p-4 bg-white rounded-3xl shadow-2xl border-4 border-purple-50 flex items-center justify-center relative z-10">
+                                                    <div className="absolute -inset-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-[2.5rem] blur-xl opacity-50"></div>
+                                                    <div className="relative bg-white p-2 rounded-2xl">
+                                                        <QRCodeSVG 
+                                                            value={result.admission_number} 
+                                                            size={180} 
+                                                            level="H"
+                                                            includeMargin={true}
+                                                            imageSettings={{
+                                                                src: companySettings.logo_url || "/logo.png",
+                                                                height: 30,
+                                                                width: 30,
+                                                                excavate: true,
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="mt-6 text-center z-10">
+                                                    <p className="text-3xl font-black text-purple-600 tracking-wider">{result.admission_number}</p>
+                                                    <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest opacity-60">Official Gatepass Authentication System</p>
+                                                </div>
 
-                                    {/* Card Footer - Compact */}
-                                    <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 px-6 py-3">
-                                        <div className="flex justify-between items-center text-white">
-                                            <p className="text-xs font-medium">© 2026 Riara University</p>
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                                                <span className="text-xs font-bold">VERIFIED & ACTIVE</span>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setIsFlipped(false); }}
+                                                    className="mt-6 flex items-center gap-2 text-purple-600 font-bold hover:bg-purple-50 px-4 py-2 rounded-xl transition-colors z-10"
+                                                >
+                                                    <RefreshCcw size={16} /> Flip to Front
+                                                </button>
+                                            </div>
+
+                                            {/* Footer */}
+                                            <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 px-6 py-3 shrink-0">
+                                                <div className="flex justify-between items-center text-white">
+                                                    <p className="text-[10px] font-medium">© 2026 {companySettings.company_name}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                                        <span className="text-[10px] font-black uppercase tracking-wider">Verified & Active</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -933,6 +941,18 @@ export default function StudentVerification() {
                         </div>
                     </div>
                 )}
+
+                {/* Hidden Real Card Renderers for High-Res Capturing */}
+                {result && !result.error && (
+                    <div className="fixed -left-[5000px] top-0 pointer-events-none">
+                        <div id={`printable-front-${result.id}`}>
+                            <PrintableIDCardFront student={result} companySettings={companySettings} />
+                        </div>
+                        <div id={`printable-back-${result.id}`}>
+                            <PrintableIDCardBack student={result} companySettings={companySettings} />
+                        </div>
+                    </div>
+                )}
             </div>
 
             <style>{`
@@ -1005,6 +1025,121 @@ export default function StudentVerification() {
                     transform: rotateY(180deg);
                 }
             `}</style>
+        </div>
+    )
+}
+
+// Sub-components for high-resolution printing (Matching the requested premium design)
+function PrintableIDCardFront({ student, companySettings }: any) {
+    return (
+        <div 
+            className="w-[1011px] h-[638px] bg-white overflow-hidden relative"
+            style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
+        >
+            {/* Header */}
+            <div className="h-[150px] bg-gradient-to-r from-purple-700 to-indigo-800 flex items-center px-12 justify-between">
+                <div className="flex items-center gap-6">
+                    <div className="w-24 h-24 bg-white rounded-2xl p-2 shadow-xl">
+                        <img src={companySettings.logo_url || "/logo.png"} className="w-full h-full object-contain" />
+                    </div>
+                    <div className="text-white">
+                        <h2 className="text-[32px] font-black uppercase tracking-tight leading-none">{companySettings.company_name}</h2>
+                        <p className="text-[18px] font-bold opacity-80 tracking-[0.3em] mt-2">OFFICIAL STUDENT ID CARD</p>
+                    </div>
+                </div>
+                <div className="text-white text-[20px] font-black border-2 border-white/30 px-6 py-2 rounded-xl bg-white/10 uppercase tracking-widest flex items-center gap-2">
+                    <CheckCircle size={24} className="text-green-400" />
+                    Verified
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-12 flex gap-12 items-start">
+                <div className="w-[320px] h-[380px] bg-gray-100 rounded-[40px] overflow-hidden border-8 border-gray-50 shadow-2xl shrink-0">
+                    {student.profile_image ? (
+                        <img src={student.profile_image} className="w-full h-full object-cover" />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-300"><User size={120} /></div>
+                    )}
+                </div>
+                <div className="flex-1 pt-4">
+                    <h3 className="text-indigo-950 text-[56px] font-black leading-tight break-words uppercase tracking-tighter">{student.full_name}</h3>
+                    <p className="text-purple-600 text-[42px] font-black mt-2 tracking-wider">{student.admission_number}</p>
+                    
+                    <div className="mt-12 space-y-6">
+                        <div className="bg-purple-50 p-6 rounded-3xl border border-purple-100">
+                            <p className="text-[16px] text-purple-400 font-black uppercase tracking-widest mb-1">School/Department</p>
+                            <p className="text-[28px] font-black text-gray-900">{student.school || 'General Studies'}</p>
+                        </div>
+                        <div className="flex justify-between items-end gap-6">
+                            <div className="flex-1 bg-green-50 p-6 rounded-3xl border border-green-100">
+                                <p className="text-[16px] text-green-500 font-black uppercase tracking-widest mb-1">Status</p>
+                                <p className="text-[24px] font-black text-green-700">ACTIVE & VERIFIED</p>
+                            </div>
+                            <div className="flex-1 bg-blue-50 p-6 rounded-3xl border border-blue-100">
+                                <p className="text-[16px] text-blue-500 font-black uppercase tracking-widest mb-1">Expiry</p>
+                                <p className="text-[24px] font-black text-gray-900">DECEMBER 2026</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Footer Accent */}
+            <div className="absolute bottom-0 left-0 w-full h-4 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
+        </div>
+    )
+}
+
+function PrintableIDCardBack({ student, companySettings }: any) {
+    return (
+        <div 
+            className="w-[1011px] h-[638px] bg-white overflow-hidden relative flex flex-col"
+            style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
+        >
+             {/* Header */}
+             <div className="h-[150px] bg-gradient-to-r from-purple-700 to-indigo-800 flex items-center px-12 justify-between">
+                <div className="flex items-center gap-6">
+                    <div className="w-24 h-24 bg-white rounded-2xl p-2">
+                        <img src={companySettings.logo_url || "/logo.png"} className="w-full h-full object-contain" />
+                    </div>
+                    <div className="text-white">
+                        <h2 className="text-[32px] font-black uppercase tracking-tight leading-none">{companySettings.company_name}</h2>
+                        <p className="text-[18px] font-bold opacity-80 tracking-[0.3em] mt-2">OFFICIAL STUDENT ID CARD</p>
+                    </div>
+                </div>
+                <div className="bg-white/20 backdrop-blur-md rounded-xl px-6 py-2 border border-white/30 text-white font-bold text-xl uppercase tracking-widest">
+                    Verified
+                </div>
+            </div>
+
+            <div className="flex-1 flex flex-col items-center justify-center p-12">
+                <div className="text-center mb-10">
+                    <h4 className="text-[42px] font-black text-gray-900 uppercase tracking-tight leading-none">Digital Identity Token</h4>
+                    <p className="text-[20px] text-gray-500 font-bold mt-2 tracking-widest">SCAN TO VERIFY AT ANY CHECKPOINT</p>
+                </div>
+
+                <div className="p-8 bg-white rounded-[60px] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border-[12px] border-purple-50">
+                    <QRCodeSVG 
+                        value={student.admission_number} 
+                        size={280} 
+                        level="H" 
+                        imageSettings={{
+                            src: companySettings.logo_url || "/logo.png",
+                            height: 60,
+                            width: 60,
+                            excavate: true
+                        }}
+                    />
+                </div>
+
+                <div className="mt-10 text-center">
+                    <p className="text-[48px] font-black text-purple-600 tracking-wider leading-none">{student.admission_number}</p>
+                    <p className="text-[14px] text-gray-400 mt-4 uppercase font-bold tracking-[0.4em] max-w-[600px] mx-auto opacity-70">Official Gatepass Authentication & Attendance System</p>
+                </div>
+            </div>
+
+            <div className="h-4 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
         </div>
     )
 }
