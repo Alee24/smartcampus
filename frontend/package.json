@@ -12,11 +12,13 @@
     "dependencies": {
         "@types/leaflet": "^1.9.12",
         "axios": "^1.6.7",
+        "browser-image-compression": "^2.0.2",
         "clsx": "^2.1.0",
         "framer-motion": "^11.0.8",
         "html2canvas": "^1.4.1",
         "html5-qrcode": "^2.3.8",
         "jspdf": "^2.5.2",
+        "jszip": "^3.10.1",
         "leaflet": "^1.9.4",
         "lucide-react": "^0.344.0",
         "qrcode": "^1.5.4",

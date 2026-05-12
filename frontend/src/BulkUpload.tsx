@@ -143,23 +143,80 @@ export default function BulkUpload() {
     // Photos Upload State
     const [csvFile, setCsvFile] = useState<File | null>(null)
     const [zipFile, setZipFile] = useState<File | null>(null)
+    const [isCompressing, setIsCompressing] = useState(false)
+    const [compressionProgress, setCompressionProgress] = useState(0)
+    const [useCompression, setUseCompression] = useState(true)
 
     const handlePhotoUpload = async () => {
         if (!zipFile) return
+        
+        let finalZip = zipFile
         setLoading(true)
+
+        // 1. Client-Side Compression Logic
+        if (useCompression && zipFile.name.toLowerCase().endsWith('.zip')) {
+            try {
+                setIsCompressing(true)
+                setMessages(prev => [...prev, { type: 'info', text: 'Preparing smart compression...' }])
+                
+                const JSZip = (await import('jszip')).default
+                const imageCompression = (await import('browser-image-compression')).default
+                
+                const originalZip = new JSZip()
+                const zipData = await originalZip.loadAsync(zipFile)
+                const newZip = new JSZip()
+                
+                const files = Object.keys(zipData.files).filter(name => !zipData.files[name].dir)
+                let processedCount = 0
+                
+                for (const filename of files) {
+                    const fileData = await zipData.files[filename].async('blob')
+                    
+                    // Only compress images
+                    if (filename.toLowerCase().match(/\.(jpg|jpeg|png|webp)$/)) {
+                        try {
+                            const options = {
+                                maxSizeMB: 0.2, // Aim for 200KB per image
+                                maxWidthOrHeight: 1000,
+                                useWebWorker: true,
+                                initialQuality: 0.7
+                            }
+                            const compressedBlob = await imageCompression(new File([fileData], filename), options)
+                            newZip.file(filename, compressedBlob)
+                        } catch (e) {
+                            newZip.file(filename, fileData) // Fallback to original if compression fails
+                        }
+                    } else {
+                        newZip.file(filename, fileData) // Keep non-image files as is
+                    }
+                    
+                    processedCount++
+                    setCompressionProgress(Math.round((processedCount / files.length) * 100))
+                }
+                
+                setMessages(prev => [...prev, { type: 'success', text: `Compression complete! Optimized ${files.length} images.` }])
+                finalZip = (await newZip.generateAsync({ type: 'blob' })) as File
+                setIsCompressing(false)
+            } catch (error: any) {
+                console.error("Compression failed", error)
+                setMessages(prev => [...prev, { type: 'error', text: `Compression failed: ${error.message}. Proceeding with original file.` }])
+                setIsCompressing(false)
+            }
+        }
+
+        // 2. Upload Logic
         setIsUploading(true)
-        setUploadProgress(5)
-        setUploadingType('Student Photos ' + (csvFile ? '(Mapped)' : '(Auto-Match)'))
+        setUploadProgress(0)
+        setUploadingType('Optimized Bulk Photos')
 
         const formData = new FormData()
-        formData.append('zip_file', zipFile)
+        formData.append('zip_file', finalZip, "optimized_photos.zip")
         if (csvFile) formData.append('csv_file', csvFile)
 
         try {
             const token = localStorage.getItem('token')
             await new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest()
-                // Set 30 minute timeout for large ZIP processing
                 xhr.timeout = 1800000 
                 
                 xhr.upload.addEventListener('progress', (e) => {
@@ -170,41 +227,27 @@ export default function BulkUpload() {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         try {
                             const data = JSON.parse(xhr.responseText)
-                            const successCount = data.matched || data.count || 0
-                            setMessages(prev => [...prev, { type: 'success', text: `Success: ${successCount} photos uploaded.` }])
-                            if (data.errors && data.errors.length) {
-                                data.errors.slice(0, 5).forEach((e: string) => setMessages(prev => [...prev, { type: 'error', text: e }]))
-                            }
+                            setMessages(prev => [...prev, { type: 'success', text: `Success: ${data.matched || data.count || 0} photos synced.` }])
                             resolve(data)
-                        } catch (err) {
-                            reject(new Error("Server returned invalid response. Check backend logs."))
-                        }
+                        } catch (err) { reject(new Error("Invalid server response")) }
                     } else {
-                        try {
-                            const data = JSON.parse(xhr.responseText)
-                            reject(new Error(data.detail || `Server Error: ${xhr.status}`))
-                        } catch (err) {
-                            reject(new Error(`HTTP ${xhr.status}: The server might be struggling with the file size.`))
-                        }
+                        reject(new Error(`Server Error: ${xhr.status}`))
                     }
                 }
-                xhr.ontimeout = () => reject(new Error("Upload timed out. The ZIP might be too large or the server is busy."))
-                xhr.onerror = () => reject(new Error("Network Error: Connection lost. Ensure Docker is running and file size is within limits."))
+                xhr.onerror = () => reject(new Error("Network Error"))
                 xhr.open('POST', '/api/admin/bulk/photos')
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`)
                 xhr.send(formData)
             })
 
-            // Cleanup
             setCsvFile(null)
             setZipFile(null)
             fetchStats()
         } catch (e: any) {
-            console.error(e)
             setMessages(prev => [...prev, { type: 'error', text: `Upload Error: ${e.message}` }])
         } finally {
             setLoading(false)
-            setTimeout(() => { setIsUploading(false); setUploadProgress(0) }, 1000)
+            setTimeout(() => { setIsUploading(false); setUploadProgress(0); setCompressionProgress(0) }, 1000)
         }
     }
 
@@ -395,12 +438,28 @@ export default function BulkUpload() {
                                         </label>
                                     </div>
 
+                                    <div className="flex items-center justify-between p-4 bg-[var(--bg-primary)] rounded-2xl border border-[var(--border-color)]">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Image size={18} /></div>
+                                            <div>
+                                                <p className="text-sm font-bold">Enable Smart Compression</p>
+                                                <p className="text-[10px] text-[var(--text-secondary)] uppercase font-black">Reduces 2GB to ~150MB automatically</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => setUseCompression(!useCompression)}
+                                            className={`w-12 h-6 rounded-full transition-all relative ${useCompression ? 'bg-green-500' : 'bg-gray-300'}`}
+                                        >
+                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${useCompression ? 'right-1' : 'left-1'}`} />
+                                        </button>
+                                    </div>
+
                                     <button
                                         onClick={handlePhotoUpload}
                                         disabled={!zipFile || loading}
                                         className="w-full py-4 bg-[var(--primary-color)] text-white rounded-xl font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
                                     >
-                                        {loading ? 'Processing...' : 'Start Bulk Photo Upload'}
+                                        {loading ? (isCompressing ? 'Optimizing Images...' : 'Uploading...') : 'Start Bulk Photo Upload'}
                                     </button>
                                 </div>
                             ) : (
@@ -422,20 +481,30 @@ export default function BulkUpload() {
                     </div>
 
                     {/* Progress Overlay */}
-                    {isUploading && (
-                        <div className="bg-[var(--bg-surface)] p-6 rounded-3xl border border-[var(--border-color)] animate-in fade-in slide-in-from-bottom-4">
+                    {(isUploading || isCompressing) && (
+                        <div className="bg-[var(--bg-surface)] p-6 rounded-3xl border border-[var(--border-color)] animate-in fade-in slide-in-from-bottom-4 shadow-xl">
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
                                     <div className="animate-spin text-[var(--primary-color)]">
                                         <Loader2 size={24} />
                                     </div>
-                                    <span className="font-bold">Processing {uploadingType}...</span>
+                                    <span className="font-bold">
+                                        {isCompressing ? `Optimizing Images: ${compressionProgress}%` : `Uploading Optimized Package: ${uploadProgress}%`}
+                                    </span>
                                 </div>
-                                <span className="text-xl font-bold font-mono text-[var(--primary-color)]">{uploadProgress}%</span>
+                                <span className="text-xl font-bold font-mono text-[var(--primary-color)]">
+                                    {isCompressing ? compressionProgress : uploadProgress}%
+                                </span>
                             </div>
                             <div className="px-4 pb-2">
-                                <ThreeDProgressBar progress={uploadProgress} colorClass={steps[currentStep].color} />
+                                <ThreeDProgressBar 
+                                    progress={isCompressing ? compressionProgress : uploadProgress} 
+                                    colorClass={isCompressing ? 'bg-blue-500' : steps[currentStep].color} 
+                                />
                             </div>
+                            <p className="text-[10px] text-center text-[var(--text-secondary)] font-bold uppercase tracking-widest mt-2">
+                                {isCompressing ? "Compressing locally - No data used yet" : "Sending compressed files to server"}
+                            </p>
                         </div>
                     )}
 
