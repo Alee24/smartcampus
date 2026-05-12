@@ -859,83 +859,81 @@ async def bulk_upload_photos(
                 if file_name.startswith('__MACOSX'): continue
                 try:
                     name_only = os.path.basename(file_name)
-                if not name_only: continue
-                
-                stem = Path(name_only).stem.strip().upper()
-                user = None
-                
-                # A. Match by CSV Mapping (Suffix Match)
-                if mapping:
-                    # Check exact filename first
-                    adm_no = mapping.get(name_only) or mapping.get(stem)
+                    if not name_only: continue
                     
-                    if not adm_no:
-                        # Check if any suffix in mapping matches the end of this filename
-                        for suffix, mapped_adm in mapping.items():
-                            if stem.endswith(suffix.upper()):
-                                adm_no = mapped_adm
-                                break
+                    stem = Path(name_only).stem.strip().upper()
+                    user = None
                     
-                    if adm_no:
-                        adm_no_norm = adm_no.strip().upper()
-                        user = user_map.get(adm_no_norm)
+                    # A. Match by CSV Mapping (Suffix Match)
+                    if mapping:
+                        # Check exact filename first
+                        adm_no = mapping.get(name_only) or mapping.get(stem)
                         
-                        # C. Auto-Create Missing User (Data Entry Mode)
-                        if not user:
-                            # Use Admission Number as default for name/email if not provided
-                            new_user = User(
-                                admission_number=adm_no_norm,
-                                full_name=adm_no_norm,
-                                school="General",
-                                role_id=student_role_id,
-                                status="Active",
-                                hashed_password=get_password_hash(adm_no_norm) # Default password is their Admission Number
-                            )
-                            session.add(new_user)
-                            # Flush to get ID if needed, but SQLModel/SQLAlchemy handles it on commit
-                            # To avoid multiple flushes, we can just use the object
-                            user = new_user
-                            user_map[adm_no_norm] = user
-                            all_users.append(user)
-                
-
-                    if user:
-                        # Save Image
-                        ext = os.path.splitext(name_only)[1].lower()
-                        if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
-                            ext = '.jpg' # Fallback
+                        if not adm_no:
+                            # Check if any suffix in mapping matches the end of this filename
+                            for suffix, mapped_adm in mapping.items():
+                                if stem.endswith(suffix.upper()):
+                                    adm_no = mapped_adm
+                                    break
+                        
+                        if adm_no:
+                            adm_no_norm = adm_no.strip().upper()
+                            user = user_map.get(adm_no_norm)
                             
-                        new_filename = f"profile_{user.id}_{uuid.uuid4().hex[:8]}{ext}"
-                        target_path = Path("static/profiles") / new_filename
-                        target_path.parent.mkdir(parents=True, exist_ok=True)
-                        
-                        with zip_ref.open(file_name) as source, open(target_path, "wb") as target:
-                            shutil.copyfileobj(source, target)
-                        
-                        user.profile_image = f"/static/profiles/{new_filename}"
-                        session.add(user)
-                        
-                        # Audit Trail Logging
-                        from app.models import AuditLog
-                        from datetime import datetime
-                        log = AuditLog(
-                            timestamp=datetime.utcnow(),
-                            user_id=admin.id,
-                            user_name=admin.full_name,
-                            action_type="BULK_PHOTO_UPDATE",
-                            table_name="users",
-                            record_id=str(user.id),
-                            description=f"Bulk updated profile photo for {user.full_name} via ZIP sync",
-                            new_values={"profile_image": user.profile_image}
-                        )
-                        session.add(log)
-                        success_count += 1
-                        if success_count % 100 == 0:
-                            await session.commit()
-                    else:
-                        failed_count += 1
-                        if len(errors) < 100:
-                            errors.append(f"No matching user for: {name_only}")
+                            # C. Auto-Create Missing User (Data Entry Mode)
+                            if not user:
+                                # Use Admission Number as default for name/email if not provided
+                                new_user = User(
+                                    admission_number=adm_no_norm,
+                                    full_name=adm_no_norm,
+                                    school="General",
+                                    role_id=student_role_id,
+                                    status="Active",
+                                    hashed_password=get_password_hash(adm_no_norm) # Default password is their Admission Number
+                                )
+                                session.add(new_user)
+                                user = new_user
+                                user_map[adm_no_norm] = user
+                                all_users.append(user)
+                    
+
+                        if user:
+                            # Save Image
+                            ext = os.path.splitext(name_only)[1].lower()
+                            if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+                                ext = '.jpg' # Fallback
+                                
+                            new_filename = f"profile_{user.id}_{uuid.uuid4().hex[:8]}{ext}"
+                            target_path = Path("static/profiles") / new_filename
+                            target_path.parent.mkdir(parents=True, exist_ok=True)
+                            
+                            with zip_ref.open(file_name) as source, open(target_path, "wb") as target:
+                                shutil.copyfileobj(source, target)
+                            
+                            user.profile_image = f"/static/profiles/{new_filename}"
+                            session.add(user)
+                            
+                            # Audit Trail Logging
+                            from app.models import AuditLog
+                            from datetime import datetime
+                            log = AuditLog(
+                                timestamp=datetime.utcnow(),
+                                user_id=admin.id,
+                                user_name=admin.full_name,
+                                action_type="BULK_PHOTO_UPDATE",
+                                table_name="users",
+                                record_id=str(user.id),
+                                description=f"Bulk updated profile photo for {user.full_name} via ZIP sync",
+                                new_values={"profile_image": user.profile_image}
+                            )
+                            session.add(log)
+                            success_count += 1
+                            if success_count % 100 == 0:
+                                await session.commit()
+                        else:
+                            failed_count += 1
+                            if len(errors) < 100:
+                                errors.append(f"No matching user for: {name_only}")
                 except Exception as e:
                     failed_count += 1
                     errors.append(f"Error processing {file_name}: {str(e)}")
