@@ -482,7 +482,7 @@ export default function BulkUpload() {
 
                     <div className="glass-card p-6 rounded-3xl bg-[image:var(--gradient-primary)] text-white">
                         <h3 className="font-bold mb-2">Need a CSV?</h3>
-                        <p className="text-xs opacity-80 mb-4">Make sure your file follows our template exactly to avoid AI mapping errors.</p>
+                        <p className="text-xs opacity-80 mb-4">Make sure your file follows our template exactly for successful mapping.</p>
                         <button
                             onClick={() => downloadTemplate(steps[currentStep].id)}
                             className="w-full py-3 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
