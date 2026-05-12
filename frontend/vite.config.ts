@@ -9,17 +9,37 @@ export default defineConfig({
         react(),
         VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+            injectRegister: 'auto',
+            workbox: {
+                globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+                runtimeCaching: [
+                    {
+                        urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+                        handler: 'CacheFirst',
+                        options: {
+                            cacheName: 'google-fonts-cache',
+                            expiration: {
+                                maxEntries: 10,
+                                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 days
+                            },
+                            cacheableResponse: {
+                                statuses: [0, 200]
+                            }
+                        }
+                    }
+                ]
+            },
             manifest: {
-                name: 'Smart Campus',
-                short_name: 'Smart Campus',
-                description: 'Smart Campus Attendance & Verification System',
-                theme_color: '#ffffff',
+                name: 'Smart Campus GatePass',
+                short_name: 'GatePass',
+                description: 'Professional Smart Campus Attendance & Security System',
+                theme_color: '#4f46e5',
                 background_color: '#ffffff',
                 display: 'standalone',
-                orientation: 'portrait',
                 scope: '/',
                 start_url: '/',
+                orientation: 'portrait',
+                categories: ['education', 'security', 'productivity'],
                 icons: [
                     {
                         src: 'pwa-192x192.png',
@@ -35,7 +55,7 @@ export default defineConfig({
                         src: 'pwa-512x512.png',
                         sizes: '512x512',
                         type: 'image/png',
-                        purpose: 'any maskable'
+                        purpose: 'maskable'
                     }
                 ]
             }
