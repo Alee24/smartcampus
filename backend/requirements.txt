@@ -15,12 +15,8 @@ google-auth
 simple-salesforce
 aiomysql
 cryptography
-opencv-python
 numpy
 Pillow
 qrcode
-openai
-google-cloud-vision
-boto3
 apscheduler
 fastapi-mail

@@ -58,16 +58,6 @@ services:
       - "443:443"
     depends_on:
       - backend
-      - ai-face
-    networks:
-      - gatepass-net
-    restart: always
-
-  ai-face:
-    build: ./ai_services/face_recognition
-    container_name: gatepass_ai_face
-    expose:
-      - "8001"
     networks:
       - gatepass-net
     restart: always

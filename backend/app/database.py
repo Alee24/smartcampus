@@ -11,7 +11,13 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://") if DATABASE_URL else "mysql+aiomysql://root:@127.0.0.1:3306/gatepass_v2"
 # Engine configuration
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
-engine = create_async_engine(ASYNC_DATABASE_URL, echo=DEBUG_MODE, future=True)
+engine = create_async_engine(
+    ASYNC_DATABASE_URL, 
+    echo=DEBUG_MODE, 
+    future=True,
+    pool_recycle=3600,
+    pool_pre_ping=True
+)
 
 async def init_db():
     async with engine.begin() as conn:

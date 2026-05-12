@@ -355,14 +355,17 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
         access_token = create_access_token(data={"sub": user.email or user.admission_number})
         
         # Log the successful login
-        await log_action(
-            session=session,
-            action_type="login",
-            user=user,
-            description=f"User {user.full_name} logged in from {role_name} panel",
-            new_values={"role": role_name},
-            request=request
-        )
+        try:
+            await log_action(
+                session=session,
+                action_type="login",
+                user=user,
+                description=f"User {user.full_name} logged in from {role_name} panel",
+                new_values={"role": role_name},
+                request=request
+            )
+        except Exception as log_err:
+            print(f"Non-critical error logging login: {log_err}")
 
         return {
             "access_token": access_token, 
@@ -577,13 +580,7 @@ app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 from app.routers import timetable
 app.include_router(timetable.router, prefix="/api/timetable", tags=["timetable"])
 
-# Import and include camera router
-from app.routers import cameras
-app.include_router(cameras.router, prefix="/api/cameras", tags=["cameras"])
 
-# Import and include AI router
-from app.routers import ai
-app.include_router(ai.router, prefix="/api/admin", tags=["ai"])
 
 # Import and include events router
 from app.routers import events

@@ -929,6 +929,8 @@ async def bulk_upload_photos(
                         )
                         session.add(log)
                         success_count += 1
+                        if success_count % 100 == 0:
+                            await session.commit()
                     else:
                         failed_count += 1
                         if len(errors) < 100:

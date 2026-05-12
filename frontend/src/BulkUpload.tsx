@@ -159,24 +159,37 @@ export default function BulkUpload() {
             const token = localStorage.getItem('token')
             await new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest()
+                // Set 30 minute timeout for large ZIP processing
+                xhr.timeout = 1800000 
+                
                 xhr.upload.addEventListener('progress', (e) => {
                     if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100))
                 })
+
                 xhr.onload = () => {
                     if (xhr.status >= 200 && xhr.status < 300) {
-                        const data = JSON.parse(xhr.responseText)
-                        const successCount = data.matched || data.count || 0
-                        setMessages(prev => [...prev, { type: 'success', text: `Success: ${successCount} photos uploaded.` }])
-                        if (data.errors && data.errors.length) {
-                            data.errors.slice(0, 5).forEach((e: string) => setMessages(prev => [...prev, { type: 'error', text: e }]))
+                        try {
+                            const data = JSON.parse(xhr.responseText)
+                            const successCount = data.matched || data.count || 0
+                            setMessages(prev => [...prev, { type: 'success', text: `Success: ${successCount} photos uploaded.` }])
+                            if (data.errors && data.errors.length) {
+                                data.errors.slice(0, 5).forEach((e: string) => setMessages(prev => [...prev, { type: 'error', text: e }]))
+                            }
+                            resolve(data)
+                        } catch (err) {
+                            reject(new Error("Server returned invalid response. Check backend logs."))
                         }
-                        resolve(data)
                     } else {
-                        const data = JSON.parse(xhr.responseText)
-                        reject(new Error(data.detail || 'Upload failed'))
+                        try {
+                            const data = JSON.parse(xhr.responseText)
+                            reject(new Error(data.detail || `Server Error: ${xhr.status}`))
+                        } catch (err) {
+                            reject(new Error(`HTTP ${xhr.status}: The server might be struggling with the file size.`))
+                        }
                     }
                 }
-                xhr.onerror = () => reject(new Error("Network Error"))
+                xhr.ontimeout = () => reject(new Error("Upload timed out. The ZIP might be too large or the server is busy."))
+                xhr.onerror = () => reject(new Error("Network Error: Connection lost. Ensure Docker is running and file size is within limits."))
                 xhr.open('POST', '/api/admin/bulk/photos')
                 xhr.setRequestHeader('Authorization', `Bearer ${token}`)
                 xhr.send(formData)
