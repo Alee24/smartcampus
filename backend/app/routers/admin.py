@@ -857,7 +857,8 @@ async def bulk_upload_photos(
             
             for file_name in files:
                 if file_name.startswith('__MACOSX'): continue
-                name_only = os.path.basename(file_name)
+                try:
+                    name_only = os.path.basename(file_name)
                 if not name_only: continue
                 
                 stem = Path(name_only).stem.strip().upper()

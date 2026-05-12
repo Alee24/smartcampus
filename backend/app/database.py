@@ -154,10 +154,12 @@ async def migrate_external_sync():
             config = res.fetchone()
             
             if not config:
+                import uuid
                 print("Seeding default External Sync API Key...")
+                new_id = uuid.uuid4().hex
                 await conn.execute(text(
                     "INSERT INTO system_configs (`id`, `key`, `value`, `category`, `is_encrypted`) "
-                    "VALUES (UUID(), 'external_sync_api_key', 'SmartCampusSync2026', 'api', 0)"
+                    f"VALUES ('{new_id}', 'external_sync_api_key', 'SmartCampusSync2026', 'api', 0)"
                 ))
                 print("External Sync API Key seeded.")
             else:
