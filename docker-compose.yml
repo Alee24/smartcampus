@@ -55,7 +55,6 @@ services:
     # Primary entry point for the entire application
     ports:
       - "8080:80"
-      - "443:443"
     depends_on:
       - backend
     networks:

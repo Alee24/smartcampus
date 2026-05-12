@@ -96,7 +96,7 @@ async def seed_data(session: AsyncSession):
         await session.commit()
         await session.refresh(lecturer_role)
     
-    lec_user = (await session.exec(select(User).where(User.email == "lecturer@test.com"))).first()
+    lec_user = (await session.exec(select(User).where((User.admission_number == "LEC001") | (User.email == "lecturer@test.com")))).first()
     if not lec_user:
         lec_user = User(
             admission_number="LEC001",
@@ -118,7 +118,7 @@ async def seed_data(session: AsyncSession):
         await session.commit()
         await session.refresh(guard_role)
 
-    guard_user = (await session.exec(select(User).where(User.email == "guard@test.com"))).first()
+    guard_user = (await session.exec(select(User).where((User.email == "guard@test.com") | (User.admission_number == "SEC001")))).first()
     if not guard_user:
         guard_user = User(
             admission_number="SEC001",
@@ -199,7 +199,7 @@ async def seed_data(session: AsyncSession):
         await session.commit()
         await session.refresh(driver_role)
 
-    stud_user = (await session.exec(select(User).where(User.admission_number == "STD001"))).first()
+    stud_user = (await session.exec(select(User).where((User.admission_number == "STD001") | (User.email == "student@test.com")))).first()
     if not stud_user:
         stud_user = User(
             admission_number="STD001",
