@@ -165,7 +165,8 @@ export default function BulkUpload() {
                 xhr.onload = () => {
                     if (xhr.status >= 200 && xhr.status < 300) {
                         const data = JSON.parse(xhr.responseText)
-                        setMessages(prev => [...prev, { type: 'success', text: `Success: ${data.count || 0} photos uploaded.` }])
+                        const successCount = data.matched || data.count || 0
+                        setMessages(prev => [...prev, { type: 'success', text: `Success: ${successCount} photos uploaded.` }])
                         if (data.errors && data.errors.length) {
                             data.errors.slice(0, 5).forEach((e: string) => setMessages(prev => [...prev, { type: 'error', text: e }]))
                         }

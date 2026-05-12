@@ -897,63 +897,45 @@ async def bulk_upload_photos(
                             user_map[adm_no_norm] = user
                             all_users.append(user)
                 
-                # B. Auto-Match by Filename (Fallback)
-                if not user:
-                    # 1. Exact Admission Number match
-                    user = user_map.get(stem)
-                    
-                    # 2. Suffix/Digit Match (Heuristic for images like "IMG_2847")
-                    if not user:
-                        candidates = []
-                        for u in all_users:
-                            adm = u.admission_number.strip().upper()
-                            adm_digits = "".join([c for c in adm if c.isdigit()])
-                            if len(adm_digits) >= 4: # Require 4 digits for safety
-                                if stem.endswith(adm_digits):
-                                    candidates.append((u, len(adm_digits)))
+
+                    if user:
+                        # Save Image
+                        ext = os.path.splitext(name_only)[1].lower()
+                        if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+                            ext = '.jpg' # Fallback
+                            
+                        new_filename = f"profile_{user.id}_{uuid.uuid4().hex[:8]}{ext}"
+                        target_path = Path("static/profiles") / new_filename
+                        target_path.parent.mkdir(parents=True, exist_ok=True)
                         
-                        if candidates:
-                            candidates.sort(key=lambda x: x[1], reverse=True)
-                            user = candidates[0][0]
-                
-                if user:
-                    # Move/Save file
-                    ext = os.path.splitext(name_only)[1].lower()
-                    if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
-                        errors.append(f"Skipped {name_only}: Invalid format")
+                        with zip_ref.open(file_name) as source, open(target_path, "wb") as target:
+                            shutil.copyfileobj(source, target)
+                        
+                        user.profile_image = f"/static/profiles/{new_filename}"
+                        session.add(user)
+                        
+                        # Audit Trail Logging
+                        from app.models import AuditLog
+                        from datetime import datetime
+                        log = AuditLog(
+                            timestamp=datetime.utcnow(),
+                            user_id=admin.id,
+                            user_name=admin.full_name,
+                            action_type="BULK_PHOTO_UPDATE",
+                            table_name="users",
+                            record_id=str(user.id),
+                            description=f"Bulk updated profile photo for {user.full_name} via ZIP sync",
+                            new_values={"profile_image": user.profile_image}
+                        )
+                        session.add(log)
+                        success_count += 1
+                    else:
                         failed_count += 1
-                        continue
-                        
-                    new_filename = f"profile_{user.id}_{uuid.uuid4().hex[:8]}{ext}"
-                    target_path = Path("static/profiles") / new_filename
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    with zip_ref.open(file_name) as source, open(target_path, "wb") as target:
-                        shutil.copyfileobj(source, target)
-                    
-                    user.profile_image = f"/static/profiles/{new_filename}"
-                    session.add(user)
-                    
-                    # Audit Trail Logging
-                    from app.models import AuditLog
-                    from datetime import datetime
-                    log = AuditLog(
-                        timestamp=datetime.utcnow(),
-                        user_id=admin.id,
-                        user_name=admin.full_name,
-                        action_type="BULK_PHOTO_UPDATE",
-                        table_name="users",
-                        record_id=str(user.id),
-                        description=f"Bulk updated profile photo for {user.full_name} via ZIP sync",
-                        new_values={"profile_image": user.profile_image}
-                    )
-                    session.add(log)
-                    
-                    success_count += 1
-                else:
+                        if len(errors) < 100:
+                            errors.append(f"No matching user for: {name_only}")
+                except Exception as e:
                     failed_count += 1
-                    if len(errors) < 20:
-                        errors.append(f"No matching user for: {name_only}")
+                    errors.append(f"Error processing {file_name}: {str(e)}")
             
             await session.commit()
             
@@ -962,9 +944,12 @@ async def bulk_upload_photos(
     finally:
         if zip_path.exists():
             os.remove(zip_path)
+        if csv_path and csv_path.exists():
+            os.remove(csv_path)
             
     return {
         "status": "success", 
+        "count": success_count,
         "processed": success_count + failed_count,
         "matched": success_count, 
         "failed": failed_count,

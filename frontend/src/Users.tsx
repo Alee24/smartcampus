@@ -331,7 +331,7 @@ export default function Users() {
                                                 <div className="flex items-center gap-3">
                                                     {user.profile_image ? (
                                                         <img
-                                                            src={user.profile_image.startsWith('http') ? user.profile_image : `http://localhost:8000${user.profile_image}`}
+                                                            src={user.profile_image}
                                                             alt={user.full_name}
                                                             className="w-10 h-10 rounded-full object-cover"
                                                         />
