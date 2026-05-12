@@ -18,15 +18,24 @@ export default function SelfServiceEntry() {
     const [cameraActive, setCameraActive] = useState(false)
 
     const startCamera = async () => {
+        if (!window.isSecureContext) {
+            alert("Camera access requires a secure (HTTPS) connection. Please contact administration.")
+            return
+        }
+
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'environment' } 
+            })
             if (videoRef.current) {
                 videoRef.current.srcObject = stream
                 setCameraActive(true)
                 videoRef.current.play()
             }
-        } catch (err) {
-            alert("Camera access denied or unavailable. Please enable camera permissions.")
+        } catch (err: any) {
+            console.error("Camera start error:", err)
+            const errorMsg = err?.message || err || "Unknown error"
+            alert(`Could not access camera: ${errorMsg}. Please ensure you have given permission.`)
         }
     }
 

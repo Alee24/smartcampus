@@ -82,16 +82,18 @@ export default function PermissionsModal() {
         try {
             // 1. Camera
             if (!permissions.camera) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-                    setTimeout(() => stream.getTracks().forEach(t => t.stop()), 100)
-                    setPermissions(prev => ({ ...prev, camera: true }))
-                    setPermissionStatus(prev => ({ ...prev, camera: 'granted' }))
-                } catch (e: any) {
-                    console.warn("Camera denied:", e)
-                    if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                if (!window.isSecureContext) {
+                    setPermissionStatus(prev => ({ ...prev, camera: 'denied' }))
+                } else {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+                        // CRITICAL: Stop tracks immediately to free the device
+                        stream.getTracks().forEach(t => t.stop())
+                        setPermissions(prev => ({ ...prev, camera: true }))
+                        setPermissionStatus(prev => ({ ...prev, camera: 'granted' }))
+                    } catch (e: any) {
+                        console.warn("Camera denied:", e)
                         setPermissionStatus(prev => ({ ...prev, camera: 'denied' }))
-                        // Don't block, just mark as denied
                     }
                 }
             }

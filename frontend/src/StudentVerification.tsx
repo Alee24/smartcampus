@@ -67,10 +67,22 @@ export default function StudentVerification() {
         }
         const requestCameraPermission = async () => {
             try {
-                await navigator.mediaDevices.getUserMedia({ video: true })
-                console.log('Camera permission granted')
-            } catch (err) {
-                console.warn('Camera permission denied or not available', err)
+                // Check if browser supports mediaDevices
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    console.warn('Camera API not supported in this browser');
+                    return;
+                }
+
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+                console.log('Camera permission granted');
+                
+                // CRITICAL: Stop the stream immediately after getting permission
+                // This ensures the camera is not "busy" when the scanner tries to start later
+                stream.getTracks().forEach(track => track.stop());
+            } catch (err: any) {
+                console.warn('Camera permission denied or not available', err);
+                // Don't show notification here as it might be annoying on every load
+                // if they intentionally denied it before.
             }
         }
 
@@ -322,6 +334,12 @@ export default function StudentVerification() {
     }
 
     const startScanner = async () => {
+        // Check for secure context (required for camera in modern browsers)
+        if (!window.isSecureContext) {
+            showNotification("Camera access requires a secure (HTTPS) connection. Please check your URL.", "error")
+            return
+        }
+
         setIsScanning(true)
         // Short delay to ensure the container is in the DOM
         setTimeout(async () => {
@@ -329,28 +347,51 @@ export default function StudentVerification() {
                 const scanner = new Html5Qrcode("qr-reader")
                 qrScannerRef.current = scanner
                 
-                await scanner.start(
-                    { facingMode: "environment" },
-                    {
-                        fps: 10,
-                        qrbox: { width: 250, height: 250 },
-                    },
-                    (decodedText) => {
-                        setQuery(decodedText)
-                        stopScanner()
-                        // Auto-verify after scan
-                        setTimeout(() => {
-                            const btn = document.getElementById('verify-btn')
-                            btn?.click()
-                        }, 500)
-                    },
-                    () => {
-                        // Silent error for no QR code found in frame
-                    }
-                )
-            } catch (err) {
+                // Try starting with environment (back) camera first
+                try {
+                    await scanner.start(
+                        { facingMode: "environment" },
+                        {
+                            fps: 10,
+                            qrbox: { width: 250, height: 250 },
+                        },
+                        (decodedText) => {
+                            setQuery(decodedText)
+                            stopScanner()
+                            // Auto-verify after scan
+                            setTimeout(() => {
+                                const btn = document.getElementById('verify-btn')
+                                btn?.click()
+                            }, 500)
+                        },
+                        () => {
+                            // Silent error for no QR code found in frame
+                        }
+                    )
+                } catch (firstErr) {
+                    console.warn("Failed to start with environment camera, trying any camera...", firstErr)
+                    // Fallback to any available camera
+                    await scanner.start(
+                        { facingMode: "user" }, // Try front camera if back fails
+                        {
+                            fps: 10,
+                            qrbox: { width: 250, height: 250 },
+                        },
+                        (decodedText) => {
+                            setQuery(decodedText)
+                            stopScanner()
+                            setTimeout(() => {
+                                const btn = document.getElementById('verify-btn')
+                                btn?.click()
+                            }, 500)
+                        },
+                        () => {}
+                    )
+                }
+            } catch (err: any) {
                 console.error("Scanner start error:", err)
-                showNotification("Could not start camera. Please ensure you have given permission.", "warning")
+                const errorMsg = err?.message || err || "Unknown camera error"
+                showNotification(`Could not start camera: ${errorMsg}. Please ensure you have given permission and no other app is using it.`, "error")
                 setIsScanning(false)
             }
         }, 300)

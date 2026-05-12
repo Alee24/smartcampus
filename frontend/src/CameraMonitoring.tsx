@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Camera as CameraIcon, Plus, Video, Activity, AlertTriangle, CheckCircle, XCircle, Eye, BarChart3, Wifi, WifiOff, Scan, Crosshair, Monitor } from 'lucide-react'
+import { Camera as CameraIcon, Plus, Video, Activity, AlertTriangle, CheckCircle, XCircle, Eye, BarChart3, Wifi, WifiOff, Scan, Crosshair, Monitor, Loader2 } from 'lucide-react'
+import { useNotification } from './components/Notification'
 
 export default function CameraMonitoring() {
+    const { showNotification } = useNotification()
     const [activeTab, setActiveTab] = useState('cameras')
     const [cameras, setCameras] = useState<any[]>([])
     const [classrooms, setClassrooms] = useState<any[]>([])
@@ -132,9 +134,17 @@ export default function CameraMonitoring() {
             }
             setStreamActive(false)
         } else {
+            // Check for secure context
+            if (!window.isSecureContext) {
+                showNotification("Camera access requires a secure (HTTPS) connection.", "error")
+                return
+            }
+
             // Start
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user" } 
+                });
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
                     setStreamActive(true)
@@ -143,8 +153,10 @@ export default function CameraMonitoring() {
                     setTimeout(() => setTrackingLog(prev => ["Motion Detector: Active", ...prev]), 1000)
                     setTimeout(() => setTrackingLog(prev => ["Face Tracker: Scanning...", ...prev]), 2000)
                 }
-            } catch (e) {
-                alert("Could not access webcam. Please allow permissions.")
+            } catch (err: any) {
+                console.error("Webcam access error:", err)
+                const errorMsg = err?.message || err || "Unknown error"
+                showNotification(`Could not access webcam: ${errorMsg}`, "error")
             }
         }
     }

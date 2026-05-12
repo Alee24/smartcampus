@@ -217,6 +217,13 @@ export default function GateControl() {
         setPermissionError('');
         setScanMode(mode)
         
+        // Check for secure context
+        if (!window.isSecureContext) {
+            showNotification("Camera access requires a secure (HTTPS) connection.", "error")
+            setScanStatus('idle')
+            return
+        }
+
         if (mode === 'qr') {
             setScanStatus('scanning')
             // QR Scanning using html5-qrcode
@@ -235,9 +242,10 @@ export default function GateControl() {
                         },
                         () => {}
                     )
-                } catch (err) {
+                } catch (err: any) {
                     console.error("QR Start Error", err)
-                    showNotification("Could not start QR scanner", "error")
+                    const errorMsg = err?.message || err || "Unknown camera error"
+                    showNotification(`Could not start QR scanner: ${errorMsg}`, "error")
                     setScanStatus('idle')
                 }
             }, 300)
@@ -256,14 +264,19 @@ export default function GateControl() {
             console.error("Camera Access Error:", err)
             setScanMode(mode) // Remember mode to retry
 
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            const errorName = err?.name || "UnknownError"
+            const errorMsg = err?.message || ""
+
+            if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
                 setPermissionError('denied');
                 setShowPermissionModal(true);
-            } else if (err.name === 'NotFoundError') {
-                alert("No camera device found!");
+            } else if (errorName === 'NotFoundError') {
+                showNotification("No camera device found on this system.", "error")
+                setScanStatus('idle')
             } else {
                 setPermissionError('unknown');
                 setShowPermissionModal(true);
+                showNotification(`Camera Error: ${errorName} - ${errorMsg}`, "error")
             }
         }
     }
