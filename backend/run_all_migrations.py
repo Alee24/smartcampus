@@ -29,10 +29,10 @@ async def run_script(script_name):
         if process.returncode == 0:
             return True
         else:
-            log(f"❌ {script_name} failed with exit code {process.returncode}")
+            log(f"[ERROR] {script_name} failed with exit code {process.returncode}")
             return False
     except Exception as e:
-        log(f"❌ Error running {script_name}: {e}")
+        log(f"[ERROR] Error running {script_name}: {e}")
         return False
 
 async def main():
@@ -65,5 +65,7 @@ async def main():
 
 if __name__ == "__main__":
     if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        # ProactorEventLoopPolicy is required for create_subprocess_exec on Windows
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    
     asyncio.run(main())
