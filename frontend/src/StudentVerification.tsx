@@ -343,8 +343,12 @@ export default function StudentVerification() {
                                     {/* Top Branding Bar */}
                                     <div className="h-24 bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 flex items-center justify-between px-8">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl p-2 border border-white/20 flex items-center justify-center">
-                                                <img src={companySettings.logo_url || "/logo.png"} className="w-full h-full object-contain brightness-0 invert" />
+                                            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl p-1.5 border border-white/20 flex items-center justify-center overflow-hidden">
+                                                {companySettings.logo_url ? (
+                                                    <img src={companySettings.logo_url} className="w-full h-full object-contain" />
+                                                ) : (
+                                                    <img src="/logo.png" className="w-full h-full object-contain" />
+                                                )}
                                             </div>
                                             <div className="text-white">
                                                 <h2 className="font-black text-2xl leading-none tracking-tight uppercase">{companySettings.company_name}</h2>
