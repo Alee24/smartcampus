@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, text
 # Database setup
 DATABASE_URL = os.getenv("DATABASE_URL", "mysql+aiomysql://gatepass_user:user_password@db:3306/gatepass_v2")
 # Convert to synchronous for raw SQLAlchemy
-SYNC_DATABASE_URL = DATABASE_URL.replace("+aiomysql", "").replace("aiomysql", "pymysql")
+SYNC_DATABASE_URL = DATABASE_URL.replace("aiomysql", "pymysql")
 
 engine = create_engine(SYNC_DATABASE_URL)
 
