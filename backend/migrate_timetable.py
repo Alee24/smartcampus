@@ -83,7 +83,7 @@ async def migrate_timetable_system():
             id CHAR(36) PRIMARY KEY,
             course_id CHAR(36) NOT NULL,
             classroom_id CHAR(36) NOT NULL,
-            lecturer_id CHAR(36) NOT NULL,
+            lecturer_id CHAR(36),
             day_of_week INT NOT NULL CHECK (day_of_week >= 0 AND day_of_week <= 6),
             start_time TIME NOT NULL,
             end_time TIME NOT NULL,
@@ -92,11 +92,19 @@ async def migrate_timetable_system():
             is_active BOOLEAN DEFAULT TRUE,
             FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
             FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE CASCADE,
-            FOREIGN KEY (lecturer_id) REFERENCES users(id) ON DELETE CASCADE
+            FOREIGN KEY (lecturer_id) REFERENCES users(id) ON DELETE SET NULL
         )
         """
         await conn.execute(text(create_timetable))
-        print("   ✓ Created 'timetable_slots' table")
+        
+        # Ensure lecturer_id is nullable if table already exists
+        try:
+            await conn.execute(text("ALTER TABLE timetable_slots MODIFY lecturer_id CHAR(36) NULL;"))
+            print("   ✓ Ensured lecturer_id is nullable in timetable_slots")
+        except Exception as e:
+            print(f"   ⚠ Could not modify lecturer_id: {e}")
+            
+        print("   ✓ Created/Updated 'timetable_slots' table")
         
         # Step 5: Modify class_sessions table
         print("\n📋 Step 5: Modifying 'class_sessions' table...")

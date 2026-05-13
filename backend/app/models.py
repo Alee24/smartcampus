@@ -342,7 +342,7 @@ class TimetableSlot(UUIDModel, table=True):
     
     course_id: UUID = Field(foreign_key="courses.id")
     classroom_id: UUID = Field(foreign_key="classrooms.id")
-    lecturer_id: UUID = Field(foreign_key="users.id")
+    lecturer_id: Optional[UUID] = Field(default=None, foreign_key="users.id", nullable=True)
     
     # Day and time
     day_of_week: int = Field(ge=0, le=6)  # 0=Monday, 6=Sunday

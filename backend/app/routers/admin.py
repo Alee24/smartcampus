@@ -709,20 +709,10 @@ async def bulk_upload_timetable_slots(
                     )
                     session.add(lecturer)
             
-            # Fallback to Course's default lecturer or First Admin?
-            if not lecturer and course.lecturer_id:
-                # If course existed and had lecturer
-                # But here 'course' might be new or not have ID yet if we didn't flush.
-                # If it's new, it has no lecturer_id.
-                pass
-
+            # Resolution: Lecturer is now optional
             if not lecturer:
-                # Assign to current admin as fallback? Or create a "Unassigned" user?
-                # For robustness, we'll try to use the admin user who is uploading as a placeholder if absolutely needed?
-                # Or just skip lecturer assignment (nullable?)
-                # TimetableSlot might require lecturer_id? It depends on model.
-                # Assuming it works with nullable or we force it.
-                lecturer = admin # Fallback to uploader
+                # If no lecturer is found or provided, we leave it as None (nullable)
+                lecturer = None
             
             # Resolve or Create Classroom
             r_code = (row.get('classroom_code') or row.get('room') or 'TBD').strip()
