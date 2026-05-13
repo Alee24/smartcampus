@@ -891,23 +891,6 @@ async def bulk_upload_photos(
                     if adm_no_candidate:
                         adm_no_norm = str(adm_no_candidate).strip().upper()
                         user = user_map.get(adm_no_norm)
-                        
-                        # C. Auto-Create Missing User
-                        if not user:
-                            # Basic validation: ensure it's not a generic name
-                            if len(adm_no_norm) >= 3:
-                                new_user = User(
-                                    admission_number=adm_no_norm,
-                                    full_name=adm_no_norm,
-                                    school="General",
-                                    role_id=student_role_id,
-                                    status="Active",
-                                    hashed_password=get_password_hash(adm_no_norm)
-                                )
-                                session.add(new_user)
-                                user = new_user
-                                user_map[adm_no_norm] = user
-                                all_users.append(user)
                     
 
                         if user:
