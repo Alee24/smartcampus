@@ -17,3 +17,12 @@ populate_db.py
 populate_traffic_only.py
 migrate_user_status.py
 update_admin_credentials.py
+venv/
+.venv/
+node_modules/
+.idea/
+.vscode/
+*.log
+temp_uploads/
+static/profiles/*
+!static/profiles/.gitkeep

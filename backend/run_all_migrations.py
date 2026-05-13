@@ -44,6 +44,7 @@ async def main():
         "migrate_timetable.py",
         "migrate_user_status.py",
         "migrate_cameras.py",
+        "migrate_fleet.py",
         "seed_db.py",
         "diagnose_500.py"
     ]

@@ -523,8 +523,13 @@ function FuelManagement({ vehicles, logs, onUpdate }: any) {
             if (res.ok) {
                 setFormData({ vehicle_id: '', amount_liters: '', cost: '', odometer_reading: '', station_name: '' });
                 onUpdate();
+            } else {
+                const data = await res.json();
+                alert(`Error: ${data.detail || 'Failed to post fuel log'}`);
             }
-        } catch (e) {} finally { setIsSubmitting(false); }
+        } catch (e: any) {
+            alert(`Network error: ${e.message}`);
+        } finally { setIsSubmitting(false); }
     };
 
     return (
@@ -640,8 +645,15 @@ function VehicleForm({ onSuccess }: { onSuccess: () => void }) {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(formData)
             });
-            if (res.ok) onSuccess();
-        } catch (e) {} finally { setIsSubmitting(false); }
+            if (res.ok) {
+                onSuccess();
+            } else {
+                const data = await res.json();
+                alert(`Error: ${data.detail || 'Failed to add vehicle'}`);
+            }
+        } catch (e: any) {
+            alert(`Network error: ${e.message}`);
+        } finally { setIsSubmitting(false); }
     };
 
     return (
@@ -683,8 +695,15 @@ function TripForm({ vehicles, onSuccess }: any) {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({...formData, status: 'scheduled'})
             });
-            if (res.ok) onSuccess();
-        } catch (e) {}
+            if (res.ok) {
+                onSuccess();
+            } else {
+                const data = await res.json();
+                alert(`Error: ${data.detail || 'Failed to schedule trip'}`);
+            }
+        } catch (e: any) {
+            alert(`Network error: ${e.message}`);
+        }
     };
     return (
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -714,8 +733,15 @@ function MaintenanceForm({ vehicles, onSuccess }: any) {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({...formData, cost: parseFloat(formData.cost), odometer_reading: parseFloat(formData.odometer_reading), next_service_due_odometer: parseFloat(formData.next_service_due_odometer)})
             });
-            if (res.ok) onSuccess();
-        } catch (e) {}
+            if (res.ok) {
+                onSuccess();
+            } else {
+                const data = await res.json();
+                alert(`Error: ${data.detail || 'Failed to post maintenance log'}`);
+            }
+        } catch (e: any) {
+            alert(`Network error: ${e.message}`);
+        }
     };
     return (
         <form onSubmit={handleSubmit} className="space-y-6">

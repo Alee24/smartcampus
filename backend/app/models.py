@@ -184,7 +184,7 @@ class VehicleLog(UUIDModel, table=True):
 class FleetTrip(UUIDModel, table=True):
     __tablename__ = "fleet_trips"
     vehicle_id: UUID = Field(foreign_key="vehicles.id")
-    driver_id: UUID = Field(foreign_key="users.id")
+    driver_id: Optional[UUID] = Field(default=None, foreign_key="users.id", nullable=True)
     
     purpose: str
     origin: str
@@ -229,7 +229,7 @@ class FleetPassengerManifest(UUIDModel, table=True):
 class FleetFuelLog(UUIDModel, table=True):
     __tablename__ = "fleet_fuel_logs"
     vehicle_id: UUID = Field(foreign_key="vehicles.id")
-    driver_id: UUID = Field(foreign_key="users.id")
+    driver_id: Optional[UUID] = Field(default=None, foreign_key="users.id", nullable=True)
     
     amount_liters: float
     cost: float
