@@ -1,9 +1,21 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, Any, Dict
 from uuid import UUID
 from fastapi import Request
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models import AuditLog, User
+
+def json_safe_dict(d: Any) -> Any:
+    """Recursively convert UUIDs and datetimes to strings for JSON serialization."""
+    if isinstance(d, dict):
+        return {k: json_safe_dict(v) for k, v in d.items()}
+    elif isinstance(d, list):
+        return [json_safe_dict(v) for v in d]
+    elif isinstance(d, UUID):
+        return str(d)
+    elif isinstance(d, (datetime, date)):
+        return d.isoformat()
+    return d
 
 async def log_action(
     session: AsyncSession,
@@ -55,8 +67,8 @@ async def log_action(
         action_type=action_type,
         table_name=table_name,
         record_id=str(record_id) if record_id else None,
-        old_values=old_values or {},
-        new_values=new_values or {},
+        old_values=json_safe_dict(old_values) if old_values else {},
+        new_values=json_safe_dict(new_values) if new_values else {},
         ip_address=ip_address,
         user_agent=user_agent,
         description=description

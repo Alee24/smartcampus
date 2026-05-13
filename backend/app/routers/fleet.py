@@ -30,22 +30,27 @@ async def create_vehicle(
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_user)
 ):
-    session.add(vehicle)
-    await session.commit()
-    await session.refresh(vehicle)
-    
-    await log_action(
-        session=session,
-        action_type="create",
-        user=admin,
-        table_name="vehicles",
-        record_id=str(vehicle.id),
-        description=f"Registered new vehicle: {vehicle.plate_number} ({vehicle.make} {vehicle.model})",
-        new_values=vehicle.dict(),
-        request=request
-    )
-    
-    return vehicle
+    try:
+        session.add(vehicle)
+        await session.commit()
+        await session.refresh(vehicle)
+        
+        await log_action(
+            session=session,
+            action_type="create",
+            user=admin,
+            table_name="vehicles",
+            record_id=str(vehicle.id),
+            description=f"Registered new vehicle: {vehicle.plate_number} ({vehicle.make} {vehicle.model})",
+            new_values=vehicle.dict(),
+            request=request
+        )
+        return vehicle
+    except Exception as e:
+        await session.rollback()
+        if "Duplicate entry" in str(e) or "1062" in str(e):
+            raise HTTPException(status_code=400, detail=f"A vehicle with plate number {vehicle.plate_number} already exists.")
+        raise HTTPException(status_code=500, detail=f"Failed to register vehicle: {str(e)}")
 
 @router.get("/vehicles/{vehicle_id}", response_model=Vehicle)
 async def get_vehicle(vehicle_id: UUID, session: AsyncSession = Depends(get_session)):
