@@ -845,8 +845,25 @@ async def bulk_upload_photos(
         errors = []
         
         with zipfile.ZipFile(zip_ref_io, 'r') as zip_ref:
-            # List files (ignoring __MACOSX)
-            files = [f for f in zip_ref.namelist() if not f.startswith('__MACOSX') and not f.endswith('/')]
+            # 1.5. Detect CSV inside ZIP if mapping is empty
+            if not mapping:
+                csv_files_in_zip = [f for f in zip_ref.namelist() if f.lower().endswith('.csv') and not f.startswith('__MACOSX')]
+                if csv_files_in_zip:
+                    try:
+                        with zip_ref.open(csv_files_in_zip[0]) as zcsv:
+                            csv_text = zcsv.read().decode('utf-8')
+                            delimiter = ','
+                            if ';' in csv_text and ',' not in csv_text: delimiter = ';'
+                            reader = csv.reader(StringIO(csv_text), delimiter=delimiter)
+                            for row in reader:
+                                if len(row) >= 2:
+                                    adm, suffix = row[0].strip(), row[1].strip()
+                                    if not adm or adm.lower() in ["admission", "adm_no", "reg_no", "id"]: continue
+                                    mapping[suffix.upper()] = adm
+                    except: pass
+
+            # List files (ignoring __MACOSX and directories and the CSV itself)
+            files = [f for f in zip_ref.namelist() if not f.startswith('__MACOSX') and not f.endswith('/') and not f.lower().endswith('.csv')]
             
             for file_name in files:
                 if file_name.startswith('__MACOSX'): continue
@@ -856,33 +873,36 @@ async def bulk_upload_photos(
                     
                     stem = Path(name_only).stem.strip().upper()
                     user = None
+                    adm_no_candidate = None
                     
-                    # A. Match by CSV Mapping (Suffix Match)
+                    # A. Match by CSV Mapping (Suffix/ID Match)
                     if mapping:
-                        # Check exact filename first
-                        adm_no = mapping.get(name_only) or mapping.get(stem)
-                        
-                        if not adm_no:
-                            # Check if any suffix in mapping matches the end of this filename
-                            for suffix, mapped_adm in mapping.items():
-                                if stem.endswith(suffix.upper()):
-                                    adm_no = mapped_adm
+                        adm_no_candidate = mapping.get(name_only) or mapping.get(stem)
+                        if not adm_no_candidate:
+                            for m_suffix, m_adm in mapping.items():
+                                if stem == m_suffix.upper() or stem.endswith(m_suffix.upper()):
+                                    adm_no_candidate = m_adm
                                     break
+                    
+                    # B. Fallback: Match by Filename directly (Filename = Admission Number)
+                    if not adm_no_candidate:
+                        adm_no_candidate = stem
+                    
+                    if adm_no_candidate:
+                        adm_no_norm = str(adm_no_candidate).strip().upper()
+                        user = user_map.get(adm_no_norm)
                         
-                        if adm_no:
-                            adm_no_norm = adm_no.strip().upper()
-                            user = user_map.get(adm_no_norm)
-                            
-                            # C. Auto-Create Missing User (Data Entry Mode)
-                            if not user:
-                                # Use Admission Number as default for name/email if not provided
+                        # C. Auto-Create Missing User
+                        if not user:
+                            # Basic validation: ensure it's not a generic name
+                            if len(adm_no_norm) >= 3:
                                 new_user = User(
                                     admission_number=adm_no_norm,
                                     full_name=adm_no_norm,
                                     school="General",
                                     role_id=student_role_id,
                                     status="Active",
-                                    hashed_password=get_password_hash(adm_no_norm) # Default password is their Admission Number
+                                    hashed_password=get_password_hash(adm_no_norm)
                                 )
                                 session.add(new_user)
                                 user = new_user

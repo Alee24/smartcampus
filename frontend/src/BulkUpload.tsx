@@ -86,7 +86,7 @@ export default function BulkUpload() {
             endpoint: 'photos',
             icon: <Image size={24} />,
             color: 'bg-teal-500',
-            example: 'CSV FORMAT (Admission Number, Photo ID/Suffix):\n23ZAD107643, 2847\n23ZAD107639, 2848\n\nZIP FILE:\nShould contain photos like DSCN2847.JPG, DSCN2848.JPG, etc.\n\nLOGIC:\nThe system matches the Admission Number to any image file that ENDS with the corresponding Photo ID/Suffix.',
+            example: 'MATCHING MODES:\n1. DIRECT: Name your photos as the Admission Number (e.g., ADM123.jpg).\n2. CSV MAPPING: Include a CSV in the ZIP or upload one below mapping Admission -> Photo Name.\n\nCSV FORMAT:\nAdmission Number, Photo ID\n23ZAD107643, 2847\n\nLOGIC:\nMatches filename to Admission Number (e.g. 2847.jpg) or ends-with match if using CSV.',
             status: 'pending'
         }
     ]
