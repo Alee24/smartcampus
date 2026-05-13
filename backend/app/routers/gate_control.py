@@ -4,6 +4,7 @@ from sqlmodel import select
 from app.database import get_session
 from app.models import User, EntryLog, Gate, Vehicle, VehicleLog, Visitor, Event, GateScanLog
 from app.utils.audit import log_action
+from app.auth import get_current_user
 from datetime import datetime
 import shutil
 import os
@@ -12,6 +13,69 @@ import random # For mocking
 from typing import Optional
 
 router = APIRouter()
+
+# --- Student Self-Service Gate Endpoints ---
+
+@router.get("/my-status")
+async def get_my_gate_status(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Check if the current student is checked in (has an open entry log with no exit_time)"""
+    open_log = (await session.exec(
+        select(EntryLog)
+        .where(EntryLog.user_id == current_user.id)
+        .where(EntryLog.exit_time == None)
+        .order_by(EntryLog.entry_time.desc())
+    )).first()
+    
+    if open_log:
+        return {
+            "checked_in": True,
+            "entry_time": open_log.entry_time.strftime("%I:%M %p"),
+            "entry_id": str(open_log.id)
+        }
+    return {"checked_in": False}
+
+@router.post("/self-checkout")
+async def self_checkout(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Allow a checked-in student to check themselves out"""
+    open_log = (await session.exec(
+        select(EntryLog)
+        .where(EntryLog.user_id == current_user.id)
+        .where(EntryLog.exit_time == None)
+        .order_by(EntryLog.entry_time.desc())
+    )).first()
+    
+    if not open_log:
+        raise HTTPException(status_code=400, detail="You are not currently checked in")
+    
+    open_log.exit_time = datetime.utcnow()
+    session.add(open_log)
+    await session.commit()
+    
+    try:
+        await log_action(
+            session=session,
+            action_type="update",
+            user=current_user,
+            table_name="entry_logs",
+            record_id=str(open_log.id),
+            description=f"Self-checkout by {current_user.full_name} ({current_user.admission_number})",
+            request=request
+        )
+    except Exception:
+        pass
+    
+    return {
+        "message": "Check-out successful",
+        "time": open_log.exit_time.strftime("%I:%M %p")
+    }
+
 
 @router.post("/manual-vehicle-entry")
 async def manual_vehicle_entry(

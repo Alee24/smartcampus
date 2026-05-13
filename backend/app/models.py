@@ -604,3 +604,11 @@ class AuditLog(UUIDModel, table=True):
     description: Optional[str] = None # Human readable summary
 
     user: Optional["User"] = Relationship()
+
+class GeofenceSetting(UUIDModel, table=True):
+    __tablename__ = "geofence_settings"
+    name: str = Field(unique=True, index=True) # e.g., "University Wi-Fi", "Main Gate"
+    ip_range: str # e.g., "192.168.1.0/24", "10.0.0.1", or comma-separated list
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    description: Optional[str] = None

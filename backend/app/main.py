@@ -315,11 +315,65 @@ os.makedirs("uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+import ipaddress
+
+async def is_ip_allowed(ip_address: str, session: AsyncSession) -> bool:
+    """Check if an IP address is allowed based on geofence settings."""
+    # 1. Check if geofencing is enabled (global toggle)
+    stmt = select(SystemConfig).where(SystemConfig.key == "enable_geofencing")
+    config = (await session.exec(stmt)).first()
+    if not config or config.value.lower() != "true":
+        return True # Geofencing disabled
+        
+    # 2. Get active geofence settings
+    stmt = select(GeofenceSetting).where(GeofenceSetting.is_active == True)
+    settings = (await session.exec(stmt)).all()
+    
+    if not settings:
+        # If enabled but no rules, we block all for security (Whitelist mode)
+        return False 
+
+    try:
+        user_ip = ipaddress.ip_address(ip_address)
+    except ValueError:
+        return False # Invalid IP
+        
+    for setting in settings:
+        # Range can be "192.168.1.0/24" or "192.168.1.1, 192.168.1.2"
+        ranges = [r.strip() for r in setting.ip_range.split(",")]
+        for r in ranges:
+            try:
+                if "/" in r:
+                    if user_ip in ipaddress.ip_network(r):
+                        return True
+                else:
+                    if user_ip == ipaddress.ip_address(r):
+                        return True
+            except:
+                continue
+                
+    return False
+
 # Auth Endpoint
 from fastapi import Request
 @app.post("/api/token")
 async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: AsyncSession = Depends(get_session)):
     try:
+        # --- Geofence Check ---
+        client_ip = request.client.host if request.client else "unknown"
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            client_ip = forwarded_for.split(",")[0].strip()
+            
+        allowed = await is_ip_allowed(client_ip, session)
+        if not allowed:
+            print(f"Login Blocked: IP {client_ip} not in geofence whitelist.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access Denied: Your IP address ({client_ip}) is not authorized to access this system. Please connect to the University Wi-Fi.",
+            )
+        # ----------------------
+
         print(f"Login Attempt: {form_data.username}")
         
         # Query with eager loading of role relationship

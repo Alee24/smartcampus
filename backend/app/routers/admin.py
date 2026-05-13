@@ -761,6 +761,94 @@ async def bulk_upload_timetable_slots(
             
         await session.commit()
         return {"status": "success", "count": count, "errors": errors}
+
+# --- Geofence Settings ---
+
+from app.models import GeofenceSetting
+
+@router.get("/geofence")
+async def get_geofence_settings(
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(ensure_admin)
+):
+    """Get all geofence settings"""
+    settings = (await session.exec(select(GeofenceSetting))).all()
+    return settings
+
+@router.post("/geofence")
+async def create_geofence_setting(
+    request: Request,
+    payload: dict,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(ensure_admin)
+):
+    """Create or update geofence setting"""
+    name = payload.get("name")
+    ip_range = payload.get("ip_range")
+    description = payload.get("description", "")
+    is_active = payload.get("is_active", True)
+    
+    if not name or not ip_range:
+        raise HTTPException(status_code=400, detail="Name and IP range are required")
+        
+    stmt = select(GeofenceSetting).where(GeofenceSetting.name == name)
+    existing = (await session.exec(stmt)).first()
+    
+    if existing:
+        existing.ip_range = ip_range
+        existing.description = description
+        existing.is_active = is_active
+        session.add(existing)
+        action = "update_geofence"
+    else:
+        new_setting = GeofenceSetting(
+            name=name,
+            ip_range=ip_range,
+            description=description,
+            is_active=is_active
+        )
+        session.add(new_setting)
+        action = "create_geofence"
+        
+    await session.commit()
+    
+    await log_action(
+        session=session,
+        action_type=action,
+        user=admin,
+        table_name="geofence_settings",
+        description=f"{action.replace('_', ' ').title()} {name}",
+        new_values=payload,
+        request=request
+    )
+    
+    return {"status": "success"}
+
+@router.delete("/geofence/{setting_id}")
+async def delete_geofence_setting(
+    request: Request,
+    setting_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(ensure_admin)
+):
+    """Delete geofence setting"""
+    setting = await session.get(GeofenceSetting, setting_id)
+    if not setting:
+        raise HTTPException(status_code=404, detail="Setting not found")
+        
+    await session.delete(setting)
+    await session.commit()
+    
+    await log_action(
+        session=session,
+        action_type="delete_geofence",
+        user=admin,
+        table_name="geofence_settings",
+        description=f"Deleted geofence setting {setting.name}",
+        request=request
+    )
+    
+    return {"status": "success"}
     except Exception as e:
         # Catch-all to prevent 500
         return {"status": "partial_success", "count": 0, "errors": [str(e)]}

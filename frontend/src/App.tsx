@@ -47,6 +47,7 @@ const CampusCalendar = lazy(() => import('./CampusCalendar'))
 const FleetManagement = lazy(() => import('./FleetManagement'))
 const AuditLogs = lazy(() => import('./AuditLogs'))
 const IDPrinting = lazy(() => import('./IDPrinting'))
+const Geofencing = lazy(() => import('./Geofencing'))
 
 // 3. Non-lazy components (small/critical)
 import InstallPWA from './components/InstallPWA'
@@ -324,7 +325,8 @@ function App() {
                 'bulk': true,
                 'settings': true,
                 'integrations': true,
-                'fleet': true
+                'fleet': true,
+                'geofencing': true
             }
         }
     }
@@ -779,6 +781,7 @@ function App() {
                                 <NavItem icon={<Sliders size={18} />} label="Design System" active={activeTab === 'dashboard-designer'} onClick={() => { setActiveTab('dashboard-designer'); setSidebarOpen(false); }} />
                                 <NavItem icon={<Server size={18} />} label="API Integrations" active={activeTab === 'integrations'} onClick={() => { setActiveTab('integrations'); setSidebarOpen(false); }} />
                                 <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => { setActiveTab('audit'); setSidebarOpen(false); }} />
+                                <NavItem icon={<Shield size={18} />} label="IP Geofencing" active={activeTab === 'geofencing'} onClick={() => { setActiveTab('geofencing'); setSidebarOpen(false); }} />
                             </SidebarGroup>
                         )}
                         <SidebarGroup title="Support" isOpen={openGroups.support} onToggle={() => toggleGroup('support')} isSidebarCollapsed={isSidebarCollapsed}>
@@ -859,6 +862,7 @@ function App() {
                                             { id: 'dashboard-designer', label: 'Design', icon: Sliders },
                                             { id: 'integrations', label: 'APIs', icon: Server },
                                             { id: 'audit', label: 'Logs', icon: History },
+                                            { id: 'geofencing', label: 'Geofence', icon: Shield },
                                             { id: 'calendar', label: 'Calendar', icon: Calendar }
                                         ].map(item => (
                                             <button
@@ -1335,6 +1339,7 @@ function App() {
                     {activeTab === 'fleet-tracking' && <FleetManagement initialTab="tracking" />}
                     {activeTab === 'fleet-trips' && <FleetManagement initialTab="trips" />}
                     {activeTab === 'audit' && <AuditLogs />}
+                    {activeTab === 'geofencing' && <Geofencing />}
                     {activeTab === 'id-printing' && <IDPrinting />}
                     <footer className="mt-10 pt-6 border-t border-[var(--border-color)] text-center text-sm text-[var(--text-secondary)]">
                         <p>&copy; {new Date().getFullYear()} Smart Campus System.</p>
