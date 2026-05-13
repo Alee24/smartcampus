@@ -156,15 +156,18 @@ async def save_company_settings(
     
     await session.commit()
     
-    await log_action(
-        session=session,
-        action_type="update_company_settings",
-        user=admin,
-        table_name="system_configs",
-        description="Updated company/university settings",
-        new_values=payload,
-        request=request
-    )
+    try:
+        await log_action(
+            session=session,
+            action_type="update_company_settings",
+            user=admin,
+            table_name="system_configs",
+            description="Updated company/university settings",
+            new_values={"company_name": payload.get("company_name", ""), "logo_url": payload.get("logo_url", "")},
+            request=request
+        )
+    except Exception as e:
+        print(f"Audit log warning (non-blocking): {e}")
     
     return {"status": "success"}
 

@@ -125,6 +125,10 @@ function App() {
     const [loading, setLoading] = useState(true)
     const [isSidebarOpen, setSidebarOpen] = useState(false)
     const [isSidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const [companySettings, setCompanySettings] = useState<{company_name: string, logo_url: string}>({
+        company_name: 'Smart Campus',
+        logo_url: ''
+    })
     const [openGroups, setOpenGroups] = useState<any>({
         overview: true,
         events: false,
@@ -221,6 +225,25 @@ function App() {
         if (isAuthenticated) {
             fetchMenuConfig()
         }
+    }, [isAuthenticated])
+
+    // Fetch company settings (logo, name) for sidebar and all pages
+    useEffect(() => {
+        const fetchCompanySettings = async () => {
+            try {
+                const res = await fetch('/api/users/public-company-settings')
+                if (res.ok) {
+                    const data = await res.json()
+                    setCompanySettings({
+                        company_name: data.company_name || 'Smart Campus',
+                        logo_url: data.logo_url || ''
+                    })
+                }
+            } catch (e) {
+                console.error('Failed to fetch company settings:', e)
+            }
+        }
+        fetchCompanySettings()
     }, [isAuthenticated])
 
     // Default configuration if none is saved
@@ -526,8 +549,14 @@ function App() {
                 <div className="p-6 relative">
                     <div className="flex items-center justify-between mb-8">
                         <div className={`flex items-center gap-2 transition-all overflow-hidden ${isSidebarCollapsed ? 'justify-center w-full px-0' : ''}`}>
-                            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white font-bold shrink-0">S</div>
-                            <h1 className={`text-xl font-bold text-[var(--text-primary)] whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>Smart Campus</h1>
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                                {companySettings.logo_url ? (
+                                    <img src={companySettings.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                                ) : (
+                                    <div className="w-full h-full bg-black rounded-lg flex items-center justify-center text-white font-bold">S</div>
+                                )}
+                            </div>
+                            <h1 className={`text-xl font-bold text-[var(--text-primary)] whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>{companySettings.company_name}</h1>
                         </div>
 
                         {/* Toggle Button (Desktop) */}
