@@ -427,7 +427,7 @@ export default function StudentVerification() {
                                                     <div>
                                                         <p className="text-[10px] font-bold text-pink-400 uppercase tracking-[0.2em] mb-1">Last Accessed</p>
                                                         <p className="font-bold text-gray-800 dark:text-gray-200 text-xl">
-                                                            {new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: '2026' })}
+                                                            {new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
                                                         </p>
                                                     </div>
                                                 </div>
