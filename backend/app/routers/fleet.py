@@ -287,9 +287,13 @@ async def get_fleet_stats(session: AsyncSession = Depends(get_session)):
     # Maintenance due
     maintenance_due = (await session.exec(select(func.count(Vehicle.id)).where(Vehicle.status == "maintenance"))).first()
     
+    # Fuel usage (total liters)
+    fuel_usage = (await session.exec(select(func.sum(FleetFuelLog.amount_liters)))).first() or 0
+    
     return {
         "total_vehicles": total_vehicles,
         "active_trips": active_trips,
         "maintenance_due": maintenance_due,
         "active_drivers": 10, # Mocked for now
+        "fuel_usage": round(float(fuel_usage), 2)
     }
