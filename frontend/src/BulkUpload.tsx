@@ -157,18 +157,22 @@ export default function BulkUpload() {
         if (useCompression && zipFile.name.toLowerCase().endsWith('.zip')) {
             try {
                 setIsCompressing(true)
-                setMessages(prev => [...prev, { type: 'info', text: 'Preparing smart compression...' }])
+                setMessages(prev => [...prev, { type: 'info', text: 'Analyzing ZIP for optimization...' }])
                 
                 const JSZip = (await import('jszip')).default
                 const imageCompression = (await import('browser-image-compression')).default
                 
+                // Read as ArrayBuffer to ensure file stays in memory and avoid permission issues
+                const arrayBuffer = await zipFile.arrayBuffer()
                 const originalZip = new JSZip()
-                const zipData = await originalZip.loadAsync(zipFile)
+                const zipData = await originalZip.loadAsync(arrayBuffer)
                 const newZip = new JSZip()
                 
                 const files = Object.keys(zipData.files).filter(name => !zipData.files[name].dir)
                 let processedCount = 0
                 
+                setMessages(prev => [...prev, { type: 'info', text: `Optimizing ${files.length} items. This may take a minute...` }])
+
                 for (const filename of files) {
                     const fileData = await zipData.files[filename].async('blob')
                     
@@ -176,30 +180,38 @@ export default function BulkUpload() {
                     if (filename.toLowerCase().match(/\.(jpg|jpeg|png|webp)$/)) {
                         try {
                             const options = {
-                                maxSizeMB: 0.2, // Aim for 200KB per image
-                                maxWidthOrHeight: 1000,
+                                maxSizeMB: 0.15, // Aim for ~150KB per image for fast loading
+                                maxWidthOrHeight: 1024,
                                 useWebWorker: true,
-                                initialQuality: 0.7
+                                initialQuality: 0.6
                             }
                             const compressedBlob = await imageCompression(new File([fileData], filename), options)
                             newZip.file(filename, compressedBlob)
                         } catch (e) {
-                            newZip.file(filename, fileData) // Fallback to original if compression fails
+                            newZip.file(filename, fileData) // Fallback to original
                         }
                     } else {
-                        newZip.file(filename, fileData) // Keep non-image files as is
+                        newZip.file(filename, fileData) 
                     }
                     
                     processedCount++
-                    setCompressionProgress(Math.round((processedCount / files.length) * 100))
+                    if (processedCount % 10 === 0 || processedCount === files.length) {
+                        setCompressionProgress(Math.round((processedCount / files.length) * 100))
+                    }
                 }
                 
-                setMessages(prev => [...prev, { type: 'success', text: `Compression complete! Optimized ${files.length} images.` }])
-                finalZip = (await newZip.generateAsync({ type: 'blob' })) as File
+                const optimizedBlob = await newZip.generateAsync({ 
+                    type: 'blob',
+                    compression: "DEFLATE",
+                    compressionOptions: { level: 6 }
+                })
+                
+                finalZip = new File([optimizedBlob], "optimized_photos.zip", { type: "application/zip" })
+                setMessages(prev => [...prev, { type: 'success', text: `Optimization complete: ${files.length} images compressed.` }])
                 setIsCompressing(false)
             } catch (error: any) {
                 console.error("Compression failed", error)
-                setMessages(prev => [...prev, { type: 'error', text: `Compression failed: ${error.message}. Proceeding with original file.` }])
+                setMessages(prev => [...prev, { type: 'error', text: `Smart Optimization bypassed: ${error.message}. Uploading original ZIP instead.` }])
                 setIsCompressing(false)
             }
         }

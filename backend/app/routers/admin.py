@@ -941,6 +941,8 @@ async def bulk_upload_photos(
                             )
                             session.add(log)
                             success_count += 1
+                            if success_count % 10 == 0:
+                                print(f"Synced {success_count} photos...")
                             if success_count % 100 == 0:
                                 await session.commit()
                         else:
@@ -951,6 +953,7 @@ async def bulk_upload_photos(
                     failed_count += 1
                     errors.append(f"Error processing {file_name}: {str(e)}")
             
+            print(f"Bulk photo sync complete. Success: {success_count}, Failed: {failed_count}")
             await session.commit()
             
     except Exception as e:

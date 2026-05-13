@@ -729,7 +729,7 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                         <div className="relative">
                             {user.profile_image ? (
                                 <img
-                                    src={user.profile_image.startsWith('http') ? user.profile_image : `http://localhost:8000${user.profile_image}`}
+                                    src={user.profile_image.startsWith('http') ? user.profile_image : user.profile_image}
                                     alt={user.full_name}
                                     className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg"
                                 />
