@@ -88,11 +88,12 @@ export default function CompanySettings() {
                 // Reload page to update logo everywhere
                 setTimeout(() => window.location.reload(), 1500)
             } else {
-                setMessage({ type: 'error', text: 'Failed to save settings' })
+                const errorData = await res.text()
+                setMessage({ type: 'error', text: `Failed to save settings: ${res.status} - ${errorData}` })
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e)
-            setMessage({ type: 'error', text: 'Error saving settings' })
+            setMessage({ type: 'error', text: `Network error: ${e.message}` })
         } finally {
             setSaving(false)
         }
