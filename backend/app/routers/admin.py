@@ -761,6 +761,8 @@ async def bulk_upload_timetable_slots(
             
         await session.commit()
         return {"status": "success", "count": count, "errors": errors}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Timetable upload failed: {str(e)}")
 
 # --- Geofence Settings ---
 
@@ -849,9 +851,6 @@ async def delete_geofence_setting(
     )
     
     return {"status": "success"}
-    except Exception as e:
-        # Catch-all to prevent 500
-        return {"status": "partial_success", "count": 0, "errors": [str(e)]}
 
 
 @router.post("/bulk/photos")
