@@ -29,7 +29,7 @@ async def get_all_users(
 ):
     """List all users with their roles"""
     # Outer join ensures users display even if role link is broken
-    query = select(User, Role).outerjoin(Role, User.role_id == Role.id)
+    query = select(User, Role).outerjoin(Role, User.role_id == Role.id).order_by(User.created_at.desc())
     results = await session.exec(query)
     
     users_list = []
@@ -481,7 +481,7 @@ async def list_users(
     session: AsyncSession = Depends(get_session), 
     current_user: User = Depends(get_current_user)
 ):
-    statement = select(User)
+    statement = select(User).order_by(User.created_at.desc())
     results = await session.exec(statement)
     return results.all()
 
