@@ -2,7 +2,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.database import engine
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from app.models import ClassSession, AttendanceRecord, User, Course
+from app.models import ClassSession, AttendanceRecord, User, Course, EntryLog, Visitor
 from app.email_utils import send_attendance_email
 from datetime import datetime
 import csv
@@ -86,11 +86,33 @@ async def generate_and_send_daily_reports():
                 if os.path.exists(filepath):
                     os.remove(filepath)
 
+async def auto_checkout_users_and_visitors():
+    print("Running Auto Checkout Job...")
+    now = datetime.utcnow()
+    
+    async with AsyncSession(engine) as session:
+        # Checkout Users (EntryLog)
+        open_logs = (await session.exec(select(EntryLog).where(EntryLog.exit_time == None))).all()
+        for log in open_logs:
+            log.exit_time = now
+            session.add(log)
+            
+        # Checkout Visitors
+        open_visitors = (await session.exec(select(Visitor).where(Visitor.status == "checked_in"))).all()
+        for visitor in open_visitors:
+            visitor.time_out = now
+            visitor.status = "checked_out"
+            session.add(visitor)
+            
+        await session.commit()
+        print(f"Auto-checked out {len(open_logs)} users and {len(open_visitors)} visitors.")
+
 def start_scheduler():
     # Schedule report at 6:00 PM every day
     try:
         scheduler.add_job(generate_and_send_daily_reports, 'cron', hour=18, minute=0)
+        scheduler.add_job(auto_checkout_users_and_visitors, 'cron', hour=0, minute=0)
         scheduler.start()
-        print("Scheduler Started: Daily Reports at 18:00")
+        print("Scheduler Started: Daily Reports at 18:00, Auto Checkout at 00:00")
     except Exception as e:
         print(f"Failed to start scheduler: {e}")
