@@ -45,7 +45,6 @@ async def fix_schema():
                     await conn.execute(text(f"ALTER TABLE vehicles ADD COLUMN {col} {type_}"))
         except Exception as e:
             print("Error migrating vehicles table:", e)
-
         # 3. Fix fleet_trips driver_id
         try:
             print("Disabling foreign key checks for schema alter...")
@@ -65,6 +64,40 @@ async def fix_schema():
             except Exception:
                 pass
             print("fleet_trips error:", e)
+
+        # 4. Add trip_lead_name and trip_lead_contact to fleet_trips
+        try:
+            def get_trip_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                return [c['name'] for c in inspector.get_columns('fleet_trips')]
+            trip_cols = await conn.run_sync(get_trip_cols)
+            
+            if "trip_lead_name" not in trip_cols:
+                print("Adding trip_lead_name column to fleet_trips...")
+                await conn.execute(text("ALTER TABLE fleet_trips ADD COLUMN trip_lead_name VARCHAR(255) NULL"))
+            if "trip_lead_contact" not in trip_cols:
+                print("Adding trip_lead_contact column to fleet_trips...")
+                await conn.execute(text("ALTER TABLE fleet_trips ADD COLUMN trip_lead_contact VARCHAR(255) NULL"))
+        except Exception as e:
+            print("Error migrating fleet_trips table columns:", e)
+
+        # 5. Add admission_number and emergency_contact_phone to fleet_passenger_manifest
+        try:
+            def get_passenger_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                return [c['name'] for c in inspector.get_columns('fleet_passenger_manifest')]
+            pass_cols = await conn.run_sync(get_passenger_cols)
+            
+            if "admission_number" not in pass_cols:
+                print("Adding admission_number column to fleet_passenger_manifest...")
+                await conn.execute(text("ALTER TABLE fleet_passenger_manifest ADD COLUMN admission_number VARCHAR(255) NULL"))
+            if "emergency_contact_phone" not in pass_cols:
+                print("Adding emergency_contact_phone column to fleet_passenger_manifest...")
+                await conn.execute(text("ALTER TABLE fleet_passenger_manifest ADD COLUMN emergency_contact_phone VARCHAR(255) NULL"))
+        except Exception as e:
+            print("Error migrating fleet_passenger_manifest table columns:", e)
 
 if __name__ == "__main__":
     if sys.platform == 'win32':

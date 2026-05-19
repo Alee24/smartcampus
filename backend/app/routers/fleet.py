@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from sqlmodel import select, func
 from sqlmodel.ext.asyncio.session import AsyncSession
 from pydantic import BaseModel
@@ -66,6 +66,21 @@ class TripCreate(BaseModel):
     start_odometer: float = 0.0
     status: str = "scheduled"
     notes: Optional[str] = None
+    trip_lead_name: Optional[str] = None
+    trip_lead_contact: Optional[str] = None
+
+class TripUpdate(BaseModel):
+    vehicle_id: Optional[UUID] = None
+    driver_id: Optional[UUID] = None
+    purpose: Optional[str] = None
+    origin: Optional[str] = None
+    destination: Optional[str] = None
+    planned_route: Optional[str] = None
+    scheduled_departure: Optional[datetime] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+    trip_lead_name: Optional[str] = None
+    trip_lead_contact: Optional[str] = None
 
 class FuelLogCreate(BaseModel):
     vehicle_id: UUID
@@ -424,7 +439,9 @@ async def get_trips(session: AsyncSession = Depends(get_session)):
             "start_odometer": t.start_odometer,
             "end_odometer": t.end_odometer,
             "status": t.status,
-            "notes": t.notes
+            "notes": t.notes,
+            "trip_lead_name": t.trip_lead_name,
+            "trip_lead_contact": t.trip_lead_contact
         }
         for t in trips
     ]
@@ -456,7 +473,9 @@ async def create_trip(
             scheduled_departure=trip_data.scheduled_departure,
             start_odometer=trip_data.start_odometer,
             status=trip_data.status,
-            notes=trip_data.notes
+            notes=trip_data.notes,
+            trip_lead_name=trip_data.trip_lead_name,
+            trip_lead_contact=trip_data.trip_lead_contact
         )
         session.add(trip)
         await session.commit()
@@ -488,8 +507,252 @@ async def create_trip(
             "destination": trip.destination,
             "scheduled_departure": trip.scheduled_departure.isoformat(),
             "status": trip.status,
-            "start_odometer": trip.start_odometer
+            "start_odometer": trip.start_odometer,
+            "trip_lead_name": trip.trip_lead_name,
+            "trip_lead_contact": trip.trip_lead_contact
         }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to schedule trip: {str(e)}")
+
+@router.get("/trips/{trip_id}")
+async def get_trip_details(
+    trip_id: UUID,
+    session: AsyncSession = Depends(get_session)
+):
+    from sqlalchemy.orm import selectinload
+    trip = (await session.exec(
+        select(FleetTrip)
+        .where(FleetTrip.id == trip_id)
+        .options(
+            selectinload(FleetTrip.vehicle),
+            selectinload(FleetTrip.driver),
+            selectinload(FleetTrip.passengers)
+        )
+    )).first()
+    
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+        
+    driver_name = trip.driver.full_name if trip.driver else (trip.vehicle.driver_name if trip.vehicle else "N/A")
+    driver_contact = trip.driver.phone_number if trip.driver else (trip.vehicle.driver_contact if trip.vehicle else "N/A")
+    
+    return {
+        "id": str(trip.id),
+        "vehicle_id": str(trip.vehicle_id),
+        "driver_id": str(trip.driver_id) if trip.driver_id else None,
+        "purpose": trip.purpose,
+        "origin": trip.origin,
+        "destination": trip.destination,
+        "planned_route": trip.planned_route,
+        "scheduled_departure": trip.scheduled_departure.isoformat() if trip.scheduled_departure else None,
+        "actual_departure": trip.actual_departure.isoformat() if trip.actual_departure else None,
+        "actual_arrival": trip.actual_arrival.isoformat() if trip.actual_arrival else None,
+        "start_odometer": trip.start_odometer,
+        "end_odometer": trip.end_odometer,
+        "status": trip.status,
+        "notes": trip.notes,
+        "trip_lead_name": trip.trip_lead_name or "N/A",
+        "trip_lead_contact": trip.trip_lead_contact or "N/A",
+        "vehicle": {
+            "plate_number": trip.vehicle.plate_number if trip.vehicle else "N/A",
+            "make": trip.vehicle.make if trip.vehicle else "N/A",
+            "model": trip.vehicle.model if trip.vehicle else "N/A",
+            "driver_name": driver_name,
+            "driver_contact": driver_contact
+        },
+        "passengers": [
+            {
+                "id": str(p.id),
+                "passenger_name": p.passenger_name,
+                "phone_number": p.phone_number or "N/A",
+                "admission_number": p.admission_number or "N/A",
+                "emergency_contact_phone": p.emergency_contact_phone or "N/A",
+                "pickup_location": p.pickup_location or "N/A",
+                "drop_off_location": p.drop_off_location or "N/A",
+                "arrival_confirmed": p.arrival_confirmed,
+                "check_in_time": p.check_in_time.isoformat() if p.check_in_time else None
+            }
+            for p in trip.passengers
+        ]
+    }
+
+@router.put("/trips/{trip_id}")
+async def update_trip_details(
+    request: Request,
+    trip_id: UUID,
+    trip_data: TripUpdate,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+):
+    try:
+        trip = await session.get(FleetTrip, trip_id)
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+            
+        update_dict = trip_data.dict(exclude_unset=True)
+        for key, value in update_dict.items():
+            if hasattr(trip, key) and value is not None:
+                setattr(trip, key, value)
+                
+        session.add(trip)
+        await session.commit()
+        await session.refresh(trip)
+        
+        await log_action(
+            session=session,
+            action_type="update",
+            user=admin,
+            table_name="fleet_trips",
+            record_id=str(trip.id),
+            description=f"Updated trip details for: {trip.origin} → {trip.destination}",
+            new_values=update_dict,
+            request=request
+        )
+        return {"status": "success", "message": "Trip updated successfully."}
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update trip: {str(e)}")
+
+@router.post("/trips/{trip_id}/manifest/upload")
+async def upload_passenger_manifest(
+    trip_id: UUID,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+):
+    import csv
+    import io
+    try:
+        trip = await session.get(FleetTrip, trip_id)
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+            
+        content = await file.read()
+        try:
+            decoded = content.decode("utf-8")
+        except UnicodeDecodeError:
+            decoded = content.decode("latin-1")
+            
+        csv_file = io.StringIO(decoded)
+        reader = csv.DictReader(csv_file)
+        
+        # Clear existing passengers
+        existing = (await session.exec(
+            select(FleetPassengerManifest).where(FleetPassengerManifest.trip_id == trip_id)
+        )).all()
+        for passenger in existing:
+            await session.delete(passenger)
+            
+        passengers_added = 0
+        for row in reader:
+            name_key = next((k for k in row.keys() if k and "name" in k.lower()), "passenger_name")
+            phone_key = next((k for k in row.keys() if k and "phone" in k.lower() and "emergency" not in k.lower()), "phone_number")
+            adm_key = next((k for k in row.keys() if k and ("admission" in k.lower() or "adm" in k.lower())), "admission_number")
+            emergency_key = next((k for k in row.keys() if k and "emergency" in k.lower()), "emergency_contact_phone")
+            
+            p_name = row.get(name_key) or row.get("name") or row.get("passenger_name")
+            p_phone = row.get(phone_key) or row.get("phone") or row.get("phone_number")
+            p_adm = row.get(adm_key) or row.get("admission") or row.get("admission_number") or row.get("adm_no")
+            p_emergency = row.get(emergency_key) or row.get("emergency") or row.get("emergency_contact_phone") or row.get("emergency_contact")
+            
+            if not p_name:
+                continue
+                
+            manifest_item = FleetPassengerManifest(
+                trip_id=trip_id,
+                passenger_name=p_name.strip(),
+                phone_number=p_phone.strip() if p_phone else None,
+                admission_number=p_adm.strip() if p_adm else None,
+                emergency_contact_phone=p_emergency.strip() if p_emergency else None,
+                arrival_confirmed=False
+            )
+            session.add(manifest_item)
+            passengers_added += 1
+            
+        await session.commit()
+        return {"status": "success", "count": passengers_added, "message": f"Successfully imported {passengers_added} passengers."}
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to upload CSV: {str(e)}")
+
+@router.get("/trips/{trip_id}/report")
+async def get_trip_report_summary(
+    trip_id: UUID,
+    session: AsyncSession = Depends(get_session)
+):
+    from sqlalchemy.orm import selectinload
+    trip = (await session.exec(
+        select(FleetTrip)
+        .where(FleetTrip.id == trip_id)
+        .options(
+            selectinload(FleetTrip.vehicle),
+            selectinload(FleetTrip.driver),
+            selectinload(FleetTrip.passengers)
+        )
+    )).first()
+    
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+        
+    driver_name = trip.driver.full_name if trip.driver else (trip.vehicle.driver_name if trip.vehicle else "N/A")
+    driver_contact = trip.driver.phone_number if trip.driver else (trip.vehicle.driver_contact if trip.vehicle else "N/A")
+    
+    # Calculate duration
+    duration_str = "N/A"
+    if trip.actual_departure and trip.actual_arrival:
+        diff = trip.actual_arrival - trip.actual_departure
+        hrs, remainder = divmod(diff.total_seconds(), 3600)
+        mins, _ = divmod(remainder, 60)
+        duration_str = f"{int(hrs)}h {int(mins)}m"
+    elif trip.actual_departure:
+        diff = datetime.utcnow() - trip.actual_departure
+        hrs, remainder = divmod(diff.total_seconds(), 3600)
+        mins, _ = divmod(remainder, 60)
+        duration_str = f"{int(hrs)}h {int(mins)}m (ongoing)"
+        
+    # Calculate odometer distance
+    distance = 0.0
+    if trip.end_odometer and trip.start_odometer:
+        distance = trip.end_odometer - trip.start_odometer
+        
+    # Find fuel logs associated with this vehicle during the trip
+    fuel_cost = 0.0
+    fuel_liters = 0.0
+    if trip.actual_departure:
+        end_time = trip.actual_arrival or datetime.utcnow()
+        fuel_query = select(FleetFuelLog).where(
+            (FleetFuelLog.vehicle_id == trip.vehicle_id) & 
+            (FleetFuelLog.timestamp >= trip.actual_departure) & 
+            (FleetFuelLog.timestamp <= end_time)
+        )
+        fuel_logs = (await session.exec(fuel_query)).all()
+        fuel_cost = sum(f.cost for f in fuel_logs)
+        fuel_liters = sum(f.amount_liters for f in fuel_logs)
+        
+    return {
+        "id": str(trip.id),
+        "origin": trip.origin,
+        "destination": trip.destination,
+        "purpose": trip.purpose,
+        "scheduled_departure": trip.scheduled_departure.isoformat() if trip.scheduled_departure else None,
+        "actual_departure": trip.actual_departure.isoformat() if trip.actual_departure else None,
+        "actual_arrival": trip.actual_arrival.isoformat() if trip.actual_arrival else None,
+        "duration": duration_str,
+        "distance_km": distance,
+        "status": trip.status,
+        "passenger_count": len(trip.passengers),
+        "fuel_cost": fuel_cost,
+        "fuel_liters": fuel_liters,
+        "trip_lead_name": trip.trip_lead_name or "N/A",
+        "trip_lead_contact": trip.trip_lead_contact or "N/A",
+        "vehicle_plate": trip.vehicle.plate_number if trip.vehicle else "N/A",
+        "driver_name": driver_name,
+        "driver_contact": driver_contact
+    }
 
     except HTTPException:
         raise

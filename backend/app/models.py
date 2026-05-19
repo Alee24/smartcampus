@@ -202,6 +202,8 @@ class FleetTrip(UUIDModel, table=True):
     status: str = "scheduled" # scheduled, ongoing, completed, cancelled
     
     notes: Optional[str] = None
+    trip_lead_name: Optional[str] = Field(default=None, nullable=True)
+    trip_lead_contact: Optional[str] = Field(default=None, nullable=True)
     
     vehicle: Vehicle = Relationship(back_populates="trips")
     driver: Optional[User] = Relationship()
@@ -212,10 +214,11 @@ class FleetPassengerManifest(UUIDModel, table=True):
     trip_id: UUID = Field(foreign_key="fleet_trips.id")
     user_id: Optional[UUID] = Field(foreign_key="users.id", nullable=True) # If student/staff
     
-    # For visitors or if user_id is null
     passenger_name: str
     passenger_id_no: Optional[str] = None 
     phone_number: Optional[str] = None
+    admission_number: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
     
     pickup_location: Optional[str] = None
     drop_off_location: Optional[str] = None

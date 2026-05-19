@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Car, MapPin, Navigation, Fuel, Wrench, AlertTriangle, Users, Plus, Search, Filter, ChevronRight, Activity, Calendar, Clock, Shield, Download, FileText, Settings, Map as MapIcon, TrendingUp, DollarSign, X, Check, Loader2, RefreshCw, Trash2, Edit } from 'lucide-react';
+import { Car, MapPin, Navigation, Fuel, Wrench, AlertTriangle, Users, Plus, Search, Filter, ChevronRight, Activity, Calendar, Clock, Shield, Download, FileText, Settings, Map as MapIcon, TrendingUp, DollarSign, X, Check, Loader2, RefreshCw, Trash2, Edit, Phone, QrCode, FileSpreadsheet, Printer, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
     ResponsiveContainer, AreaChart, Area
@@ -445,9 +445,489 @@ function StatCard({ title, value, icon, change, color }: any) {
     );
 }
 
+function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
+    const [trip, setTrip] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'crew' | 'manifest' | 'emergency' | 'report'>('crew');
+    
+    // Trip Lead form states
+    const [isEditingLead, setIsEditingLead] = useState(false);
+    const [leadName, setLeadName] = useState('');
+    const [leadContact, setLeadContact] = useState('');
+    
+    // File upload states
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+    
+    // Report stats
+    const [report, setReport] = useState<any>(null);
+    const [loadingReport, setLoadingReport] = useState(false);
+
+    const fetchDetails = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/fleet/trips/${tripId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setTrip(data);
+                setLeadName(data.trip_lead_name || '');
+                setLeadContact(data.trip_lead_contact || '');
+            } else {
+                const err = await res.json();
+                setError(err.detail || 'Failed to fetch trip details.');
+            }
+        } catch (e: any) {
+            setError(e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchReport = async () => {
+        setLoadingReport(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/fleet/trips/${tripId}/report`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setReport(data);
+            }
+        } catch (e) {
+            console.error("Failed to load report", e);
+        } finally {
+            setLoadingReport(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchDetails();
+    }, [tripId]);
+
+    useEffect(() => {
+        if (activeTab === 'report') {
+            fetchReport();
+        }
+    }, [activeTab]);
+
+    const handleUpdateLead = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/fleet/trips/${tripId}`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: JSON.stringify({
+                    trip_lead_name: leadName,
+                    trip_lead_contact: leadContact
+                })
+            });
+            if (res.ok) {
+                alert("Trip lead details updated successfully!");
+                setIsEditingLead(false);
+                fetchDetails();
+                if (onUpdate) onUpdate();
+            } else {
+                const err = await res.json();
+                alert(`Failed to update: ${err.detail || 'Error'}`);
+            }
+        } catch (e: any) {
+            alert(`Error: ${e.message}`);
+        }
+    };
+
+    const handleCSVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const fileList = e.target.files;
+        if (!fileList || fileList.length === 0) return;
+        
+        const file = fileList[0];
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        setIsUploading(true);
+        setUploadStatus("Uploading passenger CSV manifest...");
+        
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/fleet/trips/${tripId}/manifest/upload`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setUploadStatus(`Success! Imported ${data.count} passengers.`);
+                setTimeout(() => setUploadStatus(null), 3000);
+                fetchDetails();
+                if (onUpdate) onUpdate();
+            } else {
+                const err = await res.json();
+                setUploadStatus(`Error: ${err.detail || 'Import failed'}`);
+            }
+        } catch (e: any) {
+            setUploadStatus(`Error: ${e.message}`);
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const downloadCSVTemplate = () => {
+        const csvContent = "data:text/csv;charset=utf-8,Admission Number,Passenger Name,Phone Number,Emergency Contact,Pickup Location,Dropoff Location\nRU-9921,John Doe,+254711223344,+254722556677,RU Campus,Nairobi Central\nRU-8842,Jane Smith,+254700889900,+254733445566,RU Campus,Mombasa Road";
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `trip_${tripId}_manifest_template.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center p-12 min-h-[300px]">
+                <Loader2 className="animate-spin text-primary-600 mr-2" size={24} />
+                <span className="font-bold text-gray-500">Loading trip manifest details...</span>
+            </div>
+        );
+    }
+
+    if (error || !trip) {
+        return (
+            <div className="p-6 text-center bg-red-50 rounded-2xl border border-red-200 animate-fade-in">
+                <AlertTriangle className="text-red-500 mx-auto mb-3" size={32} />
+                <h4 className="text-red-800 font-bold text-lg mb-1">Failed to Load Manifest</h4>
+                <p className="text-red-600 text-sm mb-4">{error || 'Unknown error'}</p>
+                <button onClick={onClose} className="px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-bold shadow-lg">Back to Trips</button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="animate-fade-in bg-white dark:bg-gray-900 rounded-3xl border border-gray-150 dark:border-gray-800 shadow-xl overflow-hidden text-left">
+            {/* Header */}
+            <div className="p-6 bg-gradient-to-r from-primary-600 to-indigo-600 text-white flex justify-between items-start">
+                <div>
+                    <button onClick={onClose} className="mb-3 text-xs font-black bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all">
+                        <ArrowLeft size={12} /> Back to Trips
+                    </button>
+                    <span className="px-2 py-0.5 bg-white/25 rounded text-[9px] font-black uppercase tracking-wider">{trip.status}</span>
+                    <h3 className="text-xl font-black mt-2 flex items-center gap-2 flex-wrap">
+                        {trip.origin} <ChevronRight size={18} className="text-white/40" /> <span className="text-yellow-300">{trip.destination}</span>
+                    </h3>
+                    <p className="text-xs text-white/80 mt-1 font-semibold">Purpose: {trip.purpose} • Scheduled: {new Date(trip.scheduled_departure).toLocaleString()}</p>
+                </div>
+                <div className="bg-white/15 p-3 rounded-2xl border border-white/10 shrink-0">
+                    <Users size={28} />
+                </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30 overflow-x-auto">
+                <button onClick={() => setActiveTab('crew')} className={`px-6 py-4 text-xs font-black border-b-2 uppercase tracking-wider shrink-0 transition-all ${activeTab === 'crew' ? 'border-primary-600 text-primary-600 bg-white dark:bg-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900'}`}>
+                    Crew & Trip Lead
+                </button>
+                <button onClick={() => setActiveTab('manifest')} className={`px-6 py-4 text-xs font-black border-b-2 uppercase tracking-wider shrink-0 transition-all ${activeTab === 'manifest' ? 'border-primary-600 text-primary-600 bg-white dark:bg-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900'}`}>
+                    Student Manifest ({trip.passengers.length})
+                </button>
+                <button onClick={() => setActiveTab('emergency')} className={`px-6 py-4 text-xs font-black border-b-2 uppercase tracking-wider shrink-0 transition-all ${activeTab === 'emergency' ? 'border-primary-600 text-primary-600 bg-white dark:bg-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900'}`}>
+                    Emergency Contacts
+                </button>
+                <button onClick={() => setActiveTab('report')} className={`px-6 py-4 text-xs font-black border-b-2 uppercase tracking-wider shrink-0 transition-all ${activeTab === 'report' ? 'border-primary-600 text-primary-600 bg-white dark:bg-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900'}`}>
+                    QR & Trip Report
+                </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-6">
+                
+                {/* Tab: Crew & Trip Lead */}
+                {activeTab === 'crew' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+                        {/* Driver Card */}
+                        <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/60 shadow-sm flex flex-col justify-between">
+                            <div>
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded text-[9px] font-black uppercase tracking-wider">Driver Details</span>
+                                <h4 className="text-lg font-black mt-3 text-gray-900 dark:text-white">{trip.vehicle.driver_name || 'N/A'}</h4>
+                                <p className="text-xs text-gray-400 mt-1 font-bold">Assigned Vehicle: <span className="text-gray-700 dark:text-gray-300 font-extrabold">{trip.vehicle.plate_number} ({trip.vehicle.make} {trip.vehicle.model})</span></p>
+                            </div>
+                            <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between">
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Direct Phone</p>
+                                    <p className="text-sm font-black text-gray-800 dark:text-gray-200">{trip.vehicle.driver_contact || 'No Contact Listed'}</p>
+                                </div>
+                                {trip.vehicle.driver_contact && (
+                                    <a href={`tel:${trip.vehicle.driver_contact}`} className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition-colors">
+                                        <Phone size={16} />
+                                    </a>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Trip Lead Card */}
+                        <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/60 shadow-sm">
+                            <div className="flex justify-between items-start mb-4">
+                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 rounded text-[9px] font-black uppercase tracking-wider">Trip Team Lead</span>
+                                {!isEditingLead && (
+                                    <button onClick={() => setIsEditingLead(true)} className="text-xs font-bold text-primary-600 hover:underline">Edit Details</button>
+                                )}
+                            </div>
+
+                            {isEditingLead ? (
+                                <form onSubmit={handleUpdateLead} className="space-y-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Lead Coordinator Name</label>
+                                        <input type="text" value={leadName} onChange={(e) => setLeadName(e.target.value)} required className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-bold" placeholder="E.g. Dr. Kamau (Dean)" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Coordinator Phone Number</label>
+                                        <input type="text" value={leadContact} onChange={(e) => setLeadContact(e.target.value)} required className="w-full px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-bold" placeholder="E.g. +254 712 345 678" />
+                                    </div>
+                                    <div className="flex gap-2 justify-end pt-2">
+                                        <button type="button" onClick={() => setIsEditingLead(false)} className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold">Cancel</button>
+                                        <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-bold shadow-md shadow-primary-500/20">Save Coordinator</button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <div className="flex flex-col justify-between h-[80%]">
+                                    <div>
+                                        <h4 className="text-lg font-black text-gray-900 dark:text-white">{trip.trip_lead_name || 'No Coordinator Assigned'}</h4>
+                                        <p className="text-xs text-gray-400 mt-1 font-bold">Responsible for team check-in and passenger safety management.</p>
+                                    </div>
+                                    <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between">
+                                        <div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase">Emergency Hotline</p>
+                                            <p className="text-sm font-black text-gray-800 dark:text-gray-200">{trip.trip_lead_contact || 'N/A'}</p>
+                                        </div>
+                                        {trip.trip_lead_contact && trip.trip_lead_contact !== 'N/A' && (
+                                            <a href={`tel:${trip.trip_lead_contact}`} className="p-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-colors">
+                                                <Phone size={16} />
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Tab: Student Manifest */}
+                {activeTab === 'manifest' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <div className="flex flex-wrap justify-between items-center gap-4 bg-gray-50 dark:bg-gray-800/30 p-4 rounded-2xl border border-gray-100 dark:border-gray-800/80">
+                            <div>
+                                <h4 className="font-bold text-gray-800 dark:text-white">Import Student Manifest</h4>
+                                <p className="text-xs text-gray-500 font-semibold">Upload a CSV file containing students, phone numbers, and pick-up spots.</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={downloadCSVTemplate} className="px-3.5 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 hover:bg-gray-50">
+                                    <FileSpreadsheet size={14} className="text-green-600" /> Download CSV Template
+                                </button>
+                                <label className={`px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-black shadow-lg shadow-primary-500/20 flex items-center gap-1.5 cursor-pointer hover:bg-primary-700 transition-all ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <FileText size={14} /> {isUploading ? 'Uploading...' : 'Upload Student CSV'}
+                                    <input type="file" accept=".csv" onChange={handleCSVUpload} className="hidden" />
+                                </label>
+                            </div>
+                        </div>
+
+                        {uploadStatus && (
+                            <div className={`p-4 rounded-xl border text-xs font-black flex items-center gap-2 ${
+                                uploadStatus.includes('Error') 
+                                    ? 'bg-red-50 border-red-200 text-red-700' 
+                                    : uploadStatus.includes('Success') 
+                                        ? 'bg-green-50 border-green-200 text-green-700' 
+                                        : 'bg-blue-50 border-blue-200 text-blue-700 animate-pulse'
+                            }`}>
+                                {isUploading && <Loader2 className="animate-spin text-blue-600 animate-infinite" size={14} />}
+                                <span>{uploadStatus}</span>
+                            </div>
+                        )}
+
+                        <div className="overflow-x-auto rounded-2xl border border-gray-150 dark:border-gray-800 shadow-sm">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50 dark:bg-gray-800/70 border-b border-gray-150 dark:border-gray-800 text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                                        <th className="px-6 py-4">Admission</th>
+                                        <th className="px-6 py-4">Student Name</th>
+                                        <th className="px-6 py-4">Phone Number</th>
+                                        <th className="px-6 py-4">Pickup Point</th>
+                                        <th className="px-6 py-4">Dropoff Point</th>
+                                        <th className="px-6 py-4 text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-sm">
+                                    {trip.passengers.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-12 text-center text-gray-400 font-black">
+                                                No students registered on this manifest. Upload a CSV manifest to add them.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        trip.passengers.map((p: any, idx: number) => (
+                                            <tr key={p.id || idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/10">
+                                                <td className="px-6 py-4 font-black text-primary-600">{p.admission_number || 'N/A'}</td>
+                                                <td className="px-6 py-4 font-bold text-gray-900 dark:text-gray-100">{p.passenger_name}</td>
+                                                <td className="px-6 py-4 font-semibold text-gray-600 dark:text-gray-400">{p.phone_number || 'N/A'}</td>
+                                                <td className="px-6 py-4 text-xs font-semibold text-gray-500">{p.pickup_location || 'Campus'}</td>
+                                                <td className="px-6 py-4 text-xs font-semibold text-gray-500">{p.drop_off_location || 'Destination'}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                                        p.arrival_confirmed ? 'bg-green-100 text-green-700 font-extrabold' : 'bg-yellow-100 text-yellow-700'
+                                                    }`}>
+                                                        {p.arrival_confirmed ? 'Checked In' : 'Pending'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* Tab: Emergency Contacts */}
+                {activeTab === 'emergency' && (
+                    <div className="space-y-6 animate-fade-in">
+                        <div className="p-4 bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-950/30 rounded-2xl flex items-center gap-3">
+                            <div className="p-2.5 bg-rose-500 text-white rounded-xl shadow-md shrink-0">
+                                <ShieldAlert size={18} />
+                            </div>
+                            <div>
+                                <h4 className="font-black text-rose-900 dark:text-rose-400 text-sm">Emergency Protocols Active</h4>
+                                <p className="text-xs text-rose-700 dark:text-rose-500 font-semibold">Ensure a quick communication path with legal guardians or dean hotlines in case of transit incidents.</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {trip.passengers.length === 0 ? (
+                                <div className="col-span-2 p-12 text-center text-gray-400 font-bold border border-dashed border-gray-200 rounded-2xl">
+                                    No passengers registered. Upload manifest to view emergency contacts.
+                                </div>
+                            ) : (
+                                trip.passengers.map((p: any, idx: number) => (
+                                    <div key={p.id || idx} className="p-5 bg-white dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-700/50 shadow-sm flex justify-between items-center hover:border-rose-300 dark:hover:border-rose-900/50 transition-colors">
+                                        <div>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase">{p.admission_number || 'STUDENT'}</p>
+                                            <h4 className="text-base font-black text-gray-900 dark:text-white mt-0.5">{p.passenger_name}</h4>
+                                            <p className="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
+                                                <Users size={12} /> Emergency: {p.emergency_contact_phone || 'None Listed'}
+                                            </p>
+                                        </div>
+                                        {p.emergency_contact_phone && p.emergency_contact_phone !== 'N/A' && (
+                                            <a href={`tel:${p.emergency_contact_phone}`} className="p-3.5 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm">
+                                                <Phone size={14} />
+                                            </a>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Tab: QR & Trip Report */}
+                {activeTab === 'report' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+                        {/* QR Code Card */}
+                        <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/60 flex flex-col justify-between items-center text-center">
+                            <div>
+                                <span className="px-2.5 py-1 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-950/20 dark:text-yellow-400 text-[9px] font-black uppercase tracking-wider">Gatepass Security QR</span>
+                                <h4 className="text-lg font-black mt-3 text-gray-900 dark:text-white">Authorization QR Code</h4>
+                                <p className="text-xs text-gray-500 mt-1 mb-6">Scan at main gates to instantly verify vehicle, occupants, and trip validity.</p>
+                            </div>
+                            
+                            <div className="p-4 bg-white dark:bg-gray-800 rounded-3xl shadow-inner border border-gray-100 dark:border-gray-700/80">
+                                <img 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent("TRIP:" + trip.id + "|VEHICLE:" + trip.vehicle.plate_number)}`} 
+                                    alt="Trip Authorization QR" 
+                                    className="w-44 h-44 rounded-xl border-4 border-white"
+                                />
+                            </div>
+
+                            <button 
+                                onClick={() => window.open(`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent("TRIP:" + trip.id + "|VEHICLE:" + trip.vehicle.plate_number)}`, '_blank')}
+                                className="mt-6 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 hover:bg-gray-50 transition-colors"
+                            >
+                                <Download size={14} /> Download high resolution QR
+                            </button>
+                        </div>
+
+                        {/* Summary Report Card */}
+                        <div className="p-6 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800/60 flex flex-col justify-between">
+                            <div>
+                                <div className="flex justify-between items-start">
+                                    <span className="px-2.5 py-1 rounded bg-primary-100 text-primary-800 dark:bg-primary-950/20 dark:text-primary-400 text-[9px] font-black uppercase tracking-wider">Executive Transit Summary</span>
+                                    <button 
+                                        onClick={() => window.print()}
+                                        className="text-xs font-black text-primary-600 hover:underline flex items-center gap-1"
+                                    >
+                                        <Printer size={12} /> Print Summary Report
+                                    </button>
+                                </div>
+                                <h4 className="text-lg font-black mt-3 text-gray-900 dark:text-white">Transit Logistics Report</h4>
+                                <p className="text-xs text-gray-500 mt-1 mb-6">Fully summarized logistics audit metrics computed live from transit logs.</p>
+                            </div>
+
+                            {loadingReport ? (
+                                <div className="flex justify-center p-6">
+                                    <Loader2 className="animate-spin text-primary-600 mr-2" size={18} />
+                                    <span className="text-xs text-gray-500 font-bold">Computing metrics...</span>
+                                </div>
+                            ) : report ? (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700/50 shadow-sm">
+                                            <p className="text-[9px] font-black text-gray-400 uppercase">Distance Covered</p>
+                                            <p className="text-xl font-black text-gray-900 dark:text-white mt-1">{report.distance_km || 0} <span className="text-xs text-gray-400 font-bold">KM</span></p>
+                                        </div>
+                                        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700/50 shadow-sm">
+                                            <p className="text-[9px] font-black text-gray-400 uppercase">Trip Duration</p>
+                                            <p className="text-xl font-black text-gray-900 dark:text-white mt-1">{report.duration || 'N/A'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700/50 shadow-sm">
+                                            <p className="text-[9px] font-black text-gray-400 uppercase">Total Passengers</p>
+                                            <p className="text-xl font-black text-gray-900 dark:text-white mt-1">{report.passenger_count} <span className="text-xs text-gray-400 font-bold">Seats</span></p>
+                                        </div>
+                                        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700/50 shadow-sm">
+                                            <p className="text-[9px] font-black text-gray-400 uppercase">Associated Fuel Cost</p>
+                                            <p className="text-xl font-black text-emerald-600 mt-1">KES {report.fuel_cost || 0}</p>
+                                        </div>
+                                    </div>
+                                    <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700/50 shadow-sm text-xs font-semibold space-y-2">
+                                        <div className="flex justify-between border-b border-gray-50 dark:border-gray-700 pb-1.5"><span className="text-gray-400">Status</span> <span className="font-black text-primary-600 uppercase">{report.status}</span></div>
+                                        <div className="flex justify-between border-b border-gray-50 dark:border-gray-700 pb-1.5"><span className="text-gray-400">Driver</span> <span className="font-bold text-gray-800 dark:text-gray-200">{report.driver_name}</span></div>
+                                        <div className="flex justify-between"><span className="text-gray-400">Trip Lead Coordinator</span> <span className="font-bold text-gray-800 dark:text-gray-200">{report.trip_lead_name}</span></div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-4 text-xs font-bold text-gray-400">Report details not calculated yet.</div>
+                            )}
+
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-6 block text-center">Verified Official Gatepass Logistics Audit</span>
+                        </div>
+                    </div>
+                )}
+
+            </div>
+        </div>
+    );
+}
+
 // Sub-Managers
 function TripsManager({ trips, vehicles, onUpdate }: any) {
     const [showForm, setShowForm] = useState(false);
+    const [activeManifestTripId, setActiveManifestTripId] = useState<string | null>(null);
 
     const handleStartTrip = async (tripId: string, currentOdo: number) => {
         const odoStr = prompt("Enter starting odometer reading:", currentOdo.toString());
@@ -509,6 +989,17 @@ function TripsManager({ trips, vehicles, onUpdate }: any) {
         }
     };
 
+    if (activeManifestTripId) {
+        return (
+            <TripManifestViewer 
+                tripId={activeManifestTripId}
+                vehicles={vehicles}
+                onClose={() => setActiveManifestTripId(null)}
+                onUpdate={onUpdate}
+            />
+        );
+    }
+
     return (
         <div className="glass-card p-6 animate-fade-in">
             <div className="flex justify-between items-center mb-8">
@@ -565,7 +1056,12 @@ function TripsManager({ trips, vehicles, onUpdate }: any) {
                                         End Trip
                                     </button>
                                 )}
-                                <button className="px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100">Manifest</button>
+                                <button 
+                                    onClick={() => setActiveManifestTripId(trip.id)}
+                                    className="px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100 transition-colors"
+                                >
+                                    Manifest
+                                </button>
                             </div>
                         </div>
                     </div>
