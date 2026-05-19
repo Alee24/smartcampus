@@ -204,7 +204,7 @@ class FleetTrip(UUIDModel, table=True):
     notes: Optional[str] = None
     
     vehicle: Vehicle = Relationship(back_populates="trips")
-    driver: User = Relationship()
+    driver: Optional[User] = Relationship()
     passengers: List["FleetPassengerManifest"] = Relationship(back_populates="trip")
 
 class FleetPassengerManifest(UUIDModel, table=True):

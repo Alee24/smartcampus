@@ -48,9 +48,22 @@ async def fix_schema():
 
         # 3. Fix fleet_trips driver_id
         try:
+            print("Disabling foreign key checks for schema alter...")
+            await conn.execute(text("SET FOREIGN_KEY_CHECKS = 0;"))
+            
+            # Modify column to be nullable
             await conn.execute(text("ALTER TABLE fleet_trips MODIFY driver_id CHAR(36) NULL;"))
-            print("Fixed fleet_trips")
+            print("Successfully made driver_id nullable.")
+            
+            print("Re-enabling foreign key checks...")
+            await conn.execute(text("SET FOREIGN_KEY_CHECKS = 1;"))
+            print("Fixed fleet_trips schema successfully!")
         except Exception as e:
+            # Ensure they are re-enabled in case of failure
+            try:
+                await conn.execute(text("SET FOREIGN_KEY_CHECKS = 1;"))
+            except Exception:
+                pass
             print("fleet_trips error:", e)
 
 if __name__ == "__main__":

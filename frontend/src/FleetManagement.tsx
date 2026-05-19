@@ -760,10 +760,100 @@ function VehicleForm({ onSuccess }: { onSuccess: () => void }) {
 
 function TripForm({ vehicles, onSuccess }: any) {
     const [formData, setFormData] = useState({
-        vehicle_id: '', origin: '', destination: '', purpose: '', scheduled_departure: ''
+        vehicle_id: '', 
+        origin: 'Riara University Main Campus', 
+        destination: '', 
+        purpose: '', 
+        scheduled_departure: ''
     });
-    const handleSubmit = async (e: React.FormEvent) => {
+    
+    const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
+    const [showDestSuggestions, setShowDestSuggestions] = useState(false);
+    const [showMapModal, setShowMapModal] = useState(false);
+    const [mapMode, setMapMode] = useState<'origin' | 'destination'>('destination');
+    const [previewData, setPreviewData] = useState<{distance: number, duration: string} | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const KENYA_LOCATIONS = [
+        "Riara University Main Campus",
+        "Nairobi CBD",
+        "Nyahururu",
+        "Mombasa",
+        "Nakuru",
+        "Kisumu",
+        "Eldoret",
+        "Nyeri",
+        "Thika",
+        "Machakos",
+        "Naivasha",
+        "Juja (JKUAT)",
+        "Karen",
+        "Westlands",
+        "Lavington",
+        "Rongai",
+        "Kajiado",
+        "Kisii",
+        "Kakamega",
+        "Meru",
+        "Embu",
+        "Kericho"
+    ];
+
+    const MAP_PRESETS = [
+        { name: "Riara University Main Campus", coords: [-1.3117, 36.8123] as [number, number] },
+        { name: "Nairobi CBD", coords: [-1.286389, 36.817223] as [number, number] },
+        { name: "Nyahururu", coords: [-0.0421, 36.3621] as [number, number] },
+        { name: "Mombasa", coords: [-4.0435, 39.6682] as [number, number] },
+        { name: "Nakuru", coords: [-0.3031, 36.0700] as [number, number] },
+        { name: "Eldoret", coords: [0.5143, 35.2698] as [number, number] }
+    ];
+
+    const ROUTE_DISTANCES: Record<string, number> = {
+        "Riara University Main Campus-Nyahururu": 180,
+        "Riara University Main Campus-Mombasa": 485,
+        "Riara University Main Campus-Nakuru": 160,
+        "Riara University Main Campus-Kisumu": 350,
+        "Riara University Main Campus-Eldoret": 310,
+        "Riara University Main Campus-Nyeri": 150,
+        "Riara University Main Campus-Thika": 45,
+        "Riara University Main Campus-Machakos": 65,
+        "Riara University Main Campus-Naivasha": 90,
+        "Riara University Main Campus-Karen": 15,
+        "Riara University Main Campus-Westlands": 10,
+        "Riara University Main Campus-Nairobi CBD": 8,
+        "Riara University Main Campus-Juja (JKUAT)": 35
+    };
+
+    const getRouteDistance = (origin: string, dest: string) => {
+        const key = `${origin.trim()}-${dest.trim()}`;
+        if (ROUTE_DISTANCES[key]) return ROUTE_DISTANCES[key];
+        const reverseKey = `${dest.trim()}-${origin.trim()}`;
+        if (ROUTE_DISTANCES[reverseKey]) return ROUTE_DISTANCES[reverseKey];
+        
+        // Fallback stable mock distance based on characters
+        let hash = 0;
+        const str = key;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return Math.abs(hash % 300) + 12;
+    };
+
+    const handleConfirmSchedule = (e: React.FormEvent) => {
         e.preventDefault();
+        const dist = getRouteDistance(formData.origin, formData.destination);
+        const hours = dist / 80;
+        const h = Math.floor(hours);
+        const m = Math.round((hours - h) * 60);
+        const durationStr = `${h > 0 ? `${h}h ` : ''}${m}m`;
+        setPreviewData({
+            distance: dist,
+            duration: durationStr
+        });
+    };
+
+    const handleSave = async () => {
+        setIsSubmitting(true);
         try {
             const token = localStorage.getItem('token');
             const res = await fetch('/api/fleet/trips', {
@@ -772,6 +862,7 @@ function TripForm({ vehicles, onSuccess }: any) {
                 body: JSON.stringify({...formData, status: 'scheduled'})
             });
             if (res.ok) {
+                alert("Trip scheduled successfully!");
                 onSuccess();
             } else {
                 const data = await res.json();
@@ -779,20 +870,194 @@ function TripForm({ vehicles, onSuccess }: any) {
             }
         } catch (e: any) {
             alert(`Network error: ${e.message}`);
+        } finally {
+            setIsSubmitting(false);
         }
     };
+
+    function MapClickHandler({ onSelect }: { onSelect: (name: string) => void }) {
+        const map = useMap();
+        useEffect(() => {
+            map.on('click', (e: any) => {
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+                
+                // Find nearest preset
+                let nearest = MAP_PRESETS[0];
+                let minDist = Infinity;
+                MAP_PRESETS.forEach(p => {
+                    const d = Math.pow(p.coords[0] - lat, 2) + Math.pow(p.coords[1] - lng, 2);
+                    if (d < minDist) {
+                        minDist = d;
+                        nearest = p;
+                    }
+                });
+
+                if (minDist < 0.05) {
+                    onSelect(nearest.name);
+                } else {
+                    onSelect(`Location (${lat.toFixed(3)}, ${lng.toFixed(3)})`);
+                }
+            });
+        }, [map]);
+        return null;
+    }
+
+    const filteredOriginLocs = KENYA_LOCATIONS.filter(l => 
+        l.toLowerCase().includes(formData.origin.toLowerCase()) && 
+        l.toLowerCase() !== formData.origin.toLowerCase()
+    );
+
+    const filteredDestLocs = KENYA_LOCATIONS.filter(l => 
+        l.toLowerCase().includes(formData.destination.toLowerCase()) && 
+        l.toLowerCase() !== formData.destination.toLowerCase()
+    );
+
     return (
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <select required value={formData.vehicle_id} onChange={e => setFormData({...formData, vehicle_id: e.target.value})} className="p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm">
-                <option value="">Select Vehicle</option>
-                {vehicles.map((v: any) => <option key={v.id} value={v.id}>{v.plate_number}</option>)}
-            </select>
-            <input required placeholder="Origin" value={formData.origin} onChange={e => setFormData({...formData, origin: e.target.value})} className="p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
-            <input required placeholder="Destination" value={formData.destination} onChange={e => setFormData({...formData, destination: e.target.value})} className="p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
-            <input required placeholder="Purpose" value={formData.purpose} onChange={e => setFormData({...formData, purpose: e.target.value})} className="p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
-            <input required type="datetime-local" value={formData.scheduled_departure} onChange={e => setFormData({...formData, scheduled_departure: e.target.value})} className="p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
-            <button className="py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl">Confirm Schedule</button>
-        </form>
+        <div className="space-y-4">
+            <form onSubmit={handleConfirmSchedule} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col">
+                    <label className="text-xs font-bold text-gray-500 mb-1">Vehicle</label>
+                    <select required value={formData.vehicle_id} onChange={e => setFormData({...formData, vehicle_id: e.target.value})} className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm">
+                        <option value="">Select Vehicle</option>
+                        {vehicles.map((v: any) => <option key={v.id} value={v.id}>{v.plate_number}</option>)}
+                    </select>
+                </div>
+
+                <div className="flex flex-col relative">
+                    <label className="text-xs font-bold text-gray-500 mb-1 flex justify-between">
+                        <span>Origin</span>
+                        <button type="button" onClick={() => { setMapMode('origin'); setShowMapModal(true); }} className="text-primary-600 hover:underline flex items-center gap-1">📍 Pick</button>
+                    </label>
+                    <input required placeholder="Origin" value={formData.origin} 
+                        onFocus={() => setShowOriginSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 200)}
+                        onChange={e => setFormData({...formData, origin: e.target.value})} 
+                        className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" 
+                    />
+                    {showOriginSuggestions && filteredOriginLocs.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-[1500] max-h-48 overflow-y-auto">
+                            {filteredOriginLocs.map((loc, idx) => (
+                                <button key={idx} type="button" onMouseDown={() => setFormData({...formData, origin: loc})} className="w-full text-left p-3 hover:bg-primary-50 text-sm font-bold text-gray-700 transition-colors">
+                                    {loc}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex flex-col relative">
+                    <label className="text-xs font-bold text-gray-500 mb-1 flex justify-between">
+                        <span>Destination</span>
+                        <button type="button" onClick={() => { setMapMode('destination'); setShowMapModal(true); }} className="text-primary-600 hover:underline flex items-center gap-1">📍 Pick</button>
+                    </label>
+                    <input required placeholder="Destination" value={formData.destination} 
+                        onFocus={() => setShowDestSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowDestSuggestions(false), 200)}
+                        onChange={e => setFormData({...formData, destination: e.target.value})} 
+                        className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" 
+                    />
+                    {showDestSuggestions && filteredDestLocs.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-[1500] max-h-48 overflow-y-auto">
+                            {filteredDestLocs.map((loc, idx) => (
+                                <button key={idx} type="button" onMouseDown={() => setFormData({...formData, destination: loc})} className="w-full text-left p-3 hover:bg-primary-50 text-sm font-bold text-gray-700 transition-colors">
+                                    {loc}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-xs font-bold text-gray-500 mb-1">Purpose</label>
+                    <input required placeholder="Purpose (e.g. Field Trip)" value={formData.purpose} onChange={e => setFormData({...formData, purpose: e.target.value})} className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-xs font-bold text-gray-500 mb-1">Departure Time</label>
+                    <input required type="datetime-local" value={formData.scheduled_departure} onChange={e => setFormData({...formData, scheduled_departure: e.target.value})} className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
+                </div>
+
+                <div className="flex flex-col justify-end">
+                    <button className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-2xl shadow-xl transition-all">Confirm Schedule</button>
+                </div>
+            </form>
+
+            {previewData && (
+                <div className="bg-primary-50 border border-primary-100 rounded-3xl p-6 mt-4 animate-fade-in">
+                    <h5 className="font-black text-primary-900 mb-3 flex items-center gap-2">
+                        <Activity size={18} />
+                        Route Summary Details
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
+                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-primary-100/50">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Calculated Distance</p>
+                            <p className="text-xl font-black text-primary-900">{previewData.distance} km</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-primary-100/50">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Speed Multiplier</p>
+                            <p className="text-xl font-black text-primary-900">80 km/h (Avg)</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-primary-100/50">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Expected Travel Time</p>
+                            <p className="text-xl font-black text-primary-900">{previewData.duration}</p>
+                        </div>
+                    </div>
+                    <div className="flex gap-3">
+                        <button type="button" disabled={isSubmitting} onClick={handleSave} className="flex-1 py-4 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2">
+                            {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                            Save & Register Trip
+                        </button>
+                        <button type="button" onClick={() => setPreviewData(null)} className="px-6 py-4 bg-white border border-primary-200 text-primary-700 font-bold rounded-2xl hover:bg-primary-50 transition-all">
+                            Edit details
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {showMapModal && (
+                <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl relative flex flex-col h-[500px]">
+                        <button onClick={() => setShowMapModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 z-[3100] bg-white rounded-full p-1 shadow-sm"><X size={20} /></button>
+                        <h3 className="text-lg font-black mb-4 flex items-center gap-2">
+                            <MapPin className="text-primary-600" />
+                            Select {mapMode === 'origin' ? 'Origin' : 'Destination'} on Map
+                        </h3>
+                        <p className="text-xs text-gray-500 mb-4">Click anywhere on the map or select a campus branch marker below.</p>
+                        
+                        <div className="flex-1 rounded-2xl overflow-hidden border border-gray-100 mb-4">
+                            <MapContainer center={[-1.286389, 36.817223]} zoom={8} style={{ height: '100%', width: '100%' }}>
+                                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                {MAP_PRESETS.map((p, i) => (
+                                    <Marker 
+                                        key={i} 
+                                        position={p.coords}
+                                        eventHandlers={{
+                                            click: () => {
+                                                setFormData({
+                                                    ...formData,
+                                                    [mapMode]: p.name
+                                                });
+                                                setShowMapModal(false);
+                                            }
+                                        }}
+                                    >
+                                        <Popup><strong>{p.name}</strong></Popup>
+                                    </Marker>
+                                ))}
+                                <MapClickHandler onSelect={(name) => {
+                                    setFormData({
+                                        ...formData,
+                                        [mapMode]: name
+                                    });
+                                    setShowMapModal(false);
+                                }} />
+                            </MapContainer>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
 
