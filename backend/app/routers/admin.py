@@ -1087,3 +1087,94 @@ async def test_ldap_connection(
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@router.post("/sync-ad")
+async def sync_ad(
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(ensure_admin)
+):
+    try:
+        from ldap3 import Server, Connection, ALL, SUBTREE
+        configs = (await session.exec(select(SystemConfig))).all()
+        config_dict = {c.key: c.value for c in configs}
+        
+        server_uri = config_dict.get('ldap_server_uri')
+        bind_dn = config_dict.get('ldap_bind_dn')
+        bind_password = config_dict.get('ldap_bind_password')
+        base_dn = config_dict.get('ldap_base_dn')
+        
+        if not server_uri or not base_dn:
+            return {"status": "error", "message": "LDAP configuration is incomplete"}
+            
+        server = Server(server_uri, get_info=ALL)
+        conn = Connection(server, user=bind_dn, password=bind_password, auto_bind=True)
+        
+        search_filter = '(&(objectClass=user)(objectCategory=person))'
+        # Fallback to general user/uid if AD filter doesn't match
+        try:
+            conn.search(base_dn, search_filter, search_scope=SUBTREE, attributes=['sAMAccountName', 'mail', 'cn'])
+        except Exception:
+            search_filter = '(|(sAMAccountName=*)(uid=*))'
+            conn.search(base_dn, search_filter, search_scope=SUBTREE, attributes=['sAMAccountName', 'mail', 'cn', 'uid'])
+        
+        if not conn.entries:
+            # try simpler search filter
+            search_filter = '(|(sAMAccountName=*)(uid=*))'
+            conn.search(base_dn, search_filter, search_scope=SUBTREE, attributes=['sAMAccountName', 'mail', 'cn', 'uid'])
+
+        if not conn.entries:
+            return {"status": "success", "message": "No users found in AD", "new_accounts_count": 0}
+            
+        student_role = (await session.exec(select(Role).where(Role.name == "Student"))).first()
+        if not student_role:
+             student_role = Role(name="Student", description="Regular Student")
+             session.add(student_role)
+             await session.commit()
+             await session.refresh(student_role)
+        role_id = student_role.id
+        
+        added_count = 0
+        batch_size = 100
+        current_batch = 0
+        
+        for entry in conn.entries:
+            username = None
+            if hasattr(entry, 'sAMAccountName') and entry.sAMAccountName:
+                username = str(entry.sAMAccountName)
+            elif hasattr(entry, 'uid') and entry.uid:
+                username = str(entry.uid)
+                
+            email = str(entry.mail) if hasattr(entry, 'mail') and entry.mail else None
+            full_name = str(entry.cn) if hasattr(entry, 'cn') and entry.cn else username
+            
+            if not username:
+                continue
+                
+            query = select(User).where((User.admission_number == username) | ((User.email == email) if email else False))
+            existing = (await session.exec(query)).first()
+            
+            if not existing:
+                new_user = User(
+                    full_name=full_name,
+                    email=email if email else None,
+                    admission_number=username,
+                    hashed_password=get_password_hash("Digital2025"),
+                    role_id=role_id,
+                    status="active",
+                    school="General"
+                )
+                session.add(new_user)
+                added_count += 1
+                current_batch += 1
+                
+                if current_batch >= batch_size:
+                    await session.commit()
+                    current_batch = 0
+                    
+        if current_batch > 0:
+            await session.commit()
+            
+        return {"status": "success", "message": "Synchronization completed", "new_accounts_count": added_count}
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+

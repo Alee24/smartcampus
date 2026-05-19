@@ -161,7 +161,7 @@ function App() {
     const [showSecurityCheck, setShowSecurityCheck] = useState(false)
     const [menuConfig, setMenuConfig] = useState<any>({})
     const [showProfileModal, setShowProfileModal] = useState(false)
-    const [activating, setActivating] = useState(false)
+    const [syncingAD, setSyncingAD] = useState(false)
     const hasValidated = useState(false)[0] // Simple mount check
 
     // URL Deep Link Handler (QR Codes)
@@ -455,11 +455,11 @@ function App() {
         } catch (e) { console.error('Dashboard fetch error', e) }
     }
 
-    const handleActivateLive = async () => {
-        setActivating(true)
+    const handleSyncAD = async () => {
+        setSyncingAD(true)
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch('/api/attendance/sessions/activate-all', {
+            const res = await fetch('/api/admin/sync-ad', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -471,16 +471,16 @@ function App() {
             const result = await res.json()
 
             if (result.status === 'success') {
-                alert(`✅ Live System Activated!\n${result.message}`)
+                alert(`✅ AD Synchronization Complete!\n${result.message}\nNew accounts created: ${result.new_accounts_count}`)
                 fetchDashboardData()
             } else {
-                alert(result.message || 'Activation failed')
+                alert(result.message || 'Synchronization failed')
             }
         } catch (e: any) {
-            console.error('Activation error', e)
-            alert(`❌ Activation Error: ${e.message}`)
+            console.error('Sync error', e)
+            alert(`❌ Sync Error: ${e.message}`)
         } finally {
-            setActivating(false)
+            setSyncingAD(false)
         }
     }
 
@@ -1042,32 +1042,32 @@ function App() {
                             {(role === 'SuperAdmin' || role === 'Admin') && (
                                 <div className="mb-6 p-6 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl text-white shadow-xl relative overflow-hidden group">
                                     <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                                        <Activity size={120} />
+                                        <Database size={120} />
                                     </div>
                                     <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                                         <div>
                                             <h3 className="text-2xl font-black mb-1 flex items-center gap-2">
-                                                <Activity className="animate-pulse" />
-                                                Live System Control
+                                                <Users className="animate-pulse" />
+                                                Active Directory Sync
                                             </h3>
                                             <p className="text-indigo-100 text-sm max-w-md">
-                                                Activate real-time monitoring for all classrooms and gates. This will populate the dashboard with live database updates.
+                                                Synchronize the Active Directory and pull new user accounts that are not in the local database.
                                             </p>
                                         </div>
                                         <button
-                                            onClick={handleActivateLive}
-                                            disabled={activating}
+                                            onClick={handleSyncAD}
+                                            disabled={syncingAD}
                                             className="px-8 py-4 bg-white text-indigo-700 rounded-xl font-black shadow-2xl hover:bg-indigo-50 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group"
                                         >
-                                            {activating ? (
+                                            {syncingAD ? (
                                                 <>
                                                     <div className="w-5 h-5 border-4 border-indigo-700/30 border-t-indigo-700 rounded-full animate-spin"></div>
-                                                    Activating...
+                                                    Synchronizing...
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Play size={22} className="fill-current" />
-                                                    ENABLE LIVE TRACKING
+                                                    <Database size={22} className="fill-current" />
+                                                    SYNCHRONIZE AD
                                                 </>
                                             )}
                                         </button>
