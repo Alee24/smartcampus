@@ -33,6 +33,7 @@ export default function StudentVerification() {
     const [rotation, setRotation] = useState(0)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [isPrinting, setIsPrinting] = useState(false)
+    const [importing, setImporting] = useState(false)
     const qrScannerRef = useRef<Html5Qrcode | null>(null)
     const printRef = useRef<HTMLDivElement>(null)
 
@@ -122,11 +123,13 @@ export default function StudentVerification() {
             if (res.ok) {
                 const data = await res.json()
                 setResult(data)
-                setTimeout(() => {
-                    setShowCard(true)
-                    setEditData({ full_name: data.full_name, school: data.school })
-                    playSuccessSound()
-                }, 300)
+                if (!data.ad_found) {
+                    setTimeout(() => {
+                        setShowCard(true)
+                        setEditData({ full_name: data.full_name, school: data.school })
+                        playSuccessSound()
+                    }, 300)
+                }
             } else {
                 setResult({ error: 'Student not found' })
             }
@@ -134,6 +137,39 @@ export default function StudentVerification() {
             setResult({ error: 'Verification failed. Please try again.' })
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleImportAD = async (adData: any) => {
+        setImporting(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/users/import-ad-student', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(adData)
+            })
+
+            if (res.ok) {
+                const data = await res.json()
+                showNotification(`Successfully imported student from Active Directory!`, 'success')
+                setResult(data)
+                setTimeout(() => {
+                    setShowCard(true)
+                    setEditData({ full_name: data.full_name, school: data.school })
+                    playSuccessSound()
+                }, 300)
+            } else {
+                const err = await res.json()
+                showNotification(err.detail || 'Failed to import student', 'error')
+            }
+        } catch (e) {
+            showNotification('Network error during import', 'error')
+        } finally {
+            setImporting(false)
         }
     }
 
@@ -314,7 +350,7 @@ export default function StudentVerification() {
                     </div>
                 )}
 
-                {result && !result.error && (
+                {result && !result.error && !result.ad_found && (
                     <div className={`max-w-4xl mx-auto transition-all duration-500 ${showCard ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
                         <div className="mb-6 flex flex-wrap gap-4 items-center justify-between">
                             <div className="flex gap-3">
@@ -481,6 +517,55 @@ export default function StudentVerification() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {result && result.ad_found && (
+                    <div className="max-w-xl mx-auto bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden border border-purple-100 dark:border-purple-900/30 p-8 text-center animate-in fade-in slide-in-from-bottom-5">
+                        <div className="w-20 h-20 bg-purple-50 dark:bg-purple-900/30 rounded-full flex items-center justify-center mx-auto mb-6 border border-purple-200 dark:border-purple-800/30 text-purple-600">
+                            <Sparkles size={36} className="animate-pulse" />
+                        </div>
+                        <h3 className="text-2xl font-black bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-2">Student Found in Active Directory</h3>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
+                            This student exists in the university directory but has not yet been registered in the Gatepass local database.
+                        </p>
+
+                        <div className="bg-slate-50 dark:bg-gray-700/30 rounded-2xl p-6 mb-8 text-left space-y-4">
+                            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Full Name</span>
+                                <span className="font-bold text-slate-800 dark:text-slate-200">{result.full_name}</span>
+                            </div>
+                            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Admission Number</span>
+                                <span className="font-bold text-purple-600 dark:text-purple-400 font-mono">{result.admission_number}</span>
+                            </div>
+                            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Email</span>
+                                <span className="font-semibold text-slate-700 dark:text-slate-300">{result.email || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">School</span>
+                                <span className="font-bold text-slate-800 dark:text-slate-200">{result.school || 'General'}</span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => handleImportAD(result)}
+                            disabled={importing}
+                            className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+                        >
+                            {importing ? (
+                                <>
+                                    <Loader2 className="animate-spin" size={20} />
+                                    Importing Student...
+                                </>
+                            ) : (
+                                <>
+                                    <UploadCloud size={20} />
+                                    Import & Verify Student
+                                </>
+                            )}
+                        </button>
                     </div>
                 )}
 

@@ -549,49 +549,31 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
     if not user:
         # Only try if we have something substantial (e.g. > 3 chars) to avoid matching everything ending in '1'
         if len(admission_number) >= 3:
-            # col.like('%value') is 'endswith'
             query = select(User).where(User.admission_number.like(f"%{admission_number}"))
             user = (await session.exec(query)).first()
-
+ 
     # 4. LDAP/AD Fallback
     if not user:
-        # Check if LDAP is enabled
-        ldap_enabled = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_enabled"))).first()
-        if ldap_enabled and ldap_enabled.value.lower() == "true":
-            # Fetch other LDAP configs
-            uri = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_server_uri"))).first()
-            bind_dn = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_bind_dn"))).first()
-            password = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_bind_password"))).first()
-            base_dn = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_base_dn"))).first()
+        uri = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_server_uri"))).first()
+        bind_dn = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_bind_dn"))).first()
+        password = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_bind_password"))).first()
+        base_dn = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_base_dn"))).first()
 
-            if all([uri, bind_dn, password, base_dn]):
-                ldap = LDAPClient(uri.value, bind_dn.value, password.value, base_dn.value)
+        if uri and base_dn:
+            try:
+                ldap = LDAPClient(uri.value, bind_dn.value if bind_dn else "", password.value if password else "", base_dn.value)
                 ldap_data = ldap.get_user_by_id(admission_number)
-                
                 if ldap_data:
-                    # Auto-create user from LDAP
-                    role_stmt = select(Role).where(Role.name == "Student")
-                    role = (await session.exec(role_stmt)).first()
-                    if not role:
-                        role = Role(name="Student", description="Regular Student")
-                        session.add(role)
-                        await session.commit()
-                        await session.refresh(role)
-                    
-                    user = User(
-                        admission_number=ldap_data["admission_number"],
-                        full_name=ldap_data["full_name"],
-                        email=ldap_data["email"],
-                        school=ldap_data["school"],
-                        phone_number=ldap_data["phone_number"],
-                        program=ldap_data["program"],
-                        role_id=role.id,
-                        status="active",
-                        hashed_password="LDAP_MANAGED" # Password managed by AD
-                    )
-                    session.add(user)
-                    await session.commit()
-                    await session.refresh(user)
+                    return {
+                        "ad_found": True,
+                        "full_name": ldap_data["full_name"],
+                        "admission_number": ldap_data["admission_number"],
+                        "email": ldap_data["email"],
+                        "school": ldap_data["school"],
+                        "program": ldap_data["program"]
+                    }
+            except Exception as e:
+                print(f"LDAP Check during verification failed: {e}")
 
     if not user:
         raise HTTPException(status_code=404, detail="Student not found")
@@ -616,6 +598,62 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
         "expiry_date": user.expiry_date.isoformat() if user.expiry_date else None,
         "role": role.name if role else "Unknown",
         "gate_status": gate_status
+    }
+
+@router.post("/import-ad-student")
+async def import_ad_student(
+    payload: dict,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_admin_user)
+):
+    admission_number = payload.get("admission_number")
+    full_name = payload.get("full_name")
+    email = payload.get("email")
+    school = payload.get("school", "General")
+    program = payload.get("program")
+
+    if not admission_number or not full_name:
+        raise HTTPException(status_code=400, detail="Missing required fields")
+
+    # Check if already exists
+    existing = (await session.exec(select(User).where(User.admission_number == admission_number))).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="User already exists in database")
+
+    role_stmt = select(Role).where(Role.name == "Student")
+    role = (await session.exec(role_stmt)).first()
+    if not role:
+        role = Role(name="Student", description="Regular Student")
+        session.add(role)
+        await session.commit()
+        await session.refresh(role)
+
+    new_user = User(
+        admission_number=admission_number,
+        full_name=full_name,
+        email=email,
+        school=school,
+        program=program,
+        role_id=role.id,
+        status="active",
+        hashed_password="LDAP_MANAGED"
+    )
+    session.add(new_user)
+    await session.commit()
+    await session.refresh(new_user)
+
+    return {
+        "status": "success", 
+        "message": f"Successfully imported {full_name}", 
+        "id": str(new_user.id),
+        "full_name": new_user.full_name,
+        "admission_number": new_user.admission_number,
+        "email": new_user.email,
+        "school": new_user.school,
+        "status": new_user.status,
+        "profile_image": new_user.profile_image,
+        "role": "Student",
+        "gate_status": "Out"
     }
 
 @router.post("/verify-supervisor-pin")
