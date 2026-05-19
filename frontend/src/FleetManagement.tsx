@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Car, MapPin, Navigation, Fuel, Wrench, AlertTriangle, Users, Plus, Search, Filter, ChevronRight, Activity, Calendar, Clock, Shield, Download, FileText, Settings, Map as MapIcon, TrendingUp, DollarSign, X, Check, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import { Car, MapPin, Navigation, Fuel, Wrench, AlertTriangle, Users, Plus, Search, Filter, ChevronRight, Activity, Calendar, Clock, Shield, Download, FileText, Settings, Map as MapIcon, TrendingUp, DollarSign, X, Check, Loader2, RefreshCw, Trash2, Edit } from 'lucide-react';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
     ResponsiveContainer, AreaChart, Area
@@ -47,6 +47,7 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
     });
     const [loading, setLoading] = useState(true);
     const [showAddVehicle, setShowAddVehicle] = useState(false);
+    const [editingVehicle, setEditingVehicle] = useState<any>(null);
 
     useEffect(() => {
         fetchData();
@@ -380,7 +381,7 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                 </div>
             ) : (
                 <>
-    {activeTab === 'vehicles' && <VehiclesManager vehicles={vehicles} onUpdate={fetchData} setShowAddVehicle={setShowAddVehicle} />}
+    {activeTab === 'vehicles' && <VehiclesManager vehicles={vehicles} onUpdate={fetchData} setShowAddVehicle={setShowAddVehicle} setEditingVehicle={setEditingVehicle} />}
                     
                     {activeTab === 'tracking' && renderTracking()}
                     {activeTab === 'trips' && <TripsManager trips={trips} vehicles={vehicles} onUpdate={fetchData} />}
@@ -397,6 +398,17 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                         <button onClick={() => setShowAddVehicle(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-900"><X size={24} /></button>
                         <h2 className="text-2xl font-black mb-6">Register New Vehicle</h2>
                         <VehicleForm onSuccess={() => { setShowAddVehicle(false); fetchData(); }} />
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Vehicle Modal */}
+            {editingVehicle && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-3xl p-8 w-full max-w-lg animate-slide-up shadow-2xl relative">
+                        <button onClick={() => setEditingVehicle(null)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-900"><X size={24} /></button>
+                        <h2 className="text-2xl font-black mb-6">Modify Vehicle Details</h2>
+                        <VehicleForm vehicle={editingVehicle} onSuccess={() => { setEditingVehicle(null); fetchData(); }} />
                     </div>
                 </div>
             )}
@@ -704,12 +716,14 @@ interface VehiclesManagerProps {
     vehicles: any[];
     onUpdate: () => void;
     setShowAddVehicle: (show: boolean) => void;
+    setEditingVehicle: (vehicle: any) => void;
 }
 
-function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle }: VehiclesManagerProps) {
+function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehicle }: VehiclesManagerProps) {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
 
     const handleDeleteVehicle = async (vehicleId: string, plateNumber: string) => {
         if (!confirm(`Are you absolutely sure you want to delete vehicle ${plateNumber}? This will permanently remove all associated trips, fuel logs, and maintenance logs.`)) {
@@ -733,6 +747,37 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle }: VehiclesMana
             alert(`❌ Network error: ${e.message}`);
         } finally {
             setDeletingId(null);
+        }
+    };
+
+    const handleToggleStatus = async (vehicle: any) => {
+        const action = vehicle.is_checked_in ? 'checkout' : 'checkin';
+        const actionLabel = vehicle.is_checked_in ? 'Check Out' : 'Check In';
+        if (!confirm(`Do you want to manually ${actionLabel} vehicle ${vehicle.plate_number}?`)) {
+            return;
+        }
+        setStatusUpdatingId(vehicle.id);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/fleet/vehicles/${vehicle.id}/${action}`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ passengers: 1 })
+            });
+            if (res.ok) {
+                alert(`✅ Vehicle ${vehicle.plate_number} has been ${vehicle.is_checked_in ? 'checked out' : 'checked in'} successfully.`);
+                onUpdate();
+            } else {
+                const err = await res.json();
+                alert(`❌ Error updating status: ${err.detail || 'Failed'}`);
+            }
+        } catch (e: any) {
+            alert(`❌ Network error: ${e.message}`);
+        } finally {
+            setStatusUpdatingId(null);
         }
     };
 
@@ -837,9 +882,19 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle }: VehiclesMana
                                             <p className="text-xs text-gray-400 font-bold uppercase">{vehicle.make} {vehicle.model}</p>
                                         </div>
                                     </div>
-                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusStyles(vehicle.status)}`}>
-                                        {vehicle.status}
-                                    </span>
+                                    <div className="flex flex-col items-end gap-1.5">
+                                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusStyles(vehicle.status)}`}>
+                                            {vehicle.status}
+                                        </span>
+                                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                                            vehicle.is_checked_in 
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-150' 
+                                            : 'bg-gray-50 text-gray-500 border border-gray-150'
+                                        }`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${vehicle.is_checked_in ? 'bg-emerald-500' : 'bg-gray-400'}`}></span>
+                                            {vehicle.is_checked_in ? 'Inside' : 'Outside'}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4 py-3 border-y border-gray-50 text-[11px]">
@@ -864,18 +919,50 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle }: VehiclesMana
 
                             <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-50">
                                 <span className="text-[10px] font-extrabold text-gray-400 uppercase">Year: {vehicle.year || 'N/A'}</span>
-                                <button 
-                                    disabled={deletingId === vehicle.id}
-                                    onClick={() => handleDeleteVehicle(vehicle.id, vehicle.plate_number)}
-                                    className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-red-100 disabled:opacity-50"
-                                    title="Remove Vehicle"
-                                >
-                                    {deletingId === vehicle.id ? (
-                                        <Loader2 size={16} className="animate-spin" />
-                                    ) : (
-                                        <Trash2 size={16} />
-                                    )}
-                                </button>
+                                <div className="flex items-center gap-1.5">
+                                    {/* Campus Status Toggle Button */}
+                                    <button
+                                        disabled={statusUpdatingId === vehicle.id}
+                                        onClick={() => handleToggleStatus(vehicle)}
+                                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 border ${
+                                            vehicle.is_checked_in 
+                                            ? 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100' 
+                                            : 'bg-emerald-600 text-white border-emerald-600 hover:scale-105 shadow-md shadow-emerald-500/10'
+                                        } disabled:opacity-50`}
+                                        title={vehicle.is_checked_in ? "Checkout Vehicle" : "Checkin Vehicle"}
+                                    >
+                                        {statusUpdatingId === vehicle.id ? (
+                                            <Loader2 size={12} className="animate-spin" />
+                                        ) : vehicle.is_checked_in ? (
+                                            'Log Out'
+                                        ) : (
+                                            'Log In'
+                                        )}
+                                    </button>
+
+                                    {/* Edit Details Button */}
+                                    <button 
+                                        onClick={() => setEditingVehicle(vehicle)}
+                                        className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-primary-100"
+                                        title="Modify Details"
+                                    >
+                                        <Edit size={14} />
+                                    </button>
+
+                                    {/* Delete Button */}
+                                    <button 
+                                        disabled={deletingId === vehicle.id}
+                                        onClick={() => handleDeleteVehicle(vehicle.id, vehicle.plate_number)}
+                                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-red-100 disabled:opacity-50"
+                                        title="Remove Vehicle"
+                                    >
+                                        {deletingId === vehicle.id ? (
+                                            <Loader2 size={14} className="animate-spin" />
+                                        ) : (
+                                            <Trash2 size={14} />
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))}
@@ -886,10 +973,21 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle }: VehiclesMana
 }
 
 // Form Components
-function VehicleForm({ onSuccess }: { onSuccess: () => void }) {
+interface VehicleFormProps {
+    vehicle?: any;
+    onSuccess: () => void;
+}
+
+function VehicleForm({ vehicle, onSuccess }: VehicleFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
-        plate_number: '', make: '', model: '', vehicle_type: 'bus', fuel_type: 'diesel', fuel_capacity: 0, year: 2024
+        plate_number: vehicle?.plate_number || '',
+        make: vehicle?.make || '',
+        model: vehicle?.model || '',
+        vehicle_type: vehicle?.vehicle_type || 'bus',
+        fuel_type: vehicle?.fuel_type || 'diesel',
+        fuel_capacity: vehicle?.fuel_capacity || 0,
+        year: vehicle?.year || 2024
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -897,43 +995,71 @@ function VehicleForm({ onSuccess }: { onSuccess: () => void }) {
         setIsSubmitting(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch('/api/fleet/vehicles', {
-                method: 'POST',
+            const url = vehicle ? `/api/fleet/vehicles/${vehicle.id}` : '/api/fleet/vehicles';
+            const method = vehicle ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(formData)
             });
             if (res.ok) {
+                alert(vehicle ? '✅ Vehicle details updated successfully!' : '✅ Vehicle registered successfully!');
                 onSuccess();
             } else {
                 const data = await res.json();
-                alert(`Error: ${data.detail || 'Failed to add vehicle'}`);
+                alert(`❌ Error: ${data.detail || 'Failed to save vehicle'}`);
             }
         } catch (e: any) {
-            alert(`Network error: ${e.message}`);
+            alert(`❌ Network error: ${e.message}`);
         } finally { setIsSubmitting(false); }
     };
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
-            <input required placeholder="Plate Number (e.g. KAB 123G)" value={formData.plate_number} onChange={e => setFormData({...formData, plate_number: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
-            <div className="grid grid-cols-2 gap-4">
-                <input required placeholder="Make" value={formData.make} onChange={e => setFormData({...formData, make: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
-                <input required placeholder="Model" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+            <div>
+                <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Plate Number</label>
+                <input required placeholder="Plate Number (e.g. KAB 123G)" value={formData.plate_number} onChange={e => setFormData({...formData, plate_number: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
             </div>
             <div className="grid grid-cols-2 gap-4">
-                <select value={formData.vehicle_type} onChange={e => setFormData({...formData, vehicle_type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
-                    <option value="bus">Bus</option>
-                    <option value="shuttle">Shuttle</option>
-                    <option value="staff">Staff Car</option>
-                    <option value="utility">Utility</option>
-                </select>
-                <select value={formData.fuel_type} onChange={e => setFormData({...formData, fuel_type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
-                    <option value="diesel">Diesel</option>
-                    <option value="petrol">Petrol</option>
-                </select>
+                <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Make</label>
+                    <input required placeholder="Make" value={formData.make} onChange={e => setFormData({...formData, make: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                </div>
+                <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Model</label>
+                    <input required placeholder="Model" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                </div>
             </div>
-            <button disabled={isSubmitting} className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl hover:opacity-90">
-                {isSubmitting ? 'Registering...' : 'Complete Registration'}
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Vehicle Type</label>
+                    <select value={formData.vehicle_type} onChange={e => setFormData({...formData, vehicle_type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
+                        <option value="bus">Bus</option>
+                        <option value="shuttle">Shuttle</option>
+                        <option value="staff">Staff Car</option>
+                        <option value="utility">Utility</option>
+                    </select>
+                </div>
+                <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Fuel Type</label>
+                    <select value={formData.fuel_type} onChange={e => setFormData({...formData, fuel_type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
+                        <option value="diesel">Diesel</option>
+                        <option value="petrol">Petrol</option>
+                    </select>
+                </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Fuel Capacity (L)</label>
+                    <input type="number" required placeholder="Fuel Capacity" value={formData.fuel_capacity} onChange={e => setFormData({...formData, fuel_capacity: Number(e.target.value)})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                </div>
+                <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Year</label>
+                    <input type="number" required placeholder="Year" value={formData.year} onChange={e => setFormData({...formData, year: Number(e.target.value)})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                </div>
+            </div>
+            <button disabled={isSubmitting} className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl hover:opacity-90 mt-2">
+                {isSubmitting ? 'Saving...' : vehicle ? 'Update Vehicle Details' : 'Complete Registration'}
             </button>
         </form>
     );

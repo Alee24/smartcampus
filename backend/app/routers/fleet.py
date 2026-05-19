@@ -4,13 +4,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from pydantic import BaseModel
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime, date as date_type
+from datetime import datetime, date as date_type, timedelta
 
 from app.database import get_session
 from app.models import (
-    Vehicle, FleetTrip, FleetPassengerManifest,
+    Vehicle, VehicleLog, FleetTrip, FleetPassengerManifest,
     FleetFuelLog, FleetGPSLog, FleetMaintenanceLog,
-    FleetNotification, User, Role
+    FleetNotification, User, Role, Gate
 )
 from app.auth import get_current_user
 from app.utils.audit import log_action
@@ -85,12 +85,63 @@ class MaintenanceLogCreate(BaseModel):
     next_service_due_odometer: Optional[float] = None
     performed_by: Optional[str] = None
 
+class VehicleResponse(BaseModel):
+    id: UUID
+    plate_number: str
+    make: Optional[str] = None
+    model: Optional[str] = None
+    color: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_contact: Optional[str] = None
+    driver_id_number: Optional[str] = None
+    owner_id: Optional[UUID] = None
+    vehicle_type: str
+    fuel_type: str
+    fuel_capacity: float
+    engine_number: Optional[str] = None
+    chassis_number: Optional[str] = None
+    year: Optional[int] = None
+    status: str
+    current_odometer: float
+    is_checked_in: bool = False
+
 # --- Vehicle Management ---
 
-@router.get("/vehicles", response_model=List[Vehicle])
+@router.get("/vehicles", response_model=List[VehicleResponse])
 async def get_vehicles(session: AsyncSession = Depends(get_session)):
     result = await session.exec(select(Vehicle))
-    return result.all()
+    vehicles = result.all()
+    
+    # Query all active log vehicle IDs
+    active_logs = (await session.exec(
+        select(VehicleLog.vehicle_id)
+        .where(VehicleLog.exit_time == None)
+    )).all()
+    checked_in_ids = set(active_logs)
+    
+    return [
+        VehicleResponse(
+            id=v.id,
+            plate_number=v.plate_number,
+            make=v.make,
+            model=v.model,
+            color=v.color,
+            driver_name=v.driver_name,
+            driver_contact=v.driver_contact,
+            driver_id_number=v.driver_id_number,
+            owner_id=v.owner_id,
+            vehicle_type=v.vehicle_type,
+            fuel_type=v.fuel_type,
+            fuel_capacity=v.fuel_capacity,
+            engine_number=v.engine_number,
+            chassis_number=v.chassis_number,
+            year=v.year,
+            status=v.status,
+            current_odometer=v.current_odometer,
+            is_checked_in=v.id in checked_in_ids
+        )
+        for v in vehicles
+    ]
 
 @router.post("/vehicles", response_model=Vehicle)
 async def create_vehicle(
@@ -141,12 +192,38 @@ async def create_vehicle(
             raise HTTPException(status_code=400, detail=f"A vehicle with plate number '{vehicle_data.plate_number}' already exists.")
         raise HTTPException(status_code=500, detail=f"Failed to register vehicle: {str(e)}")
 
-@router.get("/vehicles/{vehicle_id}", response_model=Vehicle)
+@router.get("/vehicles/{vehicle_id}", response_model=VehicleResponse)
 async def get_vehicle(vehicle_id: UUID, session: AsyncSession = Depends(get_session)):
-    vehicle = await session.get(Vehicle, vehicle_id)
-    if not vehicle:
+    v = await session.get(Vehicle, vehicle_id)
+    if not v:
         raise HTTPException(status_code=404, detail="Vehicle not found")
-    return vehicle
+        
+    open_log = (await session.exec(
+        select(VehicleLog)
+        .where(VehicleLog.vehicle_id == vehicle_id)
+        .where(VehicleLog.exit_time == None)
+    )).first()
+    
+    return VehicleResponse(
+        id=v.id,
+        plate_number=v.plate_number,
+        make=v.make,
+        model=v.model,
+        color=v.color,
+        driver_name=v.driver_name,
+        driver_contact=v.driver_contact,
+        driver_id_number=v.driver_id_number,
+        owner_id=v.owner_id,
+        vehicle_type=v.vehicle_type,
+        fuel_type=v.fuel_type,
+        fuel_capacity=v.fuel_capacity,
+        engine_number=v.engine_number,
+        chassis_number=v.chassis_number,
+        year=v.year,
+        status=v.status,
+        current_odometer=v.current_odometer,
+        is_checked_in=open_log is not None
+    )
 
 @router.put("/vehicles/{vehicle_id}")
 async def update_vehicle(
@@ -235,6 +312,96 @@ async def delete_vehicle(
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete vehicle: {str(e)}")
+
+@router.post("/vehicles/{vehicle_id}/checkin")
+async def check_in_fleet_vehicle(
+    vehicle_id: UUID,
+    payload: dict = {},
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+):
+    try:
+        vehicle = await session.get(Vehicle, vehicle_id)
+        if not vehicle:
+            raise HTTPException(status_code=404, detail="Vehicle not found")
+        
+        # Check if already checked in
+        open_log = (await session.exec(
+            select(VehicleLog)
+            .where(VehicleLog.vehicle_id == vehicle_id)
+            .where(VehicleLog.exit_time == None)
+        )).first()
+        if open_log:
+            raise HTTPException(status_code=400, detail="Vehicle is already checked in.")
+            
+        gate = (await session.exec(select(Gate).where(Gate.name == "Main Gate"))).first()
+        if not gate:
+            gate = Gate(name="Main Gate", location="Main Entrance")
+            session.add(gate)
+            await session.commit()
+            await session.refresh(gate)
+
+        log = VehicleLog(
+            vehicle_id=vehicle_id,
+            gate_id=gate.id,
+            entry_time=datetime.utcnow(),
+            vehicle_images={},
+            manual_override=True,
+            detected_passengers=payload.get("passengers", 1)
+        )
+        session.add(log)
+        await session.commit()
+        return {"status": "success", "message": f"Vehicle {vehicle.plate_number} checked in successfully."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to check in vehicle: {str(e)}")
+
+@router.post("/vehicles/{vehicle_id}/checkout")
+async def check_out_fleet_vehicle(
+    vehicle_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+):
+    try:
+        vehicle = await session.get(Vehicle, vehicle_id)
+        if not vehicle:
+            raise HTTPException(status_code=404, detail="Vehicle not found")
+            
+        # Find last open log
+        open_log = (await session.exec(
+            select(VehicleLog)
+            .where(VehicleLog.vehicle_id == vehicle_id)
+            .where(VehicleLog.exit_time == None)
+            .order_by(VehicleLog.entry_time.desc())
+        )).first()
+        
+        if not open_log:
+            # Auto-create entry to allow checkout
+            gate = (await session.exec(select(Gate).where(Gate.name == "Main Gate"))).first()
+            if not gate:
+                gate = Gate(name="Main Gate", location="Main Entrance")
+                session.add(gate)
+                await session.commit()
+                await session.refresh(gate)
+            open_log = VehicleLog(
+                vehicle_id=vehicle_id,
+                gate_id=gate.id,
+                entry_time=datetime.utcnow() - timedelta(minutes=5),
+                vehicle_images={},
+                manual_override=True
+            )
+            
+        open_log.exit_time = datetime.utcnow()
+        session.add(open_log)
+        await session.commit()
+        return {"status": "success", "message": f"Vehicle {vehicle.plate_number} checked out successfully."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to check out vehicle: {str(e)}")
 
 # --- Trip Management ---
 
