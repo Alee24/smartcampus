@@ -440,6 +440,67 @@ function StatCard({ title, value, icon, change, color }: any) {
 // Sub-Managers
 function TripsManager({ trips, vehicles, onUpdate }: any) {
     const [showForm, setShowForm] = useState(false);
+
+    const handleStartTrip = async (tripId: string, currentOdo: number) => {
+        const odoStr = prompt("Enter starting odometer reading:", currentOdo.toString());
+        if (odoStr === null) return;
+        const odometer = parseFloat(odoStr);
+        if (isNaN(odometer)) {
+            alert("Please enter a valid number for odometer.");
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/fleet/trips/${tripId}/start?odometer=${odometer}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                alert("Trip started successfully!");
+                onUpdate();
+            } else {
+                const err = await res.json();
+                alert(`Error starting trip: ${err.detail || 'Failed'}`);
+            }
+        } catch (e: any) {
+            alert(`Error: ${e.message}`);
+        }
+    };
+
+    const handleEndTrip = async (tripId: string, currentOdo: number) => {
+        const odoStr = prompt("Enter ending odometer reading:", currentOdo.toString());
+        if (odoStr === null) return;
+        const odometer = parseFloat(odoStr);
+        if (isNaN(odometer)) {
+            alert("Please enter a valid number for odometer.");
+            return;
+        }
+        if (odometer < currentOdo) {
+            alert(`Ending odometer must be greater than or equal to starting odometer (${currentOdo}).`);
+            return;
+        }
+
+        const notes = prompt("Enter any optional trip notes:") || "";
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/fleet/trips/${tripId}/end?odometer=${odometer}&notes=${encodeURIComponent(notes)}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                alert("Trip ended successfully!");
+                onUpdate();
+            } else {
+                const err = await res.json();
+                alert(`Error ending trip: ${err.detail || 'Failed'}`);
+            }
+        } catch (e: any) {
+            alert(`Error: ${e.message}`);
+        }
+    };
+
     return (
         <div className="glass-card p-6 animate-fade-in">
             <div className="flex justify-between items-center mb-8">
@@ -480,7 +541,22 @@ function TripsManager({ trips, vehicles, onUpdate }: any) {
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                {trip.status === 'scheduled' && <button className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-bold">Start Trip</button>}
+                                {trip.status === 'scheduled' && (
+                                    <button 
+                                        onClick={() => handleStartTrip(trip.id, vehicles.find((v: any) => v.id === trip.vehicle_id)?.current_odometer || 0)} 
+                                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold transition-colors"
+                                    >
+                                        Start Trip
+                                    </button>
+                                )}
+                                {trip.status === 'ongoing' && (
+                                    <button 
+                                        onClick={() => handleEndTrip(trip.id, trip.start_odometer || 0)} 
+                                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-colors"
+                                    >
+                                        End Trip
+                                    </button>
+                                )}
                                 <button className="px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100">Manifest</button>
                             </div>
                         </div>
