@@ -12,6 +12,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function GateControl() {
     const { showNotification } = useNotification()
     const [admissionNumber, setAdmissionNumber] = useState('')
+    const [studentSuggestions, setStudentSuggestions] = useState<any[]>([])
     const [scanStatus, setScanStatus] = useState<'idle' | 'success' | 'rejected' | 'scanning'>('idle')
     const [lastScan, setLastScan] = useState<any>(null)
     const [stream, setStream] = useState<MediaStream | null>(null)
@@ -92,6 +93,26 @@ export default function GateControl() {
         setManualDriverContact(v.driver_contact || '')
         setManualDriverId(v.driver_id_number || '')
         setPlateSuggestions([])
+    }
+
+    // Autocomplete Lookup for Students
+    const handleStudentSearch = async (val: string) => {
+        const v = val.toUpperCase().replace(/[^A-Z0-9-]/g, '')
+        setAdmissionNumber(v)
+        if (v.length > 1) {
+            try {
+                const token = localStorage.getItem('token')
+                const res = await fetch(`/api/users/search?q=${v}`, { headers: { 'Authorization': `Bearer ${token}` } })
+                if (res.ok) setStudentSuggestions(await res.json())
+            } catch (e) { }
+        } else {
+            setStudentSuggestions([])
+        }
+    }
+
+    const selectStudentSuggestion = (v: any) => {
+        setAdmissionNumber(v.admission_number)
+        setStudentSuggestions([])
     }
 
     // Submit Student Verification Check-In
@@ -624,15 +645,36 @@ export default function GateControl() {
                             <form onSubmit={handleStudentVerify} className="space-y-4 animate-fade-in">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Student Admission Number</label>
-                                    <div className="relative">
+                                    <div className="relative z-50">
                                         <input 
                                             required
                                             value={admissionNumber}
-                                            onChange={e => setAdmissionNumber(e.target.value.toUpperCase())}
+                                            onChange={e => handleStudentSearch(e.target.value)}
                                             placeholder="ENTER ADMISSION NO (E.G. STD1001)"
                                             className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none text-sm font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-mono"
                                         />
                                         <UserIcon className="absolute right-4 top-4 text-slate-400" size={18} />
+                                        
+                                        {studentSuggestions.length > 0 && (
+                                            <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                                                {studentSuggestions.map((s, idx) => (
+                                                    <button 
+                                                        type="button"
+                                                        key={idx}
+                                                        onClick={() => selectStudentSuggestion(s)}
+                                                        className="w-full text-left px-4 py-3 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border-b border-slate-50 dark:border-slate-700/50 flex items-center gap-3 transition-colors last:border-none"
+                                                    >
+                                                        <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 overflow-hidden shrink-0">
+                                                            {s.profile_image ? <img src={s.profile_image} className="w-full h-full object-cover" /> : <UserIcon size={16} className="m-auto mt-2 text-indigo-600" />}
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-black text-slate-900 dark:text-white font-mono">{s.admission_number}</div>
+                                                            <div className="text-[10px] font-bold text-slate-500">{s.full_name}</div>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3 pt-2">

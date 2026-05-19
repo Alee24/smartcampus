@@ -41,6 +41,25 @@ async def get_all_users(
         
     return users_list
 
+@router.get("/search")
+async def search_users(q: str, session: AsyncSession = Depends(get_session)):
+    """Autocomplete search for users by admission number or name"""
+    if len(q) < 2: return []
+    # Search by admission number (case insensitive)
+    query = select(User).where(User.admission_number.contains(q.upper())).limit(10)
+    results = await session.exec(query)
+    
+    users_list = []
+    for user in results.all():
+        users_list.append({
+            "id": str(user.id),
+            "admission_number": user.admission_number,
+            "full_name": user.full_name,
+            "profile_image": user.profile_image,
+            "school": user.school
+        })
+    return users_list
+
 @router.put("/{user_id}")
 async def update_user(
     request: Request,

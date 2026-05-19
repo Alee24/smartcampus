@@ -9,6 +9,8 @@ import { jsPDF } from 'jspdf'
 export default function StudentVerification() {
     const { showNotification } = useNotification()
     const [query, setQuery] = useState('')
+    const [suggestions, setSuggestions] = useState<any[]>([])
+    const [showSuggestions, setShowSuggestions] = useState(false)
     const [result, setResult] = useState<any>(null)
     const [loading, setLoading] = useState(false)
     const [showCard, setShowCard] = useState(false)
@@ -113,13 +115,16 @@ export default function StudentVerification() {
         }
     }
 
-    const handleVerify = async () => {
-        if (!query.trim()) return
+    const handleVerify = async (qOverride?: string) => {
+        const searchQuery = qOverride || query
+        if (!searchQuery.trim()) return
+        setQuery(searchQuery)
         setLoading(true)
         setShowCard(false)
         setResult(null)
+        setShowSuggestions(false)
         try {
-            const res = await fetch(`/api/users/verify/${encodeURIComponent(query)}`)
+            const res = await fetch(`/api/users/verify/${encodeURIComponent(searchQuery)}`)
             if (res.ok) {
                 const data = await res.json()
                 setResult(data)
@@ -137,6 +142,23 @@ export default function StudentVerification() {
             setResult({ error: 'Verification failed. Please try again.' })
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleQueryChange = async (val: string) => {
+        setQuery(val)
+        if (val.length >= 2) {
+            try {
+                const token = localStorage.getItem('token')
+                const res = await fetch(`/api/users/search?q=${val}`, { headers: { 'Authorization': `Bearer ${token}` } })
+                if (res.ok) {
+                    setSuggestions(await res.json())
+                    setShowSuggestions(true)
+                }
+            } catch (e) { }
+        } else {
+            setSuggestions([])
+            setShowSuggestions(false)
         }
     }
 
@@ -257,7 +279,7 @@ export default function StudentVerification() {
                     (decodedText) => {
                         setQuery(decodedText)
                         stopScanner()
-                        handleVerify()
+                        handleVerify(decodedText)
                     },
                     () => {}
                 )
@@ -316,11 +338,34 @@ export default function StudentVerification() {
                                 <input
                                     type="text"
                                     value={query}
-                                    onChange={(e) => setQuery(e.target.value)}
+                                    onChange={(e) => handleQueryChange(e.target.value)}
                                     onKeyPress={(e) => e.key === 'Enter' && handleVerify()}
                                     placeholder="Enter Admission Number..."
-                                    className="w-full pl-12 pr-4 py-4 bg-transparent text-lg font-medium focus:outline-none"
+                                    className="w-full pl-12 pr-4 py-4 bg-transparent text-lg font-medium focus:outline-none uppercase"
                                 />
+                                {showSuggestions && suggestions.length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
+                                        {suggestions.map((s, idx) => (
+                                            <button 
+                                                key={idx}
+                                                className="w-full text-left px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 border-b border-gray-50 dark:border-gray-700/50 flex items-center gap-3 transition-colors last:border-none"
+                                                onClick={() => {
+                                                    setQuery(s.admission_number)
+                                                    setShowSuggestions(false)
+                                                    handleVerify(s.admission_number)
+                                                }}
+                                            >
+                                                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900 overflow-hidden shrink-0">
+                                                    {s.profile_image ? <img src={s.profile_image} className="w-full h-full object-cover" /> : <User size={20} className="m-auto mt-2.5 text-purple-600" />}
+                                                </div>
+                                                <div>
+                                                    <div className="font-black text-gray-900 dark:text-white font-mono">{s.admission_number}</div>
+                                                    <div className="text-xs font-bold text-gray-500">{s.full_name}</div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <div className="flex gap-2">
                                 <button
