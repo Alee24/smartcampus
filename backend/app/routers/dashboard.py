@@ -3,7 +3,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from datetime import datetime
 from sqlmodel import select, func
 from app.database import get_session
-from app.models import User, AttendanceRecord, Gate, EntryLog, Vehicle, VehicleLog, SystemActivity, Role
+from app.models import User, AttendanceRecord, Gate, EntryLog, Vehicle, VehicleLog, SystemActivity, Role, FleetTrip, Event
 
 from app.auth import get_current_user
 
@@ -219,4 +219,63 @@ async def get_analytics(session: AsyncSession = Depends(get_session), current_us
     return {
         "roles": roles_data,
         "gates": gates_data
+    }
+
+@router.get("/live-monitor-stats")
+async def get_live_monitor_stats(session: AsyncSession = Depends(get_session)):
+    today = datetime.utcnow().date()
+    today_start = datetime.combine(today, datetime.min.time())
+    today_end = datetime.combine(today, datetime.max.time())
+    
+    # 1. Cars (Vehicles) inside vs checked out today
+    vehicles_inside = (await session.exec(select(func.count(VehicleLog.id)).where(VehicleLog.exit_time == None))).one()
+    vehicles_checked_out = (await session.exec(select(func.count(VehicleLog.id)).where(VehicleLog.exit_time >= today_start))).one()
+    
+    # 2. Students inside
+    students_inside = (await session.exec(select(func.count(func.distinct(EntryLog.user_id))).where(EntryLog.exit_time == None))).one()
+    
+    # 3. Male vs Female inside
+    # Find all users currently inside, group by gender
+    users_inside_subquery = select(EntryLog.user_id).where(EntryLog.exit_time == None).subquery()
+    gender_query = select(User.gender, func.count(User.id)).where(User.id.in_(select(users_inside_subquery.c.user_id))).group_by(User.gender)
+    gender_results = (await session.exec(gender_query)).all()
+    gender_stats = {"Male": 0, "Female": 0, "Other": 0}
+    for gender, count in gender_results:
+        g = gender.capitalize() if gender else "Other"
+        if g in gender_stats: gender_stats[g] += count
+        else: gender_stats["Other"] += count
+        
+    # 4. Fleet Management Stats
+    buses_total = (await session.exec(select(func.count(Vehicle.id)).where(Vehicle.vehicle_type == "bus"))).one()
+    buses_inside = (await session.exec(select(func.count(Vehicle.id)).where((Vehicle.vehicle_type == "bus") & (Vehicle.status == "active")))).one()
+    buses_left = (await session.exec(select(func.count(Vehicle.id)).where((Vehicle.vehicle_type == "bus") & (Vehicle.status == "trip")))).one()
+    # Or based on trips
+    trips_planned = (await session.exec(select(func.count(FleetTrip.id)).where(FleetTrip.status == "scheduled"))).one()
+    
+    # 5. Events planned for the month
+    from sqlalchemy import extract
+    events_this_month = (await session.exec(select(func.count(Event.id)).where((extract('year', Event.event_date) == today.year) & (extract('month', Event.event_date) == today.month)))).one()
+
+    return {
+        "vehicles": {
+            "inside": vehicles_inside,
+            "checked_out_today": vehicles_checked_out
+        },
+        "students": {
+            "inside": students_inside,
+            "gender": {
+                "male": gender_stats["Male"],
+                "female": gender_stats["Female"],
+                "other": gender_stats["Other"]
+            }
+        },
+        "fleet": {
+            "buses_total": buses_total,
+            "buses_inside": buses_inside,
+            "buses_on_trip": buses_left,
+            "trips_planned": trips_planned
+        },
+        "events": {
+            "planned_this_month": events_this_month
+        }
     }

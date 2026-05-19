@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Clock, MapPin, Users, Activity, MonitorPlay, Printer, Download, BarChart2, School, UserCheck } from 'lucide-react';
+import { Clock, MapPin, Users, Activity, MonitorPlay, Printer, Download, BarChart2, School, UserCheck, Car, Bus, Calendar, User } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -15,6 +15,7 @@ export default function LiveClasses({ fullScreen = false }: { fullScreen?: boole
         utilization: 0,
         busiestBuilding: "N/A"
     });
+    const [campusStats, setCampusStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
     const [activating, setActivating] = useState(false);
@@ -90,6 +91,14 @@ export default function LiveClasses({ fullScreen = false }: { fullScreen?: boole
 
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/dashboard/live-monitor-stats', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) setCampusStats(await res.json());
+        } catch (e) { console.error(e); }
     };
 
     const generateRoomQRCodes = async () => {
@@ -372,10 +381,10 @@ export default function LiveClasses({ fullScreen = false }: { fullScreen?: boole
                         <div className={`p-2 rounded-lg ${fullScreen ? 'bg-indigo-100 text-indigo-600' : ''}`}>
                             <MonitorPlay className={fullScreen ? "text-indigo-600" : "text-green-500 animate-pulse"} size={fullScreen ? 32 : 20} />
                         </div>
-                        Live Classes Monitor
+                        Live Campus Monitor
                     </h3>
                     <p className={`${fullScreen ? 'text-base mt-2' : 'text-xs'} text-[var(--text-secondary)]`}>
-                        Real-time tracking of all active sessions across campus.
+                        Real-time tracking of overall campus statistics and active sessions.
                     </p>
                 </div>
 
@@ -421,36 +430,124 @@ export default function LiveClasses({ fullScreen = false }: { fullScreen?: boole
                 </div>
             </div>
 
+            {/* LIVE CAMPUS STATS */}
+            {fullScreen && campusStats && (
+                <div className="mb-8 space-y-4">
+                    <h4 className="text-xl font-bold flex items-center gap-2 mb-4 text-[var(--text-primary)]"><Activity size={20} className="text-blue-500" /> General Campus Activity</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* Students Box */}
+                        <div className="glass-card p-5 border-l-4 border-blue-500">
+                            <div className="flex justify-between items-start mb-2">
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Students Inside</p>
+                                    <p className="text-3xl font-black text-gray-900 dark:text-white mt-1">{campusStats.students.inside}</p>
+                                </div>
+                                <div className="p-2 bg-blue-50 rounded-lg text-blue-500"><Users size={24} /></div>
+                            </div>
+                            <div className="flex gap-4 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                <div>
+                                    <p className="text-[10px] text-gray-500 uppercase">Male</p>
+                                    <p className="font-bold text-sm text-blue-600">{campusStats.students.gender.male}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-gray-500 uppercase">Female</p>
+                                    <p className="font-bold text-sm text-pink-600">{campusStats.students.gender.female}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Vehicles Box */}
+                        <div className="glass-card p-5 border-l-4 border-emerald-500">
+                            <div className="flex justify-between items-start mb-2">
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Vehicles Traffic</p>
+                                    <p className="text-3xl font-black text-gray-900 dark:text-white mt-1">{campusStats.vehicles.inside}</p>
+                                    <p className="text-[10px] text-gray-500 font-bold uppercase mt-1">Currently Inside</p>
+                                </div>
+                                <div className="p-2 bg-emerald-50 rounded-lg text-emerald-500"><Car size={24} /></div>
+                            </div>
+                            <div className="flex gap-4 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                <div>
+                                    <p className="text-[10px] text-gray-500 uppercase">Checked Out Today</p>
+                                    <p className="font-bold text-sm text-emerald-600">{campusStats.vehicles.checked_out_today}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Fleet Box */}
+                        <div className="glass-card p-5 border-l-4 border-orange-500">
+                            <div className="flex justify-between items-start mb-2">
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Fleet Management</p>
+                                    <p className="text-3xl font-black text-gray-900 dark:text-white mt-1">{campusStats.fleet.buses_inside}</p>
+                                    <p className="text-[10px] text-gray-500 font-bold uppercase mt-1">Buses Inside</p>
+                                </div>
+                                <div className="p-2 bg-orange-50 rounded-lg text-orange-500"><Bus size={24} /></div>
+                            </div>
+                            <div className="flex gap-4 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                <div>
+                                    <p className="text-[10px] text-gray-500 uppercase">Left on Trips</p>
+                                    <p className="font-bold text-sm text-orange-600">{campusStats.fleet.buses_on_trip}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-gray-500 uppercase">Planned Trips</p>
+                                    <p className="font-bold text-sm text-gray-700 dark:text-gray-300">{campusStats.fleet.trips_planned}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Events Box */}
+                        <div className="glass-card p-5 border-l-4 border-purple-500">
+                            <div className="flex justify-between items-start mb-2">
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Events</p>
+                                    <p className="text-3xl font-black text-gray-900 dark:text-white mt-1">{campusStats.events.planned_this_month}</p>
+                                    <p className="text-[10px] text-gray-500 font-bold uppercase mt-1">Planned This Month</p>
+                                </div>
+                                <div className="p-2 bg-purple-50 rounded-lg text-purple-500"><Calendar size={24} /></div>
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                <p className="text-xs text-gray-500 font-medium">Tracking events and expected guests for better security allocation.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ENHANCED STATISTICS ROW (ONLY IN FULLSCREEN) */}
             {fullScreen && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                    <div className="glass-card p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-[var(--text-secondary)]">Total Students</p>
-                            <p className="text-2xl font-bold text-green-600">{stats.totalStudents}</p>
+                <div className="mb-8">
+                    <h4 className="text-xl font-bold flex items-center gap-2 mb-4 text-[var(--text-primary)]"><School size={20} className="text-indigo-500" /> Academic Sessions</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="glass-card p-4 flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-[var(--text-secondary)]">Students in Class</p>
+                                <p className="text-2xl font-bold text-green-600">{stats.totalStudents}</p>
+                            </div>
+                            <div className="p-3 bg-green-100 rounded-full text-green-600"><UserCheck size={24} /></div>
                         </div>
-                        <div className="p-3 bg-green-100 rounded-full text-green-600"><UserCheck size={24} /></div>
-                    </div>
-                    <div className="glass-card p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-[var(--text-secondary)]">Active Rooms</p>
-                            <p className="text-2xl font-bold text-indigo-600">{stats.activeRooms} / <span className="text-sm text-gray-500">{stats.totalRooms}</span></p>
+                        <div className="glass-card p-4 flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-[var(--text-secondary)]">Active Rooms</p>
+                                <p className="text-2xl font-bold text-indigo-600">{stats.activeRooms} / <span className="text-sm text-gray-500">{stats.totalRooms}</span></p>
+                            </div>
+                            <div className="p-3 bg-indigo-100 rounded-full text-indigo-600"><School size={24} /></div>
                         </div>
-                        <div className="p-3 bg-indigo-100 rounded-full text-indigo-600"><School size={24} /></div>
-                    </div>
-                    <div className="glass-card p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-[var(--text-secondary)]">Utilization</p>
-                            <p className="text-2xl font-bold text-purple-600">{stats.utilization}%</p>
+                        <div className="glass-card p-4 flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-[var(--text-secondary)]">Utilization</p>
+                                <p className="text-2xl font-bold text-purple-600">{stats.utilization}%</p>
+                            </div>
+                            <div className="p-3 bg-purple-100 rounded-full text-purple-600"><BarChart2 size={24} /></div>
                         </div>
-                        <div className="p-3 bg-purple-100 rounded-full text-purple-600"><BarChart2 size={24} /></div>
-                    </div>
-                    <div className="glass-card p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-[var(--text-secondary)]">Most Active</p>
-                            <p className="text-lg font-bold text-blue-600 truncate max-w-[120px]">{stats.busiestBuilding}</p>
+                        <div className="glass-card p-4 flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-[var(--text-secondary)]">Most Active</p>
+                                <p className="text-lg font-bold text-blue-600 truncate max-w-[120px]">{stats.busiestBuilding}</p>
+                            </div>
+                            <div className="p-3 bg-blue-100 rounded-full text-blue-600"><Activity size={24} /></div>
                         </div>
-                        <div className="p-3 bg-blue-100 rounded-full text-blue-600"><Activity size={24} /></div>
                     </div>
                 </div>
             )}
