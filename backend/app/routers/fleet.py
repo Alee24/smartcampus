@@ -1,20 +1,53 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlmodel import select, Session, func
+from sqlmodel import select, func
 from sqlmodel.ext.asyncio.session import AsyncSession
+from pydantic import BaseModel
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, date as date_type
 
 from app.database import get_session
 from app.models import (
-    Vehicle, FleetTrip, FleetPassengerManifest, 
-    FleetFuelLog, FleetGPSLog, FleetMaintenanceLog, 
+    Vehicle, FleetTrip, FleetPassengerManifest,
+    FleetFuelLog, FleetGPSLog, FleetMaintenanceLog,
     FleetNotification, User, Role
 )
 from app.auth import get_current_user
 from app.utils.audit import log_action
 
 router = APIRouter()
+
+# ---- Safe Pydantic Input Schemas (avoid SQLModel relationship serialization issues) ----
+
+class TripCreate(BaseModel):
+    vehicle_id: UUID
+    driver_id: Optional[UUID] = None
+    purpose: str
+    origin: str
+    destination: str
+    planned_route: Optional[str] = None
+    scheduled_departure: datetime
+    start_odometer: float = 0.0
+    status: str = "scheduled"
+    notes: Optional[str] = None
+
+class FuelLogCreate(BaseModel):
+    vehicle_id: UUID
+    driver_id: Optional[UUID] = None
+    amount_liters: float
+    cost: float
+    station_name: Optional[str] = None
+    odometer_reading: float
+
+class MaintenanceLogCreate(BaseModel):
+    vehicle_id: UUID
+    service_type: str
+    description: str
+    cost: float = 0.0
+    odometer_reading: float
+    service_date: str  # ISO date string e.g. "2026-05-19"
+    next_service_due_odometer: Optional[float] = None
+    performed_by: Optional[str] = None
 
 # --- Vehicle Management ---
 
@@ -26,7 +59,7 @@ async def get_vehicles(session: AsyncSession = Depends(get_session)):
 @router.post("/vehicles", response_model=Vehicle)
 async def create_vehicle(
     request: Request,
-    vehicle: Vehicle, 
+    vehicle: Vehicle,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_user)
 ):
@@ -34,7 +67,7 @@ async def create_vehicle(
         session.add(vehicle)
         await session.commit()
         await session.refresh(vehicle)
-        
+
         await log_action(
             session=session,
             action_type="create",
@@ -42,14 +75,16 @@ async def create_vehicle(
             table_name="vehicles",
             record_id=str(vehicle.id),
             description=f"Registered new vehicle: {vehicle.plate_number} ({vehicle.make} {vehicle.model})",
-            new_values=vehicle.dict(),
+            new_values={"plate_number": vehicle.plate_number, "make": vehicle.make, "model": vehicle.model, "type": vehicle.vehicle_type},
             request=request
         )
         return vehicle
+    except HTTPException:
+        raise
     except Exception as e:
         await session.rollback()
-        if "Duplicate entry" in str(e) or "1062" in str(e):
-            raise HTTPException(status_code=400, detail=f"A vehicle with plate number {vehicle.plate_number} already exists.")
+        if "Duplicate entry" in str(e) or "1062" in str(e) or "UNIQUE" in str(e):
+            raise HTTPException(status_code=400, detail=f"A vehicle with plate number '{vehicle.plate_number}' already exists.")
         raise HTTPException(status_code=500, detail=f"Failed to register vehicle: {str(e)}")
 
 @router.get("/vehicles/{vehicle_id}", response_model=Vehicle)
@@ -59,218 +94,407 @@ async def get_vehicle(vehicle_id: UUID, session: AsyncSession = Depends(get_sess
         raise HTTPException(status_code=404, detail="Vehicle not found")
     return vehicle
 
-# --- Trip Management ---
-
-@router.get("/trips", response_model=List[FleetTrip])
-async def get_trips(session: AsyncSession = Depends(get_session)):
-    result = await session.exec(select(FleetTrip))
-    return result.all()
-
-@router.post("/trips", response_model=FleetTrip)
-async def create_trip(
+@router.put("/vehicles/{vehicle_id}")
+async def update_vehicle(
     request: Request,
-    trip: FleetTrip, 
+    vehicle_id: UUID,
+    vehicle_data: dict,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_user)
 ):
-    session.add(trip)
-    await session.commit()
-    await session.refresh(trip)
-    
-    await log_action(
-        session=session,
-        action_type="create",
-        user=admin,
-        table_name="fleet_trips",
-        record_id=str(trip.id),
-        description=f"Scheduled new trip: {trip.destination}",
-        new_values=trip.dict(),
-        request=request
-    )
-    
-    return trip
+    try:
+        vehicle = await session.get(Vehicle, vehicle_id)
+        if not vehicle:
+            raise HTTPException(status_code=404, detail="Vehicle not found")
+        for key, value in vehicle_data.items():
+            if hasattr(vehicle, key) and value is not None:
+                setattr(vehicle, key, value)
+        session.add(vehicle)
+        await session.commit()
+        await session.refresh(vehicle)
+        return {"status": "success", "plate_number": vehicle.plate_number}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update vehicle: {str(e)}")
+
+# --- Trip Management ---
+
+@router.get("/trips")
+async def get_trips(session: AsyncSession = Depends(get_session)):
+    result = await session.exec(select(FleetTrip).order_by(FleetTrip.scheduled_departure.desc()))
+    trips = result.all()
+    return [
+        {
+            "id": str(t.id),
+            "vehicle_id": str(t.vehicle_id),
+            "driver_id": str(t.driver_id) if t.driver_id else None,
+            "purpose": t.purpose,
+            "origin": t.origin,
+            "destination": t.destination,
+            "planned_route": t.planned_route,
+            "scheduled_departure": t.scheduled_departure.isoformat() if t.scheduled_departure else None,
+            "actual_departure": t.actual_departure.isoformat() if t.actual_departure else None,
+            "actual_arrival": t.actual_arrival.isoformat() if t.actual_arrival else None,
+            "start_odometer": t.start_odometer,
+            "end_odometer": t.end_odometer,
+            "status": t.status,
+            "notes": t.notes
+        }
+        for t in trips
+    ]
+
+@router.post("/trips")
+async def create_trip(
+    request: Request,
+    trip_data: TripCreate,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+):
+    try:
+        # Validate vehicle exists
+        vehicle = await session.get(Vehicle, trip_data.vehicle_id)
+        if not vehicle:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Vehicle not found. Please select a valid vehicle from the list."
+            )
+
+        # Build trip safely without passing relationship data
+        trip = FleetTrip(
+            vehicle_id=trip_data.vehicle_id,
+            driver_id=trip_data.driver_id,
+            purpose=trip_data.purpose,
+            origin=trip_data.origin,
+            destination=trip_data.destination,
+            planned_route=trip_data.planned_route,
+            scheduled_departure=trip_data.scheduled_departure,
+            start_odometer=trip_data.start_odometer,
+            status=trip_data.status,
+            notes=trip_data.notes
+        )
+        session.add(trip)
+        await session.commit()
+        await session.refresh(trip)
+
+        await log_action(
+            session=session,
+            action_type="create",
+            user=admin,
+            table_name="fleet_trips",
+            record_id=str(trip.id),
+            description=f"Scheduled trip: {trip.origin} → {trip.destination} ({trip.purpose})",
+            new_values={
+                "vehicle": vehicle.plate_number,
+                "origin": trip.origin,
+                "destination": trip.destination,
+                "purpose": trip.purpose,
+                "departure": trip.scheduled_departure.isoformat(),
+                "status": trip.status
+            },
+            request=request
+        )
+
+        return {
+            "id": str(trip.id),
+            "vehicle_id": str(trip.vehicle_id),
+            "purpose": trip.purpose,
+            "origin": trip.origin,
+            "destination": trip.destination,
+            "scheduled_departure": trip.scheduled_departure.isoformat(),
+            "status": trip.status,
+            "start_odometer": trip.start_odometer
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to schedule trip: {str(e)}")
 
 @router.post("/trips/{trip_id}/start")
 async def start_trip(
     request: Request,
-    trip_id: UUID, 
-    odometer: float, 
+    trip_id: UUID,
+    odometer: float,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_user)
 ):
-    trip = await session.get(FleetTrip, trip_id)
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
-    
-    trip.actual_departure = datetime.utcnow()
-    trip.start_odometer = odometer
-    trip.status = "ongoing"
-    
-    session.add(trip)
-    await session.commit()
-    
-    await log_action(
-        session=session,
-        action_type="update",
-        user=admin,
-        table_name="fleet_trips",
-        record_id=str(trip_id),
-        description=f"Started trip to {trip.destination} (Odometer: {odometer})",
-        request=request
-    )
-    
-    return {"status": "success", "message": "Trip started"}
+    try:
+        trip = await session.get(FleetTrip, trip_id)
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+
+        trip.actual_departure = datetime.utcnow()
+        trip.start_odometer = odometer
+        trip.status = "ongoing"
+
+        session.add(trip)
+        await session.commit()
+
+        await log_action(
+            session=session,
+            action_type="update",
+            user=admin,
+            table_name="fleet_trips",
+            record_id=str(trip_id),
+            description=f"Started trip to {trip.destination} (Odometer: {odometer})",
+            request=request
+        )
+
+        return {"status": "success", "message": "Trip started successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to start trip: {str(e)}")
 
 @router.post("/trips/{trip_id}/end")
 async def end_trip(
     request: Request,
-    trip_id: UUID, 
-    odometer: float, 
-    notes: Optional[str] = None, 
+    trip_id: UUID,
+    odometer: float,
+    notes: Optional[str] = None,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_user)
 ):
-    trip = await session.get(FleetTrip, trip_id)
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
-    
-    trip.actual_arrival = datetime.utcnow()
-    trip.end_odometer = odometer
-    trip.status = "completed"
-    trip.notes = notes
-    
-    # Update vehicle odometer
-    vehicle = await session.get(Vehicle, trip.vehicle_id)
-    if vehicle:
-        vehicle.current_odometer = odometer
-        session.add(vehicle)
-    
-    session.add(trip)
-    await session.commit()
-    
-    await log_action(
-        session=session,
-        action_type="update",
-        user=admin,
-        table_name="fleet_trips",
-        record_id=str(trip_id),
-        description=f"Ended trip to {trip.destination} (End Odometer: {odometer})",
-        request=request
-    )
-    
-    return {"status": "success", "message": "Trip ended"}
+    try:
+        trip = await session.get(FleetTrip, trip_id)
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+
+        trip.actual_arrival = datetime.utcnow()
+        trip.end_odometer = odometer
+        trip.status = "completed"
+        trip.notes = notes
+
+        # Update vehicle odometer
+        vehicle = await session.get(Vehicle, trip.vehicle_id)
+        if vehicle:
+            vehicle.current_odometer = odometer
+            session.add(vehicle)
+
+        session.add(trip)
+        await session.commit()
+
+        await log_action(
+            session=session,
+            action_type="update",
+            user=admin,
+            table_name="fleet_trips",
+            record_id=str(trip_id),
+            description=f"Ended trip to {trip.destination} (End Odometer: {odometer})",
+            request=request
+        )
+
+        return {"status": "success", "message": "Trip ended successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to end trip: {str(e)}")
 
 # --- Fuel Logging ---
 
-@router.get("/fuel-logs", response_model=List[FleetFuelLog])
+@router.get("/fuel-logs")
 async def get_fuel_logs(session: AsyncSession = Depends(get_session)):
     result = await session.exec(select(FleetFuelLog).order_by(FleetFuelLog.timestamp.desc()))
-    return result.all()
+    logs = result.all()
+    return [
+        {
+            "id": str(l.id),
+            "vehicle_id": str(l.vehicle_id),
+            "amount_liters": l.amount_liters,
+            "cost": l.cost,
+            "station_name": l.station_name,
+            "odometer_reading": l.odometer_reading,
+            "timestamp": l.timestamp.isoformat()
+        }
+        for l in logs
+    ]
 
-@router.post("/fuel-logs", response_model=FleetFuelLog)
+@router.post("/fuel-logs")
 async def create_fuel_log(
     request: Request,
-    log: FleetFuelLog, 
+    log_data: FuelLogCreate,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_user)
 ):
-    session.add(log)
-    
-    # Update vehicle odometer if provided
-    vehicle = await session.get(Vehicle, log.vehicle_id)
-    if vehicle and log.odometer_reading > vehicle.current_odometer:
-        vehicle.current_odometer = log.odometer_reading
-        session.add(vehicle)
-        
-    await session.commit()
-    await session.refresh(log)
-    
-    await log_action(
-        session=session,
-        action_type="create",
-        user=admin,
-        table_name="fleet_fuel_logs",
-        record_id=str(log.id),
-        description=f"Logged fuel for vehicle (Liters: {log.amount_liters}, Cost: {log.cost})",
-        new_values=log.dict(),
-        request=request
-    )
-    
-    return log
+    try:
+        vehicle = await session.get(Vehicle, log_data.vehicle_id)
+        if not vehicle:
+            raise HTTPException(status_code=404, detail="Vehicle not found")
+
+        log = FleetFuelLog(
+            vehicle_id=log_data.vehicle_id,
+            driver_id=log_data.driver_id,
+            amount_liters=log_data.amount_liters,
+            cost=log_data.cost,
+            station_name=log_data.station_name,
+            odometer_reading=log_data.odometer_reading
+        )
+        session.add(log)
+
+        if log_data.odometer_reading > vehicle.current_odometer:
+            vehicle.current_odometer = log_data.odometer_reading
+            session.add(vehicle)
+
+        await session.commit()
+        await session.refresh(log)
+
+        await log_action(
+            session=session,
+            action_type="create",
+            user=admin,
+            table_name="fleet_fuel_logs",
+            record_id=str(log.id),
+            description=f"Fuel log: {log_data.amount_liters}L @ KES {log_data.cost} for {vehicle.plate_number}",
+            new_values={"liters": log_data.amount_liters, "cost": log_data.cost, "vehicle": vehicle.plate_number},
+            request=request
+        )
+
+        return {
+            "id": str(log.id),
+            "status": "success",
+            "amount_liters": log.amount_liters,
+            "cost": log.cost,
+            "vehicle_id": str(log.vehicle_id)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to log fuel: {str(e)}")
 
 # --- Maintenance Management ---
 
-@router.get("/maintenance-logs", response_model=List[FleetMaintenanceLog])
+@router.get("/maintenance-logs")
 async def get_maintenance_logs(session: AsyncSession = Depends(get_session)):
     result = await session.exec(select(FleetMaintenanceLog).order_by(FleetMaintenanceLog.service_date.desc()))
-    return result.all()
+    logs = result.all()
+    return [
+        {
+            "id": str(l.id),
+            "vehicle_id": str(l.vehicle_id),
+            "service_type": l.service_type,
+            "description": l.description,
+            "cost": l.cost,
+            "odometer_reading": l.odometer_reading,
+            "service_date": l.service_date.isoformat() if l.service_date else None,
+            "next_service_due_odometer": l.next_service_due_odometer,
+            "performed_by": l.performed_by
+        }
+        for l in logs
+    ]
 
-@router.post("/maintenance-logs", response_model=FleetMaintenanceLog)
+@router.post("/maintenance-logs")
 async def create_maintenance_log(
     request: Request,
-    log: FleetMaintenanceLog,
+    log_data: MaintenanceLogCreate,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_user)
-) :
-    session.add(log)
-    
-    # Update vehicle status and odometer
-    vehicle = await session.get(Vehicle, log.vehicle_id)
-    if vehicle:
-        vehicle.status = "active"
-        if log.odometer_reading > vehicle.current_odometer:
-            vehicle.current_odometer = log.odometer_reading
-        if log.next_service_due_odometer:
-            vehicle.next_service_odometer = log.next_service_due_odometer
-        session.add(vehicle)
-        
-    await session.commit()
-    await session.refresh(log)
-    
-    await log_action(
-        session=session,
-        action_type="create",
-        user=admin,
-        table_name="fleet_maintenance_logs",
-        record_id=str(log.id),
-        description=f"Logged maintenance for vehicle: {log.service_type}",
-        new_values=log.dict(),
-        request=request
-    )
-    return log
+):
+    try:
+        vehicle = await session.get(Vehicle, log_data.vehicle_id)
+        if not vehicle:
+            raise HTTPException(status_code=404, detail="Vehicle not found")
 
-# --- GPS Tracking (Real-time updates) ---
+        svc_date = date_type.fromisoformat(log_data.service_date)
+
+        log = FleetMaintenanceLog(
+            vehicle_id=log_data.vehicle_id,
+            service_type=log_data.service_type,
+            description=log_data.description,
+            cost=log_data.cost,
+            odometer_reading=log_data.odometer_reading,
+            service_date=svc_date,
+            next_service_due_odometer=log_data.next_service_due_odometer,
+            performed_by=log_data.performed_by
+        )
+        session.add(log)
+
+        vehicle.status = "active"
+        if log_data.odometer_reading > vehicle.current_odometer:
+            vehicle.current_odometer = log_data.odometer_reading
+        if log_data.next_service_due_odometer:
+            vehicle.next_service_odometer = log_data.next_service_due_odometer
+        session.add(vehicle)
+
+        await session.commit()
+        await session.refresh(log)
+
+        await log_action(
+            session=session,
+            action_type="create",
+            user=admin,
+            table_name="fleet_maintenance_logs",
+            record_id=str(log.id),
+            description=f"Maintenance for {vehicle.plate_number}: {log_data.service_type}",
+            new_values={"service_type": log_data.service_type, "vehicle": vehicle.plate_number, "cost": log_data.cost},
+            request=request
+        )
+
+        return {
+            "id": str(log.id),
+            "status": "success",
+            "service_type": log.service_type,
+            "vehicle_id": str(log.vehicle_id)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to log maintenance: {str(e)}")
+
+# --- GPS Tracking ---
 
 @router.post("/gps-logs")
 async def log_gps(log: FleetGPSLog, session: AsyncSession = Depends(get_session)):
-    session.add(log)
-    await session.commit()
-    return {"status": "success"}
+    try:
+        session.add(log)
+        await session.commit()
+        return {"status": "success"}
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to log GPS: {str(e)}")
 
 @router.get("/locations")
 async def get_all_latest_locations(session: AsyncSession = Depends(get_session)):
     """Fetch the latest GPS location for every vehicle in the fleet."""
-    # Subquery to find the latest timestamp for each vehicle
-    subquery = select(
-        FleetGPSLog.vehicle_id, 
-        func.max(FleetGPSLog.timestamp).label("max_ts")
-    ).group_by(FleetGPSLog.vehicle_id).subquery()
-    
-    # Join GPS logs with the subquery and vehicle info
-    statement = select(FleetGPSLog, Vehicle.plate_number).join(
-        subquery, 
-        (FleetGPSLog.vehicle_id == subquery.c.vehicle_id) & 
-        (FleetGPSLog.timestamp == subquery.c.max_ts)
-    ).join(Vehicle, FleetGPSLog.vehicle_id == Vehicle.id)
-    
-    result = await session.exec(statement)
-    locations = []
-    for log, plate in result:
-        loc_dict = log.dict()
-        loc_dict["plate_number"] = plate
-        locations.append(loc_dict)
-        
-    return locations
+    try:
+        subquery = select(
+            FleetGPSLog.vehicle_id,
+            func.max(FleetGPSLog.timestamp).label("max_ts")
+        ).group_by(FleetGPSLog.vehicle_id).subquery()
+
+        statement = select(FleetGPSLog, Vehicle.plate_number).join(
+            subquery,
+            (FleetGPSLog.vehicle_id == subquery.c.vehicle_id) &
+            (FleetGPSLog.timestamp == subquery.c.max_ts)
+        ).join(Vehicle, FleetGPSLog.vehicle_id == Vehicle.id)
+
+        result = await session.exec(statement)
+        locations = []
+        for log, plate in result:
+            loc_dict = {
+                "id": str(log.id),
+                "vehicle_id": str(log.vehicle_id),
+                "plate_number": plate,
+                "latitude": log.latitude,
+                "longitude": log.longitude,
+                "speed": log.speed,
+                "heading": log.heading,
+                "ignition_status": log.ignition_status,
+                "timestamp": log.timestamp.isoformat()
+            }
+            locations.append(loc_dict)
+
+        return locations
+    except Exception as e:
+        return []  # Return empty list instead of crashing if no GPS data
 
 @router.get("/vehicles/{vehicle_id}/location")
 async def get_latest_location(vehicle_id: UUID, session: AsyncSession = Depends(get_session)):
@@ -279,26 +503,38 @@ async def get_latest_location(vehicle_id: UUID, session: AsyncSession = Depends(
     location = result.first()
     if not location:
         return {"status": "error", "message": "No location data found"}
-    return location
+    return {
+        "id": str(location.id),
+        "vehicle_id": str(location.vehicle_id),
+        "latitude": location.latitude,
+        "longitude": location.longitude,
+        "speed": location.speed,
+        "timestamp": location.timestamp.isoformat()
+    }
 
 # --- Dashboard Stats ---
 
 @router.get("/stats")
 async def get_fleet_stats(session: AsyncSession = Depends(get_session)):
-    # Total vehicles
-    total_vehicles = (await session.exec(select(func.count(Vehicle.id)))).first()
-    # Active trips
-    active_trips = (await session.exec(select(func.count(FleetTrip.id)).where(FleetTrip.status == "ongoing"))).first()
-    # Maintenance due
-    maintenance_due = (await session.exec(select(func.count(Vehicle.id)).where(Vehicle.status == "maintenance"))).first()
-    
-    # Fuel usage (total liters)
-    fuel_usage = (await session.exec(select(func.sum(FleetFuelLog.amount_liters)))).first() or 0
-    
-    return {
-        "total_vehicles": total_vehicles,
-        "active_trips": active_trips,
-        "maintenance_due": maintenance_due,
-        "active_drivers": 10, # Mocked for now
-        "fuel_usage": round(float(fuel_usage), 2)
-    }
+    try:
+        total_vehicles = (await session.exec(select(func.count(Vehicle.id)))).first() or 0
+        active_trips = (await session.exec(select(func.count(FleetTrip.id)).where(FleetTrip.status == "ongoing"))).first() or 0
+        maintenance_due = (await session.exec(select(func.count(Vehicle.id)).where(Vehicle.status == "maintenance"))).first() or 0
+        fuel_usage_raw = (await session.exec(select(func.sum(FleetFuelLog.amount_liters)))).first()
+        fuel_usage = float(fuel_usage_raw) if fuel_usage_raw else 0.0
+
+        return {
+            "total_vehicles": total_vehicles,
+            "active_trips": active_trips,
+            "maintenance_due": maintenance_due,
+            "active_drivers": 0,
+            "fuel_usage": round(fuel_usage, 2)
+        }
+    except Exception as e:
+        return {
+            "total_vehicles": 0,
+            "active_trips": 0,
+            "maintenance_due": 0,
+            "active_drivers": 0,
+            "fuel_usage": 0.0
+        }

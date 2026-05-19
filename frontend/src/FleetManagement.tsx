@@ -855,21 +855,61 @@ function TripForm({ vehicles, onSuccess }: any) {
     const handleSave = async () => {
         setIsSubmitting(true);
         try {
+            // Validate required fields before sending
+            if (!formData.vehicle_id) {
+                alert('Please select a vehicle before saving the trip.');
+                setIsSubmitting(false);
+                return;
+            }
+            if (!formData.destination.trim()) {
+                alert('Please enter a destination.');
+                setIsSubmitting(false);
+                return;
+            }
+            if (!formData.purpose.trim()) {
+                alert('Please enter a purpose for the trip.');
+                setIsSubmitting(false);
+                return;
+            }
+            if (!formData.scheduled_departure) {
+                alert('Please set a scheduled departure date and time.');
+                setIsSubmitting(false);
+                return;
+            }
+
+            // Convert datetime-local string to proper ISO 8601 format
+            const departureISO = new Date(formData.scheduled_departure).toISOString();
+
+            const payload = {
+                vehicle_id: formData.vehicle_id,
+                origin: formData.origin || 'Riara University Main Campus',
+                destination: formData.destination,
+                purpose: formData.purpose,
+                scheduled_departure: departureISO,
+                status: 'scheduled'
+            };
+
             const token = localStorage.getItem('token');
             const res = await fetch('/api/fleet/trips', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({...formData, status: 'scheduled'})
+                body: JSON.stringify(payload)
             });
+
+            let data: any = {};
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                data = await res.json();
+            }
+
             if (res.ok) {
-                alert("Trip scheduled successfully!");
+                alert('✅ Trip scheduled successfully!');
                 onSuccess();
             } else {
-                const data = await res.json();
-                alert(`Error: ${data.detail || 'Failed to schedule trip'}`);
+                alert(`❌ Error: ${data.detail || `Server returned status ${res.status}. Please try again.`}`);
             }
         } catch (e: any) {
-            alert(`Network error: ${e.message}`);
+            alert(`❌ Network error: ${e.message}`);
         } finally {
             setIsSubmitting(false);
         }
