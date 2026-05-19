@@ -10,7 +10,10 @@ export default function Login({ onLogin }: LoginProps) {
 
     const [error, setError] = useState('')
     const [isLoading, setIsLoading] = useState(false)
-    const [demoMode, setDemoMode] = useState(false)
+    const [companySettings, setCompanySettings] = useState<{ company_name: string, logo_url: string }>({
+        company_name: 'Smart Campus',
+        logo_url: ''
+    })
 
     useEffect(() => {
         fetch('/api/public/config')
@@ -19,6 +22,16 @@ export default function Login({ onLogin }: LoginProps) {
                 if (data.demo_mode) setDemoMode(true)
             })
             .catch(err => console.error("Failed to fetch config", err))
+
+        fetch('/api/users/public-company-settings')
+            .then(res => res.json())
+            .then(data => {
+                setCompanySettings({
+                    company_name: data.company_name || 'Smart Campus',
+                    logo_url: data.logo_url || ''
+                })
+            })
+            .catch(err => console.error("Failed to fetch company settings", err))
     }, [])
 
     const handleDemoLogin = async (role: string) => {
@@ -124,9 +137,14 @@ export default function Login({ onLogin }: LoginProps) {
             <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-secondary/20 blur-[100px]" />
 
             <div className="w-full max-w-md p-8 glass-card relative z-10 animate-fade-in shadow-2xl border border-[var(--border-color)] bg-[var(--bg-surface)]">
-                <div className="text-center mb-8">
+                <div className="text-center mb-8 flex flex-col items-center justify-center">
+                    {companySettings.logo_url && (
+                        <div className="w-20 h-20 mb-4 bg-white/10 dark:bg-white/5 backdrop-blur-md rounded-2xl p-2 border border-[var(--border-color)] flex items-center justify-center overflow-hidden shadow-lg animate-fade-in">
+                            <img src={companySettings.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                        </div>
+                    )}
                     <h1 className="text-4xl font-extrabold bg-[image:var(--gradient-primary)] bg-clip-text text-transparent tracking-tight">
-                        Smart Campus
+                        {companySettings.company_name}
                     </h1>
                     <p className="text-[var(--text-secondary)] mt-2 font-medium">Secure Campus Entry System</p>
                     {demoMode && (

@@ -237,6 +237,17 @@ async def seed_data(session: AsyncSession):
     
     settings_value = json.dumps({
         "company_name": "Riara University",
+        "tagline": "Excellence in Education",
+        "email": "info@riarauniversity.ac.ke",
+        "phone": "+254 700 000 000",
+        "whatsapp": "+254 700 000 000",
+        "website": "https://riarauniversity.ac.ke",
+        "address": "Limuru Road, Nairobi, Kenya",
+        "facebook": "",
+        "twitter": "",
+        "instagram": "",
+        "linkedin": "",
+        "youtube": "",
         "logo_url": "/static/university_logo.png"
     })
     
@@ -249,9 +260,7 @@ async def seed_data(session: AsyncSession):
         session.add(new_settings)
         print("Seeded Company Settings.")
     else:
-        existing_settings.value = settings_value
-        session.add(existing_settings)
-        print("Updated Company Settings with new logo.")
+        print("Company Settings already present. Skipping seeding to prevent overwriting user changes.")
 
     await session.commit()
 

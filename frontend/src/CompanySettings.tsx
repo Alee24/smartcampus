@@ -133,8 +133,26 @@ export default function CompanySettings() {
 
             if (res.ok) {
                 const data = await res.json()
-                setSettings({ ...settings, logo_url: data.logo_url })
-                setMessage({ type: 'success', text: '✓ Logo uploaded successfully!' })
+                const updatedSettings = { ...settings, logo_url: data.logo_url }
+                setSettings(updatedSettings)
+                
+                // Immediately save the updated settings to the database
+                const saveRes = await fetch('/api/admin/company-settings', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updatedSettings)
+                })
+
+                if (saveRes.ok) {
+                    setMessage({ type: 'success', text: '✓ Logo uploaded and saved successfully!' })
+                    // Reload page to update logo everywhere
+                    setTimeout(() => window.location.reload(), 1500)
+                } else {
+                    setMessage({ type: 'error', text: 'Logo uploaded, but failed to save settings' })
+                }
             } else {
                 setMessage({ type: 'error', text: 'Failed to upload logo' })
             }

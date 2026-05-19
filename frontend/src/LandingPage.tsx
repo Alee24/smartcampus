@@ -1,5 +1,5 @@
 import { Shield, QrCode, Clock, CheckCircle, ArrowRight, Smartphone, Lock, BarChart3, Bell, UserCheck, Activity, Database, Zap } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import StudentVerification from './StudentVerification'
 
 interface LandingPageProps {
@@ -8,6 +8,22 @@ interface LandingPageProps {
 
 export default function LandingPage({ onGetStarted }: LandingPageProps) {
     const [showVerification, setShowVerification] = useState(false)
+    const [companySettings, setCompanySettings] = useState<{ company_name: string, logo_url: string }>({
+        company_name: 'Smart Campus',
+        logo_url: ''
+    })
+
+    useEffect(() => {
+        fetch('/api/users/public-company-settings')
+            .then(res => res.json())
+            .then(data => {
+                setCompanySettings({
+                    company_name: data.company_name || 'Smart Campus',
+                    logo_url: data.logo_url || ''
+                })
+            })
+            .catch(err => console.error("Failed to fetch company settings", err))
+    }, [])
 
     const features = [
         {
@@ -47,11 +63,17 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-surface)]/90 backdrop-blur-md border-b border-[var(--border-color)]">
                     <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center">
-                                <Shield className="text-white" size={20} />
-                            </div>
+                            {companySettings.logo_url ? (
+                                <div className="w-10 h-10 bg-white/10 dark:bg-white/5 backdrop-blur-sm rounded-xl p-1.5 flex items-center justify-center overflow-hidden border border-[var(--border-color)]">
+                                    <img src={companySettings.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                                </div>
+                            ) : (
+                                <div className="w-10 h-10 rounded-xl bg-black flex items-center justify-center">
+                                    <Shield className="text-white" size={20} />
+                                </div>
+                            )}
                             <span className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
-                                GATEPASS <span className="text-primary-600">PRO</span>
+                                {companySettings.company_name}
                             </span>
                         </div>
                         <button
@@ -75,11 +97,17 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-surface)]/95 backdrop-blur-md border-b border-[var(--border-color)]">
                 <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-black flex items-center justify-center">
-                            <Shield className="text-white" size={18} />
-                        </div>
+                        {companySettings.logo_url ? (
+                            <div className="w-9 h-9 bg-white/10 dark:bg-white/5 backdrop-blur-sm rounded-lg p-1.5 flex items-center justify-center overflow-hidden border border-[var(--border-color)]">
+                                <img src={companySettings.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                            </div>
+                        ) : (
+                            <div className="w-9 h-9 rounded-lg bg-black flex items-center justify-center">
+                                <Shield className="text-white" size={18} />
+                            </div>
+                        )}
                         <span className="text-xl font-bold tracking-tighter uppercase">
-                            Gatepass <span className="text-primary-600">Intelligence</span>
+                            {companySettings.company_name}
                         </span>
                     </div>
                     
