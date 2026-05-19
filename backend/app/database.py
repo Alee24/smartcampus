@@ -29,6 +29,7 @@ async def init_db():
     await migrate_fleet()
     await migrate_audit_logs()
     await migrate_external_sync()
+    await migrate_system_configs()
 
 async def get_session() -> AsyncSession:
     async_session = sessionmaker(
@@ -166,3 +167,14 @@ async def migrate_external_sync():
                 print("External Sync API Key already exists.")
     except Exception as e:
         print(f"External sync migration skipped/failed: {e}")
+
+async def migrate_system_configs():
+    """Manual migration to ensure value in system_configs is of type TEXT."""
+    print("Checking system_configs table schema...")
+    try:
+        async with engine.begin() as conn:
+            # Modify column to Text so it doesn't truncate long JSON strings
+            await conn.execute(text("ALTER TABLE system_configs MODIFY COLUMN value TEXT"))
+            print("System Configs value column changed to TEXT successfully.")
+    except Exception as e:
+        print(f"System Configs migration skipped/failed: {e}")

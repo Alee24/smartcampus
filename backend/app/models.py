@@ -415,7 +415,7 @@ class CheatingFlag(UUIDModel, table=True):
 class SystemConfig(UUIDModel, table=True):
     __tablename__ = "system_configs"
     key: str = Field(unique=True, index=True)
-    value: str
+    value: str = Field(sa_column=Column(Text, nullable=False))
     category: str # e.g., "email", "api", "general"
     is_encrypted: bool = False
 
