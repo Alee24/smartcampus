@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Car, MapPin, Navigation, Fuel, Wrench, AlertTriangle, 
-    Users, Plus, Search, Filter, ChevronRight, Activity, 
-    Calendar, Clock, Shield, Download, FileText, Settings,
-    Map as MapIcon, TrendingUp, DollarSign, X, Check, Loader2,
-    RefreshCw
-} from 'lucide-react';
+import { Car, MapPin, Navigation, Fuel, Wrench, AlertTriangle, Users, Plus, Search, Filter, ChevronRight, Activity, Calendar, Clock, Shield, Download, FileText, Settings, Map as MapIcon, TrendingUp, DollarSign, X, Check, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
     ResponsiveContainer, AreaChart, Area
@@ -356,6 +350,7 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
             <div className="flex gap-1 bg-white p-1 rounded-2xl border border-gray-100 w-fit overflow-x-auto no-scrollbar">
                 {[
                     { id: 'dashboard', label: 'Dashboard', icon: Activity },
+                    { id: 'vehicles', label: 'Fleet Vehicles', icon: Car },
                     { id: 'tracking', label: 'Live Map', icon: MapPin },
                     { id: 'trips', label: 'Trips', icon: Navigation },
                     { id: 'fuel', label: 'Fuel Logs', icon: Fuel },
@@ -385,7 +380,8 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                 </div>
             ) : (
                 <>
-                    {activeTab === 'dashboard' && renderDashboard()}
+    {activeTab === 'vehicles' && <VehiclesManager vehicles={vehicles} onUpdate={fetchData} setShowAddVehicle={setShowAddVehicle} />}
+                    
                     {activeTab === 'tracking' && renderTracking()}
                     {activeTab === 'trips' && <TripsManager trips={trips} vehicles={vehicles} onUpdate={fetchData} />}
                     {activeTab === 'fuel' && <FuelManagement vehicles={vehicles} logs={fuelLogs} onUpdate={fetchData} />}
@@ -700,6 +696,191 @@ function DriverManager() {
             <Users className="mx-auto text-gray-200 mb-4" size={64} />
             <h3 className="text-2xl font-black text-gray-900 mb-2">Driver Management Module</h3>
             <p className="text-gray-500 max-w-sm mx-auto">Please go to the 'People' section to manage drivers and assign vehicle privileges.</p>
+        </div>
+    );
+}
+
+interface VehiclesManagerProps {
+    vehicles: any[];
+    onUpdate: () => void;
+    setShowAddVehicle: (show: boolean) => void;
+}
+
+function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle }: VehiclesManagerProps) {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const handleDeleteVehicle = async (vehicleId: string, plateNumber: string) => {
+        if (!confirm(`Are you absolutely sure you want to delete vehicle ${plateNumber}? This will permanently remove all associated trips, fuel logs, and maintenance logs.`)) {
+            return;
+        }
+        setDeletingId(vehicleId);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/fleet/vehicles/${vehicleId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                alert(`✅ Vehicle ${plateNumber} successfully deleted.`);
+                onUpdate();
+            } else {
+                const err = await res.json();
+                alert(`❌ Error deleting vehicle: ${err.detail || 'Failed'}`);
+            }
+        } catch (e: any) {
+            alert(`❌ Network error: ${e.message}`);
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    const filteredVehicles = vehicles.filter(v => {
+        const matchesSearch = v.plate_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (v.make && v.make.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (v.model && v.model.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
+
+    const getStatusStyles = (status: string) => {
+        switch (status) {
+            case 'active':
+                return 'bg-green-50 text-green-700 border-green-200';
+            case 'maintenance':
+                return 'bg-amber-50 text-amber-700 border-amber-200';
+            case 'inactive':
+                return 'bg-gray-50 text-gray-500 border-gray-200';
+            default:
+                return 'bg-blue-50 text-blue-700 border-blue-200';
+        }
+    };
+
+    const getVehicleTypeIcon = (type: string) => {
+        switch (type) {
+            case 'bus': return '🚌';
+            case 'shuttle': return '🚐';
+            case 'staff': return '🚗';
+            default: return '🚚';
+        }
+    };
+
+    return (
+        <div className="glass-card p-6 animate-fade-in space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h3 className="text-xl font-black text-gray-900">Fleet Vehicles Administration</h3>
+                    <p className="text-sm text-gray-500 font-medium">Manage campus vehicles, track statuses, and schedule fleet updates</p>
+                </div>
+                <button 
+                    onClick={() => setShowAddVehicle(true)}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20 hover:scale-105 transition-all flex items-center gap-2"
+                >
+                    <Plus size={18} /> Register Vehicle
+                </button>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input 
+                        type="text" 
+                        placeholder="Search by plate number, make or model..." 
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:bg-white focus:ring-2 focus:ring-primary-500/20 transition-all"
+                    />
+                </div>
+                <div className="flex gap-2">
+                    {['all', 'active', 'maintenance', 'inactive'].map(status => (
+                        <button
+                            key={status}
+                            onClick={() => setStatusFilter(status)}
+                            className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all border ${
+                                statusFilter === status 
+                                ? 'bg-primary-600 text-white border-primary-600 shadow-md' 
+                                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                            }`}
+                        >
+                            {status}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Grid of Vehicles */}
+            {filteredVehicles.length === 0 ? (
+                <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                    <p className="text-gray-400 font-bold text-lg mb-1">No Vehicles Found</p>
+                    <p className="text-sm text-gray-400">Try adjusting your search filters or register a new campus vehicle.</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredVehicles.map(vehicle => (
+                        <div key={vehicle.id} className="p-6 bg-white border border-gray-100 rounded-2xl hover:shadow-xl hover:border-primary-100 transition-all duration-300 flex flex-col justify-between shadow-sm relative group overflow-hidden">
+                            {/* Accent line based on status */}
+                            <div className={`absolute top-0 left-0 right-0 h-1.5 ${
+                                vehicle.status === 'active' ? 'bg-green-500' :
+                                vehicle.status === 'maintenance' ? 'bg-amber-500' : 'bg-gray-400'
+                            }`} />
+
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-start pt-2">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-2xl" role="img" aria-label={vehicle.vehicle_type}>
+                                            {getVehicleTypeIcon(vehicle.vehicle_type)}
+                                        </span>
+                                        <div>
+                                            <h4 className="font-black text-gray-900 text-lg uppercase tracking-tight">{vehicle.plate_number}</h4>
+                                            <p className="text-xs text-gray-400 font-bold uppercase">{vehicle.make} {vehicle.model}</p>
+                                        </div>
+                                    </div>
+                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusStyles(vehicle.status)}`}>
+                                        {vehicle.status}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 py-3 border-y border-gray-50 text-[11px]">
+                                    <div>
+                                        <p className="text-gray-400 font-bold uppercase tracking-wider mb-0.5">Odometer</p>
+                                        <p className="font-extrabold text-gray-800">{vehicle.current_odometer?.toLocaleString() || 0} KM</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 font-bold uppercase tracking-wider mb-0.5">Type</p>
+                                        <p className="font-extrabold text-gray-800 capitalize">{vehicle.vehicle_type || 'Utility'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 font-bold uppercase tracking-wider mb-0.5">Fuel Type</p>
+                                        <p className="font-extrabold text-gray-800 capitalize">{vehicle.fuel_type || 'Diesel'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 font-bold uppercase tracking-wider mb-0.5">Fuel Capacity</p>
+                                        <p className="font-extrabold text-gray-800">{vehicle.fuel_capacity || 0} Liters</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-50">
+                                <span className="text-[10px] font-extrabold text-gray-400 uppercase">Year: {vehicle.year || 'N/A'}</span>
+                                <button 
+                                    disabled={deletingId === vehicle.id}
+                                    onClick={() => handleDeleteVehicle(vehicle.id, vehicle.plate_number)}
+                                    className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-red-100 disabled:opacity-50"
+                                    title="Remove Vehicle"
+                                >
+                                    {deletingId === vehicle.id ? (
+                                        <Loader2 size={16} className="animate-spin" />
+                                    ) : (
+                                        <Trash2 size={16} />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

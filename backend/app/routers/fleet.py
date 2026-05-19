@@ -19,6 +19,42 @@ router = APIRouter()
 
 # ---- Safe Pydantic Input Schemas (avoid SQLModel relationship serialization issues) ----
 
+class VehicleCreate(BaseModel):
+    plate_number: str
+    make: Optional[str] = None
+    model: Optional[str] = None
+    color: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_contact: Optional[str] = None
+    driver_id_number: Optional[str] = None
+    owner_id: Optional[UUID] = None
+    vehicle_type: str = "utility"
+    fuel_type: str = "petrol"
+    fuel_capacity: float = 0.0
+    engine_number: Optional[str] = None
+    chassis_number: Optional[str] = None
+    year: Optional[int] = None
+    status: str = "active"
+    current_odometer: float = 0.0
+
+class VehicleUpdate(BaseModel):
+    plate_number: Optional[str] = None
+    make: Optional[str] = None
+    model: Optional[str] = None
+    color: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_contact: Optional[str] = None
+    driver_id_number: Optional[str] = None
+    owner_id: Optional[UUID] = None
+    vehicle_type: Optional[str] = None
+    fuel_type: Optional[str] = None
+    fuel_capacity: Optional[float] = None
+    engine_number: Optional[str] = None
+    chassis_number: Optional[str] = None
+    year: Optional[int] = None
+    status: Optional[str] = None
+    current_odometer: Optional[float] = None
+
 class TripCreate(BaseModel):
     vehicle_id: UUID
     driver_id: Optional[UUID] = None
@@ -59,11 +95,29 @@ async def get_vehicles(session: AsyncSession = Depends(get_session)):
 @router.post("/vehicles", response_model=Vehicle)
 async def create_vehicle(
     request: Request,
-    vehicle: Vehicle,
+    vehicle_data: VehicleCreate,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_user)
 ):
     try:
+        vehicle = Vehicle(
+            plate_number=vehicle_data.plate_number,
+            make=vehicle_data.make,
+            model=vehicle_data.model,
+            color=vehicle_data.color,
+            driver_name=vehicle_data.driver_name,
+            driver_contact=vehicle_data.driver_contact,
+            driver_id_number=vehicle_data.driver_id_number,
+            owner_id=vehicle_data.owner_id,
+            vehicle_type=vehicle_data.vehicle_type,
+            fuel_type=vehicle_data.fuel_type,
+            fuel_capacity=vehicle_data.fuel_capacity,
+            engine_number=vehicle_data.engine_number,
+            chassis_number=vehicle_data.chassis_number,
+            year=vehicle_data.year,
+            status=vehicle_data.status,
+            current_odometer=vehicle_data.current_odometer
+        )
         session.add(vehicle)
         await session.commit()
         await session.refresh(vehicle)
@@ -84,7 +138,7 @@ async def create_vehicle(
     except Exception as e:
         await session.rollback()
         if "Duplicate entry" in str(e) or "1062" in str(e) or "UNIQUE" in str(e):
-            raise HTTPException(status_code=400, detail=f"A vehicle with plate number '{vehicle.plate_number}' already exists.")
+            raise HTTPException(status_code=400, detail=f"A vehicle with plate number '{vehicle_data.plate_number}' already exists.")
         raise HTTPException(status_code=500, detail=f"Failed to register vehicle: {str(e)}")
 
 @router.get("/vehicles/{vehicle_id}", response_model=Vehicle)
@@ -98,7 +152,7 @@ async def get_vehicle(vehicle_id: UUID, session: AsyncSession = Depends(get_sess
 async def update_vehicle(
     request: Request,
     vehicle_id: UUID,
-    vehicle_data: dict,
+    vehicle_data: VehicleUpdate,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_user)
 ):
@@ -106,9 +160,12 @@ async def update_vehicle(
         vehicle = await session.get(Vehicle, vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=404, detail="Vehicle not found")
-        for key, value in vehicle_data.items():
+        
+        update_dict = vehicle_data.dict(exclude_unset=True)
+        for key, value in update_dict.items():
             if hasattr(vehicle, key) and value is not None:
                 setattr(vehicle, key, value)
+        
         session.add(vehicle)
         await session.commit()
         await session.refresh(vehicle)
@@ -118,6 +175,66 @@ async def update_vehicle(
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to update vehicle: {str(e)}")
+
+@router.delete("/vehicles/{vehicle_id}")
+async def delete_vehicle(
+    vehicle_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_user)
+):
+    try:
+        vehicle = await session.get(Vehicle, vehicle_id)
+        if not vehicle:
+            raise HTTPException(status_code=404, detail="Vehicle not found")
+        
+        # Delete related GPS logs
+        gps_logs = (await session.exec(select(FleetGPSLog).where(FleetGPSLog.vehicle_id == vehicle_id))).all()
+        for log in gps_logs:
+            await session.delete(log)
+            
+        # Delete related fuel logs
+        fuel_logs = (await session.exec(select(FleetFuelLog).where(FleetFuelLog.vehicle_id == vehicle_id))).all()
+        for log in fuel_logs:
+            await session.delete(log)
+            
+        # Delete related maintenance logs
+        maintenance_logs = (await session.exec(select(FleetMaintenanceLog).where(FleetMaintenanceLog.vehicle_id == vehicle_id))).all()
+        for log in maintenance_logs:
+            await session.delete(log)
+
+        # Delete related notifications
+        notifications = (await session.exec(select(FleetNotification).where(FleetNotification.vehicle_id == vehicle_id))).all()
+        for notification in notifications:
+            await session.delete(notification)
+
+        # Delete related vehicle logs
+        vehicle_logs = (await session.exec(select(VehicleLog).where(VehicleLog.vehicle_id == vehicle_id))).all()
+        for log in vehicle_logs:
+            await session.delete(log)
+
+        # Delete related trips (passenger manifests & notifications deleted first)
+        trips = (await session.exec(select(FleetTrip).where(FleetTrip.vehicle_id == vehicle_id))).all()
+        for trip in trips:
+            # Delete passenger manifests for this trip
+            manifests = (await session.exec(select(FleetPassengerManifest).where(FleetPassengerManifest.trip_id == trip.id))).all()
+            for manifest in manifests:
+                await session.delete(manifest)
+            
+            # Delete trip notifications
+            trip_notifications = (await session.exec(select(FleetNotification).where(FleetNotification.trip_id == trip.id))).all()
+            for notification in trip_notifications:
+                await session.delete(notification)
+                
+            await session.delete(trip)
+            
+        # Finally delete the vehicle itself
+        await session.delete(vehicle)
+        await session.commit()
+        
+        return {"status": "success", "message": f"Vehicle '{vehicle.plate_number}' and all its related records have been deleted."}
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete vehicle: {str(e)}")
 
 # --- Trip Management ---
 
