@@ -684,81 +684,80 @@ async def get_trip_report_summary(
     trip_id: UUID,
     session: AsyncSession = Depends(get_session)
 ):
-    from sqlalchemy.orm import selectinload
-    trip = (await session.exec(
-        select(FleetTrip)
-        .where(FleetTrip.id == trip_id)
-        .options(
-            selectinload(FleetTrip.vehicle),
-            selectinload(FleetTrip.driver),
-            selectinload(FleetTrip.passengers)
-        )
-    )).first()
-    
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip not found")
+    try:
+        from sqlalchemy.orm import selectinload
+        trip = (await session.exec(
+            select(FleetTrip)
+            .where(FleetTrip.id == trip_id)
+            .options(
+                selectinload(FleetTrip.vehicle),
+                selectinload(FleetTrip.driver),
+                selectinload(FleetTrip.passengers)
+            )
+        )).first()
         
-    driver_name = trip.driver.full_name if trip.driver else (trip.vehicle.driver_name if trip.vehicle else "N/A")
-    driver_contact = trip.driver.phone_number if trip.driver else (trip.vehicle.driver_contact if trip.vehicle else "N/A")
-    
-    # Calculate duration
-    duration_str = "N/A"
-    if trip.actual_departure and trip.actual_arrival:
-        diff = trip.actual_arrival - trip.actual_departure
-        hrs, remainder = divmod(diff.total_seconds(), 3600)
-        mins, _ = divmod(remainder, 60)
-        duration_str = f"{int(hrs)}h {int(mins)}m"
-    elif trip.actual_departure:
-        diff = datetime.utcnow() - trip.actual_departure
-        hrs, remainder = divmod(diff.total_seconds(), 3600)
-        mins, _ = divmod(remainder, 60)
-        duration_str = f"{int(hrs)}h {int(mins)}m (ongoing)"
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found")
+            
+        driver_name = trip.driver.full_name if trip.driver else (trip.vehicle.driver_name if trip.vehicle else "N/A")
+        driver_contact = trip.driver.phone_number if trip.driver else (trip.vehicle.driver_contact if trip.vehicle else "N/A")
         
-    # Calculate odometer distance
-    distance = 0.0
-    if trip.end_odometer and trip.start_odometer:
-        distance = trip.end_odometer - trip.start_odometer
-        
-    # Find fuel logs associated with this vehicle during the trip
-    fuel_cost = 0.0
-    fuel_liters = 0.0
-    if trip.actual_departure:
-        end_time = trip.actual_arrival or datetime.utcnow()
-        fuel_query = select(FleetFuelLog).where(
-            (FleetFuelLog.vehicle_id == trip.vehicle_id) & 
-            (FleetFuelLog.timestamp >= trip.actual_departure) & 
-            (FleetFuelLog.timestamp <= end_time)
-        )
-        fuel_logs = (await session.exec(fuel_query)).all()
-        fuel_cost = sum(f.cost for f in fuel_logs)
-        fuel_liters = sum(f.amount_liters for f in fuel_logs)
-        
-    return {
-        "id": str(trip.id),
-        "origin": trip.origin,
-        "destination": trip.destination,
-        "purpose": trip.purpose,
-        "scheduled_departure": trip.scheduled_departure.isoformat() if trip.scheduled_departure else None,
-        "actual_departure": trip.actual_departure.isoformat() if trip.actual_departure else None,
-        "actual_arrival": trip.actual_arrival.isoformat() if trip.actual_arrival else None,
-        "duration": duration_str,
-        "distance_km": distance,
-        "status": trip.status,
-        "passenger_count": len(trip.passengers),
-        "fuel_cost": fuel_cost,
-        "fuel_liters": fuel_liters,
-        "trip_lead_name": trip.trip_lead_name or "N/A",
-        "trip_lead_contact": trip.trip_lead_contact or "N/A",
-        "vehicle_plate": trip.vehicle.plate_number if trip.vehicle else "N/A",
-        "driver_name": driver_name,
-        "driver_contact": driver_contact
-    }
-
+        # Calculate duration
+        duration_str = "N/A"
+        if trip.actual_departure and trip.actual_arrival:
+            diff = trip.actual_arrival - trip.actual_departure
+            hrs, remainder = divmod(diff.total_seconds(), 3600)
+            mins, _ = divmod(remainder, 60)
+            duration_str = f"{int(hrs)}h {int(mins)}m"
+        elif trip.actual_departure:
+            diff = datetime.utcnow() - trip.actual_departure
+            hrs, remainder = divmod(diff.total_seconds(), 3600)
+            mins, _ = divmod(remainder, 60)
+            duration_str = f"{int(hrs)}h {int(mins)}m (ongoing)"
+            
+        # Calculate odometer distance
+        distance = 0.0
+        if trip.end_odometer and trip.start_odometer:
+            distance = trip.end_odometer - trip.start_odometer
+            
+        # Find fuel logs associated with this vehicle during the trip
+        fuel_cost = 0.0
+        fuel_liters = 0.0
+        if trip.actual_departure:
+            end_time = trip.actual_arrival or datetime.utcnow()
+            fuel_query = select(FleetFuelLog).where(
+                (FleetFuelLog.vehicle_id == trip.vehicle_id) & 
+                (FleetFuelLog.timestamp >= trip.actual_departure) & 
+                (FleetFuelLog.timestamp <= end_time)
+            )
+            fuel_logs = (await session.exec(fuel_query)).all()
+            fuel_cost = sum(f.cost for f in fuel_logs)
+            fuel_liters = sum(f.amount_liters for f in fuel_logs)
+            
+        return {
+            "id": str(trip.id),
+            "origin": trip.origin,
+            "destination": trip.destination,
+            "purpose": trip.purpose,
+            "scheduled_departure": trip.scheduled_departure.isoformat() if trip.scheduled_departure else None,
+            "actual_departure": trip.actual_departure.isoformat() if trip.actual_departure else None,
+            "actual_arrival": trip.actual_arrival.isoformat() if trip.actual_arrival else None,
+            "duration": duration_str,
+            "distance_km": distance,
+            "status": trip.status,
+            "passenger_count": len(trip.passengers),
+            "fuel_cost": fuel_cost,
+            "fuel_liters": fuel_liters,
+            "trip_lead_name": trip.trip_lead_name or "N/A",
+            "trip_lead_contact": trip.trip_lead_contact or "N/A",
+            "vehicle_plate": trip.vehicle.plate_number if trip.vehicle else "N/A",
+            "driver_name": driver_name,
+            "driver_contact": driver_contact
+        }
     except HTTPException:
         raise
     except Exception as e:
-        await session.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to schedule trip: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate trip report: {str(e)}")
 
 @router.post("/trips/{trip_id}/start")
 async def start_trip(
