@@ -11,6 +11,7 @@ export default function Integrations() {
         face_api_url: 'http://localhost:5000'
     })
     const [loading, setLoading] = useState(false)
+    const [testingLdap, setTestingLdap] = useState(false)
     const [message, setMessage] = useState('')
 
     useEffect(() => {
@@ -55,6 +56,37 @@ export default function Integrations() {
 
     const handleChange = (e: any) => {
         setConfigs({ ...configs, [e.target.name]: e.target.value })
+    }
+
+    const handleTestLdap = async () => {
+        setTestingLdap(true)
+        setMessage('')
+        const token = localStorage.getItem('token')
+        try {
+            const res = await fetch('/api/admin/test-ldap', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    server_uri: configs.ldap_server_uri || '',
+                    bind_dn: configs.ldap_bind_dn || '',
+                    bind_password: configs.ldap_bind_password || '',
+                    base_dn: configs.ldap_base_dn || ''
+                })
+            })
+            const data = await res.json()
+            if (res.ok && data.status === 'success') {
+                setMessage('Success: ' + data.message)
+            } else {
+                setMessage('Error: ' + (data.message || 'Failed to connect to LDAP'))
+            }
+        } catch (e) {
+            setMessage('Error: Failed to connect to LDAP')
+        } finally {
+            setTestingLdap(false)
+        }
     }
 
     return (
@@ -134,6 +166,15 @@ export default function Integrations() {
                         <div className="md:col-span-2">
                             <label className="block text-sm text-[var(--text-secondary)] mb-1">Base DN</label>
                             <input name="ldap_base_dn" value={configs.ldap_base_dn || ''} onChange={handleChange} className="w-full p-2 rounded border border-[var(--border-color)] bg-[var(--bg-primary)]" placeholder="ou=users,dc=example,dc=com" />
+                        </div>
+                        <div className="md:col-span-2 flex justify-end mt-2">
+                            <button
+                                onClick={handleTestLdap}
+                                disabled={testingLdap}
+                                className="px-4 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded text-sm hover:bg-[var(--hover-color)] transition-colors disabled:opacity-50"
+                            >
+                                {testingLdap ? 'Testing...' : 'Test Connection'}
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -10,6 +10,7 @@ import io
 import uuid
 from typing import List
 from datetime import datetime
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -1061,7 +1062,28 @@ async def get_scan_logs(limit: int = 100, session: AsyncSession = Depends(get_se
             "admission_number": user.admission_number,
             "room_code": log.room_code,
             "is_successful": log.is_successful,
-            "status_message": log.status_message,
-            "detected_location": loc_str
         })
     return data
+
+class LDAPTestConfig(BaseModel):
+    server_uri: str
+    bind_dn: str
+    bind_password: str
+    base_dn: str
+
+@router.post("/test-ldap")
+async def test_ldap_connection(
+    config: LDAPTestConfig,
+    admin: User = Depends(ensure_admin)
+):
+    try:
+        from ldap3 import Server, Connection, ALL
+        server = Server(config.server_uri, get_info=ALL)
+        conn = Connection(server, user=config.bind_dn, password=config.bind_password, auto_bind=True)
+        if conn.bind():
+            return {"status": "success", "message": "LDAP connection successful"}
+        else:
+            return {"status": "error", "message": "Failed to bind to LDAP server"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+

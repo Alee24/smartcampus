@@ -11,6 +11,7 @@ import csv
 import codecs
 import io
 import json
+from app.utils.ldap import LDAPClient
 
 router = APIRouter()
 
@@ -551,6 +552,46 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
             # col.like('%value') is 'endswith'
             query = select(User).where(User.admission_number.like(f"%{admission_number}"))
             user = (await session.exec(query)).first()
+
+    # 4. LDAP/AD Fallback
+    if not user:
+        # Check if LDAP is enabled
+        ldap_enabled = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_enabled"))).first()
+        if ldap_enabled and ldap_enabled.value.lower() == "true":
+            # Fetch other LDAP configs
+            uri = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_server_uri"))).first()
+            bind_dn = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_bind_dn"))).first()
+            password = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_bind_password"))).first()
+            base_dn = (await session.exec(select(SystemConfig).where(SystemConfig.key == "ldap_base_dn"))).first()
+
+            if all([uri, bind_dn, password, base_dn]):
+                ldap = LDAPClient(uri.value, bind_dn.value, password.value, base_dn.value)
+                ldap_data = ldap.get_user_by_id(admission_number)
+                
+                if ldap_data:
+                    # Auto-create user from LDAP
+                    role_stmt = select(Role).where(Role.name == "Student")
+                    role = (await session.exec(role_stmt)).first()
+                    if not role:
+                        role = Role(name="Student", description="Regular Student")
+                        session.add(role)
+                        await session.commit()
+                        await session.refresh(role)
+                    
+                    user = User(
+                        admission_number=ldap_data["admission_number"],
+                        full_name=ldap_data["full_name"],
+                        email=ldap_data["email"],
+                        school=ldap_data["school"],
+                        phone_number=ldap_data["phone_number"],
+                        program=ldap_data["program"],
+                        role_id=role.id,
+                        status="active",
+                        hashed_password="LDAP_MANAGED" # Password managed by AD
+                    )
+                    session.add(user)
+                    await session.commit()
+                    await session.refresh(user)
 
     if not user:
         raise HTTPException(status_code=404, detail="Student not found")
