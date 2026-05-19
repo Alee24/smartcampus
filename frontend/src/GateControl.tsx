@@ -1,5 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { Scan, ShieldAlert, BadgeCheck, XCircle, Camera, Car, RefreshCw, StopCircle, Clock, TrendingUp, Activity, Search, Calendar, User as UserIcon, Loader2 } from 'lucide-react'
+import { 
+    Scan, ShieldAlert, BadgeCheck, XCircle, Camera, Car, RefreshCw, 
+    StopCircle, Clock, TrendingUp, Activity, Search, Calendar, 
+    User as UserIcon, Loader2, Key, Phone, FileText, CheckCircle2,
+    Users, AlertOctagon, HelpCircle, ArrowRightLeft, List, ClipboardList
+} from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useNotification } from './components/Notification'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
@@ -12,33 +17,61 @@ export default function GateControl() {
     const [stream, setStream] = useState<MediaStream | null>(null)
     const [scanMode, setScanMode] = useState<'qr' | 'plate' | null>(null)
     const [refreshTrigger, setRefreshTrigger] = useState(0)
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
     const refreshData = () => setRefreshTrigger(prev => prev + 1)
 
-    // Manual Vehicle Logic
-    const [showManualVehicle, setShowManualVehicle] = useState(false)
+    // Manual Form States
+    const [activeTab, setActiveTab] = useState<'student' | 'visitor' | 'vehicle'>('student')
+    
+    // Visitor Form
+    const [visitorForm, setVisitorForm] = useState({ name: '', id: '', phone: '', details: '' })
+    
+    // Vehicle Form
     const [manualPlate, setManualPlate] = useState('')
     const [manualPassengers, setManualPassengers] = useState(1)
-
-    // Event & Visitor State
-    const [showEventModal, setShowEventModal] = useState(false)
-    const [eventData, setEventData] = useState<any>(null)
-    const [visitorForm, setVisitorForm] = useState({ name: '', id: '', phone: '' })
-
-    // Permission State
-    const [showPermissionModal, setShowPermissionModal] = useState(false)
-    const [permissionError, setPermissionError] = useState('')
-
-    // Driver Details State
     const [manualDriverName, setManualDriverName] = useState('')
     const [manualDriverContact, setManualDriverContact] = useState('')
     const [manualDriverId, setManualDriverId] = useState('')
     const [plateSuggestions, setPlateSuggestions] = useState<any[]>([])
 
-    // Search & View Record State
+    // Detailed lists viewing modals (to keep A4 main page compact)
+    const [showLogsModal, setShowLogsModal] = useState(false)
+    const [showVehiclesModal, setShowVehiclesModal] = useState(false)
+    const [showEventModal, setShowEventModal] = useState(false)
+    const [eventData, setEventData] = useState<any>(null)
+    
+    // Camera Permission States
+    const [showPermissionModal, setShowPermissionModal] = useState(false)
+    const [permissionError, setPermissionError] = useState('')
+
+    // Search & Log detail states
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedVehicleLog, setSelectedVehicleLog] = useState<any>(null)
 
+    // Data lists
+    const [vehicleStats, setVehicleStats] = useState<any>({
+        total_today: 0,
+        current_inside: 0,
+        manual_entries: 0,
+        unique_vehicles: 0,
+        total_exited: 0,
+        longest_stays: []
+    })
+    const [visitorStats, setVisitorStats] = useState<any>({
+        total_today: 0,
+        active_now: 0,
+        exited_today: 0
+    })
+    const [recentVehicles, setRecentVehicles] = useState<any[]>([])
+    const [registeredVehicles, setRegisteredVehicles] = useState<any[]>([])
+    const [recentVisitors, setRecentVisitors] = useState<any[]>([])
+
+    const videoRef = useRef<HTMLVideoElement>(null)
+    const canvasRef = useRef<HTMLCanvasElement>(null)
+    const qrScannerRef = useRef<Html5Qrcode | null>(null)
+
+    // Autocomplete Lookup for Plates
     const handlePlateSearch = async (val: string) => {
         const v = val.toUpperCase().replace(/[^A-Z0-9\s]/g, '')
         setManualPlate(v)
@@ -61,8 +94,99 @@ export default function GateControl() {
         setPlateSuggestions([])
     }
 
-    const submitManualVehicle = async () => {
+    // Submit Student Verification Check-In
+    const handleStudentVerify = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!admissionNumber.trim()) return
+        setIsSubmitting(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/gate/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ admission_number: admissionNumber })
+            })
+
+            const result = await res.json()
+
+            if (result.status === 'allowed') {
+                setScanStatus('success')
+                setLastScan(result.data)
+                showNotification(`Access granted for ${result.data.name}`, 'success')
+                setAdmissionNumber('')
+            } else if (result.status === 'event_pass') {
+                setEventData(result.data)
+                setShowEventModal(true)
+                setScanStatus('idle')
+            } else {
+                setScanStatus('rejected')
+                setLastScan(result.data || {
+                    name: 'Unknown / Not Found',
+                    role: 'N/A',
+                    time: new Date().toLocaleTimeString()
+                })
+                showNotification('Access Denied', 'error')
+            }
+            refreshData()
+        } catch (err) {
+            setScanStatus('rejected')
+            showNotification('Network communication error', 'error')
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
+    // Submit Visitor Check-In
+    const handleVisitorCheckIn = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!visitorForm.name || !visitorForm.id || !visitorForm.phone) return
+        setIsSubmitting(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/gate/visitors/check-in', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    first_name: visitorForm.name.split(' ')[0] || '',
+                    last_name: visitorForm.name.split(' ').slice(1).join(' ') || 'Visitor',
+                    phone_number: visitorForm.phone,
+                    id_number: visitorForm.id,
+                    visit_details: visitorForm.details || 'General Campus Visit'
+                })
+            })
+            const result = await res.json()
+            if (res.ok) {
+                setScanStatus('success')
+                setLastScan({
+                    name: `${result.first_name} ${result.last_name}`,
+                    role: `Visitor: ${result.visit_details}`,
+                    time: new Date(result.time_in).toLocaleTimeString(),
+                    image: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                })
+                setVisitorForm({ name: '', id: '', phone: '', details: '' })
+                showNotification(`Visitor registered successfully`, 'success')
+                refreshData()
+            } else {
+                showNotification(result.detail || "Failed to register visitor", "error")
+            }
+        } catch (e: any) {
+            showNotification(`Error: ${e.message}`, "error")
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
+    // Submit Vehicle Entry Check-in
+    const handleVehicleCheckIn = async (e: React.FormEvent) => {
+        e.preventDefault()
         if (!manualPlate.trim()) return
+        setIsSubmitting(true)
         try {
             const token = localStorage.getItem('token')
             const res = await fetch('/api/gate/manual-vehicle-entry', {
@@ -84,30 +208,50 @@ export default function GateControl() {
                 setScanStatus('success')
                 setLastScan({
                     name: result.data.plate,
-                    role: `Driver: ${manualDriverName || 'Unknown'}`,
+                    role: `Driver: ${manualDriverName || 'Unknown Driver'}`,
                     time: result.data.time,
                     image: result.data.image,
-                    isVehicle: true
+                    isVehicle: true,
+                    passengers: manualPassengers
                 })
-                setShowManualVehicle(false)
                 setManualPlate('')
                 setManualPassengers(1)
                 setManualDriverName('')
                 setManualDriverContact('')
                 setManualDriverId('')
+                showNotification(`Vehicle ${result.data.plate} logged successfully`, 'success')
+                refreshData()
             } else {
-                alert(result.detail || "Error logging vehicle")
+                showNotification(result.detail || "Error logging vehicle", "error")
             }
-            // Refresh List
-            refreshData()
         } catch (e) {
-            console.error(e)
-            alert("Network Error")
+            showNotification("Network Error", "error")
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
-    const handleExit = async (plate: string) => {
-        if (!confirm(`Mark vehicle ${plate} as exited?`)) return
+    // Check-out active student
+    const handleStudentCheckOut = async (adm: string) => {
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/gate/check-out/${adm}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) {
+                showNotification(`Checked out student ${adm} successfully`, 'success')
+                refreshData()
+            } else {
+                showNotification('Error checking out student', 'error')
+            }
+        } catch (e) {
+            showNotification('Network Error', 'error')
+        }
+    }
+
+    // Check-out Active Vehicle
+    const handleVehicleExit = async (plate: string) => {
         try {
             const token = localStorage.getItem('token')
             const res = await fetch('/api/gate/vehicle-exit', {
@@ -116,108 +260,42 @@ export default function GateControl() {
                 body: JSON.stringify({ plate_number: plate })
             })
             if (res.ok) {
-                const data = await res.json()
-                setRecentVehicles(prev => prev.map(v => v.plate === plate && !v.exit_time ? { ...v, exit_time: data.time } : v))
+                showNotification(`Vehicle ${plate} has exited`, 'success')
                 refreshData()
             } else {
-                alert("Error recording exit (Vehicle might not be inside)")
+                showNotification("Error recording vehicle exit", "error")
             }
-        } catch (e) { alert("Network Error") }
+        } catch (e) { showNotification("Network Error", "error") }
     }
 
-
-    const videoRef = useRef<HTMLVideoElement>(null)
-    const canvasRef = useRef<HTMLCanvasElement>(null)
-    const qrScannerRef = useRef<Html5Qrcode | null>(null)
-
-    const handleManualScan = async () => {
+    // Check-out Active Visitor
+    const handleVisitorCheckOut = async (visitorId: string) => {
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch('/api/gate/scan', {
+            const res = await fetch('/api/gate/visitors/check-out', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ admission_number: admissionNumber })
+                body: JSON.stringify({ visitor_id: visitorId })
             })
-
-            const result = await res.json()
-
-            if (result.status === 'allowed') {
-                setScanStatus('success')
-                setLastScan(result.data)
-            } else if (result.status === 'event_pass') {
-                setEventData(result.data)
-                setShowEventModal(true)
-                setScanStatus('idle') // Keep camera/scanner ready? Or show success? Let's show modal.
+            if (res.ok) {
+                showNotification("Visitor checked out successfully", "success")
+                refreshData()
             } else {
-                setScanStatus('rejected')
-                setLastScan(result.data || {
-                    name: 'Unknown / Not Found',
-                    role: 'N/A',
-                    time: new Date().toLocaleTimeString()
-                })
+                showNotification("Error checking out visitor", "error")
             }
-        } catch (err) {
-            setScanStatus('rejected')
+        } catch (e: any) {
+            showNotification(`Error: ${e.message}`, "error")
         }
     }
 
-    const [vehicleStats, setVehicleStats] = useState<any>({
-        total_today: 0,
-        current_inside: 0,
-        manual_entries: 0,
-        unique_vehicles: 0,
-        total_exited: 0,
-        longest_stays: []
-    })
-    const [recentVehicles, setRecentVehicles] = useState<any[]>([])
-    const [registeredVehicles, setRegisteredVehicles] = useState<any[]>([])
-    const [checkMode, setCheckMode] = useState<'person' | 'vehicle_in' | 'vehicle_out'>('person')
-
-    const handleMainAction = () => {
-        if (!admissionNumber) return;
-        if (checkMode === 'person') {
-            handleManualScan();
-        } else if (checkMode === 'vehicle_in') {
-            setManualPlate(admissionNumber);
-            setShowManualVehicle(true);
-        } else {
-            handleExit(admissionNumber);
-            setAdmissionNumber('');
-        }
-    }
-
-    useEffect(() => {
-        const fetchVehicleData = async () => {
-            try {
-                const token = localStorage.getItem('token')
-                const headers = { 'Authorization': `Bearer ${token}` }
-
-                const statsRes = await fetch('/api/gate/vehicle-stats', { headers })
-                if (statsRes.ok) setVehicleStats(await statsRes.json())
-
-                // Cache busting added to debug update issues
-                const regRes = await fetch(`/api/gate/vehicles?_t=${Date.now()}`, { headers })
-                if (regRes.ok) setRegisteredVehicles(await regRes.json())
-                else console.error("Vehicles fetch failed", regRes.status)
-
-                const logsRes = await fetch(`/api/gate/vehicle-logs?_t=${Date.now()}`, { headers })
-                if (logsRes.ok) setRecentVehicles(await logsRes.json())
-                else console.error("Logs fetch failed", logsRes.status)
-            } catch (e) { console.error(e) }
-        }
-        fetchVehicleData()
-        const interval = setInterval(fetchVehicleData, 30000)
-        return () => clearInterval(interval)
-    }, [refreshTrigger])
-
+    // Core Camera Operations
     const startCamera = async (mode: 'qr' | 'plate') => {
-        setPermissionError('');
+        setPermissionError('')
         setScanMode(mode)
         
-        // Check for secure context
         if (!window.isSecureContext) {
             showNotification("Camera access requires a secure (HTTPS) connection.", "error")
             setScanStatus('idle')
@@ -226,7 +304,6 @@ export default function GateControl() {
 
         if (mode === 'qr') {
             setScanStatus('scanning')
-            // QR Scanning using html5-qrcode
             setTimeout(async () => {
                 try {
                     const scanner = new Html5Qrcode("gate-qr-reader")
@@ -237,22 +314,19 @@ export default function GateControl() {
                         (decodedText) => {
                             setAdmissionNumber(decodedText)
                             stopCamera()
-                            // Auto-process QR
                             processQR(decodedText)
                         },
                         () => {}
                     )
                 } catch (err: any) {
                     console.error("QR Start Error", err)
-                    const errorMsg = err?.message || err || "Unknown camera error"
-                    showNotification(`Could not start QR scanner: ${errorMsg}`, "error")
+                    showNotification(`Could not start QR scanner: ${err?.message || err}`, "error")
                     setScanStatus('idle')
                 }
             }, 300)
             return
         }
 
-        // Plate mode uses the custom video stream for capture
         try {
             const s = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment' }
@@ -262,21 +336,13 @@ export default function GateControl() {
             setShowPermissionModal(false)
         } catch (err: any) {
             console.error("Camera Access Error:", err)
-            setScanMode(mode) // Remember mode to retry
-
             const errorName = err?.name || "UnknownError"
-            const errorMsg = err?.message || ""
-
             if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
-                setPermissionError('denied');
-                setShowPermissionModal(true);
-            } else if (errorName === 'NotFoundError') {
+                setPermissionError('denied')
+                setShowPermissionModal(true)
+            } else {
                 showNotification("No camera device found on this system.", "error")
                 setScanStatus('idle')
-            } else {
-                setPermissionError('unknown');
-                setShowPermissionModal(true);
-                showNotification(`Camera Error: ${errorName} - ${errorMsg}`, "error")
             }
         }
     }
@@ -333,6 +399,7 @@ export default function GateControl() {
                 })
                 showNotification('Access Denied', 'error')
             }
+            refreshData()
         } catch (err) {
             setScanStatus('rejected')
         }
@@ -340,24 +407,18 @@ export default function GateControl() {
 
     const captureAndProcess = () => {
         if (!videoRef.current || !canvasRef.current) return
-
         const context = canvasRef.current.getContext('2d')
         if (!context) return
 
-        // Match canvas size to video
         canvasRef.current.width = videoRef.current.videoWidth
         canvasRef.current.height = videoRef.current.videoHeight
         context.drawImage(videoRef.current, 0, 0)
 
-        // Get Blob
         canvasRef.current.toBlob(async (blob) => {
             if (!blob) return
-
-            // Stop stream? Or keep it running? Let's stop to process
             stopCamera()
 
             if (scanMode === 'plate') {
-                // Upload
                 const formData = new FormData()
                 formData.append('file', blob, 'plate_scan.jpg')
 
@@ -381,6 +442,7 @@ export default function GateControl() {
                             passengers: data.data.passengers
                         })
                         showNotification(`Vehicle ${data.data.plate} logged successfully`, 'success')
+                        refreshData()
                     } else {
                         setScanStatus('rejected')
                         setLastScan({
@@ -396,775 +458,675 @@ export default function GateControl() {
                     showNotification("Error processing plate", "error")
                     setScanStatus('idle')
                 }
-            } else {
-                // QR handled by live library, but this is a fallback if needed
-                setScanStatus('idle')
             }
         }, 'image/jpeg')
     }
 
+    // Load Stats & Data
+    useEffect(() => {
+        const fetchGateData = async () => {
+            try {
+                const token = localStorage.getItem('token')
+                const headers = { 'Authorization': `Bearer ${token}` }
+
+                // Fetch Vehicle details
+                const statsRes = await fetch('/api/gate/vehicle-stats', { headers })
+                if (statsRes.ok) setVehicleStats(await statsRes.json())
+
+                const regRes = await fetch(`/api/gate/vehicles?_t=${Date.now()}`, { headers })
+                if (regRes.ok) setRegisteredVehicles(await regRes.json())
+
+                const logsRes = await fetch(`/api/gate/vehicle-logs?_t=${Date.now()}`, { headers })
+                if (logsRes.ok) setRecentVehicles(await logsRes.json())
+
+                // Fetch Visitor details
+                const visitorStatsRes = await fetch('/api/gate/visitor-stats', { headers })
+                if (visitorStatsRes.ok) setVisitorStats(await visitorStatsRes.json())
+
+                const visitorsRes = await fetch('/api/gate/visitors', { headers })
+                if (visitorsRes.ok) setRecentVisitors(await visitorsRes.json())
+
+            } catch (e) { console.error("Error loading gate data:", e) }
+        }
+        fetchGateData()
+    }, [refreshTrigger])
+
+    // Calculate aggregated stats
+    const totalEntriesToday = vehicleStats.total_today + visitorStats.total_today
+    const currentInsideToday = vehicleStats.current_inside + visitorStats.active_now
+
     return (
-        <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-[450px_1fr] gap-4">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 animate-fade-in font-sans space-y-6">
             <canvas ref={canvasRef} className="hidden" />
 
-            {/* Control Panel */}
-            <div className="glass-card p-6 h-fit">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-[var(--text-primary)]">
-                    <Scan className="text-primary-500" />
-                    Gate Control Station
-                </h3>
-
-                {/* Mode Tabs */}
-                <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl mb-6">
-                    <button
-                        onClick={() => setCheckMode('person')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${checkMode === 'person' ? 'bg-white dark:bg-gray-700 shadow-sm text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        👤 Person Entry
-                    </button>
-                    <button
-                        onClick={() => setCheckMode('vehicle_in')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${checkMode === 'vehicle_in' ? 'bg-white dark:bg-gray-700 shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        🚗 Vehicle In
-                    </button>
-                    <button
-                        onClick={() => setCheckMode('vehicle_out')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${checkMode === 'vehicle_out' ? 'bg-white dark:bg-gray-700 shadow-sm text-red-600' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        ⛔ Vehicle Out
-                    </button>
+            {/* 1. TOP STATS ROW (ON BOARD, ON TOP OF EVERYTHING ELSE) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 dark:from-indigo-950/30 dark:to-slate-900 border border-indigo-500/20 rounded-2xl p-5 shadow-sm hover:shadow transition-all relative overflow-hidden group">
+                    <div className="absolute right-4 top-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Users size={48} className="text-indigo-600" />
+                    </div>
+                    <p className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-1">Check-ins Today</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-slate-900 dark:text-white">{totalEntriesToday}</span>
+                        <span className="text-xs text-slate-400 font-bold">total entries</span>
+                    </div>
+                    <div className="mt-2 text-[10px] text-slate-400 font-bold flex gap-2">
+                        <span>🚗 {vehicleStats.total_today} Vehicles</span>
+                        <span>•</span>
+                        <span>🎫 {visitorStats.total_today} Visitors</span>
+                    </div>
                 </div>
 
-                <div className="space-y-6">
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                            {checkMode === 'person' ? "Admission Number / ID" : "Number Plate"}
-                        </label>
-                        <div className="flex gap-2">
-                            <div className="flex-1 relative">
-                                <input
-                                    value={admissionNumber}
-                                    onChange={(e) => {
-                                        const val = e.target.value.toUpperCase();
-                                        setAdmissionNumber(val);
-                                        if (checkMode.includes('vehicle')) handlePlateSearch(val);
-                                    }}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleMainAction()}
-                                    placeholder={checkMode === 'person' ? "Enter Adm No..." : "Enter Plate (e.g. KCA 123)..."}
-                                    className="w-full p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] outline-none focus:border-primary-500 transition-colors uppercase font-mono"
-                                />
-                                {checkMode.includes('vehicle') && plateSuggestions.length > 0 && (
-                                    <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 border border-[var(--border-color)] rounded-xl shadow-2xl max-h-60 overflow-y-auto">
-                                        {plateSuggestions.map((v: any) => (
-                                            <div key={v.id}
-                                                onClick={() => {
-                                                    setAdmissionNumber(v.plate_number);
-                                                    if (checkMode === 'vehicle_in') selectSuggestion(v);
-                                                    setPlateSuggestions([]);
-                                                }}
-                                                className="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-[var(--border-color)] last:border-0"
-                                            >
-                                                <div className="font-bold">{v.plate_number}</div>
-                                                <div className="text-xs text-gray-500">{v.driver_name || 'No Driver'}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            <button
-                                onClick={handleMainAction}
-                                className={`px-6 rounded-lg font-medium transition-colors text-white ${checkMode === 'vehicle_out' ? 'bg-red-600 hover:bg-red-700' :
-                                    checkMode === 'vehicle_in' ? 'bg-blue-600 hover:bg-blue-700' :
-                                        'bg-primary-600 hover:bg-primary-500'
-                                    }`}
-                            >
-                                {checkMode === 'vehicle_out' ? 'CHECKOUT' : checkMode === 'vehicle_in' ? 'LOG ENTRY' : 'VERIFY'}
-                            </button>
-                        </div>
+                <div className="bg-gradient-to-br from-teal-500/10 to-teal-600/5 dark:from-teal-950/30 dark:to-slate-900 border border-teal-500/20 rounded-2xl p-5 shadow-sm hover:shadow transition-all relative overflow-hidden group">
+                    <div className="absolute right-4 top-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <CheckCircle2 size={48} className="text-teal-600" />
                     </div>
-
-                    <div className="border-t border-[var(--border-color)] pt-6">
-                        <p className="text-sm text-[var(--text-secondary)] mb-4">Quick Actions</p>
-                        <div className="grid grid-cols-2 gap-4">
-                            <button
-                                onClick={() => startCamera('qr')}
-                                className="p-4 rounded-xl border border-[var(--border-color)] hover:bg-[var(--bg-primary)] transition-all flex flex-col items-center gap-2 text-center group"
-                            >
-                                <Scan size={24} className="text-purple-500 group-hover:scale-110 transition-transform" />
-                                <span className="text-sm font-medium">Scan QR Code</span>
-                            </button>
-                            <button
-                                onClick={() => startCamera('plate')}
-                                className="p-4 rounded-xl border border-[var(--border-color)] hover:bg-[var(--bg-primary)] transition-all flex flex-col items-center gap-2 text-center group"
-                            >
-                                <Car size={24} className="text-blue-500 group-hover:scale-110 transition-transform" />
-                                <span className="text-sm font-medium">Scan Number Plate</span>
-                            </button>
-
-                            <button
-                                onClick={() => setShowManualVehicle(true)}
-                                className="p-4 rounded-xl border border-[var(--border-color)] hover:bg-[var(--bg-primary)] transition-all flex flex-col items-center gap-2 text-center group"
-                            >
-                                <Car size={24} className="text-orange-500 group-hover:scale-110 transition-transform" />
-                                <span className="text-sm font-medium">Manual Vehicle</span>
-                            </button>
-                            <button
-                                onClick={async () => {
-                                    if (!confirm("⚠️ TRIGGER SECURITY ALARM?\n\nThis will notify all security personnel.")) return;
-                                    try {
-                                        const token = localStorage.getItem('token');
-                                        await fetch('/api/gate/alarm', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
-                                        alert("🚨 ALARM TRIGGERED! Security notified.");
-                                    } catch (e) { alert("Network Error"); }
-                                }}
-                                className="col-span-2 p-4 rounded-xl border border-[var(--border-color)] hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex flex-col items-center gap-2 text-center group active:scale-95"
-                            >
-                                <ShieldAlert size={24} className="text-red-500 group-hover:scale-110 transition-transform animate-pulse" />
-                                <span className="text-sm font-medium text-red-600 dark:text-red-400">Trigger Alarm</span>
-                            </button>
-                        </div>
+                    <p className="text-xs font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest mb-1">Currently Inside</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-slate-900 dark:text-white">{currentInsideToday}</span>
+                        <span className="text-xs text-slate-400 font-bold">active now</span>
                     </div>
+                    <div className="mt-2 text-[10px] text-slate-400 font-bold flex gap-2">
+                        <span>🚗 {vehicleStats.current_inside} Parked</span>
+                        <span>•</span>
+                        <span>🎫 {visitorStats.active_now} Visitors</span>
+                    </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-orange-500/10 to-orange-600/5 dark:from-orange-950/30 dark:to-slate-900 border border-orange-500/20 rounded-2xl p-5 shadow-sm hover:shadow transition-all relative overflow-hidden group">
+                    <div className="absolute right-4 top-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <ArrowRightLeft size={48} className="text-orange-600" />
+                    </div>
+                    <p className="text-xs font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest mb-1">Total Checked Out</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-slate-900 dark:text-white">
+                            {vehicleStats.total_exited + visitorStats.exited_today}
+                        </span>
+                        <span className="text-xs text-slate-400 font-bold">exited</span>
+                    </div>
+                    <div className="mt-2 text-[10px] text-slate-400 font-bold flex gap-2">
+                        <span>🚗 {vehicleStats.total_exited} Cars</span>
+                        <span>•</span>
+                        <span>🎫 {visitorStats.exited_today} Guests</span>
+                    </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-red-500/10 to-red-600/5 dark:from-red-950/30 dark:to-slate-900 border border-red-500/20 rounded-2xl p-5 shadow-sm hover:shadow transition-all relative overflow-hidden group">
+                    <div className="absolute right-4 top-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <AlertOctagon size={48} className="text-red-600" />
+                    </div>
+                    <p className="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-widest mb-1">Security Alert</p>
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-slate-900 dark:text-white">0</span>
+                        <span className="text-xs text-slate-400 font-bold">active threats</span>
+                    </div>
+                    <button 
+                        onClick={async () => {
+                            if (!confirm("🚨 ACTIVATE SECURITY ALARM?\n\nThis immediately broadcasts alerts to all campus guards.")) return;
+                            try {
+                                const token = localStorage.getItem('token')
+                                await fetch('/api/gate/alarm', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } })
+                                showNotification("General Security Alarm Triggered!", "error")
+                            } catch (e) { showNotification("Network Error", "error") }
+                        }}
+                        className="mt-2 text-[10px] text-red-600 dark:text-red-400 font-black uppercase tracking-wider flex items-center gap-1 hover:underline active:scale-95"
+                    >
+                        🚨 Trigger General Alarm
+                    </button>
                 </div>
             </div>
 
-            {/* Live Feed / Result */}
-            <div className={`glass-card p-6 h-fit min-h-[400px] flex flex-col ${scanStatus === 'scanning' ? 'bg-black' : ''}`}>
-                <h3 className={`text-xl font-bold mb-4 ${scanStatus === 'scanning' ? 'text-white' : ''}`}>
-                    {scanStatus === 'scanning' ? (scanMode === 'plate' ? 'Align Number Plate' : 'Scan QR Code') : 'Verification Result'}
-                </h3>
-
-                <div className="flex-1 flex items-center justify-center relative overflow-hidden rounded-xl">
-                    {/* IDLE */}
-                    {scanStatus === 'idle' && (
-                        <div className="text-center text-[var(--text-secondary)]">
-                            <div className="w-24 h-24 rounded-full bg-[var(--bg-primary)] border-2 border-dashed border-[var(--border-color)] flex items-center justify-center mx-auto mb-4">
-                                <Scan size={32} className="opacity-50" />
-                            </div>
-                            <p>Ready to scan...</p>
+            {/* 2. MAIN CORE LAYOUT (A4 VIEWS FIT - COMPACT FLEXIBLE GRID) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                {/* LEFT CONSOLE: ACTIONS & UNIFIED ENTRY CONTROL (lg:col-span-5) */}
+                <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-6 shadow-xl space-y-6">
+                    <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-800">
+                        <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                            <Scan className="text-indigo-600 animate-pulse" />
+                            Gate Terminal Entry
+                        </h3>
+                        <div className="flex gap-2">
+                            <button onClick={() => setShowVehiclesModal(true)} className="p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 rounded-xl text-slate-500" title="Registered Vehicles Directory">
+                                <Car size={16} />
+                            </button>
+                            <button onClick={() => setShowLogsModal(true)} className="p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 rounded-xl text-slate-500" title="Detailed History Logs">
+                                <ClipboardList size={16} />
+                            </button>
                         </div>
-                    )}
+                    </div>
 
-                    {/* SCANNING */}
-                    {scanStatus === 'scanning' && (
-                        <div className="w-full h-full relative flex flex-col items-center justify-center">
-                            <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="w-full h-full object-cover absolute inset-0 rounded-xl"
-                            />
-                            {/* Overlay */}
-                            <div className="relative z-10 w-full max-w-sm aspect-video flex flex-col items-center justify-center p-4">
-                                {scanMode === 'qr' ? (
-                                    <div id="gate-qr-reader" className="w-full h-full rounded-2xl overflow-hidden border-4 border-purple-500 shadow-[0_0_50px_rgba(168,85,247,0.3)]"></div>
-                                ) : (
-                                    <div className="w-full h-full border-2 border-white/50 rounded-lg flex flex-col justify-between p-2 backdrop-blur-[2px]">
-                                        <div className="flex justify-between">
-                                            <div className="w-8 h-8 border-l-4 border-t-4 border-blue-500 rounded-tl-lg"></div>
-                                            <div className="w-8 h-8 border-r-4 border-t-4 border-blue-500 rounded-tr-lg"></div>
-                                        </div>
-                                        <div className="text-center">
-                                            <div className="text-white font-black text-lg tracking-widest animate-pulse flex items-center justify-center gap-2">
-                                                <Car size={24} className="text-blue-400" />
-                                                READING PLATE...
-                                            </div>
-                                            <p className="text-white/60 text-[10px] mt-1 font-bold uppercase">Center vehicle plate in frame</p>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <div className="w-8 h-8 border-l-4 border-b-4 border-blue-500 rounded-bl-lg"></div>
-                                            <div className="w-8 h-8 border-r-4 border-b-4 border-blue-500 rounded-br-lg"></div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                    {/* Tactics Mode Selectors (Student, Visitor, Vehicle) */}
+                    <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl">
+                        <button 
+                            onClick={() => { setActiveTab('student'); setScanStatus('idle'); }}
+                            className={`flex-1 py-3 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${activeTab === 'student' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <UserIcon size={14} /> Student/Staff
+                        </button>
+                        <button 
+                            onClick={() => { setActiveTab('visitor'); setScanStatus('idle'); }}
+                            className={`flex-1 py-3 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${activeTab === 'visitor' ? 'bg-white dark:bg-slate-700 text-teal-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <Calendar size={14} /> Guest/Visitor
+                        </button>
+                        <button 
+                            onClick={() => { setActiveTab('vehicle'); setScanStatus('idle'); }}
+                            className={`flex-1 py-3 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${activeTab === 'vehicle' ? 'bg-white dark:bg-slate-700 text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                        >
+                            <Car size={14} /> Vehicle
+                        </button>
+                    </div>
 
-                            <div className="absolute bottom-6 flex gap-4 z-20">
-                                <button
-                                    onClick={stopCamera}
-                                    className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/30 transition-all font-bold flex items-center gap-2"
-                                >
-                                    <StopCircle size={20} />
-                                    CANCEL
-                                </button>
-                                {scanMode === 'plate' && (
-                                    <button
-                                        onClick={captureAndProcess}
-                                        className="px-8 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-500/30 transition-all font-black flex items-center gap-2 active:scale-95"
-                                    >
-                                        <Camera size={24} />
-                                        CAPTURE PLATE
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* SUCCESS */}
-                    {scanStatus === 'success' && (
-                        <div className="text-center animate-fade-in w-full px-4">
-                            {lastScan.isVehicle && lastScan.owner ? (
-                                <div className="flex flex-col items-center">
-                                    <div className="flex gap-4 mb-6">
-                                        {/* Vehicle Image */}
-                                        <div className="w-28 h-28 rounded-2xl border-2 border-blue-500 p-1 shadow-lg overflow-hidden bg-white">
-                                            <img src={lastScan.image} className="w-full h-full object-cover rounded-xl" alt="Vehicle" />
-                                        </div>
-                                        {/* Owner Image */}
-                                        <div className="w-28 h-28 rounded-full border-2 border-primary-500 p-1 shadow-lg overflow-hidden bg-white -ml-8 mt-4">
-                                            <img src={lastScan.owner.image} className="w-full h-full object-cover rounded-full" alt="Owner" />
-                                        </div>
-                                    </div>
-                                    <div className="inline-flex items-center gap-2 bg-blue-500/10 text-blue-500 px-4 py-1 rounded-full text-sm font-bold mb-4">
-                                        <BadgeCheck size={16} /> VEHICLE AUTHORIZED
-                                    </div>
-                                    <h2 className="text-3xl font-black mb-1">{lastScan.name}</h2>
-                                    <p className="text-primary-600 font-bold mb-1">{lastScan.owner.name}</p>
-                                    <p className="text-gray-500 text-sm font-medium">{lastScan.owner.school} • {lastScan.role}</p>
-                                    <div className="mt-4 flex gap-4 text-xs font-bold text-gray-400">
-                                        <span>🕒 {lastScan.time}</span>
-                                        <span>👥 {lastScan.passengers || 1} Passengers</span>
+                    {/* ACTIVE FORM CONSOLE */}
+                    <div className="space-y-4 min-h-[260px]">
+                        {activeTab === 'student' && (
+                            <form onSubmit={handleStudentVerify} className="space-y-4 animate-fade-in">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Student Admission Number</label>
+                                    <div className="relative">
+                                        <input 
+                                            required
+                                            value={admissionNumber}
+                                            onChange={e => setAdmissionNumber(e.target.value.toUpperCase())}
+                                            placeholder="ENTER ADMISSION NO (E.G. STD1001)"
+                                            className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-800 border-none text-sm font-bold uppercase outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-mono"
+                                        />
+                                        <UserIcon className="absolute right-4 top-4 text-slate-400" size={18} />
                                     </div>
                                 </div>
-                            ) : (
-                                <>
-                                    <div className={`w-36 h-36 rounded-full border-4 ${lastScan.isVehicle ? 'border-blue-500' : 'border-green-500'} p-1 mx-auto mb-6 shadow-lg overflow-hidden`}>
-                                        <img src={lastScan.image} className="w-full h-full object-cover rounded-full bg-white" alt="Result" />
-                                    </div>
-                                    <div className={`inline-flex items-center gap-2 ${lastScan.isVehicle ? 'bg-blue-500/10 text-blue-500' : 'bg-green-500/10 text-green-500'} px-4 py-1 rounded-full text-sm font-bold mb-4`}>
-                                        <BadgeCheck size={16} /> ACCESS GRANTED
-                                    </div>
-                                    <h2 className="text-3xl font-bold mb-1">{lastScan.name}</h2>
-                                    <p className="text-[var(--text-secondary)]">{lastScan.role} • {lastScan.time}</p>
-                                </>
-                            )}
-
-                            <button onClick={() => setScanStatus('idle')} className="mt-8 px-6 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm text-[var(--text-secondary)] hover:text-primary-500 flex items-center justify-center gap-2 mx-auto transition-all">
-                                <RefreshCw size={14} /> Scan Next
-                            </button>
-                        </div>
-                    )}
-
-                    {/* REJECTED */}
-                    {scanStatus === 'rejected' && (
-                        <div className="text-center animate-fade-in w-full">
-                            <div className="w-32 h-32 rounded-full border-4 border-red-500 bg-red-500/10 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-red-500/20">
-                                {lastScan && lastScan.image ? (
-                                    <img src={lastScan.image} className="w-full h-full object-cover rounded-full opacity-80" alt="Rejected" />
-                                ) : (
-                                    <XCircle size={64} className="text-red-500" />
-                                )}
-                            </div>
-                            <div className="inline-flex items-center gap-2 bg-red-500/10 text-red-500 px-4 py-1 rounded-full text-sm font-bold mb-4">
-                                <ShieldAlert size={16} /> ACCESS DENIED
-                            </div>
-                            <h2 className="text-3xl font-bold mb-1">{lastScan?.name || "Unknown"}</h2>
-                            <p className="text-[var(--text-secondary)]">Logged at {lastScan?.time || new Date().toLocaleTimeString()}</p>
-
-                            <button onClick={() => setScanStatus('idle')} className="mt-8 text-sm text-[var(--text-secondary)] hover:text-primary-500 flex items-center justify-center gap-2 mx-auto">
-                                <RefreshCw size={14} /> Try Again
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-            {/* Vehicle Analytics Section */}
-            <div className="col-span-1 lg:col-span-2 mt-8 animate-fade-in">
-                <h3 className="text-xl font-bold mb-6 text-[var(--text-primary)] flex items-center gap-2">
-                    <Activity className="text-blue-600" /> Vehicle Activity Intelligence
-                </h3>
-
-                {/* Stats Grid */}
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    {/* Total */}
-                    <div className="bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl p-6 rounded-2xl border border-[var(--border-color)] shadow-sm">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg"><Car size={20} /></div>
-                            <span className="text-sm font-medium text-[var(--text-secondary)]">Total Today</span>
-                        </div>
-                        <p className="text-3xl font-bold text-[var(--text-primary)]">{vehicleStats.total_today}</p>
-                    </div>
-
-                    {/* Parked / Inside */}
-                    <div className="bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl p-6 rounded-2xl border border-[var(--border-color)] shadow-sm">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-lg"><StopCircle size={20} /></div>
-                            <span className="text-sm font-medium text-[var(--text-secondary)]">Parked Now</span>
-                        </div>
-                        <div className="flex items-baseline gap-2">
-                            <p className="text-3xl font-bold text-[var(--text-primary)]">{vehicleStats.current_inside}</p>
-                            <span className="text-sm text-[var(--text-secondary)]">vehicles</span>
-                        </div>
-                    </div>
-
-                    {/* Exited */}
-                    <div className="bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl p-6 rounded-2xl border border-[var(--border-color)] shadow-sm">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-green-100 dark:bg-green-900/30 text-green-600 rounded-lg"><TrendingUp size={20} /></div>
-                            <span className="text-sm font-medium text-[var(--text-secondary)]">Exited</span>
-                        </div>
-                        <p className="text-3xl font-bold text-[var(--text-primary)]">{vehicleStats.total_exited || 0}</p>
-                    </div>
-
-                    {/* Longest Stays */}
-                    <div className="bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl p-5 rounded-2xl border border-[var(--border-color)] shadow-sm overflow-hidden flex flex-col justify-center">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Clock size={16} className="text-purple-500" />
-                            <span className="text-sm font-medium text-[var(--text-secondary)]">Longest Durations</span>
-                        </div>
-                        <div className="space-y-3">
-                            {vehicleStats.longest_stays && vehicleStats.longest_stays.length > 0 ? (
-                                vehicleStats.longest_stays.slice(0, 3).map((v: any, i: number) => (
-                                    <div key={i} className="flex justify-between items-center text-xs border-b border-[var(--border-color)] last:border-0 pb-1 last:pb-0">
-                                        <div className="font-bold text-[var(--text-primary)]">{v.plate}</div>
-                                        <div className="text-[var(--text-secondary)] font-mono">{v.duration_fmt}</div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-xs text-gray-400 italic">No long stays yet</div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Traffic Analytics Charts */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 animate-fade-in delay-100">
-                    {/* Hourly Traffic Trend */}
-                    <div className="lg:col-span-2 bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl p-5 rounded-2xl border border-[var(--border-color)] shadow-sm">
-                        <h4 className="font-bold text-[var(--text-primary)] mb-3">Hourly Traffic Trends</h4>
-                        <div className="h-[240px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={vehicleStats.hourly_traffic || []}>
-                                    <defs>
-                                        <linearGradient id="colorEntries" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id="colorExits" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#EF4444" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                                    <XAxis dataKey="time" stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
-                                    <YAxis stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
-                                    <Tooltip
-                                        contentStyle={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', borderRadius: '12px' }}
-                                        itemStyle={{ color: 'var(--text-primary)' }}
-                                    />
-                                    <Legend />
-                                    <Area type="monotone" dataKey="entries" name="Entries" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorEntries)" />
-                                    <Area type="monotone" dataKey="exits" name="Exits" stroke="#EF4444" strokeWidth={3} fillOpacity={1} fill="url(#colorExits)" />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    {/* Entry Composition */}
-                    <div className="bg-white/60 dark:bg-gray-900/60 backdrop-blur-xl p-5 rounded-2xl border border-[var(--border-color)] shadow-sm flex flex-col items-center justify-center">
-                        <h4 className="font-bold text-[var(--text-primary)] mb-3 w-full text-left">Current Status</h4>
-                        <div className="h-[200px] w-full relative">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={[
-                                            { name: 'Parked', value: vehicleStats.current_inside || 0 },
-                                            { name: 'Exited', value: vehicleStats.total_exited || 0 }
-                                        ]}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={80}
-                                        paddingAngle={5}
-                                        dataKey="value"
+                                <div className="grid grid-cols-2 gap-3 pt-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => startCamera('qr')}
+                                        className="py-4 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 transition-all active:scale-95"
                                     >
-                                        <Cell fill="#F97316" /> {/* Orange for Parked */}
-                                        <Cell fill="#10B981" /> {/* Green for Exited */}
-                                    </Pie>
-                                    <Tooltip />
-                                    <Legend verticalAlign="bottom" height={36} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                            {/* Center Text */}
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-3xl font-bold text-[var(--text-primary)]">{vehicleStats.total_today || 0}</span>
-                                <span className="text-xs text-[var(--text-secondary)] uppercase">Total Vehicles</span>
-                            </div>
-                        </div>
+                                        <Scan size={16} /> Scan QR Pass
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        disabled={isSubmitting}
+                                        className="py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-50"
+                                    >
+                                        {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <BadgeCheck size={16} />}
+                                        Verify Access
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
+                        {activeTab === 'visitor' && (
+                            <form onSubmit={handleVisitorCheckIn} className="space-y-3.5 animate-fade-in">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Guest Full Name</label>
+                                        <input 
+                                            required
+                                            value={visitorForm.name}
+                                            onChange={e => setVisitorForm({...visitorForm, name: e.target.value})}
+                                            placeholder="Jane Smith"
+                                            className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-teal-500/20"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">National ID / Passport</label>
+                                        <input 
+                                            required
+                                            value={visitorForm.id}
+                                            onChange={e => setVisitorForm({...visitorForm, id: e.target.value})}
+                                            placeholder="ID Number"
+                                            className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-teal-500/20"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Phone Number</label>
+                                        <input 
+                                            required
+                                            value={visitorForm.phone}
+                                            onChange={e => setVisitorForm({...visitorForm, phone: e.target.value})}
+                                            placeholder="0712345678"
+                                            className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-teal-500/20"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Visit Purpose / Host</label>
+                                        <input 
+                                            value={visitorForm.details}
+                                            onChange={e => setVisitorForm({...visitorForm, details: e.target.value})}
+                                            placeholder="Meeting Dr. Smith"
+                                            className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-teal-500/20"
+                                        />
+                                    </div>
+                                </div>
+                                <button 
+                                    type="submit" 
+                                    disabled={isSubmitting}
+                                    className="w-full py-4 mt-2 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-2xl text-xs shadow-lg shadow-teal-600/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                                >
+                                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                    Register Guest Entry
+                                </button>
+                            </form>
+                        )}
+
+                        {activeTab === 'vehicle' && (
+                            <form onSubmit={handleVehicleCheckIn} className="space-y-3.5 animate-fade-in">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="relative">
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">License Plate</label>
+                                        <input 
+                                            required
+                                            value={manualPlate}
+                                            onChange={e => handlePlateSearch(e.target.value)}
+                                            placeholder="KCA 123A"
+                                            className="w-full p-3 text-xs font-bold uppercase rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-orange-500/20 font-mono"
+                                        />
+                                        {plateSuggestions.length > 0 && (
+                                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-xl shadow-2xl max-h-40 overflow-y-auto">
+                                                {plateSuggestions.map((v: any, idx) => (
+                                                    <button 
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={() => selectSuggestion(v)}
+                                                        className="w-full text-left p-2.5 hover:bg-orange-50 dark:hover:bg-slate-700 border-b border-slate-50 dark:border-slate-800 last:border-none text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors"
+                                                    >
+                                                        {v.plate_number} • {v.driver_name || 'Visitor'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Passengers</label>
+                                        <div className="flex items-center bg-slate-50 dark:bg-slate-800 rounded-xl px-2 py-1">
+                                            <button type="button" onClick={() => setManualPassengers(Math.max(1, manualPassengers - 1))} className="w-8 h-8 rounded-lg font-black text-slate-600 hover:bg-slate-200">-</button>
+                                            <span className="flex-1 text-center font-black text-sm">{manualPassengers}</span>
+                                            <button type="button" onClick={() => setManualPassengers(manualPassengers + 1)} className="w-8 h-8 rounded-lg font-black text-slate-600 hover:bg-slate-200">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Driver's Name</label>
+                                        <input 
+                                            value={manualDriverName}
+                                            onChange={e => setManualDriverName(e.target.value)}
+                                            placeholder="Driver Full Name"
+                                            className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-orange-500/20"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">National ID Number</label>
+                                        <input 
+                                            value={manualDriverId}
+                                            onChange={e => setManualDriverId(e.target.value)}
+                                            placeholder="National ID"
+                                            className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-orange-500/20"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => startCamera('plate')}
+                                        className="py-3.5 bg-orange-50 hover:bg-orange-100 dark:bg-orange-950/30 dark:hover:bg-orange-900/40 text-orange-600 dark:text-orange-400 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                                    >
+                                        <Camera size={14} /> Scan Plate
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        disabled={isSubmitting}
+                                        className="py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-orange-600/20 transition-all active:scale-95"
+                                    >
+                                        {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Car size={14} />}
+                                        Register Vehicle
+                                    </button>
+                                </div>
+                            </form>
+                        )}
                     </div>
                 </div>
 
-                {/* Recent Activity Table */}
-                <div className="glass-card overflow-hidden">
-                    <div className="px-6 py-4 border-b border-[var(--border-color)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div>
-                            <h4 className="font-bold text-[var(--text-primary)]">Recent Vehicle Logs</h4>
-                            <p className="text-xs text-[var(--text-secondary)] mt-1">
-                                {recentVehicles.filter(v => !v.exit_time).length} vehicles currently parked
-                            </p>
-                        </div>
-                        <div className="relative w-full sm:w-80">
-                            <input
-                                className="w-full pl-9 pr-4 py-2.5 rounded-lg text-sm bg-[var(--bg-primary)] border-2 border-[var(--border-color)] outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                                placeholder="🔍 Search by Plate Number (e.g., KCA 123A)"
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                            />
-                            <Search className="absolute left-3 top-3 text-gray-400" size={16} />
-                            {searchQuery && (
-                                <button
-                                    onClick={() => setSearchQuery('')}
-                                    className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                                >
-                                    <XCircle size={16} />
+                {/* RIGHT FEED: LIVE RESULT TERMINAL & COMPACT LIVE GATE LOGS (lg:col-span-7) */}
+                <div className="lg:col-span-7 flex flex-col gap-6">
+                    
+                    {/* Live Camera Feed / Result Container */}
+                    <div className={`glass-card p-6 min-h-[310px] flex flex-col justify-between ${scanStatus === 'scanning' ? 'bg-black border-slate-900' : ''}`}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className={`text-md font-black ${scanStatus === 'scanning' ? 'text-white' : 'text-slate-950 dark:text-white'}`}>
+                                {scanStatus === 'scanning' ? (scanMode === 'plate' ? 'Aligning License Plate' : 'Scanning Student QR Pass') : 'Verification Console'}
+                            </h3>
+                            {scanStatus === 'scanning' && (
+                                <button onClick={stopCamera} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-black">
+                                    STOP CAMERA
                                 </button>
                             )}
                         </div>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-[var(--bg-primary)] text-[var(--text-secondary)]">
-                                <tr>
-                                    <th className="px-6 py-3 font-medium">Plate Number</th>
-                                    <th className="px-6 py-3 font-medium">Driver</th>
-                                    <th className="px-6 py-3 font-medium">Vehicle</th>
-                                    <th className="px-6 py-3 font-medium">Entry Time</th>
-                                    <th className="px-6 py-3 font-medium">Exit Time</th>
-                                    <th className="px-6 py-3 font-medium text-center">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[var(--border-color)]">
-                                {recentVehicles.filter(log => {
-                                    if (!searchQuery) return true;
-                                    const q = searchQuery.toLowerCase();
-                                    return log.plate?.toLowerCase().includes(q) || log.driver_name?.toLowerCase().includes(q) || log.make?.toLowerCase().includes(q);
-                                }).length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <div className="flex flex-col items-center gap-3">
-                                                <Car className="text-gray-300" size={48} />
-                                                <div>
-                                                    <p className="font-bold text-[var(--text-primary)]">
-                                                        {searchQuery ? `No vehicles found matching "${searchQuery}"` : 'No vehicle activity yet'}
-                                                    </p>
-                                                    <p className="text-xs text-[var(--text-secondary)] mt-1">
-                                                        {searchQuery ? 'Try searching with a different plate number' : 'Vehicle entries will appear here'}
-                                                    </p>
+
+                        <div className="flex-1 flex items-center justify-center relative overflow-hidden rounded-2xl min-h-[220px]">
+                            {/* IDLE */}
+                            {scanStatus === 'idle' && (
+                                <div className="text-center text-slate-400">
+                                    <div className="w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-3">
+                                        <Scan size={24} className="opacity-40 animate-pulse text-indigo-500" />
+                                    </div>
+                                    <p className="text-xs font-bold">Awaiting QR scan or manual input verification...</p>
+                                </div>
+                            )}
+
+                            {/* SCANNING */}
+                            {scanStatus === 'scanning' && (
+                                <div className="w-full h-full relative flex flex-col items-center justify-center min-h-[240px]">
+                                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover absolute inset-0 rounded-2xl" />
+                                    
+                                    <div className="relative z-10 w-full max-w-xs aspect-video flex flex-col items-center justify-center p-2">
+                                        {scanMode === 'qr' ? (
+                                            <div id="gate-qr-reader" className="w-full h-full rounded-xl overflow-hidden border-4 border-indigo-500 shadow-[0_0_30px_rgba(99,102,241,0.4)]"></div>
+                                        ) : (
+                                            <div className="w-full h-full border-2 border-dashed border-orange-500 rounded-xl flex flex-col justify-between p-3 backdrop-blur-[1px] animate-pulse">
+                                                <div className="flex justify-between">
+                                                    <div className="w-6 h-6 border-l-4 border-t-4 border-orange-500 rounded-tl"></div>
+                                                    <div className="w-6 h-6 border-r-4 border-t-4 border-orange-500 rounded-tr"></div>
+                                                </div>
+                                                <div className="text-center">
+                                                    <div className="text-white font-black text-sm tracking-widest flex items-center justify-center gap-1.5">
+                                                        <Car size={16} className="text-orange-400" />
+                                                        DETECTOR ONLINE
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <div className="w-6 h-6 border-l-4 border-b-4 border-orange-500 rounded-bl"></div>
+                                                    <div className="w-6 h-6 border-r-4 border-b-4 border-orange-500 rounded-br"></div>
                                                 </div>
                                             </div>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    recentVehicles.filter(log => {
-                                        if (!searchQuery) return true;
-                                        const q = searchQuery.toLowerCase();
-                                        return log.plate?.toLowerCase().includes(q) || log.driver_name?.toLowerCase().includes(q) || log.make?.toLowerCase().includes(q);
-                                    }).slice(0, 50).map((log: any, i) => {
-                                        const isParked = !log.exit_time
-                                        const isSearchMatch = searchQuery && log.plate?.toLowerCase().includes(searchQuery.toLowerCase())
+                                        )}
+                                    </div>
 
-                                        return (
-                                            <tr
-                                                key={log.id || i}
-                                                onClick={() => setSelectedVehicleLog(log)}
-                                                className={`hover:bg-[var(--bg-primary)]/50 transition-all cursor-pointer group ${isSearchMatch ? 'bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-500' : ''
-                                                    } ${isParked ? 'border-l-4 border-l-green-500' : 'border-l-4 border-l-transparent'}`}
-                                            >
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-mono font-bold text-lg">{log.plate}</span>
-                                                        {isParked && (
-                                                            <span className="px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs font-bold rounded-full">
-                                                                PARKED
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-2.5">
-                                                    <div className="font-bold">{log.driver_name || 'Unknown'}</div>
-                                                    <div className="text-xs text-[var(--text-secondary)]">{log.driver_contact || log.role || ''}</div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[var(--text-primary)] font-medium">{log.make} {log.model}</span>
-                                                        <span className="text-xs text-[var(--text-secondary)]">{log.color !== 'Unknown' ? log.color : ''}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2 text-sm">
-                                                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                                        <span className="text-green-600 dark:text-green-400 font-medium whitespace-nowrap">{log.time}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {log.exit_time ? (
-                                                        <div className="flex items-center gap-2 text-sm">
-                                                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                                            <span className="text-red-600 dark:text-red-400 font-medium whitespace-nowrap">{log.exit_time}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-gray-400 italic text-sm">Still inside</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {!log.exit_time ? (
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleExit(log.plate); }}
-                                                            className={`w-full sm:w-auto px-4 py-2 rounded-lg text-sm font-bold uppercase transition-all shadow-md hover:shadow-lg ${isSearchMatch
-                                                                ? 'bg-red-600 text-white hover:bg-red-700 animate-pulse'
-                                                                : 'bg-red-100 text-red-600 hover:bg-red-200 opacity-0 group-hover:opacity-100 focus:opacity-100'
-                                                                }`}
-                                                        >
-                                                            🚗 Checkout
-                                                        </button>
-                                                    ) : (
-                                                        <div className="text-center">
-                                                            <span className="inline-flex items-center gap-1 text-gray-400 text-xs font-medium px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full">
-                                                                <BadgeCheck size={14} />
-                                                                COMPLETED
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        )
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            {/* Registered Vehicles Directory */}
-            <div className="bg-white dark:bg-[var(--bg-surface)] rounded-2xl p-6 shadow-sm border border-[var(--border-color)] mt-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h3 className="text-lg font-bold">Registered Vehicles Directory</h3>
-                        <p className="text-sm text-[var(--text-secondary)]">
-                            {registeredVehicles.length} vehicles found in database
-                        </p>
-                    </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="text-xs text-[var(--text-secondary)] border-b border-[var(--border-color)]">
-                                <th className="py-3 px-4 font-semibold uppercase tracking-wider">Plate Number</th>
-                                <th className="py-3 px-4 font-semibold uppercase tracking-wider">Vehicle</th>
-                                <th className="py-3 px-4 font-semibold uppercase tracking-wider">Driver Details</th>
-                            </tr>
-                        </thead>
-                        <tbody className="text-sm">
-                            {registeredVehicles.length === 0 ? (
-                                <tr>
-                                    <td colSpan={3} className="py-8 text-center text-gray-400">
-                                        <div className="flex flex-col items-center">
-                                            <Car size={32} className="mb-2 opacity-20" />
-                                            <span>No registered vehicles found</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                registeredVehicles.map((vehicle, i) => (
-                                    <tr key={i} className="border-b border-[var(--border-color)] last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                        <td className="py-3 px-4 font-medium font-mono">{vehicle.plate_number}</td>
-                                        <td className="py-3 px-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-gray-300" />
-                                                <span>{vehicle.make} {vehicle.model}</span>
-                                                <span className="text-xs text-gray-400">({vehicle.color})</span>
-                                            </div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <div className="flex flex-col">
-                                                <span className="font-medium">{vehicle.driver_name || "Unknown"}</span>
-                                                <span className="text-xs text-gray-500">{vehicle.driver_contact || "-"}</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* View Record Modal */}
-            {selectedVehicleLog && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in relative">
-                        <button
-                            onClick={() => setSelectedVehicleLog(null)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-                        >
-                            <XCircle size={24} />
-                        </button>
-
-                        <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-[var(--text-primary)]">
-                            <Car className="text-blue-500" /> Vehicle Entry Details
-                        </h3>
-
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)]">
-                                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-2xl">
-                                    {selectedVehicleLog.driver_name ? selectedVehicleLog.driver_name[0] : (selectedVehicleLog.plate ? selectedVehicleLog.plate[0] : 'V')}
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-lg">{selectedVehicleLog.driver_name || 'Unknown Driver'}</h4>
-                                    <p className="text-sm text-[var(--text-secondary)]">{selectedVehicleLog.driver_contact || 'No Contact Info'}</p>
-                                    <p className="text-xs text-[var(--text-secondary)]">ID: {selectedVehicleLog.driver_id_number || selectedVehicleLog.role || '-'}</p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)]">
-                                    <p className="text-xs text-[var(--text-secondary)] uppercase font-bold mb-1">Plate Number</p>
-                                    <p className="font-mono font-bold text-xl">{selectedVehicleLog.plate}</p>
-                                </div>
-                                <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)]">
-                                    <p className="text-xs text-[var(--text-secondary)] uppercase font-bold mb-1">Vehicle</p>
-                                    <p className="font-medium text-sm">{selectedVehicleLog.make} {selectedVehicleLog.model}</p>
-                                    <p className="text-xs text-[var(--text-secondary)]">{selectedVehicleLog.color}</p>
-                                </div>
-                            </div>
-
-                            <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-[var(--text-secondary)]">Entry Time</span>
-                                    <span className="font-bold font-mono text-green-600">{selectedVehicleLog.time}</span>
-                                </div>
-                                <div className="flex justify-between items-center pt-2 border-t border-[var(--border-color)]">
-                                    <span className="text-sm text-[var(--text-secondary)]">Exit Time</span>
-                                    {selectedVehicleLog.exit_time ? (
-                                        <span className="font-bold font-mono text-red-600">{selectedVehicleLog.exit_time}</span>
-                                    ) : (
-                                        <span className="text-sm italic text-gray-400">Still Inside</span>
+                                    {scanMode === 'plate' && (
+                                        <button 
+                                            onClick={captureAndProcess}
+                                            className="absolute bottom-4 px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-black shadow-lg flex items-center gap-1.5 transition-all active:scale-95 z-20"
+                                        >
+                                            <Camera size={14} /> CAPTURE & PROCESS
+                                        </button>
                                     )}
                                 </div>
-                                <div className="flex justify-between items-center pt-2 border-t border-[var(--border-color)]">
-                                    <span className="text-sm text-[var(--text-secondary)]">Visit Count</span>
-                                    <span className="font-bold bg-blue-100 text-blue-700 px-2 rounded-full text-xs">#{selectedVehicleLog.entry_count || 1}</span>
-                                </div>
-                            </div>
+                            )}
 
-                            {!selectedVehicleLog.exit_time && (
-                                <button
-                                    onClick={() => {
-                                        handleExit(selectedVehicleLog.plate);
-                                        setSelectedVehicleLog(null);
-                                    }}
-                                    className="w-full py-3 bg-red-50 text-red-600 border border-red-200 rounded-xl font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    MARK AS EXITED
-                                </button>
+                            {/* SUCCESS */}
+                            {scanStatus === 'success' && lastScan && (
+                                <div className="text-center animate-fade-in w-full py-4">
+                                    <div className="flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-full border-4 border-emerald-500 p-0.5 shadow-lg overflow-hidden bg-white mb-3">
+                                            <img src={lastScan.image || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"} className="w-full h-full object-cover rounded-full bg-slate-50" alt="Avatar" />
+                                        </div>
+                                        
+                                        <div className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider mb-2">
+                                            <BadgeCheck size={12} /> Access Authorized
+                                        </div>
+                                        
+                                        <h4 className="text-2xl font-black text-slate-900 dark:text-white mb-0.5">{lastScan.name}</h4>
+                                        <p className="text-xs font-bold text-slate-500">{lastScan.role}</p>
+                                        <p className="text-[10px] text-slate-400 mt-1 font-mono">Timestamp: {lastScan.time}</p>
+
+                                        <button 
+                                            onClick={() => setScanStatus('idle')} 
+                                            className="mt-5 px-5 py-2 bg-slate-50 dark:bg-slate-800 text-[10px] font-black uppercase text-slate-500 hover:text-indigo-600 rounded-xl transition-all active:scale-95 flex items-center gap-1"
+                                        >
+                                            <RefreshCw size={10} /> Scan Next Pass
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* REJECTED */}
+                            {scanStatus === 'rejected' && (
+                                <div className="text-center animate-fade-in w-full py-4">
+                                    <div className="flex flex-col items-center">
+                                        <div className="w-20 h-20 rounded-full border-4 border-red-500 bg-red-500/10 flex items-center justify-center shadow-lg mb-3">
+                                            <XCircle size={40} className="text-red-500 animate-bounce" />
+                                        </div>
+                                        
+                                        <div className="inline-flex items-center gap-1 bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider mb-2">
+                                            <ShieldAlert size={12} /> Entry Blocked
+                                        </div>
+                                        
+                                        <h4 className="text-2xl font-black text-red-600 dark:text-red-400 mb-0.5">{lastScan?.name || 'Access Denied'}</h4>
+                                        <p className="text-xs font-bold text-slate-400">Credentials Rejected or Suspended</p>
+                                        
+                                        <button 
+                                            onClick={() => setScanStatus('idle')} 
+                                            className="mt-5 px-5 py-2 bg-slate-50 dark:bg-slate-800 text-[10px] font-black uppercase text-slate-500 hover:text-indigo-600 rounded-xl transition-all active:scale-95 flex items-center gap-1"
+                                        >
+                                            <RefreshCw size={10} /> Try Again
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* COMPACT ACTIVE LOGS TERMINAL (Fits A4 layout perfectly!) */}
+                    <div className="glass-card p-5 space-y-4">
+                        <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+                            <div>
+                                <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Active Campus Entries</h4>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase">{currentInsideToday} units registered inside main campus</p>
+                            </div>
+                            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black">LIVE</span>
+                        </div>
+
+                        {/* HIGH DENSITY LIST FEED */}
+                        <div className="space-y-3.5 max-h-[220px] overflow-y-auto pr-1">
+                            {/* Merge and sort active vehicle and guest logs */}
+                            {recentVehicles.filter(v => !v.exit_time).slice(0, 4).map((log, idx) => (
+                                <div key={`v-${idx}`} className="p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/80 rounded-2xl flex items-center justify-between hover:shadow-sm transition-all group">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><Car size={18} /></div>
+                                        <div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-mono font-black text-sm text-slate-900 dark:text-white">{log.plate}</span>
+                                                <span className="px-2 py-0.5 bg-orange-50 text-orange-600 text-[8px] font-black rounded uppercase">VEHICLE</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 font-bold">{log.driver_name || 'Guest Driver'} • 🕒 {new Date(log.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => handleVehicleExit(log.plate)}
+                                        className="px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-black rounded-xl text-[10px] uppercase shadow-sm transition-all active:scale-95"
+                                    >
+                                        Checkout 🚗
+                                    </button>
+                                </div>
+                            ))}
+
+                            {recentVisitors.filter(v => v.status === 'checked_in').slice(0, 4).map((visitor, idx) => (
+                                <div key={`g-${idx}`} className="p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/80 rounded-2xl flex items-center justify-between hover:shadow-sm transition-all group">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center"><UserIcon size={18} /></div>
+                                        <div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-black text-sm text-slate-900 dark:text-white">{visitor.first_name} {visitor.last_name}</span>
+                                                <span className="px-2 py-0.5 bg-teal-50 text-teal-600 text-[8px] font-black rounded uppercase">VISITOR</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 font-bold">ID: {visitor.id_number} • 🕒 {new Date(visitor.time_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => handleVisitorCheckOut(visitor.id)}
+                                        className="px-3.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-black rounded-xl text-[10px] uppercase shadow-sm transition-all active:scale-95"
+                                    >
+                                        Checkout 👤
+                                    </button>
+                                </div>
+                            ))}
+
+                            {recentVehicles.filter(v => !v.exit_time).length === 0 && recentVisitors.filter(v => v.status === 'checked_in').length === 0 && (
+                                <div className="text-center py-6 text-slate-400">
+                                    <p className="text-xs font-bold italic">No active guests or vehicles currently inside campus.</p>
+                                </div>
                             )}
                         </div>
                     </div>
                 </div>
-            )}
+            </div>
 
-            {/* Manual Vehicle Modal (Existing code follows) */}
-            {showManualVehicle && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-xl shadow-2xl animate-fade-in relative border border-white/20">
-                        <button
-                            onClick={() => setShowManualVehicle(false)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-                        >
-                            <XCircle size={24} />
-                        </button>
+            {/* 3. MODAL DRAWER: VEHICLES DIRECTORY */}
+            {showVehiclesModal && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-4xl shadow-2xl relative flex flex-col h-[550px] border border-slate-100 dark:border-slate-800">
+                        <button onClick={() => setShowVehiclesModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 z-10 p-1.5 bg-slate-50 dark:bg-slate-800 rounded-full shadow-sm"><XCircle size={20} /></button>
+                        
+                        <div className="mb-4">
+                            <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                                <Car className="text-indigo-600" />
+                                Registered Vehicles Directory
+                            </h3>
+                            <p className="text-xs text-slate-400 font-bold uppercase">{registeredVehicles.length} vehicles registered in system</p>
+                        </div>
 
-                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-[var(--text-primary)]">
-                            <Car className="text-blue-500" /> Manual Vehicle Log
-                        </h3>
+                        {/* Search in Modal */}
+                        <div className="mb-4 relative">
+                            <input 
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                placeholder="Search plate, vehicle model, or driver name..."
+                                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 text-xs font-bold rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/20"
+                            />
+                            <Search className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
+                        </div>
 
-                        <div className="space-y-5">
-                            <div className="relative">
-                                <label className="block text-xs font-bold uppercase text-[var(--text-secondary)] mb-1">Number Plate</label>
-                                <input
-                                    className="w-full p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] text-[var(--text-primary)] uppercase font-mono text-xl font-bold tracking-wider outline-none focus:border-blue-500 transition-colors"
-                                    placeholder="KCA 123B"
-                                    value={manualPlate}
-                                    onChange={e => handlePlateSearch(e.target.value)}
-                                    autoFocus
-                                />
-                                {plateSuggestions.length > 0 && (
-                                    <div className="absolute z-20 w-full mt-2 bg-white dark:bg-gray-800 border border-[var(--border-color)] rounded-xl shadow-2xl max-h-60 overflow-y-auto transform translate-y-0">
-                                        {plateSuggestions.map((v: any) => (
-                                            <div key={v.id} onClick={() => selectSuggestion(v)} className="p-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer border-b border-[var(--border-color)] last:border-0 flex justify-between items-center group">
-                                                <div>
-                                                    <div className="font-bold text-lg font-mono">{v.plate_number}</div>
-                                                    <div className="text-xs text-[var(--text-secondary)]">{v.driver_name || 'No Driver Info'}</div>
-                                                </div>
-                                                <div className="text-xs font-bold text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">SELECT</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="md:col-span-2">
-                                    <label className="block text-xs font-bold uppercase text-[var(--text-secondary)] mb-1">Driver Name</label>
-                                    <input className="w-full p-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] outline-none focus:border-blue-500"
-                                        value={manualDriverName} onChange={e => setManualDriverName(e.target.value)} placeholder="Full Name" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold uppercase text-[var(--text-secondary)] mb-1">Contact</label>
-                                    <input className="w-full p-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] outline-none focus:border-blue-500"
-                                        value={manualDriverContact} onChange={e => setManualDriverContact(e.target.value)} placeholder="Phone Number" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold uppercase text-[var(--text-secondary)] mb-1">ID Number</label>
-                                    <input className="w-full p-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] outline-none focus:border-blue-500"
-                                        value={manualDriverId} onChange={e => setManualDriverId(e.target.value)} placeholder="National ID" />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold uppercase text-[var(--text-secondary)] mb-1">Passengers</label>
-                                <div className="flex items-center gap-4">
-                                    <button onClick={() => setManualPassengers(Math.max(1, manualPassengers - 1))} className="w-12 h-12 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] font-bold text-xl hover:bg-gray-100">-</button>
-                                    <span className="flex-1 text-center font-bold text-2xl">{manualPassengers}</span>
-                                    <button onClick={() => setManualPassengers(manualPassengers + 1)} className="w-12 h-12 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] font-bold text-xl hover:bg-gray-100">+</button>
-                                </div>
-                            </div>
-
-                            <button onClick={submitManualVehicle} disabled={!manualPlate.trim()} className="w-full py-4 mt-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold shadow-lg hover:shadow-blue-500/25 transition-all hover:scale-[1.02]">
-                                {manualDriverName ? 'LOG ENTRY & UPDATE RECORD' : 'LOG VEHICLE ENTRY'}
-                            </button>
+                        <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-50 dark:border-slate-800">
+                            <table className="w-full text-left text-xs">
+                                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 sticky top-0 uppercase tracking-wider font-bold">
+                                    <tr>
+                                        <th className="p-3">Plate Number</th>
+                                        <th className="p-3">Vehicle details</th>
+                                        <th className="p-3">Driver details</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {registeredVehicles.filter(v => {
+                                        if(!searchQuery) return true;
+                                        const q = searchQuery.toLowerCase();
+                                        return v.plate_number?.toLowerCase().includes(q) || v.driver_name?.toLowerCase().includes(q) || v.make?.toLowerCase().includes(q);
+                                    }).map((v, i) => (
+                                        <tr key={i} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors font-bold text-slate-700 dark:text-slate-300">
+                                            <td className="p-3 font-mono text-sm text-indigo-600 dark:text-indigo-400">{v.plate_number}</td>
+                                            <td className="p-3">{v.make} {v.model} <span className="text-[10px] text-slate-400 font-normal">({v.color})</span></td>
+                                            <td className="p-3">
+                                                <div>{v.driver_name || 'N/A'}</div>
+                                                <div className="text-[10px] text-slate-400 font-normal">{v.driver_contact || '-'}</div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {registeredVehicles.length === 0 && (
+                                        <tr>
+                                            <td colSpan={3} className="text-center p-8 text-slate-400 italic">No vehicles registered.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
             )}
-            {/* Event Visitor Registration Modal */}
+
+            {/* 4. MODAL DRAWER: HISTORY LOGS */}
+            {showLogsModal && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-5xl shadow-2xl relative flex flex-col h-[550px] border border-slate-100 dark:border-slate-800">
+                        <button onClick={() => setShowLogsModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 z-10 p-1.5 bg-slate-50 dark:bg-slate-800 rounded-full shadow-sm"><XCircle size={20} /></button>
+                        
+                        <div className="mb-4">
+                            <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                                <ClipboardList className="text-indigo-600" />
+                                Gate Entry Logs History
+                            </h3>
+                            <p className="text-xs text-slate-400 font-bold uppercase">Comprehensive activity logs record</p>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-50 dark:border-slate-800">
+                            <table className="w-full text-left text-xs font-bold">
+                                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 sticky top-0 uppercase tracking-wider font-bold">
+                                    <tr>
+                                        <th className="p-3">Type</th>
+                                        <th className="p-3">Identifier</th>
+                                        <th className="p-3">Subject / Driver</th>
+                                        <th className="p-3">Entry Time</th>
+                                        <th className="p-3">Exit Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {recentVehicles.map((log, i) => (
+                                        <tr key={`vlog-${i}`} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 font-bold">
+                                            <td className="p-3"><span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[9px] rounded">VEHICLE</span></td>
+                                            <td className="p-3 font-mono text-indigo-600 dark:text-indigo-400">{log.plate}</td>
+                                            <td className="p-3">
+                                                <div>{log.driver_name || 'Visitor Driver'}</div>
+                                                <div className="text-[10px] text-slate-400 font-normal">{log.make} {log.model}</div>
+                                            </td>
+                                            <td className="p-3 text-emerald-600 font-mono">{new Date(log.entry_time).toLocaleString()}</td>
+                                            <td className="p-3 font-mono">
+                                                {log.exit_time ? (
+                                                    <span className="text-red-600">{new Date(log.exit_time).toLocaleString()}</span>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">Inside</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {recentVisitors.map((visitor, i) => (
+                                        <tr key={`vis-${i}`} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 font-bold">
+                                            <td className="p-3"><span className="px-2 py-0.5 bg-teal-100 text-teal-700 text-[9px] rounded">VISITOR</span></td>
+                                            <td className="p-3 font-mono">{visitor.id_number}</td>
+                                            <td className="p-3">
+                                                <div>{visitor.first_name} {visitor.last_name}</div>
+                                                <div className="text-[10px] text-slate-400 font-normal">{visitor.visit_details}</div>
+                                            </td>
+                                            <td className="p-3 text-emerald-600 font-mono">{new Date(visitor.time_in).toLocaleString()}</td>
+                                            <td className="p-3 font-mono">
+                                                {visitor.time_out ? (
+                                                    <span className="text-red-600">{new Date(visitor.time_out).toLocaleString()}</span>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">Inside</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* EVENT VISITOR CHECK IN MODAL (EXISTING SUPPORT) */}
             {showEventModal && eventData && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[110] flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-fade-in relative">
-                        <button onClick={() => setShowEventModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[2010] flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-lg shadow-2xl relative border border-slate-100 dark:border-slate-800">
+                        <button onClick={() => setShowEventModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-900"><XCircle size={24} /></button>
 
                         <div className="mb-6 flex items-center gap-3">
-                            <div className="p-3 bg-purple-100 rounded-xl text-purple-600">
+                            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
                                 <Calendar size={24} />
                             </div>
                             <div>
-                                <h3 className="text-xl font-bold text-[var(--text-primary)]">Event Check-In</h3>
-                                <p className="text-sm text-[var(--text-secondary)]">{eventData.name}</p>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white">Special Event Check-In</h3>
+                                <p className="text-xs text-slate-500 font-bold">{eventData.name}</p>
                             </div>
                         </div>
 
                         {!eventData.is_active && (
-                            <div className="mb-4 p-3 bg-red-100 text-red-600 rounded-lg text-sm font-bold flex items-center gap-2">
-                                <ShieldAlert size={16} /> Event is closed!
+                            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-xl text-xs font-bold flex items-center gap-2">
+                                <ShieldAlert size={14} /> This event is officially closed.
                             </div>
                         )}
 
                         <form onSubmit={async (e) => {
-                            e.preventDefault();
+                            e.preventDefault()
                             try {
                                 const token = localStorage.getItem('token')
                                 const res = await fetch(`/api/events/${eventData.event_id}/register-visitor`, {
@@ -1177,60 +1139,61 @@ export default function GateControl() {
                                     })
                                 })
                                 if (res.ok) {
-                                    alert("Visitor Checked In Successfully! ✅");
-                                    setShowEventModal(false);
-                                    setVisitorForm({ name: '', id: '', phone: '' });
-                                    setScanStatus('success');
+                                    showNotification("Guest Checked In to Event!", "success")
+                                    setShowEventModal(false)
+                                    setVisitorForm({ name: '', id: '', phone: '', details: '' })
+                                    setScanStatus('success')
                                     setLastScan({
                                         name: visitorForm.name,
                                         role: `Visitor - ${eventData.name}`,
                                         time: new Date().toLocaleTimeString(),
-                                        image: "https://cdn-icons-png.flaticon.com/512/3202/3202926.png" // Fallback
+                                        image: "https://cdn-icons-png.flaticon.com/512/3202/3202926.png"
                                     })
+                                    refreshData()
                                 } else {
-                                    alert("Check-in Failed");
+                                    showNotification("Check-in Failed", "error")
                                 }
-                            } catch (err) { console.error(err); alert("Network Error"); }
-                        }} className="space-y-4">
+                            } catch (err) { showNotification("Network Error", "error") }
+                        }} className="space-y-4 font-bold text-xs">
                             <div>
-                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-1">Visitor Name</label>
-                                <input required value={visitorForm.name} onChange={e => setVisitorForm({ ...visitorForm, name: e.target.value })} className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)]" placeholder="Full Name" />
+                                <label className="block text-slate-400 mb-1">Visitor Full Name</label>
+                                <input required value={visitorForm.name} onChange={e => setVisitorForm({ ...visitorForm, name: e.target.value })} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none" placeholder="Full Name" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-bold text-[var(--text-primary)] mb-1">ID / Admission No</label>
-                                    <input required value={visitorForm.id} onChange={e => setVisitorForm({ ...visitorForm, id: e.target.value })} className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)]" placeholder="ID Number" />
+                                    <label className="block text-slate-400 mb-1">ID Number</label>
+                                    <input required value={visitorForm.id} onChange={e => setVisitorForm({ ...visitorForm, id: e.target.value })} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none" placeholder="ID Number" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-[var(--text-primary)] mb-1">Phone Number</label>
-                                    <input required value={visitorForm.phone} onChange={e => setVisitorForm({ ...visitorForm, phone: e.target.value })} className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)]" placeholder="0712345678" />
+                                    <label className="block text-slate-400 mb-1">Phone Number</label>
+                                    <input required value={visitorForm.phone} onChange={e => setVisitorForm({ ...visitorForm, phone: e.target.value })} className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none" placeholder="Phone Number" />
                                 </div>
                             </div>
 
-                            <button type="submit" className="w-full py-4 bg-[image:var(--gradient-primary)] text-white font-bold rounded-xl shadow-lg mt-4" disabled={!eventData.is_active}>
-                                Register Entry
+                            <button type="submit" className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-lg mt-4 transition-all active:scale-95" disabled={!eventData.is_active}>
+                                Register Event Guest Entry
                             </button>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* Permission Request Modal */}
+            {/* CAMERA PERMISSION MODAL */}
             {showPermissionModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 w-full max-w-sm text-center shadow-2xl animate-fade-in">
-                        <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Camera size={40} className="text-red-600 dark:text-red-400" />
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[2010] flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl border border-slate-100 dark:border-slate-800">
+                        <div className="w-16 h-16 bg-red-100 dark:bg-red-950/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Camera size={32} className="text-red-600 dark:text-red-400 animate-pulse" />
                         </div>
 
-                        <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">
+                        <h3 className="text-lg font-black text-slate-950 dark:text-white mb-2">
                             {permissionError === 'denied' ? 'Camera Access Denied' : 'Camera Access Needed'}
                         </h3>
 
-                        <p className="text-gray-600 dark:text-gray-300 mb-8">
+                        <p className="text-xs text-slate-500 mb-6 leading-relaxed">
                             {permissionError === 'denied'
-                                ? "It looks like you denied camera access. Please reset permissions in your browser settings to continue."
-                                : "We need access to your camera to scan QR codes and Number Plates."
+                                ? "It looks like camera access was denied. Please reset browser permission flags for this campus site to continue scanner operations."
+                                : "We need access to your camera to scan QR codes and read license plates."
                             }
                         </p>
 
@@ -1238,31 +1201,19 @@ export default function GateControl() {
                             {permissionError !== 'denied' && (
                                 <button
                                     onClick={() => startCamera(scanMode || 'qr')}
-                                    className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-primary-600/30 transition-all active:scale-95"
+                                    className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs shadow-md transition-all active:scale-95"
                                 >
-                                    Allow Camera
+                                    Enable Camera
                                 </button>
                             )}
 
                             <button
                                 onClick={() => setShowPermissionModal(false)}
-                                className="w-full py-3 text-gray-500 font-bold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
+                                className="w-full py-3 text-slate-400 font-bold hover:bg-slate-50 rounded-xl text-xs transition-colors"
                             >
-                                Cancel
+                                Close
                             </button>
                         </div>
-
-                        {permissionError === 'denied' && (
-                            <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-700/50 rounded-xl text-xs text-left text-gray-600 dark:text-gray-400">
-                                <p className="font-bold mb-1">How to enable:</p>
-                                <ul className="list-disc pl-4 space-y-1">
-                                    <li>Tap the lock icon 🔒 in address bar</li>
-                                    <li>Site Settings / Permissions</li>
-                                    <li>Allow Camera</li>
-                                    <li>Reload Page</li>
-                                </ul>
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
