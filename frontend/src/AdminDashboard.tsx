@@ -3,7 +3,7 @@ import {
     Users, Car, Shield, Activity, Calendar, LayoutDashboard, 
     ArrowUpRight, ArrowDownRight, FileText, Database, 
     TrendingUp, ShieldCheck, AlertTriangle, ChevronRight, Bus,
-    CheckCircle2, Clock, MapPin, Search
+    CheckCircle2, Clock, MapPin, Search, Phone, X
 } from 'lucide-react';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
@@ -17,6 +17,7 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
     const [analytics, setAnalytics] = useState<any>({ roles: [], gates: [] });
     const [liveStats, setLiveStats] = useState<any>(null);
     const [syncingAD, setSyncingAD] = useState(false);
+    const [showActiveTrips, setShowActiveTrips] = useState(false);
 
     const fetchDashboardData = async () => {
         try {
@@ -125,13 +126,45 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
                             <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><Car size={20} /></div>
                         </div>
                     </div>
-                    <div className="glass-card p-5 border-l-4 border-orange-500">
+                    <div 
+                        onClick={() => {
+                            if (liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0) {
+                                setShowActiveTrips(true);
+                            }
+                        }}
+                        className={`glass-card p-5 border-l-4 border-orange-500 relative transition-all ${
+                            liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0 
+                                ? 'cursor-pointer hover:shadow-xl hover:scale-[1.02] bg-gradient-to-br from-white to-orange-50/10' 
+                                : ''
+                        }`}
+                    >
                         <div className="flex justify-between items-start mb-2">
                             <div>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fleet Active</p>
-                                <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{liveStats.fleet.buses_inside}</p>
+                                <div className="flex items-center gap-1.5">
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fleet Active</p>
+                                    {liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0 && (
+                                        <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" title="Ongoing Trip Active" />
+                                    )}
+                                </div>
+                                <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">
+                                    {liveStats.fleet.buses_on_trip || 0} <span className="text-xs text-gray-400 font-bold">On Trip</span>
+                                </p>
+                                {liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0 && (
+                                    <p className="text-[10px] font-bold text-orange-600 animate-pulse mt-0.5">Click to view details</p>
+                                )}
                             </div>
-                            <div className="p-2 bg-orange-50 rounded-lg text-orange-600"><Bus size={20} /></div>
+                            <div className={`p-2.5 rounded-xl transition-all ${
+                                liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0 
+                                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' 
+                                    : 'bg-orange-50 text-orange-600'
+                            }`}
+                            style={
+                                liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0 
+                                    ? { animation: 'pulse-bus 2s infinite' } 
+                                    : {}
+                            }>
+                                <Bus size={20} />
+                            </div>
                         </div>
                     </div>
                     <div className="glass-card p-5 border-l-4 border-purple-500">
@@ -302,8 +335,106 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
                         </div>
                     </div>
                 </div>
-
             </div>
+
+            {/* Active Trips Details Modal */}
+            {showActiveTrips && liveStats?.fleet?.active_trips && (
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in text-left">
+                    <style>{`
+                        @keyframes pulse-bus {
+                            0%, 100% {
+                                transform: scale(1);
+                                box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7);
+                            }
+                            50% {
+                                transform: scale(1.08);
+                                box-shadow: 0 0 0 8px rgba(249, 115, 22, 0);
+                            }
+                        }
+                    `}</style>
+                    <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 w-full max-w-lg shadow-2xl relative border border-gray-100 dark:border-gray-800 animate-slide-up max-h-[90vh] overflow-y-auto">
+                        <button 
+                            onClick={() => setShowActiveTrips(false)} 
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-50 dark:bg-gray-800 rounded-full p-2 transition-all"
+                        >
+                            <X size={18} />
+                        </button>
+                        
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-3 bg-orange-500 text-white rounded-2xl shadow-lg shadow-orange-500/20">
+                                <Bus size={24} className="animate-pulse" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-black text-gray-900 dark:text-white">Active Fleet Movements</h3>
+                                <p className="text-xs text-orange-600 font-bold animate-pulse">Real-Time Campus Transit Tracking</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            {liveStats.fleet.active_trips.map((trip: any, idx: number) => (
+                                <div key={trip.id || idx} className="p-5 bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                    {/* Large Passenger Bus Graphic */}
+                                    <div className="relative flex flex-col items-center justify-center bg-orange-50 dark:bg-orange-950/20 p-6 rounded-2xl border border-orange-100/55 dark:border-orange-950/30 mb-5">
+                                        <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 to-transparent animate-pulse" />
+                                        <div className="relative">
+                                            <Bus size={64} className="text-orange-500 animate-bounce" style={{ animationDuration: '2.5s' }} />
+                                            <div className="absolute -top-2 -right-6 bg-orange-600 text-white text-xs font-black px-3 py-1 rounded-full border-2 border-white dark:border-gray-900 shadow-lg flex items-center gap-1.5 animate-pulse">
+                                                <Users size={12} />
+                                                <span>{trip.passenger_count} Passengers</span>
+                                            </div>
+                                        </div>
+                                        <span className="text-[10px] font-black text-orange-700 dark:text-orange-400 uppercase tracking-widest mt-4">Capacity Load Active</span>
+                                    </div>
+
+                                    {/* Trip Detail Block */}
+                                    <div className="space-y-4">
+                                        <div>
+                                            <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                                                ONGOING TRIP
+                                            </span>
+                                            <h4 className="text-base font-black text-gray-900 dark:text-white mt-2 flex items-center gap-2 flex-wrap">
+                                                {trip.origin} 
+                                                <ChevronRight size={14} className="text-gray-400 shrink-0" /> 
+                                                <span className="text-orange-600">{trip.destination}</span>
+                                            </h4>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-bold">Purpose: {trip.purpose}</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+                                            {/* Driver Details */}
+                                            <div className="p-3 bg-white dark:bg-gray-800/80 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Driver Details</p>
+                                                <p className="text-xs font-extrabold text-gray-800 dark:text-gray-200">{trip.driver_name}</p>
+                                                <a 
+                                                    href={`tel:${trip.driver_contact}`} 
+                                                    className="inline-flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline mt-1 font-bold"
+                                                >
+                                                    <Phone size={10} />
+                                                    {trip.driver_contact}
+                                                </a>
+                                            </div>
+
+                                            {/* Trip Lead Details */}
+                                            <div className="p-3 bg-white dark:bg-gray-800/80 rounded-xl border border-gray-100 dark:border-gray-700/50">
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">Trip Lead</p>
+                                                <p className="text-xs font-extrabold text-gray-800 dark:text-gray-200">{trip.trip_lead_name}</p>
+                                                <a 
+                                                    href={`tel:${trip.trip_lead_contact}`} 
+                                                    className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline mt-1 font-bold"
+                                                >
+                                                    <Phone size={10} />
+                                                    {trip.trip_lead_contact}
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }

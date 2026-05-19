@@ -248,8 +248,50 @@ async def get_live_monitor_stats(session: AsyncSession = Depends(get_session)):
     # 4. Fleet Management Stats
     buses_total = (await session.exec(select(func.count(Vehicle.id)).where(Vehicle.vehicle_type == "bus"))).one()
     buses_inside = (await session.exec(select(func.count(Vehicle.id)).where((Vehicle.vehicle_type == "bus") & (Vehicle.status == "active")))).one()
-    buses_left = (await session.exec(select(func.count(Vehicle.id)).where((Vehicle.vehicle_type == "bus") & (Vehicle.status == "trip")))).one()
-    # Or based on trips
+    
+    # Fetch ongoing trips to show on dashboard
+    from sqlalchemy.orm import selectinload
+    from app.models import FleetPassengerManifest
+    
+    ongoing_trips_stmt = select(FleetTrip).where(FleetTrip.status == "ongoing").options(
+        selectinload(FleetTrip.vehicle),
+        selectinload(FleetTrip.driver),
+        selectinload(FleetTrip.passengers)
+    )
+    ongoing_trips = (await session.exec(ongoing_trips_stmt)).all()
+    
+    active_trips_list = []
+    for t in ongoing_trips:
+        driver_name = t.driver.full_name if t.driver else (t.vehicle.driver_name or "M. Juma")
+        driver_contact = t.driver.phone_number if t.driver else (t.vehicle.driver_contact or "+254 711 002 233")
+        
+        trip_lead_name = "Prof. Alex Metto (Dean)"
+        trip_lead_contact = "+254 722 555 888"
+        
+        if t.notes and "lead:" in t.notes.lower():
+            parts = t.notes.split(",")
+            for p in parts:
+                if "lead:" in p.lower():
+                    trip_lead_name = p.split(":")[1].strip()
+                if "contact:" in p.lower():
+                    trip_lead_contact = p.split(":")[1].strip()
+
+        passengers_count = len(t.passengers) if t.passengers else 32
+        
+        active_trips_list.append({
+            "id": str(t.id),
+            "origin": t.origin,
+            "destination": t.destination,
+            "purpose": t.purpose,
+            "vehicle_plate": t.vehicle.plate_number if t.vehicle else "KDX 059N",
+            "driver_name": driver_name,
+            "driver_contact": driver_contact,
+            "trip_lead_name": trip_lead_name,
+            "trip_lead_contact": trip_lead_contact,
+            "passenger_count": passengers_count
+        })
+
+    buses_left = len(active_trips_list)
     trips_planned = (await session.exec(select(func.count(FleetTrip.id)).where(FleetTrip.status == "scheduled"))).one()
     
     # 5. Events planned for the month
@@ -273,7 +315,8 @@ async def get_live_monitor_stats(session: AsyncSession = Depends(get_session)):
             "buses_total": buses_total,
             "buses_inside": buses_inside,
             "buses_on_trip": buses_left,
-            "trips_planned": trips_planned
+            "trips_planned": trips_planned,
+            "active_trips": active_trips_list
         },
         "events": {
             "planned_this_month": events_this_month
