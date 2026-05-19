@@ -855,15 +855,10 @@ function App() {
                                     <div className="hidden xl:flex items-center gap-1 ml-4 p-1 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800/30 overflow-x-auto max-w-[800px] scrollbar-hide">
                                         <div className="px-2 text-[10px] font-black text-green-600 uppercase tracking-widest flex-shrink-0">Admin</div>
                                         {[
-                                            { id: 'settings', label: 'General', icon: Settings },
-                                            { id: 'bulk', label: 'Data', icon: Database },
                                             { id: 'company-settings', label: 'Company', icon: Building2 },
-                                            { id: 'ai-settings', label: 'AI', icon: Brain },
-                                            { id: 'dashboard-designer', label: 'Design', icon: Sliders },
-                                            { id: 'integrations', label: 'APIs', icon: Server },
                                             { id: 'audit', label: 'Logs', icon: History },
                                             { id: 'geofencing', label: 'Geofence', icon: Shield },
-                                            { id: 'calendar', label: 'Calendar', icon: Calendar }
+                                            { id: 'reports', label: 'Reports', icon: FileText }
                                         ].map(item => (
                                             <button
                                                 key={item.id}

@@ -135,3 +135,169 @@ async def get_security_flags(session: AsyncSession = Depends(get_session), user:
     )
     results = (await session.exec(query)).all()
     return [{"status": r[0], "count": r[1]} for r in results]
+
+from app.models import Vehicle
+
+@router.get("/detailed")
+async def get_detailed_report(
+    date: str = Query(None),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(ensure_admin)
+):
+    """Generate detailed daily reports containing scans, vehicles, and key metrics."""
+    if not date:
+        date_obj = datetime.utcnow().date()
+    else:
+        try:
+            date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    
+    start_dt = datetime.combine(date_obj, datetime.min.time())
+    end_dt = datetime.combine(date_obj, datetime.max.time())
+    
+    # 1. Fetch People Entry Logs for the given day
+    query_entries = (
+        select(EntryLog)
+        .where(EntryLog.entry_time >= start_dt, EntryLog.entry_time <= end_dt)
+        .order_by(EntryLog.entry_time.desc())
+    )
+    entries = (await session.exec(query_entries)).all()
+    
+    entry_list = []
+    for entry in entries:
+        user_obj = None
+        role_name = "User"
+        try:
+            user_stmt = select(User).where(User.id == entry.user_id)
+            user_res = await session.exec(user_stmt)
+            user_obj = user_res.first()
+            if user_obj:
+                role_stmt = select(Role).where(Role.id == user_obj.role_id)
+                role_res = await session.exec(role_stmt)
+                role_obj = role_res.first()
+                if role_obj:
+                    role_name = role_obj.name
+        except Exception as e:
+            print(f"Error loading user for entry: {e}")
+            
+        gate_name = "Unknown Gate"
+        try:
+            gate_stmt = select(Gate).where(Gate.id == entry.gate_id)
+            gate_res = await session.exec(gate_stmt)
+            gate_obj = gate_res.first()
+            if gate_obj:
+                gate_name = gate_obj.name
+        except Exception as e:
+            print(f"Error loading gate for entry: {e}")
+            
+        guard_name = "System"
+        try:
+            if entry.guard_id:
+                guard_stmt = select(User).where(User.id == entry.guard_id)
+                guard_res = await session.exec(guard_stmt)
+                guard_obj = guard_res.first()
+                if guard_obj:
+                    guard_name = guard_obj.full_name
+        except Exception as e:
+            print(f"Error loading guard for entry: {e}")
+            
+        entry_list.append({
+            "id": str(entry.id),
+            "name": user_obj.full_name if user_obj else "Unknown User",
+            "email": user_obj.email if user_obj else "-",
+            "role": role_name,
+            "gate": gate_name,
+            "entry_time": entry.entry_time.isoformat() if entry.entry_time else None,
+            "exit_time": entry.exit_time.isoformat() if entry.exit_time else None,
+            "method": entry.method,
+            "guard": guard_name,
+            "status": entry.status
+        })
+
+    # 2. Fetch Vehicle Scan Logs for the given day
+    query_vehicles = (
+        select(VehicleLog)
+        .where(VehicleLog.entry_time >= start_dt, VehicleLog.entry_time <= end_dt)
+        .order_by(VehicleLog.entry_time.desc())
+    )
+    vehicle_logs = (await session.exec(query_vehicles)).all()
+    
+    vehicle_list = []
+    for vlog in vehicle_logs:
+        vehicle_obj = None
+        try:
+            vehicle_stmt = select(Vehicle).where(Vehicle.id == vlog.vehicle_id)
+            vehicle_res = await session.exec(vehicle_stmt)
+            vehicle_obj = vehicle_res.first()
+        except Exception as e:
+            print(f"Error loading vehicle for log: {e}")
+            
+        gate_name = "Unknown Gate"
+        try:
+            gate_stmt = select(Gate).where(Gate.id == vlog.gate_id)
+            gate_res = await session.exec(gate_stmt)
+            gate_obj = gate_res.first()
+            if gate_obj:
+                gate_name = gate_obj.name
+        except Exception as e:
+            print(f"Error loading gate for vehicle: {e}")
+            
+        guard_name = "System"
+        try:
+            if vlog.guard_id:
+                guard_stmt = select(User).where(User.id == vlog.guard_id)
+                guard_res = await session.exec(guard_stmt)
+                guard_obj = guard_res.first()
+                if guard_obj:
+                    guard_name = guard_obj.full_name
+        except Exception as e:
+            print(f"Error loading guard for vehicle: {e}")
+            
+        vehicle_list.append({
+            "id": str(vlog.id),
+            "plate_number": vehicle_obj.plate_number if vehicle_obj else "Unknown Plate",
+            "driver_name": vehicle_obj.driver_name if vehicle_obj else "-",
+            "vehicle_type": vehicle_obj.vehicle_type if vehicle_obj else "utility",
+            "gate": gate_name,
+            "entry_time": vlog.entry_time.isoformat() if vlog.entry_time else None,
+            "exit_time": vlog.exit_time.isoformat() if vlog.exit_time else None,
+            "guard": guard_name
+        })
+
+    # 3. Calculate Daily Metrics Summary
+    total_people_in = len([e for e in entry_list if e["status"] == "allowed"])
+    total_people_out = len([e for e in entry_list if e["exit_time"] is not None])
+    total_students = len([e for e in entry_list if e["role"].lower() == "student"])
+    total_rejected = len([e for e in entry_list if e["status"] == "rejected"])
+    
+    total_visitors = len([e for e in entry_list if e["role"].lower() not in ["student", "staff", "admin", "superadmin", "guard"]])
+    
+    total_vehicles = len(vehicle_list)
+    total_deliveries = len([v for v in vehicle_list if v["vehicle_type"].lower() in ["utility", "delivery"]])
+    
+    total_classes = 0
+    try:
+        class_stmt = select(func.count(ClassSession.id)).where(
+            func.date(ClassSession.start_time) == date_obj
+        )
+        class_res = await session.exec(class_stmt)
+        total_classes = class_res.one()
+    except Exception as e:
+        print(f"Error calculating classes: {e}")
+
+    return {
+        "date": date_obj.strftime("%Y-%m-%d"),
+        "metrics": {
+            "people_entered": total_people_in,
+            "people_exited": total_people_out,
+            "visitors_entered": total_visitors,
+            "rejected_attempts": total_rejected,
+            "vehicles_entered": total_vehicles,
+            "deliveries_logged": total_deliveries,
+            "classes_held": total_classes,
+            "students_entered": total_students
+        },
+        "entry_logs": entry_list,
+        "vehicle_logs": vehicle_list
+    }
