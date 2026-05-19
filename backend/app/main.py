@@ -383,33 +383,110 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
             )
         # ----------------------
 
-        print(f"Login Attempt: {form_data.username}")
+        print(f"Login Attempt (LDAP First): {form_data.username}")
         
-        # Query with eager loading of role relationship
-        query = select(User).where(
-            (User.email == form_data.username) | (User.admission_number == form_data.username)
-        ).options(selectinload(User.role))
-        
-        result = await session.exec(query)
-        user = result.first()
-        
-        if not user:
-            print(f"Login Failed: User {form_data.username} not found")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        # 1. Attempt LDAP verification first
+        ldap_user = None
+        try:
+            ldap_user = await verify_ldap_login(form_data.username, form_data.password, session)
+        except Exception as e:
+            print(f"LDAP login check error: {e}")
             
-        is_valid = verify_password(form_data.password, user.hashed_password)
+        user = None
         
-        if not is_valid:
-            print(f"Login Failed: Password incorrect for {form_data.username}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        if ldap_user:
+            print(f"LDAP Login Success for {form_data.username}")
+            ldap_email = ldap_user.get("email")
+            ldap_cn = ldap_user.get("name")
+            
+            # Check if local user exists via email or admission_number
+            query = select(User).where(
+                (User.email == ldap_email) | (User.admission_number == form_data.username)
+            ).options(selectinload(User.role))
+            result = await session.exec(query)
+            user = result.first()
+            
+            if not user:
+                print(f"Local user not found for LDAP login. Auto-provisioning {form_data.username}...")
+                
+                # Fetch detailed attributes if possible using LDAPClient
+                from app.utils.ldap import LDAPClient
+                configs = (await session.exec(select(SystemConfig))).all()
+                config_dict = {c.key: c.value for c in configs}
+                uri = config_dict.get('ldap_server_uri')
+                bind_dn = config_dict.get('ldap_bind_dn')
+                bind_password = config_dict.get('ldap_bind_password')
+                base_dn = config_dict.get('ldap_base_dn')
+                
+                ldap_details = None
+                if uri and base_dn:
+                    try:
+                        ldap_client = LDAPClient(uri, bind_dn if bind_dn else "", bind_password if bind_password else "", base_dn)
+                        ldap_details = ldap_client.get_user_by_id(form_data.username)
+                    except Exception as client_err:
+                        print(f"Could not fetch full LDAP details: {client_err}")
+                
+                full_name = ldap_details.get("full_name") if ldap_details else ldap_cn or form_data.username
+                email = ldap_details.get("email") if ldap_details else ldap_email or f"{form_data.username}@university.ac.ke"
+                school = ldap_details.get("school") if ldap_details else "General"
+                program = ldap_details.get("program") if ldap_details else None
+                phone_number = ldap_details.get("phone_number") if ldap_details else None
+                
+                # Fetch default Student role
+                role_stmt = select(Role).where(Role.name == "Student")
+                role = (await session.exec(role_stmt)).first()
+                if not role:
+                    role = Role(name="Student", description="Regular Student")
+                    session.add(role)
+                    await session.commit()
+                    await session.refresh(role)
+                
+                user = User(
+                    admission_number=form_data.username,
+                    full_name=full_name,
+                    email=email,
+                    school=school,
+                    program=program,
+                    phone_number=phone_number,
+                    role_id=role.id,
+                    status="active",
+                    hashed_password="LDAP_MANAGED"
+                )
+                session.add(user)
+                await session.commit()
+                
+                # Re-query user to get eager relationships
+                query = select(User).where(User.id == user.id).options(selectinload(User.role))
+                result = await session.exec(query)
+                user = result.first()
+                print(f"Auto-provisioned local user {user.full_name}")
+        else:
+            # 2. LDAP verification failed or wasn't configured: fallback to local database authentication
+            print(f"LDAP auth failed or not configured for {form_data.username}. Falling back to local DB auth.")
+            query = select(User).where(
+                (User.email == form_data.username) | (User.admission_number == form_data.username)
+            ).options(selectinload(User.role))
+            
+            result = await session.exec(query)
+            user = result.first()
+            
+            if not user:
+                print(f"Login Failed: User {form_data.username} not found locally or via LDAP")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect username or password",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+                
+            is_valid = verify_password(form_data.password, user.hashed_password)
+            
+            if not is_valid:
+                print(f"Login Failed: Password incorrect locally for {form_data.username}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Incorrect username or password",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
         
         # Get role name
         role_name = user.role.name if user.role else "student"
