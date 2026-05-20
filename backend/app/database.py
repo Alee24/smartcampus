@@ -103,6 +103,52 @@ async def migrate_fleet():
                     print(f"Adding column {col} to vehicles table...")
                     await conn.execute(text(f"ALTER TABLE vehicles ADD COLUMN {col} {type_}"))
             
+            print("Vehicles table migration checked/applied.")
+            
+            # Make driver_id nullable in fleet_trips
+            try:
+                print("Disabling foreign key checks for schema alter...")
+                await conn.execute(text("SET FOREIGN_KEY_CHECKS = 0;"))
+                await conn.execute(text("ALTER TABLE fleet_trips MODIFY driver_id CHAR(36) NULL;"))
+                print("Successfully made driver_id nullable.")
+            except Exception as e:
+                print("Error making driver_id nullable:", e)
+            finally:
+                try:
+                    await conn.execute(text("SET FOREIGN_KEY_CHECKS = 1;"))
+                except:
+                    pass
+
+            # Check columns for fleet_trips
+            def get_trip_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                return [c['name'] for c in inspector.get_columns('fleet_trips')]
+            
+            trip_cols = await conn.run_sync(get_trip_cols)
+            if "trip_lead_name" not in trip_cols:
+                print("Adding trip_lead_name column to fleet_trips...")
+                await conn.execute(text("ALTER TABLE fleet_trips ADD COLUMN trip_lead_name VARCHAR(255) NULL"))
+            if "trip_lead_contact" not in trip_cols:
+                print("Adding trip_lead_contact column to fleet_trips...")
+                await conn.execute(text("ALTER TABLE fleet_trips ADD COLUMN trip_lead_contact VARCHAR(255) NULL"))
+            print("fleet_trips table migration checked/applied.")
+
+            # Check columns for fleet_passenger_manifest
+            def get_passenger_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                return [c['name'] for c in inspector.get_columns('fleet_passenger_manifest')]
+            
+            pass_cols = await conn.run_sync(get_passenger_cols)
+            if "admission_number" not in pass_cols:
+                print("Adding admission_number column to fleet_passenger_manifest...")
+                await conn.execute(text("ALTER TABLE fleet_passenger_manifest ADD COLUMN admission_number VARCHAR(255) NULL"))
+            if "emergency_contact_phone" not in pass_cols:
+                print("Adding emergency_contact_phone column to fleet_passenger_manifest...")
+                await conn.execute(text("ALTER TABLE fleet_passenger_manifest ADD COLUMN emergency_contact_phone VARCHAR(255) NULL"))
+            print("fleet_passenger_manifest table migration checked/applied.")
+            
             print("Fleet migration checked/applied.")
     except Exception as e:
         print(f"Fleet migration skipped/failed: {e}")
