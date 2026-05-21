@@ -3,7 +3,7 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Install system dependencies for MySQL and standard libraries
-RUN apt-get update && apt-get install -y \
+RUN (apt-get update || apt-get update --fix-missing) && apt-get install -y --no-install-recommends \
     libmariadb-dev \
     gcc \
     curl \
