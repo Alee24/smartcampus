@@ -66,7 +66,7 @@ export default function BulkUpload() {
             endpoint: 'students',
             icon: <Users size={24} />,
             color: 'bg-blue-500',
-            example: 'admission_number,first_name,last_name,email,school,status,phone_number,profile_image\nSTD202,Jane,Doe,jane@example.com,ICT,Active,+254711223344,/static/profiles/jane.jpg\n\nOptions: Active, Graduated, Suspended, Registered, Deferred',
+            example: 'admission_number,full_name,first_name,last_name,email,school,status,phone_number,profile_image,role\nSTD202,Jane Doe,Jane,Doe,jane@example.com,ICT,Active,+254711223344,/static/profiles/jane.jpg,Student\n\nOptions: Active, Graduated, Suspended, Registered, Deferred',
             status: 'pending'
         },
         {

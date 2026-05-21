@@ -158,7 +158,7 @@ async def get_vehicles(session: AsyncSession = Depends(get_session)):
         for v in vehicles
     ]
 
-@router.post("/vehicles", response_model=Vehicle)
+@router.post("/vehicles", response_model=VehicleResponse)
 async def create_vehicle(
     request: Request,
     vehicle_data: VehicleCreate,
@@ -198,7 +198,27 @@ async def create_vehicle(
             new_values={"plate_number": vehicle.plate_number, "make": vehicle.make, "model": vehicle.model, "type": vehicle.vehicle_type},
             request=request
         )
-        return vehicle
+        # Return safe dict instead of SQLModel object to avoid async lazy-load errors on relationships
+        return VehicleResponse(
+            id=vehicle.id,
+            plate_number=vehicle.plate_number,
+            make=vehicle.make,
+            model=vehicle.model,
+            color=vehicle.color,
+            driver_name=vehicle.driver_name,
+            driver_contact=vehicle.driver_contact,
+            driver_id_number=vehicle.driver_id_number,
+            owner_id=vehicle.owner_id,
+            vehicle_type=vehicle.vehicle_type,
+            fuel_type=vehicle.fuel_type,
+            fuel_capacity=vehicle.fuel_capacity,
+            engine_number=vehicle.engine_number,
+            chassis_number=vehicle.chassis_number,
+            year=vehicle.year,
+            status=vehicle.status,
+            current_odometer=vehicle.current_odometer,
+            is_checked_in=False
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -1066,15 +1086,64 @@ async def get_fleet_stats(session: AsyncSession = Depends(get_session)):
         total_vehicles = (await session.exec(select(func.count(Vehicle.id)))).first() or 0
         active_trips = (await session.exec(select(func.count(FleetTrip.id)).where(FleetTrip.status == "ongoing"))).first() or 0
         maintenance_due = (await session.exec(select(func.count(Vehicle.id)).where(Vehicle.status == "maintenance"))).first() or 0
+
+        # Buses currently checked IN (open VehicleLog with no exit_time)
+        buses_in = (await session.exec(
+            select(func.count(VehicleLog.id)).where(VehicleLog.exit_time == None)
+        )).first() or 0
+        # Buses currently OUT (total minus checked in)
+        buses_out = max(0, total_vehicles - buses_in)
+
+        # Total students who have been on any trip (total passenger manifest entries)
+        total_students = (await session.exec(select(func.count(FleetPassengerManifest.id)))).first() or 0
+
+        # Total completed trips
+        total_trips = (await session.exec(select(func.count(FleetTrip.id)))).first() or 0
+
+        # Fuel costs and usage
+        fuel_spend_raw = (await session.exec(select(func.sum(FleetFuelLog.cost)))).first()
+        fuel_spend = float(fuel_spend_raw) if fuel_spend_raw else 0.0
+
         fuel_usage_raw = (await session.exec(select(func.sum(FleetFuelLog.amount_liters)))).first()
         fuel_usage = float(fuel_usage_raw) if fuel_usage_raw else 0.0
+
+        # Maintenance costs
+        maint_spend_raw = (await session.exec(select(func.sum(FleetMaintenanceLog.cost)))).first()
+        maint_spend = float(maint_spend_raw) if maint_spend_raw else 0.0
+
+        total_spend = fuel_spend + maint_spend
+
+        # Last maintenance record
+        last_maint = (await session.exec(
+            select(FleetMaintenanceLog).order_by(FleetMaintenanceLog.service_date.desc()).limit(1)
+        )).first()
+
+        last_maintenance_info = None
+        if last_maint:
+            v = await session.get(Vehicle, last_maint.vehicle_id)
+            last_maintenance_info = {
+                "vehicle": v.plate_number if v else "Unknown",
+                "service_type": last_maint.service_type,
+                "description": last_maint.description,
+                "date": last_maint.service_date.isoformat() if last_maint.service_date else None,
+                "cost": last_maint.cost,
+                "performed_by": last_maint.performed_by or "N/A"
+            }
 
         return {
             "total_vehicles": total_vehicles,
             "active_trips": active_trips,
             "maintenance_due": maintenance_due,
             "active_drivers": 0,
-            "fuel_usage": round(fuel_usage, 2)
+            "fuel_usage": round(fuel_usage, 2),
+            "buses_in": buses_in,
+            "buses_out": buses_out,
+            "total_students_on_trips": total_students,
+            "total_trips": total_trips,
+            "total_spending": round(total_spend, 2),
+            "fuel_spending": round(fuel_spend, 2),
+            "maintenance_spending": round(maint_spend, 2),
+            "last_maintenance": last_maintenance_info
         }
     except Exception as e:
         return {
@@ -1082,5 +1151,13 @@ async def get_fleet_stats(session: AsyncSession = Depends(get_session)):
             "active_trips": 0,
             "maintenance_due": 0,
             "active_drivers": 0,
-            "fuel_usage": 0.0
+            "fuel_usage": 0.0,
+            "buses_in": 0,
+            "buses_out": 0,
+            "total_students_on_trips": 0,
+            "total_trips": 0,
+            "total_spending": 0.0,
+            "fuel_spending": 0.0,
+            "maintenance_spending": 0.0,
+            "last_maintenance": None
         }

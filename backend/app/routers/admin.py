@@ -238,8 +238,10 @@ async def bulk_upload_lecturers(
         
         lecturer_role = (await session.exec(select(Role).where(Role.name == "Lecturer"))).first()
         if not lecturer_role:
-            raise HTTPException(status_code=400, detail="Lecturer role not found")
-
+            lecturer_role = Role(name="Lecturer", description="Lecturer Role")
+            session.add(lecturer_role)
+            await session.commit()
+            await session.refresh(lecturer_role)
         added_count = 0
         updated_count = 0
         error_count = 0
@@ -332,8 +334,10 @@ async def bulk_upload_students(
         
         student_role = (await session.exec(select(Role).where(Role.name == "Student"))).first()
         if not student_role:
-            raise HTTPException(status_code=400, detail="Student role not found")
-
+            student_role = Role(name="Student", description="Student Role")
+            session.add(student_role)
+            await session.commit()
+            await session.refresh(student_role)
         added_count = 0
         updated_count = 0
         error_count = 0

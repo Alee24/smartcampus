@@ -43,7 +43,15 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
         total_vehicles: 0,
         active_trips: 0,
         maintenance_due: 0,
-        fuel_usage: 0
+        fuel_usage: 0,
+        buses_in: 0,
+        buses_out: 0,
+        total_students_on_trips: 0,
+        total_trips: 0,
+        total_spending: 0,
+        fuel_spending: 0,
+        maintenance_spending: 0,
+        last_maintenance: null
     });
     const [loading, setLoading] = useState(true);
     const [showAddVehicle, setShowAddVehicle] = useState(false);
@@ -95,48 +103,89 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
 
     const renderDashboard = () => (
         <div className="space-y-6 animate-fade-in">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard 
-                    title="Total Fleet" 
-                    value={stats.total_vehicles || 0} 
-                    icon={<Car className="text-blue-600" />} 
-                    change="Registered Units"
-                    color="blue"
-                />
-                <StatCard 
-                    title="Active Trips" 
-                    value={stats.active_trips || 0} 
-                    icon={<Navigation className="text-green-600" />} 
-                    change="Live Now"
-                    color="green"
-                />
-                <StatCard 
-                    title="Maintenance Due" 
-                    value={stats.maintenance_due || 0} 
-                    icon={<Wrench className="text-red-600" />} 
-                    change="Requires Action"
-                    color="red"
-                />
-                <StatCard 
-                    title="Active Drivers" 
-                    value={stats.active_drivers || 0} 
-                    icon={<Users className="text-orange-600" />} 
-                    change="On Duty"
-                    color="orange"
-                />
+
+            {/* Primary Stats Row — Buses In/Out, Active Trips, Total Fleet */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
+                <div className="glass-card p-5 border-l-4 border-green-500">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-2.5 bg-green-50 rounded-xl"><Car className="text-green-600" size={22} /></div>
+                        <span className="text-[10px] font-black bg-green-50 text-green-700 px-2 py-1 rounded-lg uppercase tracking-tight">On Campus</span>
+                    </div>
+                    <p className="text-gray-500 font-bold text-xs mb-1">Buses In</p>
+                    <div className="text-3xl font-black text-gray-900">{stats.buses_in ?? 0}</div>
+                </div>
+                <div className="glass-card p-5 border-l-4 border-orange-500">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-2.5 bg-orange-50 rounded-xl"><Navigation className="text-orange-600" size={22} /></div>
+                        <span className="text-[10px] font-black bg-orange-50 text-orange-700 px-2 py-1 rounded-lg uppercase tracking-tight">Deployed</span>
+                    </div>
+                    <p className="text-gray-500 font-bold text-xs mb-1">Buses Out</p>
+                    <div className="text-3xl font-black text-gray-900">{stats.buses_out ?? 0}</div>
+                </div>
+                <div className="glass-card p-5 border-l-4 border-blue-500">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-2.5 bg-blue-50 rounded-xl"><Car className="text-blue-600" size={22} /></div>
+                        <span className="text-[10px] font-black bg-blue-50 text-blue-700 px-2 py-1 rounded-lg uppercase tracking-tight">Fleet</span>
+                    </div>
+                    <p className="text-gray-500 font-bold text-xs mb-1">Total Vehicles</p>
+                    <div className="text-3xl font-black text-gray-900">{stats.total_vehicles ?? 0}</div>
+                </div>
+                <div className="glass-card p-5 border-l-4 border-red-500">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-2.5 bg-red-50 rounded-xl"><Wrench className="text-red-600" size={22} /></div>
+                        <span className="text-[10px] font-black bg-red-50 text-red-700 px-2 py-1 rounded-lg uppercase tracking-tight">Action</span>
+                    </div>
+                    <p className="text-gray-500 font-bold text-xs mb-1">Maintenance Due</p>
+                    <div className="text-3xl font-black text-gray-900">{stats.maintenance_due ?? 0}</div>
+                </div>
             </div>
 
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="glass-card p-6">
+            {/* Secondary Stats Row — Students, Trips, Fuel, Spending */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="glass-card p-5 border-l-4 border-indigo-500">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-2.5 bg-indigo-50 rounded-xl"><Users className="text-indigo-600" size={22} /></div>
+                        <span className="text-[10px] font-black bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg uppercase tracking-tight">All-time</span>
+                    </div>
+                    <p className="text-gray-500 font-bold text-xs mb-1">Students on Trips</p>
+                    <div className="text-3xl font-black text-gray-900">{stats.total_students_on_trips ?? 0}</div>
+                </div>
+                <div className="glass-card p-5 border-l-4 border-cyan-500">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-2.5 bg-cyan-50 rounded-xl"><Navigation className="text-cyan-600" size={22} /></div>
+                        <span className="text-[10px] font-black bg-cyan-50 text-cyan-700 px-2 py-1 rounded-lg uppercase tracking-tight">Total</span>
+                    </div>
+                    <p className="text-gray-500 font-bold text-xs mb-1">Total Trips</p>
+                    <div className="text-3xl font-black text-gray-900">{stats.total_trips ?? 0}</div>
+                </div>
+                <div className="glass-card p-5 border-l-4 border-yellow-500">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-2.5 bg-yellow-50 rounded-xl"><Fuel className="text-yellow-600" size={22} /></div>
+                        <span className="text-[10px] font-black bg-yellow-50 text-yellow-700 px-2 py-1 rounded-lg uppercase tracking-tight">Litres</span>
+                    </div>
+                    <p className="text-gray-500 font-bold text-xs mb-1">Fuel Consumed</p>
+                    <div className="text-3xl font-black text-gray-900">{(stats.fuel_usage ?? 0).toLocaleString()}L</div>
+                </div>
+                <div className="glass-card p-5 border-l-4 border-emerald-500">
+                    <div className="flex justify-between items-start mb-3">
+                        <div className="p-2.5 bg-emerald-50 rounded-xl"><DollarSign className="text-emerald-600" size={22} /></div>
+                        <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-2 py-1 rounded-lg uppercase tracking-tight">KES</span>
+                    </div>
+                    <p className="text-gray-500 font-bold text-xs mb-1">Total Spend</p>
+                    <div className="text-2xl font-black text-gray-900">{(stats.total_spending ?? 0).toLocaleString()}</div>
+                </div>
+            </div>
+
+            {/* Charts + Spending Breakdown Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 glass-card p-6">
                     <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                         <TrendingUp size={20} className="text-primary-600" />
                         Fuel Consumption History
                     </h3>
-                    <div className="h-80">
+                    <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={fuelLogs.slice(0, 7).reverse().map(l => ({ name: new Date(l.timestamp).toLocaleDateString(), liters: l.amount_liters }))}>
+                            <AreaChart data={fuelLogs.slice(0, 10).reverse().map(l => ({ name: new Date(l.timestamp).toLocaleDateString(), liters: l.amount_liters, cost: l.cost }))}>
                                 <defs>
                                     <linearGradient id="colorFuel" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.3}/>
@@ -147,99 +196,188 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#6B7280'}} />
                                 <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} />
                                 <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
-                                <Area type="monotone" dataKey="liters" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorFuel)" />
+                                <Area type="monotone" dataKey="liters" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorFuel)" name="Litres" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
 
-                <div className="glass-card p-6">
-                    <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                        <Activity size={20} className="text-green-600" />
-                        Fleet Utilization
+                {/* Spending Breakdown Card */}
+                <div className="glass-card p-6 flex flex-col gap-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                        <DollarSign size={20} className="text-emerald-600" />
+                        Spending Breakdown
                     </h3>
-                    <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={[
-                                { name: 'Active', val: stats.active_trips },
-                                { name: 'Idle', val: stats.total_vehicles - stats.active_trips - stats.maintenance_due },
-                                { name: 'Repair', val: stats.maintenance_due }
-                            ]}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} />
-                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} />
-                                <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
-                                <Bar dataKey="val" fill="#10B981" radius={[6, 6, 0, 0]} barSize={40} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <div className="space-y-3 flex-1">
+                        <div className="p-4 bg-yellow-50 rounded-2xl border border-yellow-100">
+                            <p className="text-xs font-black text-yellow-600 uppercase mb-1">Fuel Costs</p>
+                            <p className="text-2xl font-black text-yellow-900">KES {(stats.fuel_spending ?? 0).toLocaleString()}</p>
+                            <div className="mt-2 h-1.5 bg-yellow-100 rounded-full">
+                                <div className="h-1.5 bg-yellow-500 rounded-full" style={{width: stats.total_spending > 0 ? `${((stats.fuel_spending / stats.total_spending) * 100).toFixed(0)}%` : '0%'}} />
+                            </div>
+                        </div>
+                        <div className="p-4 bg-red-50 rounded-2xl border border-red-100">
+                            <p className="text-xs font-black text-red-600 uppercase mb-1">Maintenance Costs</p>
+                            <p className="text-2xl font-black text-red-900">KES {(stats.maintenance_spending ?? 0).toLocaleString()}</p>
+                            <div className="mt-2 h-1.5 bg-red-100 rounded-full">
+                                <div className="h-1.5 bg-red-500 rounded-full" style={{width: stats.total_spending > 0 ? `${((stats.maintenance_spending / stats.total_spending) * 100).toFixed(0)}%` : '0%'}} />
+                            </div>
+                        </div>
+                        <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                            <p className="text-xs font-black text-emerald-600 uppercase mb-1">Total Fleet Spend</p>
+                            <p className="text-2xl font-black text-emerald-900">KES {(stats.total_spending ?? 0).toLocaleString()}</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Bottom Row */}
+            {/* Bottom Row — Live Trips + Last Maintenance + Fleet Health */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Live Trip Log */}
                 <div className="lg:col-span-2 glass-card p-6">
-                    <div className="flex justify-between items-center mb-6">
+                    <div className="flex justify-between items-center mb-5">
                         <h3 className="text-lg font-bold">Live Trip Log</h3>
                         <button onClick={() => setActiveTab('trips')} className="text-sm text-primary-600 font-semibold hover:underline">View All</button>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
-                                    <th className="pb-4">Vehicle</th>
-                                    <th className="pb-4">Destination</th>
-                                    <th className="pb-4">Status</th>
-                                    <th className="pb-4">Departure</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {trips.slice(0, 5).map((trip, i) => (
-                                    <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                        <td className="py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-gray-100 rounded-lg"><Car size={16} /></div>
-                                                <span className="font-bold text-sm">{vehicles.find(v => v.id === trip.vehicle_id)?.plate_number || 'Vehicle'}</span>
-                                            </div>
-                                        </td>
-                                        <td className="py-4 text-sm text-gray-600">{trip.destination}</td>
-                                        <td className="py-4">
-                                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                                                trip.status === 'ongoing' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                                            }`}>{trip.status}</span>
-                                        </td>
-                                        <td className="py-4 text-xs font-semibold text-gray-500">
-                                            {new Date(trip.scheduled_departure).toLocaleString()}
-                                        </td>
+                    {trips.length === 0 ? (
+                        <div className="text-center py-10">
+                            <Navigation className="mx-auto text-gray-300 mb-3" size={40} />
+                            <p className="font-bold text-gray-400 text-sm">No trips scheduled yet</p>
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="text-left text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                        <th className="pb-4">Vehicle</th>
+                                        <th className="pb-4">Destination</th>
+                                        <th className="pb-4">Status</th>
+                                        <th className="pb-4">Departure</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {trips.slice(0, 6).map((trip, i) => (
+                                        <tr key={i} className="hover:bg-gray-50 transition-colors">
+                                            <td className="py-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-primary-50 rounded-lg"><Car size={14} className="text-primary-600" /></div>
+                                                    <span className="font-bold text-sm">{vehicles.find(v => v.id === trip.vehicle_id)?.plate_number || 'N/A'}</span>
+                                                </div>
+                                            </td>
+                                            <td className="py-3 text-sm text-gray-600">{trip.destination}</td>
+                                            <td className="py-3">
+                                                <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                                                    trip.status === 'ongoing' ? 'bg-green-100 text-green-700' :
+                                                    trip.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                                                    trip.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+                                                }`}>{trip.status}</span>
+                                            </td>
+                                            <td className="py-3 text-xs font-semibold text-gray-500">
+                                                {new Date(trip.scheduled_departure).toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
 
-                <div className="glass-card p-6">
-                    <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                        <AlertTriangle size={20} className="text-red-600" />
-                        Vehicle Alerts
-                    </h3>
-                    <div className="space-y-4">
-                        {vehicles.filter(v => v.status === 'maintenance').map((v, i) => (
-                            <div key={i} className="flex gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">
-                                <Wrench className="text-red-600 shrink-0" size={18} />
-                                <div>
-                                    <p className="text-sm font-bold text-red-900">{v.plate_number} Overdue</p>
-                                    <p className="text-xs text-red-700">Immediate service required.</p>
+                {/* Right Column — Last Maintenance + Alerts */}
+                <div className="space-y-4">
+                    {/* Last Maintenance Card */}
+                    <div className="glass-card p-5">
+                        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
+                            <Wrench size={18} className="text-orange-500" />
+                            Last Maintenance
+                        </h3>
+                        {stats.last_maintenance ? (
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-gray-400 uppercase">Vehicle</span>
+                                    <span className="text-sm font-black text-gray-800">{stats.last_maintenance.vehicle}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-gray-400 uppercase">Service</span>
+                                    <span className="text-sm font-bold text-gray-700 capitalize">{stats.last_maintenance.service_type}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-gray-400 uppercase">Date</span>
+                                    <span className="text-sm font-bold text-gray-700">{stats.last_maintenance.date ? new Date(stats.last_maintenance.date).toLocaleDateString() : 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-gray-400 uppercase">Cost</span>
+                                    <span className="text-sm font-black text-emerald-700">KES {(stats.last_maintenance.cost ?? 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold text-gray-400 uppercase">By</span>
+                                    <span className="text-xs font-bold text-gray-600">{stats.last_maintenance.performed_by}</span>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-gray-100">
+                                    <p className="text-xs text-gray-500 italic">{stats.last_maintenance.description}</p>
                                 </div>
                             </div>
-                        ))}
-                        {vehicles.filter(v => v.status === 'maintenance').length === 0 && (
-                            <div className="text-center py-8">
-                                <Shield className="mx-auto text-green-500 mb-2" size={32} />
-                                <p className="text-sm font-bold text-gray-600">All vehicles healthy</p>
+                        ) : (
+                            <div className="text-center py-6">
+                                <Calendar className="mx-auto text-gray-300 mb-2" size={28} />
+                                <p className="text-xs font-bold text-gray-400">No maintenance records yet</p>
                             </div>
                         )}
                     </div>
+
+                    {/* Fleet Health / Alerts */}
+                    <div className="glass-card p-5">
+                        <h3 className="text-base font-bold mb-4 flex items-center gap-2">
+                            <AlertTriangle size={18} className="text-red-600" />
+                            Vehicle Alerts
+                        </h3>
+                        <div className="space-y-2">
+                            {vehicles.filter(v => v.status === 'maintenance').length === 0 ? (
+                                <div className="text-center py-4">
+                                    <Shield className="mx-auto text-green-500 mb-1" size={28} />
+                                    <p className="text-xs font-bold text-gray-500">All vehicles healthy</p>
+                                </div>
+                            ) : vehicles.filter(v => v.status === 'maintenance').map((v, i) => (
+                                <div key={i} className="flex gap-2 p-2.5 bg-red-50 border border-red-100 rounded-xl">
+                                    <Wrench className="text-red-600 shrink-0 mt-0.5" size={14} />
+                                    <div>
+                                        <p className="text-xs font-black text-red-900">{v.plate_number}</p>
+                                        <p className="text-[10px] text-red-600">Needs immediate service</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Fleet Utilization Chart */}
+            <div className="glass-card p-6">
+                <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                    <Activity size={20} className="text-green-600" />
+                    Fleet Utilization Overview
+                </h3>
+                <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={[
+                            { name: 'Buses In', val: stats.buses_in ?? 0, fill: '#10B981' },
+                            { name: 'Buses Out', val: stats.buses_out ?? 0, fill: '#F59E0B' },
+                            { name: 'Active Trips', val: stats.active_trips ?? 0, fill: '#4F46E5' },
+                            { name: 'In Maintenance', val: stats.maintenance_due ?? 0, fill: '#EF4444' }
+                        ]}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} />
+                            <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#6B7280'}} allowDecimals={false} />
+                            <Tooltip cursor={{fill: '#F3F4F6'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }} />
+                            <Bar dataKey="val" radius={[8, 8, 0, 0]} barSize={50}
+                                label={{ position: 'top', fontSize: 13, fontWeight: 900, fill: '#374151' }}
+                            >
+                                {[{fill:'#10B981'},{fill:'#F59E0B'},{fill:'#4F46E5'},{fill:'#EF4444'}].map((entry, index) => (
+                                    <Cell key={index} fill={entry.fill} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
             </div>
         </div>
@@ -381,8 +519,8 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                 </div>
             ) : (
                 <>
-    {activeTab === 'vehicles' && <VehiclesManager vehicles={vehicles} onUpdate={fetchData} setShowAddVehicle={setShowAddVehicle} setEditingVehicle={setEditingVehicle} />}
-                    
+                    {activeTab === 'dashboard' && renderDashboard()}
+                    {activeTab === 'vehicles' && <VehiclesManager vehicles={vehicles} onUpdate={fetchData} setShowAddVehicle={setShowAddVehicle} setEditingVehicle={setEditingVehicle} />}
                     {activeTab === 'tracking' && renderTracking()}
                     {activeTab === 'trips' && <TripsManager trips={trips} vehicles={vehicles} onUpdate={fetchData} />}
                     {activeTab === 'fuel' && <FuelManagement vehicles={vehicles} logs={fuelLogs} onUpdate={fetchData} />}
