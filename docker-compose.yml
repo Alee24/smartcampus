@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: mysql:8.0
@@ -25,7 +23,9 @@ services:
     restart: always
 
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      network: host
     container_name: gatepass_backend
     volumes:
       - ./backend/static:/app/static
@@ -48,7 +48,9 @@ services:
     restart: always
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      network: host
     container_name: gatepass_frontend
     # Primary entry point for the entire application
     ports:
