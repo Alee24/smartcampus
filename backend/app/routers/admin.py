@@ -276,7 +276,12 @@ async def bulk_upload_lecturers(
                     if phone_number: existing.phone_number = phone_number
                     if profile_image: existing.profile_image = profile_image
                     session.add(existing)
-                    updated_count += 1
+                    try:
+                        await session.commit()
+                        updated_count += 1
+                    except Exception as e:
+                        await session.rollback()
+                        raise Exception(f"Database error on update: {str(e)}")
                 else:
                     # INSERT
                     new_user = User(
@@ -291,19 +296,16 @@ async def bulk_upload_lecturers(
                         profile_image=profile_image
                     )
                     session.add(new_user)
-                    added_count += 1
-                
-                current_batch += 1
-                if current_batch >= batch_size:
-                    await session.commit()
-                    current_batch = 0
+                    try:
+                        await session.commit()
+                        added_count += 1
+                    except Exception as e:
+                        await session.rollback()
+                        raise Exception(f"Database error on insert: {str(e)}")
                     
             except Exception as e:
                 error_count += 1
                 errors.append(f"Row {row_num}: {str(e)}")
-        
-        if current_batch > 0:
-            await session.commit()
         
         return {
             "success": True,
@@ -401,7 +403,12 @@ async def bulk_upload_students(
                     if phone_number: existing.phone_number = phone_number
                     if profile_image: existing.profile_image = profile_image
                     session.add(existing)
-                    updated_count += 1
+                    try:
+                        await session.commit()
+                        updated_count += 1
+                    except Exception as e:
+                        await session.rollback()
+                        raise Exception(f"Database error on update: {str(e)}")
                 else:
                     # INSERT
                     new_user = User(
@@ -420,19 +427,16 @@ async def bulk_upload_students(
                         profile_image=profile_image
                     )
                     session.add(new_user)
-                    added_count += 1
-                
-                current_batch += 1
-                if current_batch >= batch_size:
-                    await session.commit()
-                    current_batch = 0
+                    try:
+                        await session.commit()
+                        added_count += 1
+                    except Exception as e:
+                        await session.rollback()
+                        raise Exception(f"Database error on insert: {str(e)}")
                     
             except Exception as e:
                 error_count += 1
                 errors.append(f"Row {row_num}: {str(e)}")
-        
-        if current_batch > 0:
-            await session.commit()
         
         return {
             "success": True,
