@@ -230,7 +230,7 @@ async def bulk_upload_lecturers(
     try:
         content = await file.read()
         try:
-            decoded = content.decode('utf-8').splitlines()
+            decoded = content.decode('utf-8-sig').splitlines()
         except UnicodeDecodeError:
             decoded = content.decode('latin-1').splitlines()
 
@@ -251,10 +251,12 @@ async def bulk_upload_lecturers(
         
         for row_num, row in enumerate(reader, start=1):
             try:
-                email = row.get('email', '').strip()
-                name = row.get('full_name', '').strip()
-                adm = row.get('admission_number', '').strip()
+                email = (row.get('email') or '').strip()
+                name = (row.get('full_name') or '').strip()
+                adm = (row.get('admission_number') or '').strip()
                 school = (row.get('school') or 'General').strip()
+                phone_number = (row.get('phone_number') or '').strip() or None
+                profile_image = (row.get('profile_image') or '').strip() or None
                 
                 if not email or not name:
                     error_count += 1
@@ -271,8 +273,8 @@ async def bulk_upload_lecturers(
                     existing.school = school
                     existing.role_id = lecturer_role.id
                     existing.status = "active"
-                    if row.get('phone_number'): existing.phone_number = row.get('phone_number').strip()
-                    if row.get('profile_image'): existing.profile_image = row.get('profile_image').strip()
+                    if phone_number: existing.phone_number = phone_number
+                    if profile_image: existing.profile_image = profile_image
                     session.add(existing)
                     updated_count += 1
                 else:
@@ -285,8 +287,8 @@ async def bulk_upload_lecturers(
                         hashed_password=get_password_hash("Digital2025"),
                         role_id=lecturer_role.id,
                         status="active",
-                        phone_number=row.get('phone_number').strip() if row.get('phone_number') else None,
-                        profile_image=row.get('profile_image').strip() if row.get('profile_image') else None
+                        phone_number=phone_number,
+                        profile_image=profile_image
                     )
                     session.add(new_user)
                     added_count += 1
@@ -326,7 +328,7 @@ async def bulk_upload_students(
     try:
         content = await file.read()
         try:
-            decoded = content.decode('utf-8').splitlines()
+            decoded = content.decode('utf-8-sig').splitlines()
         except UnicodeDecodeError:
             decoded = content.decode('latin-1').splitlines()
 
@@ -352,19 +354,21 @@ async def bulk_upload_students(
         
         for row_num, row in enumerate(reader, start=1):
             try:
-                # Support both formats: admission_number OR first_name+last_name
-                adm = row.get('admission_number', '').strip()
-                first_name = row.get('first_name', '').strip()
-                last_name = row.get('last_name', '').strip()
-                full_name = row.get('full_name', '').strip()
-                email = row.get('email', '').strip()
+                adm = (row.get('admission_number') or '').strip()
+                first_name = (row.get('first_name') or '').strip()
+                last_name = (row.get('last_name') or '').strip()
+                full_name = (row.get('full_name') or '').strip()
+                email = (row.get('email') or '').strip()
                 school = (row.get('school') or 'General').strip()
-                gender = row.get('gender', '').strip() or None
-                program = row.get('program', '').strip() or None
-                status_val = row.get('status', 'active').strip() or 'active'
+                gender = (row.get('gender') or '').strip() or None
+                program = (row.get('program') or '').strip() or None
+                status_val = (row.get('status') or 'active').strip() or 'active'
+                
+                phone_number = (row.get('phone_number') or '').strip() or None
+                profile_image = (row.get('profile_image') or '').strip() or None
                 
                 # Resolve role from CSV column, default to Student
-                role_name = row.get('role', '').strip().lower()
+                role_name = (row.get('role') or '').strip().lower()
                 resolved_role = role_cache.get(role_name) if role_name else None
                 assigned_role = resolved_role or student_role
                 
@@ -394,8 +398,8 @@ async def bulk_upload_students(
                     if email: existing.email = email
                     if gender: existing.gender = gender
                     if program: existing.program = program
-                    if row.get('phone_number'): existing.phone_number = row.get('phone_number').strip()
-                    if row.get('profile_image'): existing.profile_image = row.get('profile_image').strip()
+                    if phone_number: existing.phone_number = phone_number
+                    if profile_image: existing.profile_image = profile_image
                     session.add(existing)
                     updated_count += 1
                 else:
@@ -412,8 +416,8 @@ async def bulk_upload_students(
                         status=status_val,
                         gender=gender,
                         program=program,
-                        phone_number=row.get('phone_number').strip() if row.get('phone_number') else None,
-                        profile_image=row.get('profile_image').strip() if row.get('profile_image') else None
+                        phone_number=phone_number,
+                        profile_image=profile_image
                     )
                     session.add(new_user)
                     added_count += 1
@@ -454,7 +458,7 @@ async def bulk_upload_courses(
     try:
         content = await file.read()
         try:
-            decoded = content.decode('utf-8').splitlines()
+            decoded = content.decode('utf-8-sig').splitlines()
         except UnicodeDecodeError:
             decoded = content.decode('latin-1').splitlines()
         
@@ -548,7 +552,7 @@ async def bulk_upload_classrooms(
     try:
         content = await file.read()
         try:
-            decoded = content.decode('utf-8').splitlines()
+            decoded = content.decode('utf-8-sig').splitlines()
         except UnicodeDecodeError:
             decoded = content.decode('latin-1').splitlines()
         
@@ -650,7 +654,7 @@ async def bulk_upload_timetable_slots(
     try:
         content = await file.read()
         try:
-            decoded = content.decode('utf-8').splitlines()
+            decoded = content.decode('utf-8-sig').splitlines()
         except UnicodeDecodeError:
             decoded = content.decode('latin-1').splitlines()
         

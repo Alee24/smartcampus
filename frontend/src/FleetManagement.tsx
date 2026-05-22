@@ -39,6 +39,8 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
     const [fuelLogs, setFuelLogs] = useState<any[]>([]);
     const [maintenanceLogs, setMaintenanceLogs] = useState<any[]>([]);
     const [locations, setLocations] = useState<any[]>([]);
+    const [toast, setToast] = useState<{msg: string, type: 'success'|'error'|'info'} | null>(null);
+
     const [stats, setStats] = useState<any>({
         total_vehicles: 0,
         active_trips: 0,
@@ -57,11 +59,17 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
     const [showAddVehicle, setShowAddVehicle] = useState(false);
     const [editingVehicle, setEditingVehicle] = useState<any>(null);
 
+    const showToast = (msg: string, type: 'success'|'error'|'info' = 'info') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 4000);
+    };
+
     useEffect(() => {
         fetchData();
-        const interval = setInterval(fetchLocations, 10000); // Update locations every 10s
+        const interval = setInterval(fetchLocations, 10000);
         return () => clearInterval(interval);
     }, []);
+
 
     const fetchData = async () => {
         setLoading(true);
@@ -473,7 +481,23 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                     <button onClick={fetchData} className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition-all">
                         <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
                     </button>
-                    <button className="px-4 py-2 bg-white border border-gray-200 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-2">
+                    <button
+                        onClick={() => {
+                            const headers: HeadersInit = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
+                            // Export vehicles as CSV
+                            const rows = [
+                                ['Plate','Make','Model','Type','Status','Fuel Type','Year','Odometer','Driver','Contact'],
+                                ...vehicles.map(v => [v.plate_number, v.make||'', v.model||'', v.vehicle_type, v.status, v.fuel_type, v.year||'', v.current_odometer, v.driver_name||'', v.driver_contact||''])
+                            ];
+                            const csv = rows.map(r => r.join(',')).join('\n');
+                            const blob = new Blob([csv], { type: 'text/csv' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url; a.download = `fleet_export_${new Date().toISOString().slice(0,10)}.csv`;
+                            a.click(); URL.revokeObjectURL(url);
+                        }}
+                        className="px-4 py-2 bg-white border border-gray-200 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-2"
+                    >
                         <Download size={18} /> Export
                     </button>
                     <button 
@@ -519,35 +543,44 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                 </div>
             ) : (
                 <>
-                    {activeTab === 'dashboard' && renderDashboard()}
-                    {activeTab === 'vehicles' && <VehiclesManager vehicles={vehicles} onUpdate={fetchData} setShowAddVehicle={setShowAddVehicle} setEditingVehicle={setEditingVehicle} />}
+                {activeTab === 'dashboard' && renderDashboard()}
+                    {activeTab === 'vehicles' && <VehiclesManager vehicles={vehicles} onUpdate={fetchData} setShowAddVehicle={setShowAddVehicle} setEditingVehicle={setEditingVehicle} showToast={showToast} />}
                     {activeTab === 'tracking' && renderTracking()}
-                    {activeTab === 'trips' && <TripsManager trips={trips} vehicles={vehicles} onUpdate={fetchData} />}
-                    {activeTab === 'fuel' && <FuelManagement vehicles={vehicles} logs={fuelLogs} onUpdate={fetchData} />}
-                    {activeTab === 'maintenance' && <MaintenanceManager vehicles={vehicles} logs={maintenanceLogs} onUpdate={fetchData} />}
+                    {activeTab === 'trips' && <TripsManager trips={trips} vehicles={vehicles} onUpdate={fetchData} showToast={showToast} />}
+                    {activeTab === 'fuel' && <FuelManagement vehicles={vehicles} logs={fuelLogs} onUpdate={fetchData} showToast={showToast} />}
+                    {activeTab === 'maintenance' && <MaintenanceManager vehicles={vehicles} logs={maintenanceLogs} onUpdate={fetchData} showToast={showToast} />}
                     {activeTab === 'drivers' && <DriverManager />}
                 </>
             )}
 
-            {/* Add Vehicle Modal */}
             {showAddVehicle && (
                 <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-3xl p-8 w-full max-w-lg animate-slide-up shadow-2xl relative">
+                    <div className="bg-white rounded-3xl p-8 w-full max-w-2xl animate-slide-up shadow-2xl relative overflow-y-auto max-h-[90vh]">
                         <button onClick={() => setShowAddVehicle(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-900"><X size={24} /></button>
                         <h2 className="text-2xl font-black mb-6">Register New Vehicle</h2>
-                        <VehicleForm onSuccess={() => { setShowAddVehicle(false); fetchData(); }} />
+                        <VehicleForm onSuccess={() => { setShowAddVehicle(false); fetchData(); showToast('Vehicle registered successfully!', 'success'); }} onError={(msg) => showToast(msg, 'error')} />
                     </div>
                 </div>
             )}
 
-            {/* Edit Vehicle Modal */}
             {editingVehicle && (
                 <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-3xl p-8 w-full max-w-lg animate-slide-up shadow-2xl relative">
+                    <div className="bg-white rounded-3xl p-8 w-full max-w-2xl animate-slide-up shadow-2xl relative overflow-y-auto max-h-[90vh]">
                         <button onClick={() => setEditingVehicle(null)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-900"><X size={24} /></button>
                         <h2 className="text-2xl font-black mb-6">Modify Vehicle Details</h2>
-                        <VehicleForm vehicle={editingVehicle} onSuccess={() => { setEditingVehicle(null); fetchData(); }} />
+                        <VehicleForm vehicle={editingVehicle} onSuccess={() => { setEditingVehicle(null); fetchData(); showToast('Vehicle updated successfully!', 'success'); }} onError={(msg) => showToast(msg, 'error')} />
                     </div>
+                </div>
+            )}
+
+            {/* Toast Notifications */}
+            {toast && (
+                <div className={`fixed bottom-6 right-6 z-[9999] px-6 py-4 rounded-2xl shadow-2xl text-white font-bold text-sm flex items-center gap-3 animate-slide-up transition-all ${
+                    toast.type === 'success' ? 'bg-green-600' : toast.type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+                }`}>
+                    {toast.type === 'success' ? <Check size={20} /> : toast.type === 'error' ? <X size={20} /> : <Activity size={20} />}
+                    {toast.msg}
+                    <button onClick={() => setToast(null)} className="ml-2 opacity-70 hover:opacity-100"><X size={16} /></button>
                 </div>
             )}
         </div>
@@ -1337,11 +1370,100 @@ function MaintenanceManager({ vehicles, logs, onUpdate }: any) {
 }
 
 function DriverManager() {
+    const [drivers, setDrivers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+
+    useEffect(() => {
+        const fetchDrivers = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch('/api/users/?role=Lecturer', { headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    const allUsers = await res.json();
+                    // Show Lecturers + anyone with LEC prefix or driver_id_number set via fleet
+                    setDrivers(allUsers.filter((u: any) => 
+                        (u.role_name || '').toLowerCase() === 'lecturer' ||
+                        (u.admission_number || '').startsWith('LEC')
+                    ));
+                }
+            } catch(e) {}
+            setLoading(false);
+        };
+        fetchDrivers();
+    }, []);
+
+    const filtered = drivers.filter(d =>
+        (d.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+        (d.admission_number || '').toLowerCase().includes(search.toLowerCase()) ||
+        (d.email || '').toLowerCase().includes(search.toLowerCase())
+    );
+
     return (
-        <div className="glass-card p-8 animate-fade-in text-center py-20">
-            <Users className="mx-auto text-gray-200 mb-4" size={64} />
-            <h3 className="text-2xl font-black text-gray-900 mb-2">Driver Management Module</h3>
-            <p className="text-gray-500 max-w-sm mx-auto">Please go to the 'People' section to manage drivers and assign vehicle privileges.</p>
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <h3 className="text-xl font-black">Driver & Staff Registry</h3>
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input
+                        type="text" placeholder="Search drivers..."
+                        value={search} onChange={e => setSearch(e.target.value)}
+                        className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold outline-none w-64"
+                    />
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="flex items-center justify-center py-20"><Loader2 className="animate-spin text-primary-600" size={36} /></div>
+            ) : filtered.length === 0 ? (
+                <div className="glass-card p-12 text-center">
+                    <Users className="mx-auto text-gray-200 mb-4" size={64} />
+                    <h3 className="text-xl font-black text-gray-700 mb-2">No Drivers Found</h3>
+                    <p className="text-gray-500 text-sm max-w-sm mx-auto">Register lecturers or staff in the People section to assign them as drivers.</p>
+                    <a href="#" onClick={e => {e.preventDefault(); window.location.hash='people';}} className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg">
+                        <Users size={16} /> Go to People Section
+                    </a>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filtered.map((d: any, i: number) => (
+                        <div key={i} className="glass-card p-6 hover:shadow-lg transition-all">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center overflow-hidden">
+                                    {d.profile_image ? (
+                                        <img src={d.profile_image} alt={d.full_name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="text-xl font-black text-primary-600">{(d.full_name || 'D').charAt(0)}</span>
+                                    )}
+                                </div>
+                                <div>
+                                    <h4 className="font-black text-gray-900">{d.full_name}</h4>
+                                    <p className="text-xs font-bold text-primary-600 uppercase">{d.school || 'Staff'}</p>
+                                </div>
+                            </div>
+                            <div className="space-y-2 text-xs">
+                                <div className="flex justify-between">
+                                    <span className="font-bold text-gray-400 uppercase">ID No.</span>
+                                    <span className="font-black text-gray-700">{d.admission_number || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-bold text-gray-400 uppercase">Phone</span>
+                                    <span className="font-black text-gray-700">{d.phone_number || 'N/A'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-bold text-gray-400 uppercase">Email</span>
+                                    <span className="font-black text-gray-700 truncate max-w-[140px]">{d.email || 'N/A'}</span>
+                                </div>
+                            </div>
+                            {d.phone_number && (
+                                <a href={`tel:${d.phone_number}`} className="mt-4 w-full py-2.5 bg-primary-50 text-primary-700 rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-primary-100 transition-all">
+                                    <Phone size={14} /> Call Driver
+                                </a>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
@@ -1610,19 +1732,55 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
 interface VehicleFormProps {
     vehicle?: any;
     onSuccess: () => void;
+    onError?: (msg: string) => void;
 }
 
-function VehicleForm({ vehicle, onSuccess }: VehicleFormProps) {
+function VehicleForm({ vehicle, onSuccess, onError }: VehicleFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
-        plate_number: vehicle?.plate_number || '',
-        make: vehicle?.make || '',
-        model: vehicle?.model || '',
-        vehicle_type: vehicle?.vehicle_type || 'bus',
-        fuel_type: vehicle?.fuel_type || 'diesel',
-        fuel_capacity: vehicle?.fuel_capacity || 0,
-        year: vehicle?.year || 2024
+        plate_number: '',
+        make: '',
+        model: '',
+        color: '',
+        vehicle_type: 'bus',
+        fuel_type: 'diesel',
+        fuel_capacity: 0,
+        year: new Date().getFullYear(),
+        driver_name: '',
+        driver_contact: '',
+        driver_id_number: '',
+        engine_number: '',
+        chassis_number: '',
+        current_odometer: 0,
+        status: 'active',
+        insurance_expiry: '',
     });
+
+    // Sync form when editing vehicle prop changes
+    useEffect(() => {
+        if (vehicle) {
+            setFormData({
+                plate_number: vehicle.plate_number || '',
+                make: vehicle.make || '',
+                model: vehicle.model || '',
+                color: vehicle.color || '',
+                vehicle_type: vehicle.vehicle_type || 'bus',
+                fuel_type: vehicle.fuel_type || 'diesel',
+                fuel_capacity: vehicle.fuel_capacity || 0,
+                year: vehicle.year || new Date().getFullYear(),
+                driver_name: vehicle.driver_name || '',
+                driver_contact: vehicle.driver_contact || '',
+                driver_id_number: vehicle.driver_id_number || '',
+                engine_number: vehicle.engine_number || '',
+                chassis_number: vehicle.chassis_number || '',
+                current_odometer: vehicle.current_odometer || 0,
+                status: vehicle.status || 'active',
+                insurance_expiry: vehicle.insurance_expiry || '',
+            });
+        }
+    }, [vehicle?.id]);
+
+    const set = (key: string, val: any) => setFormData(p => ({...p, [key]: val}));
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -1631,68 +1789,131 @@ function VehicleForm({ vehicle, onSuccess }: VehicleFormProps) {
             const token = localStorage.getItem('token');
             const url = vehicle ? `/api/fleet/vehicles/${vehicle.id}` : '/api/fleet/vehicles';
             const method = vehicle ? 'PUT' : 'POST';
+            const payload = { ...formData,
+                fuel_capacity: Number(formData.fuel_capacity),
+                year: Number(formData.year),
+                current_odometer: Number(formData.current_odometer),
+                insurance_expiry: formData.insurance_expiry || undefined,
+            };
             const res = await fetch(url, {
-                method: method,
+                method,
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
             if (res.ok) {
-                alert(vehicle ? '✅ Vehicle details updated successfully!' : '✅ Vehicle registered successfully!');
                 onSuccess();
             } else {
                 const data = await res.json();
-                alert(`❌ Error: ${data.detail || 'Failed to save vehicle'}`);
+                const msg = data.detail || 'Failed to save vehicle';
+                if (onError) onError(msg); else alert(`❌ Error: ${msg}`);
             }
         } catch (e: any) {
-            alert(`❌ Network error: ${e.message}`);
+            const msg = e.message;
+            if (onError) onError(msg); else alert(`❌ Network error: ${msg}`);
         } finally { setIsSubmitting(false); }
     };
 
+    const inp = "w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:border-primary-400 focus:bg-white transition-all";
+    const lbl = "block text-[10px] font-black text-gray-400 uppercase mb-1";
+
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-                <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Plate Number</label>
-                <input required placeholder="Plate Number (e.g. KAB 123G)" value={formData.plate_number} onChange={e => setFormData({...formData, plate_number: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Make</label>
-                    <input required placeholder="Make" value={formData.make} onChange={e => setFormData({...formData, make: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                <div className="col-span-2">
+                    <label className={lbl}>Plate Number *</label>
+                    <input required placeholder="e.g. KAB 123G" value={formData.plate_number} onChange={e => set('plate_number', e.target.value)} className={inp} />
                 </div>
                 <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Model</label>
-                    <input required placeholder="Model" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                    <label className={lbl}>Make *</label>
+                    <input required placeholder="e.g. Toyota" value={formData.make} onChange={e => set('make', e.target.value)} className={inp} />
                 </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Vehicle Type</label>
-                    <select value={formData.vehicle_type} onChange={e => setFormData({...formData, vehicle_type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
-                        <option value="bus">Bus</option>
-                        <option value="shuttle">Shuttle</option>
-                        <option value="staff">Staff Car</option>
-                        <option value="utility">Utility</option>
+                    <label className={lbl}>Model *</label>
+                    <input required placeholder="e.g. Coaster" value={formData.model} onChange={e => set('model', e.target.value)} className={inp} />
+                </div>
+                <div>
+                    <label className={lbl}>Color</label>
+                    <input placeholder="e.g. White" value={formData.color} onChange={e => set('color', e.target.value)} className={inp} />
+                </div>
+                <div>
+                    <label className={lbl}>Year</label>
+                    <input type="number" value={formData.year} onChange={e => set('year', e.target.value)} className={inp} />
+                </div>
+                <div>
+                    <label className={lbl}>Vehicle Type *</label>
+                    <select value={formData.vehicle_type} onChange={e => set('vehicle_type', e.target.value)} className={inp}>
+                        <option value="bus">🚌 Bus</option>
+                        <option value="shuttle">🚐 Shuttle / Matatu</option>
+                        <option value="staff">🚗 Staff Car</option>
+                        <option value="utility">🚚 Utility / Truck</option>
+                        <option value="motorcycle">🏍️ Motorcycle</option>
                     </select>
                 </div>
                 <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Fuel Type</label>
-                    <select value={formData.fuel_type} onChange={e => setFormData({...formData, fuel_type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
+                    <label className={lbl}>Fuel Type</label>
+                    <select value={formData.fuel_type} onChange={e => set('fuel_type', e.target.value)} className={inp}>
                         <option value="diesel">Diesel</option>
                         <option value="petrol">Petrol</option>
+                        <option value="electric">Electric</option>
+                        <option value="hybrid">Hybrid</option>
                     </select>
                 </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Fuel Capacity (L)</label>
-                    <input type="number" required placeholder="Fuel Capacity" value={formData.fuel_capacity} onChange={e => setFormData({...formData, fuel_capacity: Number(e.target.value)})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                    <label className={lbl}>Fuel Capacity (L)</label>
+                    <input type="number" value={formData.fuel_capacity} onChange={e => set('fuel_capacity', e.target.value)} className={inp} />
                 </div>
                 <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Year</label>
-                    <input type="number" required placeholder="Year" value={formData.year} onChange={e => setFormData({...formData, year: Number(e.target.value)})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                    <label className={lbl}>Status</label>
+                    <select value={formData.status} onChange={e => set('status', e.target.value)} className={inp}>
+                        <option value="active">Active</option>
+                        <option value="maintenance">In Maintenance</option>
+                        <option value="inactive">Inactive / Retired</option>
+                    </select>
+                </div>
+                <div>
+                    <label className={lbl}>Current Odometer (km)</label>
+                    <input type="number" value={formData.current_odometer} onChange={e => set('current_odometer', e.target.value)} className={inp} />
                 </div>
             </div>
-            <button disabled={isSubmitting} className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl hover:opacity-90 mt-2">
+
+            <div className="border-t border-gray-100 pt-4">
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-3">Driver / Crew Information</p>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className={lbl}>Driver Name</label>
+                        <input placeholder="Full name" value={formData.driver_name} onChange={e => set('driver_name', e.target.value)} className={inp} />
+                    </div>
+                    <div>
+                        <label className={lbl}>Driver Contact</label>
+                        <input placeholder="+254 7XX XXX XXX" value={formData.driver_contact} onChange={e => set('driver_contact', e.target.value)} className={inp} />
+                    </div>
+                    <div className="col-span-2">
+                        <label className={lbl}>Driver ID / License No.</label>
+                        <input placeholder="National ID or License Number" value={formData.driver_id_number} onChange={e => set('driver_id_number', e.target.value)} className={inp} />
+                    </div>
+                </div>
+            </div>
+
+            <div className="border-t border-gray-100 pt-4">
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-3">Vehicle Identifiers & Insurance</p>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className={lbl}>Engine Number</label>
+                        <input placeholder="Engine No." value={formData.engine_number} onChange={e => set('engine_number', e.target.value)} className={inp} />
+                    </div>
+                    <div>
+                        <label className={lbl}>Chassis Number</label>
+                        <input placeholder="Chassis / VIN" value={formData.chassis_number} onChange={e => set('chassis_number', e.target.value)} className={inp} />
+                    </div>
+                    <div className="col-span-2">
+                        <label className={lbl}>Insurance Expiry Date</label>
+                        <input type="date" value={formData.insurance_expiry} onChange={e => set('insurance_expiry', e.target.value)} className={inp} />
+                    </div>
+                </div>
+            </div>
+
+            <button disabled={isSubmitting} className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl hover:opacity-90 mt-2 flex items-center justify-center gap-2">
+                {isSubmitting && <Loader2 size={18} className="animate-spin" />}
                 {isSubmitting ? 'Saving...' : vehicle ? 'Update Vehicle Details' : 'Complete Registration'}
             </button>
         </form>
@@ -2042,68 +2263,101 @@ function TripForm({ vehicles, onSuccess }: any) {
     );
 }
 
-function MaintenanceForm({ vehicles, onSuccess }: any) {
+function MaintenanceForm({ vehicles, onSuccess, showToast }: any) {
     const [formData, setFormData] = useState({
-        vehicle_id: '', service_type: 'regular', description: '', cost: '', odometer_reading: '', service_date: '', next_service_due_odometer: ''
+        vehicle_id: '', service_type: 'regular', description: '', cost: '',
+        odometer_reading: '', service_date: '', next_service_due_odometer: '',
+        performed_by: ''
     });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setIsSubmitting(true);
         try {
             const token = localStorage.getItem('token');
             const res = await fetch('/api/fleet/maintenance-logs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({...formData, cost: parseFloat(formData.cost), odometer_reading: parseFloat(formData.odometer_reading), next_service_due_odometer: parseFloat(formData.next_service_due_odometer)})
+                body: JSON.stringify({
+                    ...formData,
+                    cost: parseFloat(formData.cost) || 0,
+                    odometer_reading: parseFloat(formData.odometer_reading) || 0,
+                    next_service_due_odometer: formData.next_service_due_odometer ? parseFloat(formData.next_service_due_odometer) : undefined
+                })
             });
             if (res.ok) {
+                if (showToast) showToast('Maintenance record saved!', 'success');
+                else alert('✅ Maintenance record saved!');
+                setFormData({ vehicle_id: '', service_type: 'regular', description: '', cost: '', odometer_reading: '', service_date: '', next_service_due_odometer: '', performed_by: '' });
                 onSuccess();
             } else {
                 const data = await res.json();
-                alert(`Error: ${data.detail || 'Failed to post maintenance log'}`);
+                const msg = data.detail || 'Failed to post maintenance log';
+                if (showToast) showToast(msg, 'error'); else alert(`Error: ${msg}`);
             }
         } catch (e: any) {
-            alert(`Network error: ${e.message}`);
-        }
+            if (showToast) showToast(e.message, 'error'); else alert(`Network error: ${e.message}`);
+        } finally { setIsSubmitting(false); }
     };
+
+    const inp = "w-full p-3.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:border-primary-400 transition-all";
+    const lbl = "block text-xs font-black text-gray-400 uppercase mb-2";
+
     return (
-        <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase mb-2">Vehicle</label>
-                    <select required value={formData.vehicle_id} onChange={e => setFormData({...formData, vehicle_id: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
+                    <label className={lbl}>Vehicle *</label>
+                    <select required value={formData.vehicle_id} onChange={e => setFormData({...formData, vehicle_id: e.target.value})} className={inp}>
                         <option value="">Select Unit</option>
-                        {vehicles.map((v: any) => <option key={v.id} value={v.id}>{v.plate_number}</option>)}
+                        {vehicles.map((v: any) => <option key={v.id} value={v.id}>{v.plate_number} — {v.make} {v.model}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase mb-2">Service Category</label>
-                    <select value={formData.service_type} onChange={e => setFormData({...formData, service_type: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none">
+                    <label className={lbl}>Service Category *</label>
+                    <select value={formData.service_type} onChange={e => setFormData({...formData, service_type: e.target.value})} className={inp}>
                         <option value="regular">Regular Service</option>
                         <option value="repair">Mechanical Repair</option>
                         <option value="tire_change">Tire Replacement</option>
                         <option value="inspection">Safety Inspection</option>
+                        <option value="oil_change">Oil Change</option>
+                        <option value="brake_service">Brake Service</option>
+                        <option value="electrical">Electrical / Electronics</option>
+                        <option value="bodywork">Body Work / Painting</option>
                     </select>
                 </div>
             </div>
-            <textarea required placeholder="Service Description..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-3xl text-sm font-bold outline-none h-32" />
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <label className={lbl}>Service Description *</label>
+                <textarea required placeholder="Describe the service performed..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className={`${inp} h-24`} />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase mb-2">Cost</label>
-                    <input required type="number" value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                    <label className={lbl}>Performed By (Mechanic / Garage)</label>
+                    <input placeholder="e.g. Toyota Kenya, Nairobi" value={formData.performed_by} onChange={e => setFormData({...formData, performed_by: e.target.value})} className={inp} />
                 </div>
                 <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase mb-2">Current Odo</label>
-                    <input required type="number" value={formData.odometer_reading} onChange={e => setFormData({...formData, odometer_reading: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                    <label className={lbl}>Service Date *</label>
+                    <input required type="date" value={formData.service_date} onChange={e => setFormData({...formData, service_date: e.target.value})} className={inp} />
                 </div>
                 <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase mb-2">Next Service (Km)</label>
-                    <input required type="number" value={formData.next_service_due_odometer} onChange={e => setFormData({...formData, next_service_due_odometer: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                    <label className={lbl}>Cost (KES) *</label>
+                    <input required type="number" placeholder="0" value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} className={inp} />
+                </div>
+                <div>
+                    <label className={lbl}>Current Odometer (km) *</label>
+                    <input required type="number" placeholder="e.g. 45000" value={formData.odometer_reading} onChange={e => setFormData({...formData, odometer_reading: e.target.value})} className={inp} />
+                </div>
+                <div className="md:col-span-2">
+                    <label className={lbl}>Next Service Due (km)</label>
+                    <input type="number" placeholder="e.g. 50000" value={formData.next_service_due_odometer} onChange={e => setFormData({...formData, next_service_due_odometer: e.target.value})} className={inp} />
                 </div>
             </div>
-            <div className="flex gap-4">
-                <input required type="date" value={formData.service_date} onChange={e => setFormData({...formData, service_date: e.target.value})} className="flex-1 p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
-                <button className="px-10 bg-red-600 text-white font-black rounded-2xl shadow-xl">Post Record</button>
-            </div>
+            <button disabled={isSubmitting} className="w-full py-4 bg-red-600 text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50">
+                {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                {isSubmitting ? 'Saving...' : 'Post Service Record'}
+            </button>
         </form>
     );
 }
