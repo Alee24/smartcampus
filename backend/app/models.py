@@ -144,6 +144,7 @@ class Vehicle(UUIDModel, table=True):
     owner: Optional["User"] = Relationship(back_populates="vehicles")
 
     # Fleet specific fields
+    is_fleet: bool = Field(default=False)
     vehicle_type: str = "utility" # bus, staff, field, shuttle, utility
     fuel_type: str = "petrol" # petrol, diesel, electric
     fuel_capacity: float = 0.0

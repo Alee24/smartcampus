@@ -124,7 +124,7 @@ class VehicleResponse(BaseModel):
 
 @router.get("/vehicles", response_model=List[VehicleResponse])
 async def get_vehicles(session: AsyncSession = Depends(get_session)):
-    result = await session.exec(select(Vehicle))
+    result = await session.exec(select(Vehicle).where(Vehicle.is_fleet == True))
     vehicles = result.all()
     
     # Query all active log vehicle IDs
@@ -166,25 +166,48 @@ async def create_vehicle(
     admin: User = Depends(get_current_user)
 ):
     try:
-        vehicle = Vehicle(
-            plate_number=vehicle_data.plate_number,
-            make=vehicle_data.make,
-            model=vehicle_data.model,
-            color=vehicle_data.color,
-            driver_name=vehicle_data.driver_name,
-            driver_contact=vehicle_data.driver_contact,
-            driver_id_number=vehicle_data.driver_id_number,
-            owner_id=vehicle_data.owner_id,
-            vehicle_type=vehicle_data.vehicle_type,
-            fuel_type=vehicle_data.fuel_type,
-            fuel_capacity=vehicle_data.fuel_capacity,
-            engine_number=vehicle_data.engine_number,
-            chassis_number=vehicle_data.chassis_number,
-            year=vehicle_data.year,
-            status=vehicle_data.status,
-            current_odometer=vehicle_data.current_odometer
-        )
-        session.add(vehicle)
+        # Check if it already exists (e.g. from Gate Control)
+        vehicle = (await session.exec(select(Vehicle).where(Vehicle.plate_number == vehicle_data.plate_number))).first()
+        if vehicle:
+            # Update the existing record and attach it to the fleet
+            vehicle.make = vehicle_data.make
+            vehicle.model = vehicle_data.model
+            vehicle.color = vehicle_data.color
+            vehicle.driver_name = vehicle_data.driver_name
+            vehicle.driver_contact = vehicle_data.driver_contact
+            vehicle.driver_id_number = vehicle_data.driver_id_number
+            vehicle.owner_id = vehicle_data.owner_id
+            vehicle.vehicle_type = vehicle_data.vehicle_type
+            vehicle.fuel_type = vehicle_data.fuel_type
+            vehicle.fuel_capacity = vehicle_data.fuel_capacity
+            vehicle.engine_number = vehicle_data.engine_number
+            vehicle.chassis_number = vehicle_data.chassis_number
+            vehicle.year = vehicle_data.year
+            vehicle.status = vehicle_data.status
+            vehicle.current_odometer = vehicle_data.current_odometer
+            vehicle.is_fleet = True
+        else:
+            vehicle = Vehicle(
+                plate_number=vehicle_data.plate_number,
+                make=vehicle_data.make,
+                model=vehicle_data.model,
+                color=vehicle_data.color,
+                driver_name=vehicle_data.driver_name,
+                driver_contact=vehicle_data.driver_contact,
+                driver_id_number=vehicle_data.driver_id_number,
+                owner_id=vehicle_data.owner_id,
+                vehicle_type=vehicle_data.vehicle_type,
+                fuel_type=vehicle_data.fuel_type,
+                fuel_capacity=vehicle_data.fuel_capacity,
+                engine_number=vehicle_data.engine_number,
+                chassis_number=vehicle_data.chassis_number,
+                year=vehicle_data.year,
+                status=vehicle_data.status,
+                current_odometer=vehicle_data.current_odometer,
+                is_fleet=True
+            )
+            session.add(vehicle)
+            
         await session.commit()
         await session.refresh(vehicle)
 
@@ -299,54 +322,28 @@ async def delete_vehicle(
         if not vehicle:
             raise HTTPException(status_code=404, detail="Vehicle not found")
         
-        # Delete related GPS logs
-        gps_logs = (await session.exec(select(FleetGPSLog).where(FleetGPSLog.vehicle_id == vehicle_id))).all()
-        for log in gps_logs:
-            await session.delete(log)
-            
-        # Delete related fuel logs
-        fuel_logs = (await session.exec(select(FleetFuelLog).where(FleetFuelLog.vehicle_id == vehicle_id))).all()
-        for log in fuel_logs:
-            await session.delete(log)
-            
-        # Delete related maintenance logs
-        maintenance_logs = (await session.exec(select(FleetMaintenanceLog).where(FleetMaintenanceLog.vehicle_id == vehicle_id))).all()
-        for log in maintenance_logs:
-            await session.delete(log)
-
-        # Delete related notifications
-        notifications = (await session.exec(select(FleetNotification).where(FleetNotification.vehicle_id == vehicle_id))).all()
-        for notification in notifications:
-            await session.delete(notification)
-
-        # Delete related vehicle logs
-        vehicle_logs = (await session.exec(select(VehicleLog).where(VehicleLog.vehicle_id == vehicle_id))).all()
-        for log in vehicle_logs:
-            await session.delete(log)
-
-        # Delete related trips (passenger manifests & notifications deleted first)
-        trips = (await session.exec(select(FleetTrip).where(FleetTrip.vehicle_id == vehicle_id))).all()
-        for trip in trips:
-            # Delete passenger manifests for this trip
-            manifests = (await session.exec(select(FleetPassengerManifest).where(FleetPassengerManifest.trip_id == trip.id))).all()
-            for manifest in manifests:
-                await session.delete(manifest)
-            
-            # Delete trip notifications
-            trip_notifications = (await session.exec(select(FleetNotification).where(FleetNotification.trip_id == trip.id))).all()
-            for notification in trip_notifications:
-                await session.delete(notification)
-                
-            await session.delete(trip)
-            
-        # Finally delete the vehicle itself
-        await session.delete(vehicle)
+        # Soft delete from fleet instead of hard deleting to preserve gate pass history
+        vehicle.is_fleet = False
+        vehicle.status = "inactive"
+        session.add(vehicle)
         await session.commit()
         
-        return {"status": "success", "message": f"Vehicle '{vehicle.plate_number}' and all its related records have been deleted."}
+        await log_action(
+            session=session,
+            action_type="delete",
+            user=admin,
+            table_name="vehicles",
+            record_id=str(vehicle.id),
+            description=f"Removed vehicle from fleet tracking: {vehicle.plate_number}",
+            new_values=None,
+            request=None
+        )
+        return {"status": "success", "message": "Vehicle removed from fleet."}
+    except HTTPException:
+        raise
     except Exception as e:
         await session.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to delete vehicle: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to remove vehicle from fleet: {str(e)}")
 
 @router.post("/vehicles/{vehicle_id}/checkin")
 async def check_in_fleet_vehicle(
@@ -1083,13 +1080,13 @@ async def get_latest_location(vehicle_id: UUID, session: AsyncSession = Depends(
 @router.get("/stats")
 async def get_fleet_stats(session: AsyncSession = Depends(get_session)):
     try:
-        total_vehicles = (await session.exec(select(func.count(Vehicle.id)))).first() or 0
+        total_vehicles = (await session.exec(select(func.count(Vehicle.id)).where(Vehicle.is_fleet == True))).first() or 0
         active_trips = (await session.exec(select(func.count(FleetTrip.id)).where(FleetTrip.status == "ongoing"))).first() or 0
-        maintenance_due = (await session.exec(select(func.count(Vehicle.id)).where(Vehicle.status == "maintenance"))).first() or 0
+        maintenance_due = (await session.exec(select(func.count(Vehicle.id)).where(Vehicle.status == "maintenance").where(Vehicle.is_fleet == True))).first() or 0
 
         # Buses currently checked IN (open VehicleLog with no exit_time)
         buses_in = (await session.exec(
-            select(func.count(VehicleLog.id)).where(VehicleLog.exit_time == None)
+            select(func.count(VehicleLog.id)).join(Vehicle, VehicleLog.vehicle_id == Vehicle.id).where(VehicleLog.exit_time == None).where(Vehicle.is_fleet == True)
         )).first() or 0
         # Buses currently OUT (total minus checked in)
         buses_out = max(0, total_vehicles - buses_in)

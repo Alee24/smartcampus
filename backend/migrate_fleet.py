@@ -17,6 +17,7 @@ async def fix_schema():
         
         # 2. Manual column additions for existing tables
         new_vehicle_cols = {
+            "is_fleet": "BOOLEAN DEFAULT FALSE",
             "vehicle_type": "VARCHAR(255) DEFAULT 'utility'",
             "fuel_type": "VARCHAR(255) DEFAULT 'petrol'",
             "fuel_capacity": "FLOAT DEFAULT 0.0",
@@ -45,6 +46,14 @@ async def fix_schema():
                     await conn.execute(text(f"ALTER TABLE vehicles ADD COLUMN {col} {type_}"))
         except Exception as e:
             print("Error migrating vehicles table:", e)
+            
+        # 2b. Set is_fleet = True for existing fleet vehicles based on their type
+        try:
+            print("Setting is_fleet=True for actual fleet vehicles...")
+            await conn.execute(text("UPDATE vehicles SET is_fleet = 1 WHERE vehicle_type IN ('bus', 'shuttle', 'field', 'utility')"))
+        except Exception as e:
+            print("Error updating is_fleet flag:", e)
+            
         # 3. Fix fleet_trips driver_id
         try:
             print("Disabling foreign key checks for schema alter...")
