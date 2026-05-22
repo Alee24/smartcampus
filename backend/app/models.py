@@ -148,6 +148,7 @@ class Vehicle(UUIDModel, table=True):
     vehicle_type: str = "utility" # bus, staff, field, shuttle, utility
     fuel_type: str = "petrol" # petrol, diesel, electric
     fuel_capacity: float = 0.0
+    seating_capacity: int = 0
     engine_number: Optional[str] = None
     chassis_number: Optional[str] = None
     year: Optional[int] = None
@@ -193,6 +194,7 @@ class FleetTrip(UUIDModel, table=True):
     planned_route: Optional[str] = None
     
     scheduled_departure: datetime
+    expected_return: Optional[datetime] = None
     actual_departure: Optional[datetime] = None
     actual_arrival: Optional[datetime] = None
     eta: Optional[datetime] = None

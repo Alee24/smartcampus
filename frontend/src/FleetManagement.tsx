@@ -1224,28 +1224,48 @@ function TripsManager({ trips, vehicles, onUpdate }: any) {
             )}
 
             <div className="space-y-4">
-                {(trips || []).map((trip: any, i: number) => (
-                    <div key={i} className="p-6 bg-white rounded-2xl border border-gray-100 hover:border-primary-300 transition-all shadow-sm">
-                        <div className="flex flex-col lg:flex-row justify-between gap-6">
-                            <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${
-                                        trip.status === 'completed' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'
-                                    }`}>{trip.status}</span>
-                                    <span className="text-xs font-bold text-gray-400">{new Date(trip.scheduled_departure).toLocaleString()}</span>
-                                </div>
-                                <h4 className="text-xl font-black text-gray-900 mb-4">{trip.origin} <ChevronRight className="inline text-gray-300" /> {trip.destination}</h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-                                    <div>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Vehicle</p>
-                                        <p className="text-sm font-bold">{vehicles.find((v: any) => v.id === trip.vehicle_id)?.plate_number || 'Unit'}</p>
+                {(trips || []).map((trip: any, i: number) => {
+                    const vehicle = vehicles.find((v: any) => v.id === trip.vehicle_id);
+                    const seatingCapacity = vehicle?.seating_capacity || 0;
+                    const availableSeats = Math.max(0, seatingCapacity - (trip.passengers_count || 0));
+
+                    return (
+                        <div key={i} className="p-6 bg-white rounded-2xl border border-gray-100 hover:border-primary-300 transition-all shadow-sm">
+                            <div className="flex flex-col lg:flex-row justify-between gap-6">
+                                <div className="flex-1">
+                                    <div className="flex flex-wrap items-center gap-3 mb-3">
+                                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase ${
+                                            trip.status === 'completed' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'
+                                        }`}>{trip.status}</span>
+                                        <span className="text-xs font-bold text-gray-400">
+                                            {new Date(trip.scheduled_departure).toLocaleString()}
+                                            {trip.expected_return && ` - ${new Date(trip.expected_return).toLocaleString()}`}
+                                        </span>
                                     </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Purpose</p>
-                                        <p className="text-sm font-bold">{trip.purpose}</p>
+                                    <h4 className="text-xl font-black text-gray-900 mb-4">{trip.origin} <ChevronRight className="inline text-gray-300" /> {trip.destination}</h4>
+                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                                        <div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Vehicle</p>
+                                            <p className="text-sm font-bold">{vehicle?.plate_number || 'Unit'}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Purpose</p>
+                                            <p className="text-sm font-bold">{trip.purpose}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Person in Charge</p>
+                                            <p className="text-sm font-bold">{trip.trip_lead_name || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Lead Contact</p>
+                                            <p className="text-sm font-bold">{trip.trip_lead_contact || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Available Seats</p>
+                                            <p className="text-sm font-bold text-primary-600">{availableSeats} / {seatingCapacity}</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
                             <div className="flex items-center gap-3">
                                 {trip.status === 'scheduled' && (
                                     <button 
@@ -1272,7 +1292,7 @@ function TripsManager({ trips, vehicles, onUpdate }: any) {
                             </div>
                         </div>
                     </div>
-                ))}
+                )})}
             </div>
         </div>
     );
@@ -1781,6 +1801,7 @@ function VehicleForm({ vehicle, onSuccess, onError }: VehicleFormProps) {
         vehicle_type: 'bus',
         fuel_type: 'diesel',
         fuel_capacity: 0,
+        seating_capacity: 0,
         year: new Date().getFullYear(),
         driver_name: '',
         driver_contact: '',
@@ -1803,6 +1824,7 @@ function VehicleForm({ vehicle, onSuccess, onError }: VehicleFormProps) {
                 vehicle_type: vehicle.vehicle_type || 'bus',
                 fuel_type: vehicle.fuel_type || 'diesel',
                 fuel_capacity: vehicle.fuel_capacity || 0,
+                seating_capacity: vehicle.seating_capacity || 0,
                 year: vehicle.year || new Date().getFullYear(),
                 driver_name: vehicle.driver_name || '',
                 driver_contact: vehicle.driver_contact || '',
@@ -1827,6 +1849,7 @@ function VehicleForm({ vehicle, onSuccess, onError }: VehicleFormProps) {
             const method = vehicle ? 'PUT' : 'POST';
             const payload = { ...formData,
                 fuel_capacity: Number(formData.fuel_capacity),
+                seating_capacity: Number(formData.seating_capacity),
                 year: Number(formData.year),
                 current_odometer: Number(formData.current_odometer),
                 insurance_expiry: formData.insurance_expiry || undefined,
@@ -1899,6 +1922,10 @@ function VehicleForm({ vehicle, onSuccess, onError }: VehicleFormProps) {
                     <input type="number" value={formData.fuel_capacity} onChange={e => set('fuel_capacity', e.target.value)} className={inp} />
                 </div>
                 <div>
+                    <label className={lbl}>Seating Capacity</label>
+                    <input type="number" value={formData.seating_capacity} onChange={e => set('seating_capacity', e.target.value)} className={inp} />
+                </div>
+                <div>
                     <label className={lbl}>Status</label>
                     <select value={formData.status} onChange={e => set('status', e.target.value)} className={inp}>
                         <option value="active">Active</option>
@@ -1962,7 +1989,10 @@ function TripForm({ vehicles, onSuccess }: any) {
         origin: 'Riara University Main Campus', 
         destination: '', 
         purpose: '', 
-        scheduled_departure: ''
+        scheduled_departure: '',
+        expected_return: '',
+        trip_lead_name: '',
+        trip_lead_contact: ''
     });
     
     const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
@@ -2077,6 +2107,7 @@ function TripForm({ vehicles, onSuccess }: any) {
 
             // Convert datetime-local string to proper ISO 8601 format
             const departureISO = new Date(formData.scheduled_departure).toISOString();
+            const returnISO = formData.expected_return ? new Date(formData.expected_return).toISOString() : undefined;
 
             const payload = {
                 vehicle_id: formData.vehicle_id,
@@ -2084,6 +2115,9 @@ function TripForm({ vehicles, onSuccess }: any) {
                 destination: formData.destination,
                 purpose: formData.purpose,
                 scheduled_departure: departureISO,
+                expected_return: returnISO,
+                trip_lead_name: formData.trip_lead_name || undefined,
+                trip_lead_contact: formData.trip_lead_contact || undefined,
                 status: 'scheduled'
             };
 
@@ -2214,6 +2248,21 @@ function TripForm({ vehicles, onSuccess }: any) {
                 <div className="flex flex-col">
                     <label className="text-xs font-bold text-gray-500 mb-1">Departure Time</label>
                     <input required type="datetime-local" value={formData.scheduled_departure} onChange={e => setFormData({...formData, scheduled_departure: e.target.value})} className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-xs font-bold text-gray-500 mb-1">Expected Return Date</label>
+                    <input type="datetime-local" value={formData.expected_return} onChange={e => setFormData({...formData, expected_return: e.target.value})} className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-xs font-bold text-gray-500 mb-1">Person in Charge (Name)</label>
+                    <input placeholder="e.g. John Doe" value={formData.trip_lead_name} onChange={e => setFormData({...formData, trip_lead_name: e.target.value})} className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
+                </div>
+
+                <div className="flex flex-col">
+                    <label className="text-xs font-bold text-gray-500 mb-1">Person in Charge (Phone)</label>
+                    <input placeholder="e.g. 0712345678" value={formData.trip_lead_contact} onChange={e => setFormData({...formData, trip_lead_contact: e.target.value})} className="w-full p-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold outline-none shadow-sm" />
                 </div>
 
                 <div className="flex flex-col justify-end">

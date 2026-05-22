@@ -21,6 +21,7 @@ async def fix_schema():
             "vehicle_type": "VARCHAR(255) DEFAULT 'utility'",
             "fuel_type": "VARCHAR(255) DEFAULT 'petrol'",
             "fuel_capacity": "FLOAT DEFAULT 0.0",
+            "seating_capacity": "INT DEFAULT 0",
             "engine_number": "VARCHAR(255)",
             "chassis_number": "VARCHAR(255)",
             "year": "INT",
@@ -88,6 +89,9 @@ async def fix_schema():
             if "trip_lead_contact" not in trip_cols:
                 print("Adding trip_lead_contact column to fleet_trips...")
                 await conn.execute(text("ALTER TABLE fleet_trips ADD COLUMN trip_lead_contact VARCHAR(255) NULL"))
+            if "expected_return" not in trip_cols:
+                print("Adding expected_return column to fleet_trips...")
+                await conn.execute(text("ALTER TABLE fleet_trips ADD COLUMN expected_return DATETIME NULL"))
         except Exception as e:
             print("Error migrating fleet_trips table columns:", e)
 

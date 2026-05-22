@@ -31,6 +31,7 @@ class VehicleCreate(BaseModel):
     vehicle_type: str = "utility"
     fuel_type: str = "petrol"
     fuel_capacity: float = 0.0
+    seating_capacity: int = 0
     engine_number: Optional[str] = None
     chassis_number: Optional[str] = None
     year: Optional[int] = None
@@ -49,6 +50,7 @@ class VehicleUpdate(BaseModel):
     vehicle_type: Optional[str] = None
     fuel_type: Optional[str] = None
     fuel_capacity: Optional[float] = None
+    seating_capacity: Optional[int] = None
     engine_number: Optional[str] = None
     chassis_number: Optional[str] = None
     year: Optional[int] = None
@@ -63,6 +65,7 @@ class TripCreate(BaseModel):
     destination: str
     planned_route: Optional[str] = None
     scheduled_departure: datetime
+    expected_return: Optional[datetime] = None
     start_odometer: float = 0.0
     status: str = "scheduled"
     notes: Optional[str] = None
@@ -77,6 +80,7 @@ class TripUpdate(BaseModel):
     destination: Optional[str] = None
     planned_route: Optional[str] = None
     scheduled_departure: Optional[datetime] = None
+    expected_return: Optional[datetime] = None
     status: Optional[str] = None
     notes: Optional[str] = None
     trip_lead_name: Optional[str] = None
@@ -113,6 +117,7 @@ class VehicleResponse(BaseModel):
     vehicle_type: str
     fuel_type: str
     fuel_capacity: float
+    seating_capacity: int
     engine_number: Optional[str] = None
     chassis_number: Optional[str] = None
     year: Optional[int] = None
@@ -148,6 +153,7 @@ async def get_vehicles(session: AsyncSession = Depends(get_session)):
             vehicle_type=v.vehicle_type,
             fuel_type=v.fuel_type,
             fuel_capacity=v.fuel_capacity,
+            seating_capacity=v.seating_capacity,
             engine_number=v.engine_number,
             chassis_number=v.chassis_number,
             year=v.year,
@@ -180,6 +186,7 @@ async def create_vehicle(
             vehicle.vehicle_type = vehicle_data.vehicle_type
             vehicle.fuel_type = vehicle_data.fuel_type
             vehicle.fuel_capacity = vehicle_data.fuel_capacity
+            vehicle.seating_capacity = vehicle_data.seating_capacity
             vehicle.engine_number = vehicle_data.engine_number
             vehicle.chassis_number = vehicle_data.chassis_number
             vehicle.year = vehicle_data.year
@@ -199,6 +206,7 @@ async def create_vehicle(
                 vehicle_type=vehicle_data.vehicle_type,
                 fuel_type=vehicle_data.fuel_type,
                 fuel_capacity=vehicle_data.fuel_capacity,
+                seating_capacity=vehicle_data.seating_capacity,
                 engine_number=vehicle_data.engine_number,
                 chassis_number=vehicle_data.chassis_number,
                 year=vehicle_data.year,
@@ -235,6 +243,7 @@ async def create_vehicle(
             vehicle_type=vehicle.vehicle_type,
             fuel_type=vehicle.fuel_type,
             fuel_capacity=vehicle.fuel_capacity,
+            seating_capacity=vehicle.seating_capacity,
             engine_number=vehicle.engine_number,
             chassis_number=vehicle.chassis_number,
             year=vehicle.year,
@@ -275,6 +284,7 @@ async def get_vehicle(vehicle_id: UUID, session: AsyncSession = Depends(get_sess
         vehicle_type=v.vehicle_type,
         fuel_type=v.fuel_type,
         fuel_capacity=v.fuel_capacity,
+        seating_capacity=v.seating_capacity,
         engine_number=v.engine_number,
         chassis_number=v.chassis_number,
         year=v.year,
@@ -441,8 +451,11 @@ async def check_out_fleet_vehicle(
 async def get_trips(session: AsyncSession = Depends(get_session)):
     result = await session.exec(select(FleetTrip).order_by(FleetTrip.scheduled_departure.desc()))
     trips = result.all()
-    return [
-        {
+    
+    trip_data = []
+    for t in trips:
+        passengers_count = (await session.exec(select(func.count(FleetPassengerManifest.id)).where(FleetPassengerManifest.trip_id == t.id))).first() or 0
+        trip_data.append({
             "id": str(t.id),
             "vehicle_id": str(t.vehicle_id),
             "driver_id": str(t.driver_id) if t.driver_id else None,
@@ -451,6 +464,7 @@ async def get_trips(session: AsyncSession = Depends(get_session)):
             "destination": t.destination,
             "planned_route": t.planned_route,
             "scheduled_departure": t.scheduled_departure.isoformat() if t.scheduled_departure else None,
+            "expected_return": t.expected_return.isoformat() if t.expected_return else None,
             "actual_departure": t.actual_departure.isoformat() if t.actual_departure else None,
             "actual_arrival": t.actual_arrival.isoformat() if t.actual_arrival else None,
             "start_odometer": t.start_odometer,
@@ -458,10 +472,10 @@ async def get_trips(session: AsyncSession = Depends(get_session)):
             "status": t.status,
             "notes": t.notes,
             "trip_lead_name": t.trip_lead_name,
-            "trip_lead_contact": t.trip_lead_contact
-        }
-        for t in trips
-    ]
+            "trip_lead_contact": t.trip_lead_contact,
+            "passengers_count": passengers_count
+        })
+    return trip_data
 
 @router.post("/trips")
 async def create_trip(
@@ -488,6 +502,7 @@ async def create_trip(
             destination=trip_data.destination,
             planned_route=trip_data.planned_route,
             scheduled_departure=trip_data.scheduled_departure,
+            expected_return=trip_data.expected_return,
             start_odometer=trip_data.start_odometer,
             status=trip_data.status,
             notes=trip_data.notes,
@@ -566,6 +581,7 @@ async def get_trip_details(
         "destination": trip.destination,
         "planned_route": trip.planned_route,
         "scheduled_departure": trip.scheduled_departure.isoformat() if trip.scheduled_departure else None,
+        "expected_return": trip.expected_return.isoformat() if trip.expected_return else None,
         "actual_departure": trip.actual_departure.isoformat() if trip.actual_departure else None,
         "actual_arrival": trip.actual_arrival.isoformat() if trip.actual_arrival else None,
         "start_odometer": trip.start_odometer,
