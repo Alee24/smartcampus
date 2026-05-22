@@ -144,6 +144,7 @@ async def factory_reset_users(
         await session.execute(text("DELETE FROM student_course_registrations WHERE student_id NOT IN (SELECT id FROM users)"))
         await session.execute(text("DELETE FROM attendance_records WHERE student_id NOT IN (SELECT id FROM users)"))
         await session.execute(text("DELETE FROM scan_logs WHERE student_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("DELETE FROM vehicle_logs WHERE guard_id NOT IN (SELECT id FROM users)"))
         
         # 4. Nullify nullable foreign keys pointing to deleted users
         await session.execute(text("UPDATE entry_logs SET guard_id = NULL WHERE guard_id NOT IN (SELECT id FROM users)"))
@@ -156,9 +157,9 @@ async def factory_reset_users(
         await session.execute(text("UPDATE class_sessions SET lecturer_id = NULL WHERE lecturer_id NOT IN (SELECT id FROM users)"))
         await session.execute(text("UPDATE timetable_slots SET lecturer_id = NULL WHERE lecturer_id NOT IN (SELECT id FROM users)"))
         await session.execute(text("UPDATE attendance_records SET assisted_by = NULL WHERE assisted_by NOT IN (SELECT id FROM users)"))
-        await session.execute(text("UPDATE audit_logs SET actor_id = NULL WHERE actor_id NOT IN (SELECT id FROM users)"))
-        await session.execute(text("UPDATE scan_logs SET scanned_by = NULL WHERE scanned_by NOT IN (SELECT id FROM users)"))
-        await session.execute(text("UPDATE system_activities SET user_id = NULL WHERE user_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE system_activities SET actor_id = NULL WHERE actor_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE audit_logs SET user_id = NULL WHERE user_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE event_visitors SET scanned_by = NULL WHERE scanned_by NOT IN (SELECT id FROM users)"))
         await session.execute(text("UPDATE users SET guardian_id = NULL WHERE guardian_id NOT IN (SELECT id FROM (SELECT id FROM users) AS tmp)"))
         
         # 5. Re-enable Foreign Key Checks
