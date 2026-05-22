@@ -12,11 +12,14 @@ ASYNC_DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg:/
 # Engine configuration
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 engine = create_async_engine(
-    ASYNC_DATABASE_URL, 
-    echo=DEBUG_MODE, 
+    ASYNC_DATABASE_URL,
+    echo=DEBUG_MODE,
     future=True,
-    pool_recycle=3600,
-    pool_pre_ping=True
+    pool_recycle=1800,       # Recycle connections every 30 min
+    pool_pre_ping=False,     # Disabled - aiomysql ping() requires reconnect arg
+    pool_size=10,
+    max_overflow=20,
+    pool_timeout=30,
 )
 
 async def init_db():
