@@ -77,9 +77,11 @@ async def migrate_fleet():
     """Manual migration to add columns for Fleet Management if they don't exist."""
     print("Checking vehicles table schema...")
     new_vehicle_cols = {
+        "is_fleet": "BOOLEAN DEFAULT FALSE",
         "vehicle_type": "VARCHAR(255) DEFAULT 'utility'",
         "fuel_type": "VARCHAR(255) DEFAULT 'petrol'",
         "fuel_capacity": "FLOAT DEFAULT 0.0",
+        "seating_capacity": "INT DEFAULT 0",
         "engine_number": "VARCHAR(255)",
         "chassis_number": "VARCHAR(255)",
         "year": "INT",
@@ -135,6 +137,9 @@ async def migrate_fleet():
             if "trip_lead_contact" not in trip_cols:
                 print("Adding trip_lead_contact column to fleet_trips...")
                 await conn.execute(text("ALTER TABLE fleet_trips ADD COLUMN trip_lead_contact VARCHAR(255) NULL"))
+            if "expected_return" not in trip_cols:
+                print("Adding expected_return column to fleet_trips...")
+                await conn.execute(text("ALTER TABLE fleet_trips ADD COLUMN expected_return DATETIME NULL"))
             print("fleet_trips table migration checked/applied.")
 
             # Check columns for fleet_passenger_manifest
