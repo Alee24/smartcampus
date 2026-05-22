@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Car, MapPin, Navigation, Fuel, Wrench, AlertTriangle, Users, Plus, Search, Filter, ChevronRight, Activity, Calendar, Clock, Shield, Download, FileText, Settings, Map as MapIcon, TrendingUp, DollarSign, X, Check, Loader2, RefreshCw, Trash2, Edit, Phone, QrCode, FileSpreadsheet, Printer, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
-    ResponsiveContainer, AreaChart, Area
+    ResponsiveContainer, AreaChart, Area, Cell
 } from 'recharts';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
