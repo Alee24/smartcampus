@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
     CheckCircle, Download, UploadCloud, Users,
     BookOpen, UserCheck, Layers, ChevronRight, Play,
-    Building2, CalendarDays, Loader2, ArrowRight, Image
+    Building2, CalendarDays, Loader2, ArrowRight, Image, Trash2
 } from 'lucide-react'
 import ThreeDProgressBar from './ThreeDProgressBar'
 
@@ -366,6 +366,39 @@ export default function BulkUpload() {
         a.click()
     }
 
+    const handleFactoryReset = async () => {
+        const confirm1 = window.confirm("DANGER: This will delete ALL users, their gate pass logs, attendance records, and vehicles from the system (except SuperAdmins). This action CANNOT be undone.\n\nAre you absolutely sure you want to proceed?")
+        if (!confirm1) return
+        
+        const confirm2 = window.prompt("To confirm, type 'RESET' in the box below:")
+        if (confirm2 !== 'RESET') {
+            alert("Reset cancelled.")
+            return
+        }
+        
+        setLoading(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/admin/users/factory-reset', {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            
+            const data = await res.json()
+            if (res.ok) {
+                alert("Success: " + data.message)
+                fetchStats()
+            } else {
+                alert("Factory reset failed: " + (data.detail || data.message))
+            }
+        } catch (e) {
+            console.error(e)
+            alert("Network error during factory reset.")
+        } finally {
+            setLoading(false)
+        }
+    }
+
     return (
         <div className="animate-fade-in max-w-6xl mx-auto space-y-8 pb-20">
             {/* Header */}
@@ -576,6 +609,22 @@ export default function BulkUpload() {
                             className="w-full py-3 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
                         >
                             <Download size={16} /> Get Step {currentStep + 1} Template
+                        </button>
+                    </div>
+
+                    {/* Danger Zone */}
+                    <div className="glass-card p-6 rounded-3xl bg-red-50 border border-red-100">
+                        <h3 className="font-bold text-red-700 mb-2">Danger Zone</h3>
+                        <p className="text-xs text-red-600/80 mb-4">
+                            Need a fresh start? This will delete all users (except SuperAdmin) and clear their associated logs, attendance, and vehicles.
+                        </p>
+                        <button
+                            onClick={handleFactoryReset}
+                            disabled={loading}
+                            className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold shadow-lg shadow-red-600/20 transition-all flex items-center justify-center gap-2"
+                        >
+                            {loading ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                            Factory Reset Users
                         </button>
                     </div>
                 </div>

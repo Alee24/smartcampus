@@ -114,6 +114,75 @@ async def save_dashboard_config(
     
     return {"status": "success"}
 
+@router.delete("/users/factory-reset")
+async def factory_reset_users(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(ensure_admin)
+):
+    """
+    DANGEROUS: Deletes all users and their dependent records from the database,
+    EXCEPT for 'mettoalex@gmail.com' and users with the 'SuperAdmin' role.
+    """
+    try:
+        # 1. Disable Foreign Key Checks to allow mass deletion
+        await session.execute(text("SET FOREIGN_KEY_CHECKS=0;"))
+        
+        # 2. Delete main users first (this identifies who is gone)
+        # We exclude mettoalex@gmail.com and any user with the SuperAdmin role
+        delete_users_sql = """
+            DELETE FROM users 
+            WHERE email != 'mettoalex@gmail.com' 
+            AND role_id NOT IN (SELECT id FROM roles WHERE name='SuperAdmin')
+        """
+        await session.execute(text(delete_users_sql))
+        
+        # 3. Clean up orphaned dependent records (Tables where user_id is NOT NULL)
+        await session.execute(text("DELETE FROM user_faces WHERE user_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("DELETE FROM user_location_logs WHERE user_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("DELETE FROM entry_logs WHERE user_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("DELETE FROM student_course_registrations WHERE student_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("DELETE FROM attendance_records WHERE student_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("DELETE FROM scan_logs WHERE student_id NOT IN (SELECT id FROM users)"))
+        
+        # 4. Nullify nullable foreign keys pointing to deleted users
+        await session.execute(text("UPDATE entry_logs SET guard_id = NULL WHERE guard_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE gate_scan_logs SET guard_id = NULL WHERE guard_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE vehicles SET owner_id = NULL WHERE owner_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE fleet_trips SET driver_id = NULL WHERE driver_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE fleet_passenger_manifest SET user_id = NULL WHERE user_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE fleet_fuel_logs SET driver_id = NULL WHERE driver_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE courses SET lecturer_id = NULL WHERE lecturer_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE class_sessions SET lecturer_id = NULL WHERE lecturer_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE timetable_slots SET lecturer_id = NULL WHERE lecturer_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE attendance_records SET assisted_by = NULL WHERE assisted_by NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE audit_logs SET actor_id = NULL WHERE actor_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE scan_logs SET scanned_by = NULL WHERE scanned_by NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE system_activities SET user_id = NULL WHERE user_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE users SET guardian_id = NULL WHERE guardian_id NOT IN (SELECT id FROM users)"))
+        
+        # 5. Re-enable Foreign Key Checks
+        await session.execute(text("SET FOREIGN_KEY_CHECKS=1;"))
+        
+        # Commit the transaction
+        await session.commit()
+        
+        await log_action(
+            session=session,
+            action_type="factory_reset_users",
+            user=admin,
+            table_name="users",
+            description="Performed a factory reset of all users except SuperAdmins",
+            new_values={"action": "factory_reset"},
+            request=request
+        )
+        
+        return {"status": "success", "message": "All users have been successfully reset."}
+    except Exception as e:
+        await session.execute(text("SET FOREIGN_KEY_CHECKS=1;"))
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Factory reset failed: {str(e)}")
+
 @router.get("/company-settings")
 async def get_company_settings(
     session: AsyncSession = Depends(get_session),
