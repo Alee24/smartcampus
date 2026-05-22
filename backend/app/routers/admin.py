@@ -357,12 +357,13 @@ async def bulk_upload_students(
                 
                 # Construct full name
                 if not full_name:
-                    full_name = f"{first_name} {last_name}".strip()
+                    if first_name or last_name:
+                        full_name = f"{first_name} {last_name}".strip()
+                    else:
+                        full_name = f"Student {uuid.uuid4().hex[:6].upper()}"
                 
-                if not adm or not full_name:
-                    error_count += 1
-                    errors.append(f"Row {row_num}: Missing admission_number or name")
-                    continue
+                if not adm:
+                    adm = f"STD{uuid.uuid4().hex[:8].upper()}"
                 
                 # Check if exists (by email or admission number)
                 query = select(User).where((User.admission_number == adm) | (User.email == email if email else False))
