@@ -159,7 +159,7 @@ async def factory_reset_users(
         await session.execute(text("UPDATE audit_logs SET actor_id = NULL WHERE actor_id NOT IN (SELECT id FROM users)"))
         await session.execute(text("UPDATE scan_logs SET scanned_by = NULL WHERE scanned_by NOT IN (SELECT id FROM users)"))
         await session.execute(text("UPDATE system_activities SET user_id = NULL WHERE user_id NOT IN (SELECT id FROM users)"))
-        await session.execute(text("UPDATE users SET guardian_id = NULL WHERE guardian_id NOT IN (SELECT id FROM users)"))
+        await session.execute(text("UPDATE users SET guardian_id = NULL WHERE guardian_id NOT IN (SELECT id FROM (SELECT id FROM users) AS tmp)"))
         
         # 5. Re-enable Foreign Key Checks
         await session.execute(text("SET FOREIGN_KEY_CHECKS=1;"))
