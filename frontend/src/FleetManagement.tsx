@@ -32,7 +32,43 @@ interface FleetManagementProps {
     initialTab?: string;
 }
 
-export default function FleetManagement({ initialTab = 'dashboard' }: FleetManagementProps) {
+class ErrorBoundary extends React.Component<any, { hasError: boolean, error: any }> {
+    constructor(props: any) {
+        super(props);
+        this.state = { hasError: false, error: null };
+    }
+    static getDerivedStateFromError(error: any) {
+        return { hasError: true, error };
+    }
+    componentDidCatch(error: any, errorInfo: any) {
+        console.error("FleetManagement Error:", error, errorInfo);
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="p-8 m-8 bg-red-50 border border-red-200 rounded-xl text-red-700">
+                    <h2 className="text-xl font-bold mb-4">Something went wrong in Fleet Management</h2>
+                    <pre className="text-sm overflow-auto p-4 bg-white rounded shadow-inner whitespace-pre-wrap">
+                        {this.state.error?.toString()}
+                        {"\n\n"}
+                        {this.state.error?.stack}
+                    </pre>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
+
+export default function FleetManagement(props: FleetManagementProps) {
+    return (
+        <ErrorBoundary>
+            <FleetManagementContent {...props} />
+        </ErrorBoundary>
+    );
+}
+
+function FleetManagementContent({ initialTab = 'dashboard' }: FleetManagementProps) {
     const [activeTab, setActiveTab] = useState(initialTab);
     const [vehicles, setVehicles] = useState<any[]>([]);
     const [trips, setTrips] = useState<any[]>([]);
@@ -193,7 +229,7 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                     </h3>
                     <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={fuelLogs.slice(0, 10).reverse().map(l => ({ name: new Date(l.timestamp).toLocaleDateString(), liters: l.amount_liters, cost: l.cost }))}>
+                            <AreaChart data={(fuelLogs || []).slice(0, 10).reverse().map(l => ({ name: new Date(l.timestamp).toLocaleDateString(), liters: l.amount_liters, cost: l.cost }))}>
                                 <defs>
                                     <linearGradient id="colorFuel" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.3}/>
@@ -247,7 +283,7 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                         <h3 className="text-lg font-bold">Live Trip Log</h3>
                         <button onClick={() => setActiveTab('trips')} className="text-sm text-primary-600 font-semibold hover:underline">View All</button>
                     </div>
-                    {trips.length === 0 ? (
+                    {(!trips || trips.length === 0) ? (
                         <div className="text-center py-10">
                             <Navigation className="mx-auto text-gray-300 mb-3" size={40} />
                             <p className="font-bold text-gray-400 text-sm">No trips scheduled yet</p>
@@ -264,7 +300,7 @@ export default function FleetManagement({ initialTab = 'dashboard' }: FleetManag
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {trips.slice(0, 6).map((trip, i) => (
+                                    {(trips || []).slice(0, 6).map((trip, i) => (
                                         <tr key={i} className="hover:bg-gray-50 transition-colors">
                                             <td className="py-3">
                                                 <div className="flex items-center gap-3">
@@ -1188,7 +1224,7 @@ function TripsManager({ trips, vehicles, onUpdate }: any) {
             )}
 
             <div className="space-y-4">
-                {trips.map((trip: any, i: number) => (
+                {(trips || []).map((trip: any, i: number) => (
                     <div key={i} className="p-6 bg-white rounded-2xl border border-gray-100 hover:border-primary-300 transition-all shadow-sm">
                         <div className="flex flex-col lg:flex-row justify-between gap-6">
                             <div className="flex-1">
@@ -1310,13 +1346,13 @@ function FuelManagement({ vehicles, logs, onUpdate }: any) {
             </div>
             <div className="lg:col-span-2 glass-card p-6">
                 <h3 className="text-lg font-black mb-6">Refill History</h3>
-                <div className="space-y-3">
-                    {logs.map((log: any, i: number) => (
+                <div className="space-y-4">
+                    {(logs || []).map((log: any, i: number) => (
                         <div key={i} className="p-4 bg-white border border-gray-100 rounded-2xl flex items-center justify-between shadow-sm">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center"><Fuel size={20} /></div>
                                 <div>
-                                    <h4 className="font-bold text-sm">{vehicles.find((v: any) => v.id === log.vehicle_id)?.plate_number || 'Unit'} • {log.station_name}</h4>
+                                    <h4 className="font-bold text-sm">{(vehicles || []).find((v: any) => v.id === log.vehicle_id)?.plate_number || 'Unit'} • {log.station_name}</h4>
                                     <p className="text-[10px] font-black text-gray-400 uppercase">{log.amount_liters}L • {new Date(log.timestamp).toLocaleDateString()}</p>
                                 </div>
                             </div>
@@ -1350,13 +1386,13 @@ function MaintenanceManager({ vehicles, logs, onUpdate }: any) {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {logs.map((log: any, i: number) => (
+                {(logs || []).map((log: any, i: number) => (
                     <div key={i} className="glass-card p-6 border-t-4 border-red-500">
                         <div className="flex justify-between items-start mb-4">
                             <div className="p-2 bg-red-50 text-red-600 rounded-lg"><Shield size={20} /></div>
                             <span className="text-[10px] font-black bg-gray-100 px-2 py-1 rounded text-gray-500 uppercase">{log.service_type}</span>
                         </div>
-                        <h4 className="font-black text-gray-900 mb-1">{vehicles.find((v: any) => v.id === log.vehicle_id)?.plate_number || 'Unit'}</h4>
+                        <h4 className="font-black text-gray-900 mb-1">{(vehicles || []).find((v: any) => v.id === log.vehicle_id)?.plate_number || 'Unit'}</h4>
                         <p className="text-xs text-gray-500 mb-4">{log.description}</p>
                         <div className="pt-4 border-t border-gray-50 flex justify-between text-[10px] font-bold uppercase tracking-wider">
                             <span className="text-gray-400">Next Service</span>
@@ -1393,7 +1429,7 @@ function DriverManager() {
         fetchDrivers();
     }, []);
 
-    const filtered = drivers.filter(d =>
+    const filtered = (drivers || []).filter(d =>
         (d.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
         (d.admission_number || '').toLowerCase().includes(search.toLowerCase()) ||
         (d.email || '').toLowerCase().includes(search.toLowerCase())
