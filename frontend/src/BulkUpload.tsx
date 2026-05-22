@@ -66,7 +66,7 @@ export default function BulkUpload() {
             endpoint: 'students',
             icon: <Users size={24} />,
             color: 'bg-blue-500',
-            example: 'admission_number,full_name,first_name,last_name,email,school,status,phone_number,profile_image\nSTD202,Jane Doe,Jane,Doe,jane@example.com,ICT,Active,+254711223344,/static/profiles/jane.jpg\n\nOptions: Active, Graduated, Suspended, Registered, Deferred',
+            example: 'admission_number,full_name,first_name,last_name,email,school,status,phone_number,role,gender,program,profile_image\nSTD202,Jane Doe,Jane,Doe,jane@example.com,ICT,Active,+254711223344,Student,female,B.Sc Computer Science,/static/profiles/jane.jpg\n\n--- FIELD GUIDE ---\nadmission_number : Unique ID (auto-generated if blank)\nfull_name        : Full name (or use first_name + last_name)\nemail            : Optional, must be unique\nschool           : Department/Faculty (default: General)\nstatus           : Active | Graduated | Suspended | Registered | Deferred\nrole             : Student | Lecturer | Admin (default: Student)\ngender           : male | female | other\nprogram          : e.g. B.Sc Computer Science',
             status: 'pending'
         },
         {
@@ -114,7 +114,11 @@ export default function BulkUpload() {
                     statsRes.json(), coursesRes.json(), usersRes.json(), roomsRes.json(), slotsRes.json()
                 ])
 
-                const lecs = users.filter((u: any) => u.admission_number.startsWith('LEC') || u.email.includes('lecturer')).length
+                const lecs = users.filter((u: any) => 
+                    (u.admission_number || '').startsWith('LEC') || 
+                    (u.email || '').toLowerCase().includes('lecturer') ||
+                    (u.role_name || '').toLowerCase() === 'lecturer'
+                ).length
 
                 setStats({
                     students: dash.active_students,
@@ -287,31 +291,30 @@ export default function BulkUpload() {
                 })
                 xhr.addEventListener('load', () => {
                     if (xhr.status >= 200 && xhr.status < 300) {
-                        const data = JSON.parse(xhr.responseText)
+                        let data: any = {}
+                        try { data = JSON.parse(xhr.responseText) } catch { data = {} }
 
                         // Handle new detailed response format
                         if (data.added !== undefined && data.updated !== undefined) {
-                            // New format with upsert
                             const total = data.added + data.updated
                             let msg = `✓ Success: ${total} ${type} processed`
                             if (data.added > 0) msg += ` (${data.added} new)`
                             if (data.updated > 0) msg += ` (${data.updated} updated)`
-                            if (data.errors > 0) msg += ` • ${data.errors} errors`
+                            if (typeof data.errors === 'number' && data.errors > 0) msg += ` • ${data.errors} row errors`
                             setMessages(prev => [...prev, { type: 'success', text: msg }])
                         } else {
-                            // Legacy format
                             const count = data.added || data.count || 0
-                            setMessages(prev => [...prev, { type: 'success', text: `Success: ${count} ${type} processed.` }])
+                            setMessages(prev => [...prev, { type: 'success', text: `✓ Success: ${count} ${type} processed.` }])
                         }
 
-                        // Show detailed errors/warnings if any
-                        const errorList = data.error_details || data.errors
-                        if (errorList && Array.isArray(errorList) && errorList.length > 0) {
+                        // Show detailed row-level errors if any
+                        const errorList = data.error_details
+                        if (Array.isArray(errorList) && errorList.length > 0) {
                             errorList.slice(0, 5).forEach((err: string) => {
                                 setMessages(prev => [...prev, { type: 'error', text: err }])
                             })
                             if (errorList.length > 5) {
-                                setMessages(prev => [...prev, { type: 'error', text: `...and ${errorList.length - 5} more errors.` }])
+                                setMessages(prev => [...prev, { type: 'error', text: `...and ${errorList.length - 5} more row errors.` }])
                             }
                         }
 
@@ -319,12 +322,16 @@ export default function BulkUpload() {
                         resolve(data)
                     } else {
                         if (xhr.status === 401) {
-                            window.location.href = '/' // Logout/Login
+                            window.location.href = '/'
                             return
                         }
-                        const data = JSON.parse(xhr.responseText)
-                        setMessages(prev => [...prev, { type: 'error', text: `${type} Error: ${data.detail || 'Failed'}` }])
-                        reject(new Error(data.detail))
+                        let detail = `HTTP ${xhr.status}`
+                        try {
+                            const errData = JSON.parse(xhr.responseText)
+                            detail = errData.detail || errData.message || detail
+                        } catch { detail = xhr.responseText?.slice(0, 200) || detail }
+                        setMessages(prev => [...prev, { type: 'error', text: `Upload failed: ${detail}` }])
+                        reject(new Error(detail))
                     }
                 })
                 xhr.addEventListener('error', () => {
@@ -501,7 +508,7 @@ export default function BulkUpload() {
                                         <Loader2 size={24} />
                                     </div>
                                     <span className="font-bold">
-                                        {isCompressing ? `Optimizing Images: ${compressionProgress}%` : `Uploading Optimized Package: ${uploadProgress}%`}
+                                        {isCompressing ? `Optimizing Images: ${compressionProgress}%` : uploadingType === 'Optimized Bulk Photos' ? `Uploading Optimized Package: ${uploadProgress}%` : `Uploading ${uploadingType}: ${uploadProgress}%`}
                                     </span>
                                 </div>
                                 <span className="text-xl font-bold font-mono text-[var(--primary-color)]">
@@ -515,7 +522,7 @@ export default function BulkUpload() {
                                 />
                             </div>
                             <p className="text-[10px] text-center text-[var(--text-secondary)] font-bold uppercase tracking-widest mt-2">
-                                {isCompressing ? "Compressing locally - No data used yet" : "Sending compressed files to server"}
+                                {isCompressing ? "Compressing locally - No data used yet" : uploadingType === 'Optimized Bulk Photos' ? "Sending compressed files to server" : "Sending file to server"}
                             </p>
                         </div>
                     )}

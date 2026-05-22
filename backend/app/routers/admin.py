@@ -338,6 +338,11 @@ async def bulk_upload_students(
             session.add(student_role)
             await session.commit()
             await session.refresh(student_role)
+        
+        # Pre-load all roles into a cache for quick lookup
+        all_roles = (await session.exec(select(Role))).all()
+        role_cache = {r.name.lower(): r for r in all_roles}
+        
         added_count = 0
         updated_count = 0
         error_count = 0
@@ -354,6 +359,14 @@ async def bulk_upload_students(
                 full_name = row.get('full_name', '').strip()
                 email = row.get('email', '').strip()
                 school = (row.get('school') or 'General').strip()
+                gender = row.get('gender', '').strip() or None
+                program = row.get('program', '').strip() or None
+                status_val = row.get('status', 'active').strip() or 'active'
+                
+                # Resolve role from CSV column, default to Student
+                role_name = row.get('role', '').strip().lower()
+                resolved_role = role_cache.get(role_name) if role_name else None
+                assigned_role = resolved_role or student_role
                 
                 # Construct full name
                 if not full_name:
@@ -365,18 +378,22 @@ async def bulk_upload_students(
                 if not adm:
                     adm = f"STD{uuid.uuid4().hex[:8].upper()}"
                 
-                # Check if exists (by email or admission number)
-                query = select(User).where((User.admission_number == adm) | (User.email == email if email else False))
-                existing = (await session.exec(query)).first()
+                # Check if exists (by admission number first, then email)
+                existing = (await session.exec(select(User).where(User.admission_number == adm))).first()
+                if not existing and email:
+                    existing = (await session.exec(select(User).where(User.email == email))).first()
                 
                 if existing:
-                    # UPDATE - Ensure role is set to Student
+                    # UPDATE
                     existing.full_name = full_name
                     existing.school = school
-                    existing.role_id = student_role.id  # Ensure Student role
-                    existing.status = "active"
-                    if email:
-                        existing.email = email
+                    existing.role_id = assigned_role.id
+                    existing.status = status_val
+                    if first_name: existing.first_name = first_name
+                    if last_name: existing.last_name = last_name
+                    if email: existing.email = email
+                    if gender: existing.gender = gender
+                    if program: existing.program = program
                     if row.get('phone_number'): existing.phone_number = row.get('phone_number').strip()
                     if row.get('profile_image'): existing.profile_image = row.get('profile_image').strip()
                     session.add(existing)
@@ -385,12 +402,16 @@ async def bulk_upload_students(
                     # INSERT
                     new_user = User(
                         full_name=full_name,
+                        first_name=first_name or None,
+                        last_name=last_name or None,
                         email=email or None,
                         school=school,
                         admission_number=adm,
                         hashed_password=get_password_hash("Digital2025"),
-                        role_id=student_role.id,
-                        status="active",
+                        role_id=assigned_role.id,
+                        status=status_val,
+                        gender=gender,
+                        program=program,
                         phone_number=row.get('phone_number').strip() if row.get('phone_number') else None,
                         profile_image=row.get('profile_image').strip() if row.get('profile_image') else None
                     )
