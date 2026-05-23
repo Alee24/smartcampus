@@ -305,131 +305,144 @@ async def bulk_upload_students(
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    Bulk upload users from CSV. Supports large files (10,000+ records).
-    - Updates existing users (UPSERT logic)
-    - Batch commits every 500 records
-    - School field is optional (defaults to 'General')
-    - Treats uploaded data as source of truth
+    HIGH-PERFORMANCE Bulk upload. Loads all existing users into memory in ONE query,
+    then processes CSV rows in memory, then does batched raw SQL upserts.
+    Supports 50,000+ records without timeouts.
     """
+    from sqlalchemy import text as sa_text
+    import uuid as uuid_lib
+
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files allowed")
     
-    # Read CSV
     content = await file.read()
-    try:
-        decoded_content = content.decode('utf-8')
-    except UnicodeDecodeError:
-        decoded_content = content.decode('latin-1')
-        
+    decoded_content = content.decode('utf-8', errors='ignore')
     csv_reader = csv.DictReader(io.StringIO(decoded_content))
     
-    # Get Student Role
-    role_query = select(Role).where(Role.name == "Student")
-    student_role = (await session.exec(role_query)).first()
-    
+    # === STEP 1: Load ALL existing users into memory (ONE DB query) ===
+    db_results = await session.exec(select(User))
+    existing_map = {u.admission_number: u for u in db_results.all()}
+
+    # === STEP 2: Get/Create Student Role ===
+    role_res = await session.exec(select(Role).where(Role.name == "Student"))
+    student_role = role_res.first()
     if not student_role:
         student_role = Role(name="Student", description="Regular Student")
         session.add(student_role)
         await session.commit()
         await session.refresh(student_role)
     
-    # Hash default password once for massive performance boost
+    # === STEP 3: Hash password ONCE ===
     default_hashed_pwd = get_password_hash("Student123")
-    
+
+    # === STEP 4: Parse all CSV rows in memory ===
+    to_insert = []
+    to_update = []
     added_count = 0
     updated_count = 0
     error_count = 0
     errors = []
-    batch_size = 500
-    current_batch = 0
-    
+
     for row_num, row in enumerate(csv_reader, start=1):
         try:
-            # Get admission number (required)
             adm_no = row.get('admission_number', '').strip()
             if not adm_no:
                 error_count += 1
                 errors.append(f"Row {row_num}: Missing admission_number")
                 continue
             
-            # Build full name
             f_name = row.get('first_name', '').strip()
             l_name = row.get('last_name', '').strip()
-            full_n = row.get('full_name', '').strip()
-            if not full_n and (f_name or l_name):
-                full_n = f"{f_name} {l_name}".strip()
-            if not full_n:
-                full_n = "Unknown"
-            
-            # Clean optional fields
+            full_n = row.get('full_name', '').strip() or f"{f_name} {l_name}".strip() or "Unknown"
             email_val = row.get('email', '').strip() or None
             phone_val = row.get('phone_number', '').strip() or None
-            school_val = row.get('school', '').strip() or "General"  # Default if missing
-            
-            # Check if user exists (UPSERT logic)
-            exists_q = select(User).where(User.admission_number == adm_no)
-            existing_user = (await session.exec(exists_q)).first()
-            
-            if existing_user:
-                # UPDATE existing user (treat uploaded data as source of truth)
-                existing_user.full_name = full_n
-                existing_user.first_name = f_name or existing_user.first_name
-                existing_user.last_name = l_name or existing_user.last_name
-                existing_user.phone_number = phone_val or existing_user.phone_number
-                existing_user.school = school_val
-                existing_user.email = email_val or existing_user.email
-                existing_user.status = "active"  # Reactivate if was inactive
-                if row.get('profile_image'): existing_user.profile_image = row.get('profile_image').strip()
-                session.add(existing_user)
+            school_val = row.get('school', '').strip() or "General"
+            gender_val = row.get('gender', '').strip() or None
+            program_val = row.get('program', '').strip() or None
+            profile_val = row.get('profile_image', '').strip() or None
+
+            if adm_no in existing_map:
+                existing = existing_map[adm_no]
+                to_update.append({
+                    "id": str(existing.id),
+                    "full_name": full_n,
+                    "first_name": f_name or (existing.first_name or ""),
+                    "last_name": l_name or (existing.last_name or ""),
+                    "phone": phone_val or existing.phone_number,
+                    "school": school_val,
+                    "email": email_val or existing.email,
+                })
                 updated_count += 1
             else:
-                # INSERT new user
-                new_student = User(
-                    admission_number=adm_no,
-                    full_name=full_n,
-                    first_name=f_name,
-                    last_name=l_name,
-                    phone_number=phone_val,
-                    school=school_val,
-                    email=email_val,
-                    gender=row.get('gender'),
-                    program=row.get('program'),
-                    hashed_password=default_hashed_pwd,
-                    role_id=student_role.id,
-                    status="active",
-                    profile_image=row.get('profile_image').strip() if row.get('profile_image') else None
-                )
-                session.add(new_student)
+                new_id = uuid_lib.uuid4().hex
+                to_insert.append({
+                    "id": new_id,
+                    "adm": adm_no,
+                    "full_name": full_n,
+                    "first_name": f_name,
+                    "last_name": l_name,
+                    "phone": phone_val,
+                    "school": school_val,
+                    "email": email_val,
+                    "gender": gender_val,
+                    "program": program_val,
+                    "pwd": default_hashed_pwd,
+                    "role_id": str(student_role.id).replace('-', ''),
+                    "profile_image": profile_val,
+                })
+                # Prevent duplicate inserts within same CSV
+                existing_map[adm_no] = True
                 added_count += 1
-            
-            current_batch += 1
-            
-            # Batch commit every 500 records to avoid timeout
-            if current_batch >= batch_size:
-                await session.commit()
-                current_batch = 0
-                
+
+        except Exception as e:
+            error_count += 1
+            errors.append(f"Row {row_num}: {str(e)}")
+
+    # === STEP 5: Bulk INSERT in batches of 1000 ===
+    batch_size = 1000
+    for i in range(0, len(to_insert), batch_size):
+        batch = to_insert[i:i + batch_size]
+        try:
+            await session.execute(sa_text("""
+                INSERT INTO users 
+                    (id, admission_number, full_name, first_name, last_name, phone_number,
+                     school, email, gender, program, hashed_password, role_id, status, profile_image)
+                VALUES 
+                    (:id, :adm, :full_name, :first_name, :last_name, :phone,
+                     :school, :email, :gender, :program, :pwd, UNHEX(:role_id), 'active', :profile_image)
+                ON DUPLICATE KEY UPDATE
+                    full_name=VALUES(full_name), first_name=VALUES(first_name),
+                    last_name=VALUES(last_name), phone_number=VALUES(phone_number),
+                    school=VALUES(school), email=COALESCE(VALUES(email), email), status='active'
+            """), batch)
+            await session.commit()
         except Exception as e:
             await session.rollback()
-            error_count += 1
-            errors.append(f"Row {row_num} ({adm_no if 'adm_no' in locals() else 'unknown'}): {str(e)}")
-            # Reset current batch to avoid partial commits accumulating
-            current_batch = 0
-    
-    # Final commit for remaining records
-    try:
-        if current_batch > 0:
+            errors.append(f"Insert batch {i//batch_size + 1} error: {str(e)}")
+
+    # === STEP 6: Bulk UPDATE in batches of 1000 ===
+    for i in range(0, len(to_update), batch_size):
+        batch = to_update[i:i + batch_size]
+        try:
+            for record in batch:
+                await session.execute(sa_text("""
+                    UPDATE users SET
+                        full_name=:full_name, first_name=:first_name, last_name=:last_name,
+                        phone_number=:phone, school=:school,
+                        email=COALESCE(:email, email), status='active'
+                    WHERE HEX(id)=:id
+                """), {**record, "id": record["id"].replace('-', '').upper()})
             await session.commit()
-    except Exception as e:
-        await session.rollback()
-        errors.append(f"Final batch commit error: {str(e)}")
-    
+        except Exception as e:
+            await session.rollback()
+            errors.append(f"Update batch {i//batch_size + 1} error: {str(e)}")
+
     return {
         "success": True,
         "added": added_count,
         "updated": updated_count,
         "errors": error_count,
-        "error_details": errors[:100],  # Limit error list to first 100
+        "error_details": errors[:50],
         "total_processed": added_count + updated_count + error_count
     }
 
