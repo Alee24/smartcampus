@@ -333,6 +333,9 @@ async def bulk_upload_students(
         await session.commit()
         await session.refresh(student_role)
     
+    # Hash default password once for massive performance boost
+    default_hashed_pwd = get_password_hash("Student123")
+    
     added_count = 0
     updated_count = 0
     error_count = 0
@@ -381,7 +384,6 @@ async def bulk_upload_students(
                 updated_count += 1
             else:
                 # INSERT new user
-                hashed = get_password_hash("Student123")
                 new_student = User(
                     admission_number=adm_no,
                     full_name=full_n,
@@ -392,7 +394,7 @@ async def bulk_upload_students(
                     email=email_val,
                     gender=row.get('gender'),
                     program=row.get('program'),
-                    hashed_password=hashed,
+                    hashed_password=default_hashed_pwd,
                     role_id=student_role.id,
                     status="active",
                     profile_image=row.get('profile_image').strip() if row.get('profile_image') else None
@@ -408,13 +410,19 @@ async def bulk_upload_students(
                 current_batch = 0
                 
         except Exception as e:
+            await session.rollback()
             error_count += 1
             errors.append(f"Row {row_num} ({adm_no if 'adm_no' in locals() else 'unknown'}): {str(e)}")
-            # Continue processing other records
+            # Reset current batch to avoid partial commits accumulating
+            current_batch = 0
     
     # Final commit for remaining records
-    if current_batch > 0:
-        await session.commit()
+    try:
+        if current_batch > 0:
+            await session.commit()
+    except Exception as e:
+        await session.rollback()
+        errors.append(f"Final batch commit error: {str(e)}")
     
     return {
         "success": True,
@@ -447,10 +455,8 @@ async def bulk_upload_registrations(
     
     count = 0
     errors = []
-    
-    # Cache for performance
-    # In a large system, we might query db row by row or fetch all.
-    # For now, let's fetch on demand or optimistically.
+    batch_size = 500
+    current_batch = 0
     
     for row in csv_reader:
         try:
@@ -489,12 +495,25 @@ async def bulk_upload_registrations(
             )
             session.add(reg)
             count += 1
+            current_batch += 1
+            
+            if current_batch >= batch_size:
+                await session.commit()
+                current_batch = 0
             
         except Exception as e:
+            await session.rollback()
             errors.append(f"Row error: {str(e)}")
+            current_batch = 0
             
-    await session.commit()
-    return {"added": count, "errors": errors}
+    try:
+        if current_batch > 0:
+            await session.commit()
+    except Exception as e:
+        await session.rollback()
+        errors.append(f"Final batch commit error: {str(e)}")
+        
+    return {"added": count, "errors": errors[:100]}
 
 @router.get("/", response_model=List[User])
 async def list_users(
