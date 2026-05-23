@@ -311,42 +311,47 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
     """
     Background task: processes the CSV and updates _upload_jobs[job_id].
     Creates its own DB session so it runs independently of the HTTP request.
+    id and role_id are stored as plain VARCHAR hex strings — NO UNHEX() needed.
     """
     _upload_jobs[job_id] = {"status": "processing", "added": 0, "updated": 0, "errors": 0, "error_details": [], "total_processed": 0}
-    
+
     try:
-        # Create a fresh DB session for this background task
         async_session_factory = sessionmaker(engine, class_=SAAsyncSession, expire_on_commit=False)
-        
+
         async with async_session_factory() as session:
             # Parse CSV
             decoded = content.decode('utf-8', errors='ignore')
             rows = list(csv.DictReader(io.StringIO(decoded)))
 
             if not rows:
-                _upload_jobs[job_id] = {"status": "done", "added": 0, "updated": 0, "errors": 0, "error_details": ["CSV is empty or has no valid rows"], "total_processed": 0}
+                _upload_jobs[job_id] = {"status": "done", "added": 0, "updated": 0, "errors": 0, "error_details": ["CSV is empty"], "total_processed": 0}
                 return
 
-            # Get/Create Student Role
-            role_res = await session.execute(sa_text("SELECT id, HEX(id) as hex_id FROM roles WHERE name='Student' LIMIT 1"))
+            # ── Get/Create Student Role ──────────────────────────────────────────
+            # id is VARCHAR — read it directly, no HEX() needed
+            role_res = await session.execute(sa_text("SELECT id FROM roles WHERE name='Student' LIMIT 1"))
             role_row = role_res.fetchone()
             if not role_row:
-                await session.execute(sa_text("INSERT INTO roles (id, name, description) VALUES (UNHEX(REPLACE(UUID(),'-','')), 'Student', 'Regular Student')"))
+                new_role_id = uuid_lib.uuid4().hex.upper()
+                await session.execute(sa_text(
+                    "INSERT INTO roles (id, name, description) VALUES (:id, 'Student', 'Regular Student')"
+                ), {"id": new_role_id})
                 await session.commit()
-                role_res = await session.execute(sa_text("SELECT id, HEX(id) as hex_id FROM roles WHERE name='Student' LIMIT 1"))
+                role_res = await session.execute(sa_text("SELECT id FROM roles WHERE name='Student' LIMIT 1"))
                 role_row = role_res.fetchone()
-            
-            role_hex = role_row[1]  # hex string of role UUID
 
-            # Hash password ONCE (run in thread pool so it doesn't block event loop)
+            role_id_val = str(role_row[0])  # plain VARCHAR value from DB
+
+            # ── Hash password ONCE in thread pool (non-blocking) ─────────────────
             loop = asyncio.get_event_loop()
             default_hashed_pwd = await loop.run_in_executor(None, get_password_hash, "Student123")
 
-            # Load ALL existing admission numbers into memory (ONE query)
-            existing_res = await session.execute(sa_text("SELECT admission_number, HEX(id) as hex_id FROM users"))
-            existing_map = {row[0]: row[1] for row in existing_res.fetchall()}
+            # ── Load ALL existing users into memory (ONE query) ──────────────────
+            # id is VARCHAR — read directly
+            existing_res = await session.execute(sa_text("SELECT admission_number, id FROM users"))
+            existing_map = {row[0]: str(row[1]) for row in existing_res.fetchall()}
 
-            # Parse rows into inserts and updates
+            # ── Parse CSV rows ───────────────────────────────────────────────────
             to_insert = []
             to_update = []
             added_count = 0
@@ -362,20 +367,19 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                         errors.append(f"Row {row_num}: Missing admission_number")
                         continue
 
-                    f_name = (row.get('first_name') or '').strip()
-                    l_name = (row.get('last_name') or '').strip()
-                    full_n = (row.get('full_name') or '').strip() or f"{f_name} {l_name}".strip() or "Unknown"
-                    email_val = (row.get('email') or '').strip() or None
-                    phone_val = (row.get('phone_number') or '').strip() or None
-                    school_val = (row.get('school') or '').strip() or "General"
-                    gender_val = (row.get('gender') or '').strip() or None
-                    program_val = (row.get('program') or '').strip() or None
+                    f_name  = (row.get('first_name')    or '').strip()
+                    l_name  = (row.get('last_name')     or '').strip()
+                    full_n  = (row.get('full_name')     or '').strip() or f"{f_name} {l_name}".strip() or "Unknown"
+                    email_val   = (row.get('email')         or '').strip() or None
+                    phone_val   = (row.get('phone_number')  or '').strip() or None
+                    school_val  = (row.get('school')        or '').strip() or "General"
+                    gender_val  = (row.get('gender')        or '').strip() or None
+                    program_val = (row.get('program')       or '').strip() or None
                     profile_val = (row.get('profile_image') or '').strip() or None
 
                     if adm_no in existing_map:
-                        existing_hex = existing_map[adm_no]
                         to_update.append({
-                            "id_hex": existing_hex,
+                            "existing_id": existing_map[adm_no],
                             "full_name": full_n,
                             "first_name": f_name,
                             "last_name": l_name,
@@ -385,9 +389,9 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                         })
                         updated_count += 1
                     else:
-                        new_hex = uuid_lib.uuid4().hex.upper()
+                        new_id = uuid_lib.uuid4().hex.upper()
                         to_insert.append({
-                            "new_hex": new_hex,
+                            "new_id": new_id,
                             "adm": adm_no,
                             "full_name": full_n,
                             "first_name": f_name,
@@ -398,39 +402,39 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                             "gender": gender_val,
                             "program": program_val,
                             "pwd": default_hashed_pwd,
-                            "role_hex": role_hex,
+                            "role_id": role_id_val,
                             "profile_image": profile_val,
                         })
-                        existing_map[adm_no] = True  # Prevent duplicates within CSV
+                        existing_map[adm_no] = new_id  # prevent CSV duplicates
                         added_count += 1
 
                 except Exception as e:
                     error_count += 1
                     errors.append(f"Row {row_num}: {str(e)}")
 
-            # Batch INSERT (500 at a time)
+            # ── Batch INSERT (plain VARCHAR ids — NO UNHEX) ──────────────────────
             batch_size = 500
             for i in range(0, len(to_insert), batch_size):
                 batch = to_insert[i:i + batch_size]
                 try:
                     for rec in batch:
                         await session.execute(sa_text("""
-                            INSERT INTO users 
+                            INSERT INTO users
                                 (id, admission_number, full_name, first_name, last_name,
                                  phone_number, school, email, gender, program,
                                  hashed_password, role_id, status, profile_image)
-                            VALUES 
-                                (UNHEX(:new_hex), :adm, :full_name, :first_name, :last_name,
+                            VALUES
+                                (:new_id, :adm, :full_name, :first_name, :last_name,
                                  :phone, :school, :email, :gender, :program,
-                                 :pwd, UNHEX(:role_hex), 'active', :profile_image)
+                                 :pwd, :role_id, 'active', :profile_image)
                             ON DUPLICATE KEY UPDATE
-                                full_name=VALUES(full_name),
-                                first_name=VALUES(first_name),
-                                last_name=VALUES(last_name),
-                                phone_number=COALESCE(VALUES(phone_number), phone_number),
-                                school=VALUES(school),
-                                email=COALESCE(VALUES(email), email),
-                                status='active'
+                                full_name        = VALUES(full_name),
+                                first_name       = VALUES(first_name),
+                                last_name        = VALUES(last_name),
+                                phone_number     = COALESCE(VALUES(phone_number), phone_number),
+                                school           = VALUES(school),
+                                email            = COALESCE(VALUES(email), email),
+                                status           = 'active'
                         """), rec)
                     await session.commit()
                 except Exception as e:
@@ -438,21 +442,21 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                     error_count += len(batch)
                     errors.append(f"Insert batch {i//batch_size+1} failed: {str(e)}")
 
-            # Batch UPDATE (500 at a time)
+            # ── Batch UPDATE (match by plain VARCHAR id) ─────────────────────────
             for i in range(0, len(to_update), batch_size):
                 batch = to_update[i:i + batch_size]
                 try:
                     for rec in batch:
                         await session.execute(sa_text("""
                             UPDATE users SET
-                                full_name=:full_name,
-                                first_name=:first_name,
-                                last_name=:last_name,
-                                phone_number=COALESCE(:phone, phone_number),
-                                school=:school,
-                                email=COALESCE(:email, email),
-                                status='active'
-                            WHERE HEX(id)=:id_hex
+                                full_name    = :full_name,
+                                first_name   = :first_name,
+                                last_name    = :last_name,
+                                phone_number = COALESCE(:phone, phone_number),
+                                school       = :school,
+                                email        = COALESCE(:email, email),
+                                status       = 'active'
+                            WHERE id = :existing_id
                         """), rec)
                     await session.commit()
                 except Exception as e:
