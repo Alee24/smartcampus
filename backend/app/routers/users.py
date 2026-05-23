@@ -361,21 +361,94 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
 
             for row_num, row in enumerate(rows, start=1):
                 try:
-                    adm_no = (row.get('admission_number') or '').strip()
+                    # Create a helper dict with lowercase stripped keys
+                    raw_map = {str(k).strip().lower(): v for k, v in row.items() if k is not None}
+
+                    # Find admission number with multiple fallbacks
+                    adm_no = ""
+                    for key in ['admission_number', 'admission', 'adm', 'adm_no', 'reg_no', 'registration_number', 'reg_number', 'student_id', 'id']:
+                        if key in raw_map:
+                            val = str(raw_map[key] or '').strip()
+                            if val:
+                                adm_no = val
+                                break
+                    
                     if not adm_no:
                         error_count += 1
-                        errors.append(f"Row {row_num}: Missing admission_number")
+                        errors.append(f"Row {row_num}: Missing admission number column or value")
                         continue
 
-                    f_name  = (row.get('first_name')    or '').strip()
-                    l_name  = (row.get('last_name')     or '').strip()
-                    full_n  = (row.get('full_name')     or '').strip() or f"{f_name} {l_name}".strip() or "Unknown"
-                    email_val   = (row.get('email')         or '').strip() or None
-                    phone_val   = (row.get('phone_number')  or '').strip() or None
-                    school_val  = (row.get('school')        or '').strip() or "General"
-                    gender_val  = (row.get('gender')        or '').strip() or None
-                    program_val = (row.get('program')       or '').strip() or None
-                    profile_val = (row.get('profile_image') or '').strip() or None
+                    # Find name/full_name
+                    full_n = ""
+                    for key in ['full_name', 'name', 'fullname', 'student_name', 'user_name']:
+                        if key in raw_map:
+                            val = str(raw_map[key] or '').strip()
+                            if val:
+                                full_n = val
+                                break
+
+                    f_name = ""
+                    for key in ['first_name', 'firstname', 'fname']:
+                        if key in raw_map:
+                            f_name = str(raw_map[key] or '').strip()
+                            break
+
+                    l_name = ""
+                    for key in ['last_name', 'lastname', 'lname']:
+                        if key in raw_map:
+                            l_name = str(raw_map[key] or '').strip()
+                            break
+
+                    if not full_n:
+                        if f_name or l_name:
+                            full_n = f"{f_name} {l_name}".strip()
+                        else:
+                            full_n = "Unknown Student"
+
+                    # If full_name is present but first_name/last_name are empty, split full_name to fill them
+                    if full_n and not f_name and not l_name:
+                        parts = full_n.split(None, 1)
+                        if len(parts) == 2:
+                            f_name, l_name = parts[0], parts[1]
+                        else:
+                            f_name = full_n
+
+                    # Other optional fields
+                    email_val = None
+                    for key in ['email', 'email_address', 'mail']:
+                        if key in raw_map:
+                            email_val = str(raw_map[key] or '').strip() or None
+                            break
+
+                    phone_val = None
+                    for key in ['phone_number', 'phone', 'phone_no', 'telephone', 'mobile']:
+                        if key in raw_map:
+                            phone_val = str(raw_map[key] or '').strip() or None
+                            break
+
+                    school_val = "General"
+                    for key in ['school', 'department', 'dept', 'faculty']:
+                        if key in raw_map:
+                            school_val = str(raw_map[key] or '').strip() or "General"
+                            break
+
+                    gender_val = None
+                    for key in ['gender', 'sex']:
+                        if key in raw_map:
+                            gender_val = str(raw_map[key] or '').strip() or None
+                            break
+
+                    program_val = None
+                    for key in ['program', 'course', 'degree']:
+                        if key in raw_map:
+                            program_val = str(raw_map[key] or '').strip() or None
+                            break
+
+                    profile_val = None
+                    for key in ['profile_image', 'profile_pic', 'image', 'photo']:
+                        if key in raw_map:
+                            profile_val = str(raw_map[key] or '').strip() or None
+                            break
 
                     if adm_no in existing_map:
                         to_update.append({
