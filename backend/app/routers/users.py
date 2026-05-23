@@ -477,6 +477,7 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                             "pwd": default_hashed_pwd,
                             "role_id": role_id_val,
                             "profile_image": profile_val,
+                            "created_at": datetime.utcnow(),
                         })
                         existing_map[adm_no] = new_id  # prevent CSV duplicates
                         added_count += 1
@@ -495,11 +496,13 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                             INSERT INTO users
                                 (id, admission_number, full_name, first_name, last_name,
                                  phone_number, school, email, gender, program,
-                                 hashed_password, role_id, status, profile_image)
+                                 hashed_password, role_id, status, profile_image,
+                                 has_smartphone, pin, pin_setup_required, created_at)
                             VALUES
                                 (:new_id, :adm, :full_name, :first_name, :last_name,
                                  :phone, :school, :email, :gender, :program,
-                                 :pwd, :role_id, 'active', :profile_image)
+                                 :pwd, :role_id, 'active', :profile_image,
+                                 0, '2424', 1, :created_at)
                             ON DUPLICATE KEY UPDATE
                                 full_name        = VALUES(full_name),
                                 first_name       = VALUES(first_name),
