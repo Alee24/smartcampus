@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request, Form, BackgroundTasks
 from datetime import datetime
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession as SAAsyncSession
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text as sa_text
 from typing import List, Optional
-from app.database import get_session
+from app.database import get_session, engine
 from app.models import User, Role, SystemConfig, EntryLog
 from app.auth import get_current_user, get_password_hash
 from app.utils.audit import log_action
@@ -11,9 +14,15 @@ import csv
 import codecs
 import io
 import json
+import uuid as uuid_lib
+import asyncio
 from app.utils.ldap import LDAPClient
 
 router = APIRouter()
+
+# In-memory job store for bulk upload status
+_upload_jobs: dict = {}
+
 
 # Dependency to check if user is admin
 async def get_current_admin_user(current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)):
@@ -298,153 +307,211 @@ async def create_user(
     
     return db_user
 
+async def _process_bulk_upload_task(content: bytes, job_id: str):
+    """
+    Background task: processes the CSV and updates _upload_jobs[job_id].
+    Creates its own DB session so it runs independently of the HTTP request.
+    """
+    _upload_jobs[job_id] = {"status": "processing", "added": 0, "updated": 0, "errors": 0, "error_details": [], "total_processed": 0}
+    
+    try:
+        # Create a fresh DB session for this background task
+        async_session_factory = sessionmaker(engine, class_=SAAsyncSession, expire_on_commit=False)
+        
+        async with async_session_factory() as session:
+            # Parse CSV
+            decoded = content.decode('utf-8', errors='ignore')
+            rows = list(csv.DictReader(io.StringIO(decoded)))
+
+            if not rows:
+                _upload_jobs[job_id] = {"status": "done", "added": 0, "updated": 0, "errors": 0, "error_details": ["CSV is empty or has no valid rows"], "total_processed": 0}
+                return
+
+            # Get/Create Student Role
+            role_res = await session.execute(sa_text("SELECT id, HEX(id) as hex_id FROM roles WHERE name='Student' LIMIT 1"))
+            role_row = role_res.fetchone()
+            if not role_row:
+                await session.execute(sa_text("INSERT INTO roles (id, name, description) VALUES (UNHEX(REPLACE(UUID(),'-','')), 'Student', 'Regular Student')"))
+                await session.commit()
+                role_res = await session.execute(sa_text("SELECT id, HEX(id) as hex_id FROM roles WHERE name='Student' LIMIT 1"))
+                role_row = role_res.fetchone()
+            
+            role_hex = role_row[1]  # hex string of role UUID
+
+            # Hash password ONCE (run in thread pool so it doesn't block event loop)
+            loop = asyncio.get_event_loop()
+            default_hashed_pwd = await loop.run_in_executor(None, get_password_hash, "Student123")
+
+            # Load ALL existing admission numbers into memory (ONE query)
+            existing_res = await session.execute(sa_text("SELECT admission_number, HEX(id) as hex_id FROM users"))
+            existing_map = {row[0]: row[1] for row in existing_res.fetchall()}
+
+            # Parse rows into inserts and updates
+            to_insert = []
+            to_update = []
+            added_count = 0
+            updated_count = 0
+            error_count = 0
+            errors = []
+
+            for row_num, row in enumerate(rows, start=1):
+                try:
+                    adm_no = (row.get('admission_number') or '').strip()
+                    if not adm_no:
+                        error_count += 1
+                        errors.append(f"Row {row_num}: Missing admission_number")
+                        continue
+
+                    f_name = (row.get('first_name') or '').strip()
+                    l_name = (row.get('last_name') or '').strip()
+                    full_n = (row.get('full_name') or '').strip() or f"{f_name} {l_name}".strip() or "Unknown"
+                    email_val = (row.get('email') or '').strip() or None
+                    phone_val = (row.get('phone_number') or '').strip() or None
+                    school_val = (row.get('school') or '').strip() or "General"
+                    gender_val = (row.get('gender') or '').strip() or None
+                    program_val = (row.get('program') or '').strip() or None
+                    profile_val = (row.get('profile_image') or '').strip() or None
+
+                    if adm_no in existing_map:
+                        existing_hex = existing_map[adm_no]
+                        to_update.append({
+                            "id_hex": existing_hex,
+                            "full_name": full_n,
+                            "first_name": f_name,
+                            "last_name": l_name,
+                            "phone": phone_val,
+                            "school": school_val,
+                            "email": email_val,
+                        })
+                        updated_count += 1
+                    else:
+                        new_hex = uuid_lib.uuid4().hex.upper()
+                        to_insert.append({
+                            "new_hex": new_hex,
+                            "adm": adm_no,
+                            "full_name": full_n,
+                            "first_name": f_name,
+                            "last_name": l_name,
+                            "phone": phone_val,
+                            "school": school_val,
+                            "email": email_val,
+                            "gender": gender_val,
+                            "program": program_val,
+                            "pwd": default_hashed_pwd,
+                            "role_hex": role_hex,
+                            "profile_image": profile_val,
+                        })
+                        existing_map[adm_no] = True  # Prevent duplicates within CSV
+                        added_count += 1
+
+                except Exception as e:
+                    error_count += 1
+                    errors.append(f"Row {row_num}: {str(e)}")
+
+            # Batch INSERT (500 at a time)
+            batch_size = 500
+            for i in range(0, len(to_insert), batch_size):
+                batch = to_insert[i:i + batch_size]
+                try:
+                    for rec in batch:
+                        await session.execute(sa_text("""
+                            INSERT INTO users 
+                                (id, admission_number, full_name, first_name, last_name,
+                                 phone_number, school, email, gender, program,
+                                 hashed_password, role_id, status, profile_image)
+                            VALUES 
+                                (UNHEX(:new_hex), :adm, :full_name, :first_name, :last_name,
+                                 :phone, :school, :email, :gender, :program,
+                                 :pwd, UNHEX(:role_hex), 'active', :profile_image)
+                            ON DUPLICATE KEY UPDATE
+                                full_name=VALUES(full_name),
+                                first_name=VALUES(first_name),
+                                last_name=VALUES(last_name),
+                                phone_number=COALESCE(VALUES(phone_number), phone_number),
+                                school=VALUES(school),
+                                email=COALESCE(VALUES(email), email),
+                                status='active'
+                        """), rec)
+                    await session.commit()
+                except Exception as e:
+                    await session.rollback()
+                    error_count += len(batch)
+                    errors.append(f"Insert batch {i//batch_size+1} failed: {str(e)}")
+
+            # Batch UPDATE (500 at a time)
+            for i in range(0, len(to_update), batch_size):
+                batch = to_update[i:i + batch_size]
+                try:
+                    for rec in batch:
+                        await session.execute(sa_text("""
+                            UPDATE users SET
+                                full_name=:full_name,
+                                first_name=:first_name,
+                                last_name=:last_name,
+                                phone_number=COALESCE(:phone, phone_number),
+                                school=:school,
+                                email=COALESCE(:email, email),
+                                status='active'
+                            WHERE HEX(id)=:id_hex
+                        """), rec)
+                    await session.commit()
+                except Exception as e:
+                    await session.rollback()
+                    error_count += len(batch)
+                    errors.append(f"Update batch {i//batch_size+1} failed: {str(e)}")
+
+            _upload_jobs[job_id] = {
+                "status": "done",
+                "added": added_count,
+                "updated": updated_count,
+                "errors": error_count,
+                "error_details": errors[:50],
+                "total_processed": added_count + updated_count + error_count
+            }
+
+    except Exception as e:
+        _upload_jobs[job_id] = {
+            "status": "failed",
+            "added": 0, "updated": 0, "errors": 1,
+            "error_details": [f"Critical error: {str(e)}"],
+            "total_processed": 0
+        }
+
+
+@router.get("/upload-status/{job_id}")
+async def get_upload_status(job_id: str, current_user: User = Depends(get_current_user)):
+    """Poll this endpoint to get the status of a bulk upload job."""
+    job = _upload_jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found or expired")
+    return job
+
+
 @router.post("/bulk-upload")
 async def bulk_upload_students(
-    file: UploadFile = File(...), 
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(get_current_admin_user)
 ):
     """
-    HIGH-PERFORMANCE Bulk upload. Loads all existing users into memory in ONE query,
-    then processes CSV rows in memory, then does batched raw SQL upserts.
-    Supports 50,000+ records without timeouts.
+    Accepts CSV upload, returns immediately with a job_id.
+    Processing happens in the background — poll /upload-status/{job_id} for results.
+    This prevents 502 timeouts on large files.
     """
-    from sqlalchemy import text as sa_text
-    import uuid as uuid_lib
-
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files allowed")
-    
+
     content = await file.read()
-    decoded_content = content.decode('utf-8', errors='ignore')
-    csv_reader = csv.DictReader(io.StringIO(decoded_content))
-    
-    # === STEP 1: Load ALL existing users into memory (ONE DB query) ===
-    db_results = await session.exec(select(User))
-    existing_map = {u.admission_number: u for u in db_results.all()}
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-    # === STEP 2: Get/Create Student Role ===
-    role_res = await session.exec(select(Role).where(Role.name == "Student"))
-    student_role = role_res.first()
-    if not student_role:
-        student_role = Role(name="Student", description="Regular Student")
-        session.add(student_role)
-        await session.commit()
-        await session.refresh(student_role)
-    
-    # === STEP 3: Hash password ONCE ===
-    default_hashed_pwd = get_password_hash("Student123")
+    job_id = uuid_lib.uuid4().hex
+    background_tasks.add_task(_process_bulk_upload_task, content, job_id)
 
-    # === STEP 4: Parse all CSV rows in memory ===
-    to_insert = []
-    to_update = []
-    added_count = 0
-    updated_count = 0
-    error_count = 0
-    errors = []
+    return {"status": "processing", "job_id": job_id, "message": "Upload started. Poll /api/users/upload-status/{job_id} for progress."}
 
-    for row_num, row in enumerate(csv_reader, start=1):
-        try:
-            adm_no = row.get('admission_number', '').strip()
-            if not adm_no:
-                error_count += 1
-                errors.append(f"Row {row_num}: Missing admission_number")
-                continue
-            
-            f_name = row.get('first_name', '').strip()
-            l_name = row.get('last_name', '').strip()
-            full_n = row.get('full_name', '').strip() or f"{f_name} {l_name}".strip() or "Unknown"
-            email_val = row.get('email', '').strip() or None
-            phone_val = row.get('phone_number', '').strip() or None
-            school_val = row.get('school', '').strip() or "General"
-            gender_val = row.get('gender', '').strip() or None
-            program_val = row.get('program', '').strip() or None
-            profile_val = row.get('profile_image', '').strip() or None
 
-            if adm_no in existing_map:
-                existing = existing_map[adm_no]
-                to_update.append({
-                    "id": str(existing.id),
-                    "full_name": full_n,
-                    "first_name": f_name or (existing.first_name or ""),
-                    "last_name": l_name or (existing.last_name or ""),
-                    "phone": phone_val or existing.phone_number,
-                    "school": school_val,
-                    "email": email_val or existing.email,
-                })
-                updated_count += 1
-            else:
-                new_id = uuid_lib.uuid4().hex
-                to_insert.append({
-                    "id": new_id,
-                    "adm": adm_no,
-                    "full_name": full_n,
-                    "first_name": f_name,
-                    "last_name": l_name,
-                    "phone": phone_val,
-                    "school": school_val,
-                    "email": email_val,
-                    "gender": gender_val,
-                    "program": program_val,
-                    "pwd": default_hashed_pwd,
-                    "role_id": str(student_role.id).replace('-', ''),
-                    "profile_image": profile_val,
-                })
-                # Prevent duplicate inserts within same CSV
-                existing_map[adm_no] = True
-                added_count += 1
-
-        except Exception as e:
-            error_count += 1
-            errors.append(f"Row {row_num}: {str(e)}")
-
-    # === STEP 5: Bulk INSERT in batches of 1000 ===
-    batch_size = 1000
-    for i in range(0, len(to_insert), batch_size):
-        batch = to_insert[i:i + batch_size]
-        try:
-            await session.execute(sa_text("""
-                INSERT INTO users 
-                    (id, admission_number, full_name, first_name, last_name, phone_number,
-                     school, email, gender, program, hashed_password, role_id, status, profile_image)
-                VALUES 
-                    (:id, :adm, :full_name, :first_name, :last_name, :phone,
-                     :school, :email, :gender, :program, :pwd, UNHEX(:role_id), 'active', :profile_image)
-                ON DUPLICATE KEY UPDATE
-                    full_name=VALUES(full_name), first_name=VALUES(first_name),
-                    last_name=VALUES(last_name), phone_number=VALUES(phone_number),
-                    school=VALUES(school), email=COALESCE(VALUES(email), email), status='active'
-            """), batch)
-            await session.commit()
-        except Exception as e:
-            await session.rollback()
-            errors.append(f"Insert batch {i//batch_size + 1} error: {str(e)}")
-
-    # === STEP 6: Bulk UPDATE in batches of 1000 ===
-    for i in range(0, len(to_update), batch_size):
-        batch = to_update[i:i + batch_size]
-        try:
-            for record in batch:
-                await session.execute(sa_text("""
-                    UPDATE users SET
-                        full_name=:full_name, first_name=:first_name, last_name=:last_name,
-                        phone_number=:phone, school=:school,
-                        email=COALESCE(:email, email), status='active'
-                    WHERE HEX(id)=:id
-                """), {**record, "id": record["id"].replace('-', '').upper()})
-            await session.commit()
-        except Exception as e:
-            await session.rollback()
-            errors.append(f"Update batch {i//batch_size + 1} error: {str(e)}")
-
-    return {
-        "success": True,
-        "added": added_count,
-        "updated": updated_count,
-        "errors": error_count,
-        "error_details": errors[:50],
-        "total_processed": added_count + updated_count + error_count
-    }
 
 @router.post("/registrations/bulk-upload")
 async def bulk_upload_registrations(

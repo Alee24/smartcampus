@@ -366,6 +366,85 @@ export default function BulkUpload() {
         a.click()
     }
 
+    const handleStudentsUpload = async (file: File) => {
+        setLoading(true)
+        setIsUploading(true)
+        setUploadingType('Students')
+        setUploadProgress(10)
+        setMessages(prev => [...prev, { type: 'info', text: '⏳ Uploading CSV to server...' }])
+
+        const formData = new FormData()
+        formData.append('file', file)
+        const token = localStorage.getItem('token')
+
+        try {
+            // Step 1: POST file — returns immediately with job_id (no 502!)
+            const res = await fetch('/api/users/bulk-upload', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            })
+
+            if (res.status === 401) { window.location.href = '/'; return }
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}))
+                throw new Error(err.detail || `HTTP ${res.status}`)
+            }
+
+            const { job_id } = await res.json()
+            setUploadProgress(30)
+            setMessages(prev => [...prev, { type: 'info', text: '⚙️ Processing students in background. Please wait...' }])
+
+            // Step 2: Poll /api/users/upload-status/{job_id} every 2s
+            let attempts = 0
+            const maxAttempts = 150 // 5 minutes max
+            await new Promise<void>((resolve, reject) => {
+                const poll = setInterval(async () => {
+                    attempts++
+                    if (attempts > maxAttempts) {
+                        clearInterval(poll)
+                        reject(new Error('Upload timed out after 5 minutes'))
+                        return
+                    }
+                    try {
+                        const statusRes = await fetch(`/api/users/upload-status/${job_id}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        })
+                        if (!statusRes.ok) return
+                        const status = await statusRes.json()
+                        setUploadProgress(Math.min(30 + Math.round((attempts / maxAttempts) * 65), 95))
+
+                        if (status.status === 'done') {
+                            clearInterval(poll)
+                            setUploadProgress(100)
+                            const total = (status.added || 0) + (status.updated || 0)
+                            let msg = `✅ Upload complete: ${total} students processed`
+                            if (status.added > 0) msg += ` (${status.added} new)`
+                            if (status.updated > 0) msg += ` (${status.updated} updated)`
+                            if (status.errors > 0) msg += ` • ⚠️ ${status.errors} row errors`
+                            setMessages(prev => [...prev, { type: 'success', text: msg }])
+                            if (Array.isArray(status.error_details)) {
+                                status.error_details.slice(0, 5).forEach((err: string) => {
+                                    setMessages(prev => [...prev, { type: 'error', text: err }])
+                                })
+                            }
+                            fetchStats()
+                            resolve()
+                        } else if (status.status === 'failed') {
+                            clearInterval(poll)
+                            reject(new Error(status.error_details?.[0] || 'Processing failed on server'))
+                        }
+                    } catch { /* keep polling */ }
+                }, 2000)
+            })
+        } catch (e: any) {
+            setMessages(prev => [...prev, { type: 'error', text: `Students upload failed: ${e.message}` }])
+        } finally {
+            setLoading(false)
+            setTimeout(() => { setIsUploading(false); setUploadProgress(0) }, 2000)
+        }
+    }
+
     const handleFactoryReset = async () => {
         const confirm1 = window.confirm("DANGER: This will delete ALL users, their gate pass logs, attendance records, and vehicles from the system (except SuperAdmins). This action CANNOT be undone.\n\nAre you absolutely sure you want to proceed?")
         if (!confirm1) return
@@ -522,7 +601,15 @@ export default function BulkUpload() {
                                             {`Upload ${steps[currentStep].title.split(':')[1]}`}
                                         </span>
                                         <input type="file" accept=".csv"
-                                            onChange={(e) => e.target.files && handleUpload(steps[currentStep].endpoint, e.target.files[0], steps[currentStep].id)}
+                                            onChange={(e) => {
+                                                if (!e.target.files) return
+                                                const file = e.target.files[0]
+                                                if (steps[currentStep].id === 'students') {
+                                                    handleStudentsUpload(file)
+                                                } else {
+                                                    handleUpload(steps[currentStep].endpoint, file, steps[currentStep].id)
+                                                }
+                                            }}
                                             disabled={loading}
                                             className="hidden"
                                         />
