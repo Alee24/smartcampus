@@ -991,32 +991,81 @@ async def bulk_upload_photos(
     student_role_id = student_role.id
 
     # 1. Parse CSV Mapping (If provided)
-    mapping = {} # Suffix/Filename -> Admission Number
-    if csv_file:
+    mapping = {} # Normalized Photo ID/Filename -> Admission Number
+
+    def parse_mapping_csv_text(csv_text: str):
         try:
-            content = await csv_file.read()
-            csv_text = content.decode('utf-8')
-            
-            # Detect delimiter (handle semi-colon for Excel CSVs)
             delimiter = ','
             if ';' in csv_text and ',' not in csv_text:
                 delimiter = ';'
             
             reader = csv.reader(StringIO(csv_text), delimiter=delimiter)
-            rows = list(reader)
-            
-            if rows:
-                # Find columns: Usually Col A (0) is Admission, Col B (1) is Suffix/ID
-                for row in rows:
-                    if len(row) >= 2:
-                        adm = row[0].strip()
-                        suffix = row[1].strip()
-                        # Skip header rows
-                        if not adm or adm.lower() in ["admission", "adm_no", "admission number", "reg_no"]:
-                            continue
-                        mapping[suffix.upper()] = adm
-                        # Also store as lowercase just in case
-                        mapping[suffix.lower()] = adm
+            rows = [r for r in reader if r and any(cell.strip() for cell in r)]
+            if not rows:
+                return
+
+            # Determine column indices dynamically
+            adm_idx = 0
+            photo_idx = 1
+
+            # Strategy A: Check live database matches on first 20 rows
+            col0_matches = 0
+            col1_matches = 0
+            for row in rows[:20]:
+                if len(row) >= 2:
+                    val0 = str(row[0]).strip().upper()
+                    val1 = str(row[1]).strip().upper()
+                    if val0 in user_map: col0_matches += 1
+                    if val1 in user_map: col1_matches += 1
+
+            if col0_matches > 0 or col1_matches > 0:
+                if col1_matches > col0_matches:
+                    adm_idx = 1
+                    photo_idx = 0
+                else:
+                    adm_idx = 0
+                    photo_idx = 1
+            else:
+                # Strategy B: Check header text in first row
+                first_row = [str(cell).strip().lower() for cell in rows[0]]
+                for idx, cell in enumerate(first_row):
+                    if any(h in cell for h in ['admission', 'adm', 'reg', 'student_id']):
+                        adm_idx = idx
+                    elif any(h in cell for h in ['photo', 'filename', 'file', 'image', 'pic', 'id']):
+                        photo_idx = idx
+                
+                # Verify indices are different, otherwise default
+                if adm_idx == photo_idx:
+                    adm_idx = 0
+                    photo_idx = 1
+
+            # Skip header if first row has header-like names
+            start_row = 0
+            first_row_lower = [str(cell).strip().lower() for cell in rows[0]]
+            if any(any(h in cell for h in ['admission', 'adm', 'reg', 'photo', 'file', 'image', 'pic', 'id']) for cell in first_row_lower):
+                start_row = 1
+
+            for row in rows[start_row:]:
+                if len(row) > max(adm_idx, photo_idx):
+                    adm = str(row[adm_idx]).strip().upper()
+                    photo = str(row[photo_idx]).strip()
+                    if not adm or not photo:
+                        continue
+                    
+                    # Normalize photo key: strip, uppercase, remove extension
+                    photo_stem = Path(photo).stem.strip().upper()
+                    photo_full = photo.strip().upper()
+                    
+                    mapping[photo_stem] = adm
+                    mapping[photo_full] = adm
+        except Exception as e:
+            print(f"Error parsing mapping CSV: {e}")
+
+    if csv_file:
+        try:
+            content = await csv_file.read()
+            csv_text = content.decode('utf-8', errors='ignore')
+            parse_mapping_csv_text(csv_text)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid CSV file: {str(e)}")
 
@@ -1036,16 +1085,10 @@ async def bulk_upload_photos(
                 if csv_files_in_zip:
                     try:
                         with zip_ref.open(csv_files_in_zip[0]) as zcsv:
-                            csv_text = zcsv.read().decode('utf-8')
-                            delimiter = ','
-                            if ';' in csv_text and ',' not in csv_text: delimiter = ';'
-                            reader = csv.reader(StringIO(csv_text), delimiter=delimiter)
-                            for row in reader:
-                                if len(row) >= 2:
-                                    adm, suffix = row[0].strip(), row[1].strip()
-                                    if not adm or adm.lower() in ["admission", "adm_no", "reg_no", "id"]: continue
-                                    mapping[suffix.upper()] = adm
-                    except: pass
+                            csv_text = zcsv.read().decode('utf-8', errors='ignore')
+                            parse_mapping_csv_text(csv_text)
+                    except Exception as e:
+                        print(f"Failed to parse CSV inside ZIP: {e}")
 
             # List files (ignoring __MACOSX and directories and the CSV itself)
             files = [f for f in zip_ref.namelist() if not f.startswith('__MACOSX') and not f.endswith('/') and not f.lower().endswith('.csv')]
@@ -1057,15 +1100,19 @@ async def bulk_upload_photos(
                     if not name_only: continue
                     
                     stem = Path(name_only).stem.strip().upper()
+                    name_only_upper = name_only.strip().upper()
                     user = None
                     adm_no_candidate = None
                     
                     # A. Match by CSV Mapping (Suffix/ID Match)
                     if mapping:
-                        adm_no_candidate = mapping.get(name_only) or mapping.get(stem)
+                        # Match by stem (e.g. '2847') or by full filename with extension (e.g. '2847.JPG')
+                        adm_no_candidate = mapping.get(stem) or mapping.get(name_only_upper)
+                        
+                        # Resilient substring matching: check if stem contains or is contained in any suffix key
                         if not adm_no_candidate:
                             for m_suffix, m_adm in mapping.items():
-                                if stem == m_suffix.upper() or stem.endswith(m_suffix.upper()):
+                                if stem == m_suffix or m_suffix == stem or stem.endswith(m_suffix) or m_suffix.endswith(stem):
                                     adm_no_candidate = m_adm
                                     break
                     
