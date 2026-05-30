@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List, Optional
@@ -406,6 +406,7 @@ class VerifyScanRequest(BaseModel):
 
 @router.post("/verify-scan")
 async def verify_classroom_scan(
+    request: Request,
     scan_data: VerifyScanRequest,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
@@ -416,7 +417,7 @@ async def verify_classroom_scan(
     2. Identify classroom.
     3. Check for ACTIVE Class Session.
     4. Verify Registration.
-    5. Mark attendance.
+    5. Mark attendance with timestamp and client IP address.
     """
     from app.models import AttendanceRecord, ScanLog, StudentCourseRegistration
     
@@ -438,7 +439,6 @@ async def verify_classroom_scan(
     if not room:
         scan_log.status_message = "Invalid Room Code"
         await session.commit()
-        # "Record no matter what" - Return recorded state instead of Error
         return {"success": False, "message": "Unknown Room Code (Logged)"}
         
     # 2. Determine Current Context
@@ -488,12 +488,11 @@ async def verify_classroom_scan(
             await session.refresh(active_session)
             
     if not active_session:
-        scan_log.status_message = "No Class Scheduled"
+        scan_log.status_message = "unrelated student no class"
         await session.commit()
-        # "Don't disallow" - Return Success (Recorded)
         return {
-            "success": True, 
-            "message": "Scan Recorded (No Active Session)",
+            "success": False, 
+            "message": "unrelated student no class",
             "room_name": room.room_name
         }
     
@@ -507,33 +506,18 @@ async def verify_classroom_scan(
     )
     reg_result = await session.exec(reg_query)
     if not reg_result.first():
-         # Fetch Course Info
-        course = await session.get(Course, active_session.course_id)
-        import json
-        
-        # Create Flagged Record ("Don't disallow")
-        att_record = AttendanceRecord(
-            session_id=active_session.id,
-            student_id=current_user.id,
-            time=datetime.utcnow(),
-            status="flagged",
-            verification_method="qr",
-            ip_address=scan_data.metadata.get("public_ip") if scan_data.metadata else None,
-            device_info=scan_data.metadata.get("userAgent") if scan_data.metadata else None,
-            location_data=json.dumps(scan_data.metadata.get("geolocation")) if scan_data.metadata else None
-        )
-        session.add(att_record)
-
-        scan_log.is_successful = True # It IS successful in terms of recording
-        scan_log.status_message = "Flagged (Not Registered)"
+        # Log failure in ScanLog
+        scan_log.is_successful = False
+        scan_log.status_message = "unrelated student no class"
         
         # Log System Activity
-        log_meta = {"status": "Flagged", "course": course.course_code}
+        course = await session.get(Course, active_session.course_id)
+        log_meta = {"status": "Failed", "course": course.course_code, "reason": "unrelated student no class"}
         if scan_data.metadata:
             log_meta.update(scan_data.metadata)
             
         await log_system_activity(
-            session, "SCAN_SUCCESS", "ATTENDANCE", f"Flagged Entry: {course.course_code}", 
+            session, "SCAN_FAILED", "ATTENDANCE", f"Unregistered Entry Attempt: {course.course_code}", 
             actor_id=current_user.id, entity_id=str(room.id), 
             metadata=log_meta
         )
@@ -541,10 +525,10 @@ async def verify_classroom_scan(
         await session.commit()
 
         return {
-            "success": True,
-            "message": f"Check-in Recorded (Flagged - Not Registered for {course.course_code})",
-            "room_name": room.room_name,
-            "course_name": course.course_name
+            "success": False,
+            "message": "unrelated student no class",
+            "course_name": course.course_name,
+            "room_name": room.room_name
         }
         
     # 4. Check for Existing Attendance
@@ -554,7 +538,6 @@ async def verify_classroom_scan(
     )
     existing_result = await session.exec(existing_query)
     if existing_result.first():
-         # Fetch Course Info
         course = await session.get(Course, active_session.course_id)
         
         scan_log.is_successful = True # Access granted
@@ -569,13 +552,20 @@ async def verify_classroom_scan(
             "room_name": room.room_name
         }
 
-    # 5. Mark Attendance
+    # 5. Mark Attendance with Client IP Address & timestamp
+    import json
+    client_ip = request.client.host if request.client else "unknown"
+    meta = scan_data.metadata or {}
+    if "ip_address" not in meta or meta["ip_address"] == "unknown":
+        meta["ip_address"] = client_ip
+
     record = AttendanceRecord(
         session_id=active_session.id,
         student_id=current_user.id,
         scan_time=now,
         status="present",
-        connection_type="QR_SCAN_LAN"
+        connection_type="QR_SCAN_LAN",
+        metadata_info=json.dumps(meta)
     )
     session.add(record)
     
@@ -584,7 +574,7 @@ async def verify_classroom_scan(
     scan_log.status_message = "Success: Marked Present"
     
     # Log System Activity (Success)
-    course = await session.get(Course, active_session.course_id) # Fetch early for log
+    course = await session.get(Course, active_session.course_id)
     
     log_meta = {"status": "Present", "course": course.course_code}
     if scan_data.metadata:
@@ -594,7 +584,7 @@ async def verify_classroom_scan(
         session, "SCAN_SUCCESS", "ATTENDANCE", f"Marked Present: {course.course_code}", 
         actor_id=current_user.id, entity_id=str(room.id), 
         metadata=log_meta,
-        ip_address=scan_data.metadata.get("public_ip") if scan_data.metadata else None
+        ip_address=client_ip
     )
 
     await session.commit()

@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Download, Calendar, Users, ChevronRight, BookOpen, Clock, MapPin, ChevronDown, CheckCircle, XCircle } from 'lucide-react';
+import { Download, Calendar, Users, ChevronRight, BookOpen, Clock, MapPin, ChevronDown, CheckCircle, XCircle, QrCode, X, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { QRCodeCanvas } from 'qrcode.react';
+
+import { useState, useEffect } from 'react';
 
 export default function CourseReports() {
     const [courses, setCourses] = useState<any[]>([]);
@@ -10,6 +12,119 @@ export default function CourseReports() {
     const [expandedSession, setExpandedSession] = useState<string | null>(null);
     const [sessionDetails, setSessionDetails] = useState<any[]>([]);
     const [loadingDetails, setLoadingDetails] = useState(false);
+    const [showQRModal, setShowQRModal] = useState(false);
+
+    const downloadQR = () => {
+        const canvas = document.getElementById('course-qr-canvas') as HTMLCanvasElement;
+        if (canvas && selectedCourse) {
+            const pngUrl = canvas
+                .toDataURL('image/png')
+                .replace('image/png', 'image/octet-stream');
+            let downloadLink = document.createElement('a');
+            downloadLink.href = pngUrl;
+            downloadLink.download = `QR_${selectedCourse.course_code}_${selectedCourse.room_code || 'class'}.png`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
+    };
+
+    const printQR = () => {
+        const canvas = document.getElementById('course-qr-canvas') as HTMLCanvasElement;
+        if (!canvas || !selectedCourse) return;
+        const qrImage = canvas.toDataURL('image/png');
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Print QR Code - ${selectedCourse.course_code}</title>
+                    <style>
+                        body {
+                            font-family: 'Inter', system-ui, sans-serif;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100vh;
+                            margin: 0;
+                            text-align: center;
+                            color: #1e293b;
+                            background-color: #f8fafc;
+                        }
+                        .card {
+                            border: 3px solid #3b82f6;
+                            border-radius: 24px;
+                            padding: 40px;
+                            max-width: 450px;
+                            background: white;
+                            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+                        }
+                        .header {
+                            font-size: 28px;
+                            font-weight: 800;
+                            color: #1d4ed8;
+                            margin: 0 0 5px 0;
+                            letter-spacing: -0.025em;
+                        }
+                        .title {
+                            font-size: 18px;
+                            font-weight: 500;
+                            color: #64748b;
+                            margin: 0 0 25px 0;
+                        }
+                        .qr-container {
+                            padding: 20px;
+                            border: 2px dashed #cbd5e1;
+                            border-radius: 16px;
+                            display: inline-block;
+                            background: #f8fafc;
+                            margin-bottom: 25px;
+                        }
+                        img {
+                            width: 250px;
+                            height: 250px;
+                        }
+                        .room-badge {
+                            background: #eff6ff;
+                            color: #2563eb;
+                            font-weight: 700;
+                            padding: 10px 20px;
+                            border-radius: 9999px;
+                            font-size: 16px;
+                            display: inline-block;
+                        }
+                        .instructions {
+                            font-size: 12px;
+                            color: #94a3b8;
+                            margin-top: 30px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h1 class="header">${selectedCourse.course_code}</h1>
+                        <p class="title">${selectedCourse.course_name}</p>
+                        <div class="qr-container">
+                            <img src="${qrImage}" alt="QR Code" />
+                        </div>
+                        <div>
+                            <span class="room-badge">📍 Classroom: ${selectedCourse.room_code || 'N/A'}</span>
+                        </div>
+                        <p class="instructions">Scan to mark attendance for this class session</p>
+                    </div>
+                    <script>
+                        window.onload = function() {
+                            window.print();
+                            setTimeout(function() { window.close(); }, 500);
+                        };
+                    </script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+    };
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -151,11 +266,28 @@ export default function CourseReports() {
                         <>
                             <div className="p-6 border-b border-[var(--border-color)] bg-[var(--bg-secondary)] flex justify-between items-center shrink-0">
                                 <div>
-                                    <h2 className="text-xl font-bold text-[var(--text-primary)]">{selectedCourse.course_name}</h2>
+                                    <h2 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-3">
+                                        {selectedCourse.course_name}
+                                        {selectedCourse.room_code && (
+                                            <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1 border border-slate-200 dark:border-slate-700">
+                                                <MapPin size={10} /> {selectedCourse.room_code}
+                                            </span>
+                                        )}
+                                    </h2>
                                     <p className="text-sm text-[var(--text-secondary)]">Historical Attendance Records</p>
                                 </div>
-                                <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                                    {sessions.length} Sessions
+                                <div className="flex items-center gap-2">
+                                    {selectedCourse.room_code && (
+                                        <button
+                                            onClick={() => setShowQRModal(true)}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3.5 py-1.8 rounded-lg font-bold transition-all shadow-md shadow-blue-500/10 flex items-center gap-1.5"
+                                        >
+                                            <QrCode size={14} /> Class QR Code
+                                        </button>
+                                    )}
+                                    <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                                        {sessions.length} Sessions
+                                    </div>
                                 </div>
                             </div>
 
@@ -289,6 +421,94 @@ export default function CourseReports() {
                     )}
                 </div>
             </div>
+
+            {/* QR Code Modal */}
+            <AnimatePresence>
+                {showQRModal && selectedCourse && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        {/* Backdrop */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowQRModal(false)}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                        />
+                        
+                        {/* Modal Box */}
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="relative bg-[var(--card-bg)] border border-[var(--border-color)] w-full max-w-md rounded-3xl p-6 shadow-2xl z-10 flex flex-col items-center text-center overflow-hidden"
+                        >
+                            {/* Visual Top Highlight Accent */}
+                            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-500 to-indigo-600" />
+                            
+                            {/* Close Button */}
+                            <button
+                                onClick={() => setShowQRModal(false)}
+                                className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--text-primary)] p-1.5 rounded-full hover:bg-[var(--bg-secondary)] transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+
+                            <div className="mt-4 mb-6">
+                                <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                                    Class Check-In Badge
+                                </span>
+                                <h3 className="text-2xl font-black text-[var(--text-primary)] mt-3 leading-tight">
+                                    {selectedCourse.course_code}
+                                </h3>
+                                <p className="text-sm text-[var(--text-secondary)] font-medium max-w-[280px] mx-auto mt-1">
+                                    {selectedCourse.course_name}
+                                </p>
+                            </div>
+
+                            {/* QR Canvas Wrap */}
+                            <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-[var(--border-color)] rounded-2xl mb-6 shadow-inner relative">
+                                {selectedCourse.room_code ? (
+                                    <QRCodeCanvas
+                                        id="course-qr-canvas"
+                                        value={`${window.location.origin}/?room=${selectedCourse.room_code}`}
+                                        size={200}
+                                        level="H"
+                                        includeMargin={true}
+                                        className="mx-auto rounded-lg"
+                                    />
+                                ) : (
+                                    <div className="w-[200px] h-[200px] flex items-center justify-center text-xs text-red-500 font-semibold italic">
+                                        No default classroom mapped to course
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Meta details */}
+                            {selectedCourse.room_code && (
+                                <div className="flex items-center gap-2 mb-8 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 px-4 py-2 rounded-xl text-blue-600 dark:text-blue-400 font-bold text-sm">
+                                    <MapPin size={16} /> Classroom: {selectedCourse.room_code}
+                                </div>
+                            )}
+
+                            {/* Buttons */}
+                            <div className="grid grid-cols-2 gap-3 w-full">
+                                <button
+                                    onClick={downloadQR}
+                                    className="py-3 bg-[var(--bg-secondary)] hover:bg-[var(--border-color)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl font-bold flex items-center justify-center gap-1.5 transition-colors text-sm"
+                                >
+                                    <Download size={16} /> Download
+                                </button>
+                                <button
+                                    onClick={printQR}
+                                    className="py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/10 text-sm"
+                                >
+                                    <Printer size={16} /> Print Card
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
