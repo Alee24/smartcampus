@@ -54,7 +54,7 @@ services:
     container_name: gatepass_frontend
     # Primary entry point for the entire application
     ports:
-      - "8080:80"
+      - "80:80"
     depends_on:
       - backend
     networks:
