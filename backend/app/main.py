@@ -213,6 +213,28 @@ async def seed_data(session: AsyncSession):
         session.add(stud_user)
         print("Seeded Student: STD001 / Pass123!")
     
+    # 5b. Seed Drivers
+    drivers_to_seed = [
+        {"admission_number": "DRV001", "full_name": "John Kamau", "email": "kamau@test.com", "phone_number": "0711223344", "school": "Logistics & Transport"},
+        {"admission_number": "DRV002", "full_name": "Jane Mwangi", "email": "mwangi@test.com", "phone_number": "0722334455", "school": "Logistics & Transport"},
+        {"admission_number": "DRV003", "full_name": "David Ochieng", "email": "ochieng@test.com", "phone_number": "0733445566", "school": "Logistics & Transport"}
+    ]
+    for d_data in drivers_to_seed:
+        existing_drv = (await session.exec(select(User).where((User.admission_number == d_data["admission_number"]) | (User.email == d_data["email"])))).first()
+        if not existing_drv:
+            drv_user = User(
+                admission_number=d_data["admission_number"],
+                full_name=d_data["full_name"],
+                email=d_data["email"],
+                phone_number=d_data["phone_number"],
+                school=d_data["school"],
+                hashed_password=get_password_hash("Pass123!"),
+                role_id=driver_role.id,
+                status="active"
+            )
+            session.add(drv_user)
+            print(f"Seeded Driver: {d_data['full_name']}")
+    
     # 4. Sample Classrooms for QR Code Generation
     sample_rooms = [
         {"room_code": "LH1", "room_name": "Lecture Hall 1", "building": "Main Building", "floor": "Ground Floor", "capacity": 150},
@@ -734,6 +756,10 @@ app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 from app.routers import audit
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(external_sync.router, prefix="/api/external-sync", tags=["external_sync"])
+
+# Import and include academic dashboards router
+from app.routers import academic_dashboards
+app.include_router(academic_dashboards.router)
 
 @app.get("/")
 async def root():

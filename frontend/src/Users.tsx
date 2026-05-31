@@ -150,7 +150,7 @@ export default function Users() {
         total: users.length,
         active: users.filter(u => ['active', 'Active', 'Registered'].includes(u.status)).length,
         students: users.filter(u => u.role === 'Student').length,
-        staff: users.filter(u => u.role === 'Lecturer' || u.role === 'Admin' || u.role === 'Security').length
+        staff: users.filter(u => u.role === 'Lecturer' || u.role === 'Admin' || u.role === 'Security' || u.role === 'Driver').length
     }
 
     if (loading) {
@@ -262,6 +262,7 @@ export default function Users() {
                             <option value="lecturer">Lecturers</option>
                             <option value="admin">Admins</option>
                             <option value="security">Security</option>
+                            <option value="driver">Drivers</option>
                         </select>
                     </div>
 
@@ -1077,6 +1078,7 @@ function AddUserModal({ onClose, onRefresh }: any) {
                                     <option value="Lecturer">Lecturer</option>
                                     <option value="Admin">Admin</option>
                                     <option value="Security">Security</option>
+                                    <option value="Driver">Driver</option>
                                 </select>
                             </div>
                         </div>

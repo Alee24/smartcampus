@@ -49,6 +49,7 @@ const AuditLogs = lazy(() => import('./AuditLogs'))
 const IDPrinting = lazy(() => import('./IDPrinting'))
 const Geofencing = lazy(() => import('./Geofencing'))
 const AdminDashboard = lazy(() => import('./AdminDashboard'))
+const LecturerDashboard = lazy(() => import('./LecturerDashboard'))
 
 // 3. Non-lazy components (small/critical)
 import InstallPWA from './components/InstallPWA'
@@ -93,17 +94,7 @@ function App() {
     // Get user role from localStorage and set initial dashboard
     const userRole = localStorage.getItem('userRole') || 'student'
     const getInitialTab = () => {
-        if (!localStorage.getItem('token')) return 'dashboard'
-        // Role-based default dashboards
-        switch (userRole.toLowerCase()) {
-            case 'student': return 'student-dashboard'
-            case 'admin': return 'dashboard'
-            case 'security': return 'dashboard'
-            case 'lecturer': return 'live'
-            case 'staff': return 'dashboard'
-            case 'visitor': return 'dashboard'
-            default: return 'dashboard'
-        }
+        return 'dashboard'
     }
 
     const [activeTab, setActiveTab] = useState(getInitialTab())
@@ -1022,9 +1013,11 @@ function App() {
 
                     {activeTab === 'dashboard' && role === 'Guardian' && <GuardianDashboard />}
                     {activeTab === 'dashboard' && role === 'Security' && <SecurityDashboard onNavigate={setActiveTab} />}
+                    {activeTab === 'dashboard' && role === 'Student' && <StudentDashboard />}
+                    {activeTab === 'dashboard' && role === 'Lecturer' && <LecturerDashboard />}
                     {activeTab === 'visitors' && <VisitorManagement />}
                     {activeTab === 'calendar' && <CampusCalendar />}
-                    {activeTab === 'dashboard' && role !== 'Guardian' && role !== 'Security' && (
+                    {activeTab === 'dashboard' && role !== 'Guardian' && role !== 'Security' && role !== 'Student' && role !== 'Lecturer' && (
                         <AdminDashboard onNavigate={setActiveTab} />
                     )}
 
