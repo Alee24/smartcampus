@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles # Import StaticFiles
 from app.database import init_db, get_session
@@ -766,7 +766,7 @@ class DemoLoginRequest(BaseModel):
     role: str # admin, lecturer, security, student, guardian
 
 @app.post("/api/auth/demo-login")
-async def demo_login(req: DemoLoginRequest, session: AsyncSession = Depends(get_session)):
+async def demo_login(req: DemoLoginRequest, request: Request, session: AsyncSession = Depends(get_session)):
     """
     Passwordless login for Demo Mode.
     ONLY works if 'demo_mode' system config is set to 'true'.
