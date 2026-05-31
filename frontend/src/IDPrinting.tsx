@@ -18,6 +18,8 @@ export default function IDPrinting() {
         company_name: 'Riara University',
         logo_url: ''
     })
+    const [currentPage, setCurrentPage] = useState(1)
+    const itemsPerPage = 10
 
     const cardsRef = useRef<HTMLDivElement>(null)
 
@@ -33,6 +35,7 @@ export default function IDPrinting() {
             u.admission_number?.toLowerCase().includes(searchQuery.toLowerCase())
         ))
         setFilteredUsers(filtered)
+        setCurrentPage(1)
     }, [users, searchQuery])
 
     const fetchUsers = async () => {
@@ -274,55 +277,113 @@ export default function IDPrinting() {
             </div>
 
             {/* Student List */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredUsers.map(student => (
-                    <div 
-                        key={student.id}
-                        className={`bg-white dark:bg-gray-800 rounded-2xl p-4 border-2 transition-all cursor-pointer ${selectedIds.has(student.id) ? 'border-purple-500 shadow-xl scale-[1.02]' : 'border-gray-100 dark:border-gray-700 shadow-sm'}`}
-                        onClick={() => toggleSelect(student.id)}
-                    >
-                        <div className="flex items-start justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 flex items-center justify-center text-purple-600 font-bold overflow-hidden">
-                                    {student.profile_image ? (
-                                        <img src={student.profile_image} className="w-full h-full object-cover" />
-                                    ) : (
-                                        student.full_name.charAt(0)
-                                    )}
+            {(() => {
+                const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
+                const startIndex = (currentPage - 1) * itemsPerPage
+                const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage)
+
+                return (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {paginatedUsers.map(student => (
+                                <div 
+                                    key={student.id}
+                                    className={`bg-white dark:bg-gray-800 rounded-2xl p-4 border-2 transition-all cursor-pointer ${selectedIds.has(student.id) ? 'border-purple-500 shadow-xl scale-[1.02]' : 'border-gray-100 dark:border-gray-700 shadow-sm'}`}
+                                    onClick={() => toggleSelect(student.id)}
+                                >
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-100 to-indigo-100 flex items-center justify-center text-purple-600 font-bold overflow-hidden">
+                                                {student.profile_image ? (
+                                                    <img src={student.profile_image} className="w-full h-full object-cover" />
+                                                ) : (
+                                                    student.full_name.charAt(0)
+                                                )}
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-gray-900 dark:text-gray-100">{student.full_name}</h3>
+                                                <p className="text-xs font-mono text-gray-500">{student.admission_number}</p>
+                                            </div>
+                                        </div>
+                                        <div className={`p-1 rounded-md ${selectedIds.has(student.id) ? 'text-purple-600' : 'text-gray-300'}`}>
+                                            {selectedIds.has(student.id) ? <CheckSquare size={24} /> : <Square size={24} />}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); exportToPNG(student.id) }}
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 text-xs font-bold transition-colors"
+                                        >
+                                            <ImageIcon size={14} /> PNG
+                                        </button>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); /* TODO: Single PDF? */ }}
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 text-xs font-bold transition-colors"
+                                        >
+                                            <Printer size={14} /> Print
+                                        </button>
+                                    </div>
+
+                                    {/* Hidden Real Card Renderers for Capturing */}
+                                    <div className="fixed -left-[2000px] top-0">
+                                        <IDCardFront student={student} companySettings={companySettings} />
+                                        <IDCardBack student={student} companySettings={companySettings} />
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-gray-900 dark:text-gray-100">{student.full_name}</h3>
-                                    <p className="text-xs font-mono text-gray-500">{student.admission_number}</p>
-                                </div>
-                            </div>
-                            <div className={`p-1 rounded-md ${selectedIds.has(student.id) ? 'text-purple-600' : 'text-gray-300'}`}>
-                                {selectedIds.has(student.id) ? <CheckSquare size={24} /> : <Square size={24} />}
-                            </div>
+                            ))}
                         </div>
 
-                        <div className="flex gap-2">
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); exportToPNG(student.id) }}
-                                className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 text-xs font-bold transition-colors"
-                            >
-                                <ImageIcon size={14} /> PNG
-                            </button>
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); /* TODO: Single PDF? */ }}
-                                className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-100 text-xs font-bold transition-colors"
-                            >
-                                <Printer size={14} /> Print
-                            </button>
-                        </div>
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                            <div className="mt-6 flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-150 dark:border-gray-700 p-4 rounded-2xl shadow-sm">
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    Showing <span className="font-bold text-gray-900 dark:text-white">{startIndex + 1}</span> to <span className="font-bold text-gray-900 dark:text-white">{Math.min(startIndex + itemsPerPage, filteredUsers.length)}</span> of <span className="font-bold text-gray-900 dark:text-white">{filteredUsers.length}</span> students
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-55 dark:hover:bg-gray-800 disabled:opacity-40 disabled:hover:bg-transparent font-bold text-xs transition-all flex items-center gap-1"
+                                    >
+                                        <ChevronLeft size={16} /> Prev
+                                    </button>
+                                    
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .filter(pageNum => pageNum === 1 || pageNum === totalPages || Math.abs(pageNum - currentPage) <= 1)
+                                        .map((pageNum, index, arr) => {
+                                            const showEllipsis = index > 0 && pageNum - arr[index - 1] > 1;
+                                            return (
+                                                <div key={pageNum} className="flex items-center gap-1.5">
+                                                    {showEllipsis && <span className="text-gray-400 text-xs">...</span>}
+                                                    <button
+                                                        onClick={() => setCurrentPage(pageNum)}
+                                                        className={`w-8 h-8 rounded-xl text-xs font-extrabold transition-all ${
+                                                            currentPage === pageNum
+                                                                ? 'bg-purple-600 text-white shadow-md'
+                                                                : 'hover:bg-gray-55 dark:hover:bg-gray-850 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800'
+                                                        }`}
+                                                    >
+                                                        {pageNum}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })
+                                    }
 
-                        {/* Hidden Real Card Renderers for Capturing */}
-                        <div className="fixed -left-[2000px] top-0">
-                            <IDCardFront student={student} companySettings={companySettings} />
-                            <IDCardBack student={student} companySettings={companySettings} />
-                        </div>
-                    </div>
-                ))}
-            </div>
+                                    <button
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                        className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-55 dark:hover:bg-gray-800 disabled:opacity-40 disabled:hover:bg-transparent font-bold text-xs transition-all flex items-center gap-1"
+                                    >
+                                        Next <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )
+            })()}
 
             {filteredUsers.length === 0 && (
                 <div className="text-center py-20">

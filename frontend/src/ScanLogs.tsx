@@ -1,10 +1,12 @@
 
 import { useState, useEffect } from 'react'
-import { QrCode, RefreshCw, Smartphone, MapPin, CheckCircle, XCircle } from 'lucide-react'
+import { QrCode, RefreshCw, Smartphone, MapPin, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export default function ScanLogs() {
     const [logs, setLogs] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [currentPage, setCurrentPage] = useState(1)
+    const itemsPerPage = 10
 
     const fetchLogs = async () => {
         try {
@@ -29,6 +31,10 @@ export default function ScanLogs() {
         return () => clearInterval(interval)
     }, [])
 
+    const totalPages = Math.ceil(logs.length / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const paginatedLogs = logs.slice(startIndex, startIndex + itemsPerPage)
+
     return (
         <div className="animate-fade-in p-2">
             <header className="mb-6 flex justify-between items-end">
@@ -40,7 +46,7 @@ export default function ScanLogs() {
                     <p className="text-[var(--text-secondary)]">Real-time attendance scanning activity from all devices</p>
                 </div>
                 <button
-                    onClick={() => { setLoading(true); fetchLogs(); }}
+                    onClick={() => { setLoading(true); fetchLogs(); setCurrentPage(1); }}
                     className="p-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors"
                     title="Refresh Logs"
                 >
@@ -71,7 +77,7 @@ export default function ScanLogs() {
                                     <td colSpan={6} className="p-8 text-center text-gray-400">No scan activity recorded yet.</td>
                                 </tr>
                             ) : (
-                                logs.map((log) => (
+                                paginatedLogs.map((log) => (
                                     <tr key={log.id} className="hover:bg-[var(--bg-primary)] transition-colors">
                                         <td className="p-4 whitespace-nowrap text-sm font-mono text-[var(--text-secondary)]">
                                             {new Date(log.timestamp).toLocaleTimeString()}
@@ -120,6 +126,34 @@ export default function ScanLogs() {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {!loading && logs.length > itemsPerPage && (
+                    <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900/30 border-t border-[var(--border-color)] flex items-center justify-between">
+                        <div className="text-xs text-[var(--text-secondary)]">
+                            Showing <span className="font-bold text-[var(--text-primary)]">{startIndex + 1}</span> to <span className="font-bold text-[var(--text-primary)]">{Math.min(startIndex + itemsPerPage, logs.length)}</span> of <span className="font-bold text-[var(--text-primary)]">{logs.length}</span> logs
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 rounded-lg border border-[var(--border-color)] hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <button
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 rounded-lg border border-[var(--border-color)] hover:bg-white dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     )

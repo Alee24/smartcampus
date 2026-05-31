@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
     QrCode, Printer, Download, Search, Users, Car,
     Building, BookOpen, Calendar, X, ChevronRight, Check,
-    Loader2, HelpCircle, Shield, Sliders
+    Loader2, HelpCircle, Shield, Sliders, ChevronLeft
 } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 
@@ -22,6 +22,12 @@ export default function QRRegistry() {
     const [loading, setLoading] = useState(true)
     const [selectedAsset, setSelectedAsset] = useState<QRAsset | null>(null)
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+    const [currentPage, setCurrentPage] = useState(1)
+    const itemsPerPage = 10
+
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [selectedCategory, searchQuery])
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setToast({ msg, type })
@@ -308,6 +314,10 @@ export default function QRRegistry() {
         return matchesCategory && matchesSearch
     })
 
+    const totalPages = Math.ceil(filteredAssets.length / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const paginatedAssets = filteredAssets.slice(startIndex, startIndex + itemsPerPage)
+
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in">
             {/* Header */}
@@ -382,46 +392,96 @@ export default function QRRegistry() {
                                 <p className="text-gray-400 text-xs mt-1">Refine your search term or select another category tab above.</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {filteredAssets.map(asset => (
-                                    <div
-                                        key={asset.id}
-                                        onClick={() => setSelectedAsset(asset)}
-                                        className={`glass-card p-5 cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all flex justify-between items-start border rounded-3xl ${
-                                            selectedAsset?.id === asset.id
-                                                ? 'bg-indigo-50/50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
-                                                : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800'
-                                        }`}
-                                    >
-                                        <div className="min-w-0 pr-3">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className="p-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded-lg">
-                                                    {getCategoryIcon(asset.category)}
-                                                </span>
-                                                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                                                    {asset.category}
-                                                </span>
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {paginatedAssets.map(asset => (
+                                        <div
+                                            key={asset.id}
+                                            onClick={() => setSelectedAsset(asset)}
+                                            className={`glass-card p-5 cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all flex justify-between items-start border rounded-3xl ${
+                                                selectedAsset?.id === asset.id
+                                                    ? 'bg-indigo-50/50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
+                                                    : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800'
+                                            }`}
+                                        >
+                                            <div className="min-w-0 pr-3">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="p-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded-lg">
+                                                        {getCategoryIcon(asset.category)}
+                                                    </span>
+                                                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                                        {asset.category}
+                                                    </span>
+                                                </div>
+                                                <h4 className="font-black text-gray-900 dark:text-white truncate">{asset.name}</h4>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{asset.subtext}</p>
                                             </div>
-                                            <h4 className="font-black text-gray-900 dark:text-white truncate">{asset.name}</h4>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{asset.subtext}</p>
+                                            <div className="flex flex-col items-end justify-between h-full shrink-0">
+                                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[9px] font-bold tracking-wider uppercase">
+                                                    {asset.identifier}
+                                                </span>
+                                                {/* Small preview of QR */}
+                                                <div className="mt-3 p-1.5 bg-slate-50 dark:bg-slate-800 border border-gray-100 dark:border-gray-700 rounded-lg shadow-inner">
+                                                    <QRCodeCanvas
+                                                        value={getQRValue(asset)}
+                                                        size={40}
+                                                        level="L"
+                                                        className="rounded"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col items-end justify-between h-full shrink-0">
-                                            <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[9px] font-bold tracking-wider uppercase">
-                                                {asset.identifier}
-                                            </span>
-                                            {/* Small preview of QR */}
-                                            <div className="mt-3 p-1.5 bg-slate-50 dark:bg-slate-800 border border-gray-100 dark:border-gray-700 rounded-lg shadow-inner">
-                                                <QRCodeCanvas
-                                                    value={getQRValue(asset)}
-                                                    size={40}
-                                                    level="L"
-                                                    className="rounded"
-                                                />
-                                            </div>
+                                    ))}
+                                </div>
+
+                                {/* Pagination Controls */}
+                                {totalPages > 1 && (
+                                    <div className="mt-6 flex items-center justify-between bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-750 p-4 rounded-2xl shadow-sm">
+                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                            Showing <span className="font-bold text-gray-900 dark:text-white">{startIndex + 1}</span> to <span className="font-bold text-gray-900 dark:text-white">{Math.min(startIndex + itemsPerPage, filteredAssets.length)}</span> of <span className="font-bold text-gray-900 dark:text-white">{filteredAssets.length}</span> assets
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                                disabled={currentPage === 1}
+                                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-55 dark:hover:bg-gray-800 disabled:opacity-40 disabled:hover:bg-transparent font-bold text-xs transition-all flex items-center gap-1"
+                                            >
+                                                <ChevronLeft size={16} />
+                                            </button>
+                                            
+                                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                                .filter(pageNum => pageNum === 1 || pageNum === totalPages || Math.abs(pageNum - currentPage) <= 1)
+                                                .map((pageNum, index, arr) => {
+                                                    const showEllipsis = index > 0 && pageNum - arr[index - 1] > 1;
+                                                    return (
+                                                        <div key={pageNum} className="flex items-center gap-1.5">
+                                                            {showEllipsis && <span className="text-gray-400 text-xs">...</span>}
+                                                            <button
+                                                                onClick={() => setCurrentPage(pageNum)}
+                                                                className={`w-8 h-8 rounded-lg text-xs font-extrabold transition-all ${
+                                                                    currentPage === pageNum
+                                                                        ? 'bg-indigo-600 text-white shadow-md'
+                                                                        : 'hover:bg-gray-50 dark:hover:bg-gray-850 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800'
+                                                                }`}
+                                                            >
+                                                                {pageNum}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })
+                                            }
+
+                                            <button
+                                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                                disabled={currentPage === totalPages}
+                                                className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-55 dark:hover:bg-gray-800 disabled:opacity-40 disabled:hover:bg-transparent font-bold text-xs transition-all flex items-center gap-1"
+                                            >
+                                                <ChevronRight size={16} />
+                                            </button>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+                                )}
+                            </>
                         )}
                     </div>
 

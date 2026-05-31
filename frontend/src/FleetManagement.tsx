@@ -1750,6 +1750,12 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
     const [statusFilter, setStatusFilter] = useState('all');
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter]);
 
     const handleDeleteVehicle = async (vehicleId: string, plateNumber: string) => {
         if (!confirm(`Are you absolutely sure you want to delete vehicle ${plateNumber}? This will permanently remove all associated trips, fuel logs, and maintenance logs.`)) {
@@ -1814,6 +1820,10 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
         const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
         return matchesSearch && matchesStatus;
     });
+
+    const totalVehiclePages = Math.ceil(filteredVehicles.length / itemsPerPage);
+    const vehicleStartIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedVehicles = filteredVehicles.slice(vehicleStartIndex, vehicleStartIndex + itemsPerPage);
 
     const getStatusStyles = (status: string) => {
         switch (status) {
@@ -1891,7 +1901,7 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredVehicles.map(vehicle => (
+                    {paginatedVehicles.map(vehicle => (
                         <div key={vehicle.id} className="p-6 bg-white border border-gray-100 rounded-2xl hover:shadow-xl hover:border-primary-100 transition-all duration-300 flex flex-col justify-between shadow-sm relative group overflow-hidden">
                             {/* Accent line based on status */}
                             <div className={`absolute top-0 left-0 right-0 h-1.5 ${
@@ -1996,6 +2006,50 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Vehicles Pagination */}
+            {totalVehiclePages > 1 && (
+                <div className="flex items-center justify-between bg-white border border-gray-100 p-4 rounded-2xl shadow-sm">
+                    <div className="text-xs text-gray-500">
+                        Showing <span className="font-bold text-gray-800">{vehicleStartIndex + 1}</span> – <span className="font-bold text-gray-800">{Math.min(vehicleStartIndex + itemsPerPage, filteredVehicles.length)}</span> of <span className="font-bold text-gray-800">{filteredVehicles.length}</span> vehicles
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 disabled:opacity-40 font-bold text-xs transition-all flex items-center gap-1"
+                        >
+                            ← Prev
+                        </button>
+                        {Array.from({ length: totalVehiclePages }, (_, i) => i + 1)
+                            .filter(p => p === 1 || p === totalVehiclePages || Math.abs(p - currentPage) <= 1)
+                            .map((pageNum, idx, arr) => (
+                                <>
+                                    {idx > 0 && pageNum - arr[idx - 1] > 1 && <span key={`e${pageNum}`} className="text-gray-300 text-xs">…</span>}
+                                    <button
+                                        key={pageNum}
+                                        onClick={() => setCurrentPage(pageNum)}
+                                        className={`w-8 h-8 rounded-xl text-xs font-extrabold transition-all ${
+                                            currentPage === pageNum
+                                                ? 'bg-primary-600 text-white shadow-md'
+                                                : 'border border-gray-200 text-gray-700 bg-white hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        {pageNum}
+                                    </button>
+                                </>
+                            ))
+                        }
+                        <button
+                            onClick={() => setCurrentPage(p => Math.min(totalVehiclePages, p + 1))}
+                            disabled={currentPage === totalVehiclePages}
+                            className="px-3 py-1.5 rounded-xl border border-gray-200 hover:bg-gray-50 disabled:opacity-40 font-bold text-xs transition-all flex items-center gap-1"
+                        >
+                            Next →
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

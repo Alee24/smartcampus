@@ -34,7 +34,12 @@ export default function AuditLogs() {
 
     useEffect(() => {
         fetchLogs();
+        setCurrentPage(1);
     }, [filters]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     const fetchLogs = async () => {
         setLoading(true);
