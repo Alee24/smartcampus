@@ -50,6 +50,7 @@ const IDPrinting = lazy(() => import('./IDPrinting'))
 const Geofencing = lazy(() => import('./Geofencing'))
 const AdminDashboard = lazy(() => import('./AdminDashboard'))
 const LecturerDashboard = lazy(() => import('./LecturerDashboard'))
+const QRRegistry = lazy(() => import('./QRRegistry'))
 
 // 3. Non-lazy components (small/critical)
 import InstallPWA from './components/InstallPWA'
@@ -672,6 +673,12 @@ function App() {
                                     active={activeTab === 'id-printing'}
                                     onClick={() => { setActiveTab('id-printing'); setSidebarOpen(false); }}
                                 />
+                                <NavItem
+                                    icon={<QrCode size={18} />}
+                                    label="QR Asset Hub"
+                                    active={activeTab === 'qr-registry'}
+                                    onClick={() => { setActiveTab('qr-registry'); setSidebarOpen(false); }}
+                                />
                             </SidebarGroup>
                         )}
 
@@ -1051,6 +1058,7 @@ function App() {
                     {activeTab === 'audit' && <AuditLogs />}
                     {activeTab === 'geofencing' && <Geofencing />}
                     {activeTab === 'id-printing' && <IDPrinting />}
+                    {activeTab === 'qr-registry' && <QRRegistry />}
                     <footer className="mt-10 pt-6 border-t border-[var(--border-color)] text-center text-sm text-[var(--text-secondary)]">
                         <p>&copy; {new Date().getFullYear()} Smart Campus System.</p>
                     </footer>

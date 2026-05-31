@@ -277,14 +277,12 @@ export default function CourseReports() {
                                     <p className="text-sm text-[var(--text-secondary)]">Historical Attendance Records</p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {selectedCourse.room_code && (
-                                        <button
-                                            onClick={() => setShowQRModal(true)}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3.5 py-1.8 rounded-lg font-bold transition-all shadow-md shadow-blue-500/10 flex items-center gap-1.5"
-                                        >
-                                            <QrCode size={14} /> Class QR Code
-                                        </button>
-                                    )}
+                                    <button
+                                        onClick={() => setShowQRModal(true)}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3.5 py-1.8 rounded-lg font-bold transition-all shadow-md shadow-blue-500/10 flex items-center gap-1.5"
+                                    >
+                                        <QrCode size={14} /> Class QR Code
+                                    </button>
                                     <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
                                         {sessions.length} Sessions
                                     </div>
@@ -467,28 +465,20 @@ export default function CourseReports() {
 
                             {/* QR Canvas Wrap */}
                             <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-[var(--border-color)] rounded-2xl mb-6 shadow-inner relative">
-                                {selectedCourse.room_code ? (
-                                    <QRCodeCanvas
-                                        id="course-qr-canvas"
-                                        value={`${window.location.origin}/?room=${selectedCourse.room_code}`}
-                                        size={200}
-                                        level="H"
-                                        includeMargin={true}
-                                        className="mx-auto rounded-lg"
-                                    />
-                                ) : (
-                                    <div className="w-[200px] h-[200px] flex items-center justify-center text-xs text-red-500 font-semibold italic">
-                                        No default classroom mapped to course
-                                    </div>
-                                )}
+                                <QRCodeCanvas
+                                    id="course-qr-canvas"
+                                    value={selectedCourse.room_code ? `${window.location.origin}/?room=${selectedCourse.room_code}` : `${window.location.origin}/?course=${selectedCourse.course_code}`}
+                                    size={200}
+                                    level="H"
+                                    includeMargin={true}
+                                    className="mx-auto rounded-lg"
+                                />
                             </div>
 
                             {/* Meta details */}
-                            {selectedCourse.room_code && (
-                                <div className="flex items-center gap-2 mb-8 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 px-4 py-2 rounded-xl text-blue-600 dark:text-blue-400 font-bold text-sm">
-                                    <MapPin size={16} /> Classroom: {selectedCourse.room_code}
-                                </div>
-                            )}
+                            <div className="flex items-center gap-2 mb-8 bg-blue-50/50 dark:bg-blue-955/20 border border-blue-100 dark:border-blue-900/30 px-4 py-2 rounded-xl text-blue-600 dark:text-blue-400 font-bold text-sm">
+                                <MapPin size={16} /> Classroom: {selectedCourse.room_code || 'General / Dynamic'}
+                            </div>
 
                             {/* Buttons */}
                             <div className="grid grid-cols-2 gap-3 w-full">
