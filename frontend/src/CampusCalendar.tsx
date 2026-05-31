@@ -20,6 +20,8 @@ interface DailyStats {
 }
 
 export default function CampusCalendar() {
+    const role = localStorage.getItem('userRole')
+    const isAdmin = role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin'
     const [currentDate, setCurrentDate] = useState(new Date())
     const [events, setEvents] = useState<CalendarEvent[]>([])
     const [statsMap, setStatsMap] = useState<Record<string, DailyStats>>({})
@@ -179,7 +181,7 @@ export default function CampusCalendar() {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3 bg-[var(--bg-card)] p-1 rounded-xl border border-[var(--border-color)]">
+                <div className="flex items-center gap-3 bg-[var(--bg-surface)] p-1 rounded-xl border border-[var(--border-color)]">
                     <button onClick={() => setView('month')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'month' ? 'bg-[var(--bg-primary)] shadow-sm' : 'opacity-50 hover:opacity-100'}`}>Month</button>
                     <button onClick={() => setView('week')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'week' ? 'bg-[var(--bg-primary)] shadow-sm' : 'opacity-50 hover:opacity-100'}`}>Week</button>
                     <div className="w-px h-6 bg-[var(--border-color)] mx-1"></div>
@@ -278,7 +280,7 @@ export default function CampusCalendar() {
 
                 {/* Sidebar Details */}
                 <div className="lg:col-span-1 space-y-6">
-                    <div className="glass-card p-6 rounded-3xl border border-purple-500/20 bg-gradient-to-br from-[var(--bg-card)] to-purple-900/5">
+                    <div className="glass-card p-6 rounded-3xl border border-purple-500/20 bg-gradient-to-br from-[var(--bg-surface)] to-purple-900/5">
                         <h4 className="font-bold uppercase tracking-widest text-xs mb-4 flex items-center gap-2 text-purple-600">
                             <Layers size={14} /> Upcoming Focus
                         </h4>
@@ -302,14 +304,16 @@ export default function CampusCalendar() {
                         </div>
                     </div>
 
-                    <div className="p-6 rounded-3xl bg-gradient-to-br from-indigo-600 to-purple-700 text-white shadow-xl relative overflow-hidden group hover:scale-[1.02] transition-transform">
-                        <div className="absolute top-[-20%] right-[-20%] w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all"></div>
-                        <h4 className="font-bold text-lg mb-2 relative z-10">Create Event</h4>
-                        <p className="text-sm opacity-80 mb-4 relative z-10">Schedule a new academic or social event for the campus.</p>
-                        <button onClick={() => setIsModalOpen(true)} className="w-full py-3 bg-white text-indigo-700 rounded-xl font-bold shadow-lg relative z-10 hover:bg-indigo-50 transition-colors">
-                            + Add Event
-                        </button>
-                    </div>
+                    {isAdmin && (
+                        <div className="p-6 rounded-3xl bg-gradient-to-br from-indigo-600 to-purple-700 text-white shadow-xl relative overflow-hidden group hover:scale-[1.02] transition-transform">
+                            <div className="absolute top-[-20%] right-[-20%] w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all"></div>
+                            <h4 className="font-bold text-lg mb-2 relative z-10">Create Event</h4>
+                            <p className="text-sm opacity-80 mb-4 relative z-10">Schedule a new academic or social event for the campus.</p>
+                            <button onClick={() => setIsModalOpen(true)} className="w-full py-3 bg-white text-indigo-700 rounded-xl font-bold shadow-lg relative z-10 hover:bg-indigo-50 transition-colors">
+                                + Add Event
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 

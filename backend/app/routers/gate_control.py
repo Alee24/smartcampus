@@ -4,7 +4,7 @@ from sqlmodel import select
 from app.database import get_session
 from app.models import User, EntryLog, Gate, Vehicle, VehicleLog, Visitor, Event, GateScanLog
 from app.utils.audit import log_action
-from app.auth import get_current_user
+from app.auth import get_current_user, get_current_admin
 from datetime import datetime
 import shutil
 import os
@@ -802,7 +802,7 @@ async def list_gates(session: AsyncSession = Depends(get_session)):
     return (await session.exec(select(Gate))).all()
 
 @router.post("/manage/gates")
-async def create_gate(gate_data: dict, session: AsyncSession = Depends(get_session)):
+async def create_gate(gate_data: dict, session: AsyncSession = Depends(get_session), admin: User = Depends(get_current_admin)):
     # Basic validation
     if not gate_data.get("name"): raise HTTPException(400, "Name required")
     gate = Gate(name=gate_data["name"], location=gate_data.get("location"))
@@ -812,7 +812,7 @@ async def create_gate(gate_data: dict, session: AsyncSession = Depends(get_sessi
     return gate
 
 @router.put("/manage/gates/{gate_id}")
-async def update_gate(gate_id: uuid.UUID, gate_data: dict, session: AsyncSession = Depends(get_session)):
+async def update_gate(gate_id: uuid.UUID, gate_data: dict, session: AsyncSession = Depends(get_session), admin: User = Depends(get_current_admin)):
     gate = await session.get(Gate, gate_id)
     if not gate: raise HTTPException(404, "Gate not found")
     
@@ -826,7 +826,7 @@ async def update_gate(gate_id: uuid.UUID, gate_data: dict, session: AsyncSession
     return gate
 
 @router.delete("/manage/gates/{gate_id}")
-async def delete_gate(gate_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+async def delete_gate(gate_id: uuid.UUID, session: AsyncSession = Depends(get_session), admin: User = Depends(get_current_admin)):
     gate = await session.get(Gate, gate_id)
     if gate:
         session.delete(gate)

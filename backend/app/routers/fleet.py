@@ -12,7 +12,7 @@ from app.models import (
     FleetFuelLog, FleetGPSLog, FleetMaintenanceLog,
     FleetNotification, User, Role, Gate
 )
-from app.auth import get_current_user
+from app.auth import get_current_user, get_current_admin
 from app.utils.audit import log_action
 
 router = APIRouter()
@@ -169,7 +169,7 @@ async def create_vehicle(
     request: Request,
     vehicle_data: VehicleCreate,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     try:
         # Check if it already exists (e.g. from Gate Control)
@@ -299,7 +299,7 @@ async def update_vehicle(
     vehicle_id: UUID,
     vehicle_data: VehicleUpdate,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     try:
         vehicle = await session.get(Vehicle, vehicle_id)
@@ -325,7 +325,7 @@ async def update_vehicle(
 async def delete_vehicle(
     vehicle_id: UUID,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     try:
         vehicle = await session.get(Vehicle, vehicle_id)
@@ -360,7 +360,7 @@ async def check_in_fleet_vehicle(
     vehicle_id: UUID,
     payload: dict = {},
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     try:
         vehicle = await session.get(Vehicle, vehicle_id)
@@ -404,7 +404,7 @@ async def check_in_fleet_vehicle(
 async def check_out_fleet_vehicle(
     vehicle_id: UUID,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     try:
         vehicle = await session.get(Vehicle, vehicle_id)
@@ -482,7 +482,7 @@ async def create_trip(
     request: Request,
     trip_data: TripCreate,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     try:
         # Validate vehicle exists
@@ -619,7 +619,7 @@ async def update_trip_details(
     trip_id: UUID,
     trip_data: TripUpdate,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     try:
         trip = await session.get(FleetTrip, trip_id)
@@ -655,7 +655,7 @@ async def upload_passenger_manifest(
     trip_id: UUID,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     import csv
     import io
@@ -798,7 +798,7 @@ async def start_trip(
     trip_id: UUID,
     odometer: float,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     try:
         trip = await session.get(FleetTrip, trip_id)
@@ -836,7 +836,7 @@ async def end_trip(
     odometer: float,
     notes: Optional[str] = None,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     try:
         trip = await session.get(FleetTrip, trip_id)
@@ -898,7 +898,7 @@ async def create_fuel_log(
     request: Request,
     log_data: FuelLogCreate,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     try:
         vehicle = await session.get(Vehicle, log_data.vehicle_id)
@@ -973,7 +973,7 @@ async def create_maintenance_log(
     request: Request,
     log_data: MaintenanceLogCreate,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_user)
+    admin: User = Depends(get_current_admin)
 ):
     try:
         vehicle = await session.get(Vehicle, log_data.vehicle_id)

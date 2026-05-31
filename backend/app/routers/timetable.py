@@ -5,7 +5,7 @@ from typing import List, Optional
 from datetime import date, time, datetime, timedelta
 from app.database import get_session
 from app.models import Classroom, Course, TimetableSlot, ClassSession, User
-from app.auth import get_current_user
+from app.auth import get_current_user, get_current_admin
 from app.logging_utils import log_system_activity
 import uuid
 
@@ -23,7 +23,7 @@ async def get_classrooms(session: AsyncSession = Depends(get_session)):
 async def create_classroom(
     classroom_data: dict,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Create a new classroom"""
     classroom = Classroom(
@@ -48,7 +48,7 @@ async def update_classroom(
     classroom_id: str,
     classroom_data: dict,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Update classroom details"""
     classroom = await session.get(Classroom, uuid.UUID(classroom_id))
@@ -303,7 +303,7 @@ async def update_classroom(
     classroom_id: str,
     update_data: dict,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Update classroom details"""
     try:
@@ -346,7 +346,7 @@ async def update_classroom(
 @router.post("/generate-all-qr")
 async def generate_all_qr_codes(
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """
     Switch to Dynamic QR Codes.
@@ -381,7 +381,7 @@ async def generate_all_qr_codes(
 @router.post("/deactivate-all")
 async def deactivate_all_classrooms(
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Deactivate all classrooms by removing their QR codes."""
     classrooms_result = await session.exec(select(Classroom))
@@ -627,7 +627,7 @@ async def get_courses(session: AsyncSession = Depends(get_session)):
 async def create_course(
     course_data: dict,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Create a new course"""
     course = Course(
@@ -651,7 +651,7 @@ async def update_course(
     course_id: str,
     course_data: dict,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Update course details"""
     course = await session.get(Course, uuid.UUID(course_id))
@@ -709,7 +709,7 @@ async def get_timetable(
 async def create_timetable_slot(
     slot_data: dict,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Create a new timetable slot"""
     # Check for conflicts
@@ -755,7 +755,7 @@ async def update_timetable_slot(
     slot_id: str,
     slot_data: dict,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Update a timetable slot"""
     slot = await session.get(TimetableSlot, uuid.UUID(slot_id))
@@ -793,7 +793,7 @@ async def update_timetable_slot(
 async def delete_timetable_slot(
     slot_id: str,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Delete a timetable slot"""
     slot = await session.get(TimetableSlot, uuid.UUID(slot_id))

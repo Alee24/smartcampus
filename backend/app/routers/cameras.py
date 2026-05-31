@@ -5,7 +5,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 from app.database import get_session
 from app.models import Camera, CameraAnalytics, Classroom, ClassSession
-from app.auth import get_current_user, User
+from app.auth import get_current_user, get_current_admin, User
 import uuid
 import asyncio
 import cv2
@@ -174,7 +174,7 @@ async def get_camera(
 async def create_camera(
     camera_data: dict,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Create a new camera"""
     # Build camera object
@@ -234,7 +234,7 @@ async def update_camera(
     camera_id: str,
     camera_data: dict,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Update camera configuration"""
     camera = await session.get(Camera, uuid.UUID(camera_id))
@@ -257,7 +257,7 @@ async def update_camera(
 async def delete_camera(
     camera_id: str,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Delete a camera"""
     camera = await session.get(Camera, uuid.UUID(camera_id))
@@ -270,7 +270,7 @@ async def delete_camera(
     return {"message": "Camera deleted successfully"}
 
 @router.post("/cameras/{camera_id}/test")
-async def test_camera(camera_id: str, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
+async def test_camera(camera_id: str, session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_admin)):
     """Test connectivity of a specific camera and return detailed status, logging failures."""
     cam = await session.get(Camera, uuid.UUID(camera_id))
     if not cam:
@@ -374,7 +374,7 @@ async def get_room_analytics(
 async def generate_analytics(
     data: dict,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """Manually trigger analytics generation (for testing)"""
     camera_id = data.get('camera_id')
@@ -483,7 +483,7 @@ async def get_supported_brands():
 @router.post("/scan-network")
 async def scan_network_for_cameras(
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_admin)
 ):
     """
     Scans the local network for potential IP cameras.

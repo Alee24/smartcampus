@@ -120,3 +120,13 @@ async def verify_google_token(token: str, session: AsyncSession):
     except ValueError as e:
         print(f"Google Token Error: {e}")
         return None
+
+async def get_current_admin(current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)) -> User:
+    from app.models import Role
+    role = await session.get(Role, current_user.role_id)
+    if not role or role.name not in ["SuperAdmin", "Admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators are authorized to perform this action"
+        )
+    return current_user

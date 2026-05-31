@@ -69,6 +69,8 @@ export default function FleetManagement(props: FleetManagementProps) {
 }
 
 function FleetManagementContent({ initialTab = 'dashboard' }: FleetManagementProps) {
+    const role = localStorage.getItem('userRole');
+    const isAdmin = role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin';
     const [activeTab, setActiveTab] = useState(initialTab);
     const [vehicles, setVehicles] = useState<any[]>([]);
     const [trips, setTrips] = useState<any[]>([]);
@@ -536,12 +538,14 @@ function FleetManagementContent({ initialTab = 'dashboard' }: FleetManagementPro
                     >
                         <Download size={18} /> Export
                     </button>
-                    <button 
-                        onClick={() => setShowAddVehicle(true)}
-                        className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20 hover:scale-105 transition-all flex items-center gap-2"
-                    >
-                        <Plus size={18} /> Add Vehicle
-                    </button>
+                    {isAdmin && (
+                        <button 
+                            onClick={() => setShowAddVehicle(true)}
+                            className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20 hover:scale-105 transition-all flex items-center gap-2"
+                        >
+                            <Plus size={18} /> Add Vehicle
+                        </button>
+                    )}
                 </div>
             </header>
 
@@ -1133,6 +1137,8 @@ function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
 
 // Sub-Managers
 function TripsManager({ trips, vehicles, onUpdate }: any) {
+    const role = localStorage.getItem('userRole');
+    const isAdmin = role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin';
     const [showForm, setShowForm] = useState(false);
     const [activeManifestTripId, setActiveManifestTripId] = useState<string | null>(null);
 
@@ -1211,9 +1217,11 @@ function TripsManager({ trips, vehicles, onUpdate }: any) {
         <div className="glass-card p-6 animate-fade-in">
             <div className="flex justify-between items-center mb-8">
                 <h3 className="text-xl font-black">Trip Manifests</h3>
-                <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20 flex items-center gap-2">
-                    <Plus size={18} /> Schedule Trip
-                </button>
+                {isAdmin && (
+                    <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20 flex items-center gap-2">
+                        <Plus size={18} /> Schedule Trip
+                    </button>
+                )}
             </div>
             
             {showForm && (
@@ -1267,7 +1275,7 @@ function TripsManager({ trips, vehicles, onUpdate }: any) {
                                     </div>
                                 </div>
                             <div className="flex items-center gap-3">
-                                {trip.status === 'scheduled' && (
+                                {isAdmin && trip.status === 'scheduled' && (
                                     <button 
                                         onClick={() => handleStartTrip(trip.id, vehicles.find((v: any) => v.id === trip.vehicle_id)?.current_odometer || 0)} 
                                         className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold transition-colors"
@@ -1275,7 +1283,7 @@ function TripsManager({ trips, vehicles, onUpdate }: any) {
                                         Start Trip
                                     </button>
                                 )}
-                                {trip.status === 'ongoing' && (
+                                {isAdmin && trip.status === 'ongoing' && (
                                     <button 
                                         onClick={() => handleEndTrip(trip.id, trip.start_odometer || 0)} 
                                         className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-colors"
@@ -1299,6 +1307,8 @@ function TripsManager({ trips, vehicles, onUpdate }: any) {
 }
 
 function FuelManagement({ vehicles, logs, onUpdate }: any) {
+    const role = localStorage.getItem('userRole');
+    const isAdmin = role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin';
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         vehicle_id: '',
@@ -1341,30 +1351,32 @@ function FuelManagement({ vehicles, logs, onUpdate }: any) {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-            <div className="lg:col-span-1 glass-card p-6">
-                <h3 className="text-lg font-black mb-6">Log Refill</h3>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <select 
-                        required 
-                        value={formData.vehicle_id}
-                        onChange={e => setFormData({...formData, vehicle_id: e.target.value})}
-                        className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none"
-                    >
-                        <option value="">Select Vehicle</option>
-                        {vehicles.map((v: any) => <option key={v.id} value={v.id}>{v.plate_number}</option>)}
-                    </select>
-                    <div className="grid grid-cols-2 gap-4">
-                        <input type="number" step="0.01" required placeholder="Liters" value={formData.amount_liters} onChange={e => setFormData({...formData, amount_liters: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
-                        <input type="number" step="0.01" required placeholder="Cost (KES)" value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
-                    </div>
-                    <input type="number" required placeholder="Odometer Reading" value={formData.odometer_reading} onChange={e => setFormData({...formData, odometer_reading: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
-                    <input type="text" required placeholder="Fuel Station" value={formData.station_name} onChange={e => setFormData({...formData, station_name: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
-                    <button disabled={isSubmitting} className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl hover:opacity-90 disabled:opacity-50">
-                        {isSubmitting ? 'Logging...' : 'Save Fuel Log'}
-                    </button>
-                </form>
-            </div>
-            <div className="lg:col-span-2 glass-card p-6">
+            {isAdmin && (
+                <div className="lg:col-span-1 glass-card p-6">
+                    <h3 className="text-lg font-black mb-6">Log Refill</h3>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <select 
+                            required 
+                            value={formData.vehicle_id}
+                            onChange={e => setFormData({...formData, vehicle_id: e.target.value})}
+                            className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none"
+                        >
+                            <option value="">Select Vehicle</option>
+                            {vehicles.map((v: any) => <option key={v.id} value={v.id}>{v.plate_number}</option>)}
+                        </select>
+                        <div className="grid grid-cols-2 gap-4">
+                            <input type="number" step="0.01" required placeholder="Liters" value={formData.amount_liters} onChange={e => setFormData({...formData, amount_liters: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                            <input type="number" step="0.01" required placeholder="Cost (KES)" value={formData.cost} onChange={e => setFormData({...formData, cost: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                        </div>
+                        <input type="number" required placeholder="Odometer Reading" value={formData.odometer_reading} onChange={e => setFormData({...formData, odometer_reading: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                        <input type="text" required placeholder="Fuel Station" value={formData.station_name} onChange={e => setFormData({...formData, station_name: e.target.value})} className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" />
+                        <button disabled={isSubmitting} className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl hover:opacity-90 disabled:opacity-50">
+                            {isSubmitting ? 'Logging...' : 'Save Fuel Log'}
+                        </button>
+                    </form>
+                </div>
+            )}
+            <div className={`${isAdmin ? 'lg:col-span-2' : 'lg:col-span-3'} glass-card p-6`}>
                 <h3 className="text-lg font-black mb-6">Refill History</h3>
                 <div className="space-y-4">
                     {(logs || []).map((log: any, i: number) => (
@@ -1389,14 +1401,18 @@ function FuelManagement({ vehicles, logs, onUpdate }: any) {
 }
 
 function MaintenanceManager({ vehicles, logs, onUpdate }: any) {
+    const role = localStorage.getItem('userRole');
+    const isAdmin = role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin';
     const [showForm, setShowForm] = useState(false);
     return (
         <div className="space-y-6 animate-fade-in">
             <div className="flex justify-between items-center">
                 <h3 className="text-xl font-black">Maintenance & Service</h3>
-                <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold text-sm shadow-lg flex items-center gap-2">
-                    <Wrench size={18} /> Log Service
-                </button>
+                {isAdmin && (
+                    <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold text-sm shadow-lg flex items-center gap-2">
+                        <Wrench size={18} /> Log Service
+                    </button>
+                )}
             </div>
             
             {showForm && (
@@ -1532,6 +1548,8 @@ interface VehiclesManagerProps {
 }
 
 function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehicle }: VehiclesManagerProps) {
+    const role = localStorage.getItem('userRole');
+    const isAdmin = role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin';
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -1630,12 +1648,14 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
                     <h3 className="text-xl font-black text-gray-900">Fleet Vehicles Administration</h3>
                     <p className="text-sm text-gray-500 font-medium">Manage campus vehicles, track statuses, and schedule fleet updates</p>
                 </div>
-                <button 
-                    onClick={() => setShowAddVehicle(true)}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20 hover:scale-105 transition-all flex items-center gap-2"
-                >
-                    <Plus size={18} /> Register Vehicle
-                </button>
+                {isAdmin && (
+                    <button 
+                        onClick={() => setShowAddVehicle(true)}
+                        className="px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-500/20 hover:scale-105 transition-all flex items-center gap-2"
+                    >
+                        <Plus size={18} /> Register Vehicle
+                    </button>
+                )}
             </div>
 
             {/* Filter and Search Bar */}
@@ -1731,50 +1751,52 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
 
                             <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-50">
                                 <span className="text-[10px] font-extrabold text-gray-400 uppercase">Year: {vehicle.year || 'N/A'}</span>
-                                <div className="flex items-center gap-1.5">
-                                    {/* Campus Status Toggle Button */}
-                                    <button
-                                        disabled={statusUpdatingId === vehicle.id}
-                                        onClick={() => handleToggleStatus(vehicle)}
-                                        className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 border ${
-                                            vehicle.is_checked_in 
-                                            ? 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100' 
-                                            : 'bg-emerald-600 text-white border-emerald-600 hover:scale-105 shadow-md shadow-emerald-500/10'
-                                        } disabled:opacity-50`}
-                                        title={vehicle.is_checked_in ? "Checkout Vehicle" : "Checkin Vehicle"}
-                                    >
-                                        {statusUpdatingId === vehicle.id ? (
-                                            <Loader2 size={12} className="animate-spin" />
-                                        ) : vehicle.is_checked_in ? (
-                                            'Log Out'
-                                        ) : (
-                                            'Log In'
-                                        )}
-                                    </button>
+                                {isAdmin && (
+                                    <div className="flex items-center gap-1.5">
+                                        {/* Campus Status Toggle Button */}
+                                        <button
+                                            disabled={statusUpdatingId === vehicle.id}
+                                            onClick={() => handleToggleStatus(vehicle)}
+                                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 border ${
+                                                vehicle.is_checked_in 
+                                                ? 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100' 
+                                                : 'bg-emerald-600 text-white border-emerald-600 hover:scale-105 shadow-md shadow-emerald-500/10'
+                                            } disabled:opacity-50`}
+                                            title={vehicle.is_checked_in ? "Checkout Vehicle" : "Checkin Vehicle"}
+                                        >
+                                            {statusUpdatingId === vehicle.id ? (
+                                                <Loader2 size={12} className="animate-spin" />
+                                            ) : vehicle.is_checked_in ? (
+                                                'Log Out'
+                                            ) : (
+                                                'Log In'
+                                            )}
+                                        </button>
 
-                                    {/* Edit Details Button */}
-                                    <button 
-                                        onClick={() => setEditingVehicle(vehicle)}
-                                        className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-primary-100"
-                                        title="Modify Details"
-                                    >
-                                        <Edit size={14} />
-                                    </button>
+                                        {/* Edit Details Button */}
+                                        <button 
+                                            onClick={() => setEditingVehicle(vehicle)}
+                                            className="p-2 text-primary-600 hover:bg-primary-50 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-primary-100"
+                                            title="Modify Details"
+                                        >
+                                            <Edit size={14} />
+                                        </button>
 
-                                    {/* Delete Button */}
-                                    <button 
-                                        disabled={deletingId === vehicle.id}
-                                        onClick={() => handleDeleteVehicle(vehicle.id, vehicle.plate_number)}
-                                        className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-red-100 disabled:opacity-50"
-                                        title="Remove Vehicle"
-                                    >
-                                        {deletingId === vehicle.id ? (
-                                            <Loader2 size={14} className="animate-spin" />
-                                        ) : (
-                                            <Trash2 size={14} />
-                                        )}
-                                    </button>
-                                </div>
+                                        {/* Delete Button */}
+                                        <button 
+                                            disabled={deletingId === vehicle.id}
+                                            onClick={() => handleDeleteVehicle(vehicle.id, vehicle.plate_number)}
+                                            className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-red-100 disabled:opacity-50"
+                                            title="Remove Vehicle"
+                                        >
+                                            {deletingId === vehicle.id ? (
+                                                <Loader2 size={14} className="animate-spin" />
+                                            ) : (
+                                                <Trash2 size={14} />
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}

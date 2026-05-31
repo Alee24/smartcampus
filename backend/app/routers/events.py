@@ -10,7 +10,7 @@ import uuid
 from sqlalchemy import func as sa_func 
 from ..database import get_session
 from ..models import Event, EventVisitor, User, EntryLog, VehicleLog, ClassSession, GateScanLog, TimetableSlot
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_admin
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
@@ -20,7 +20,7 @@ async def get_events(session: AsyncSession = Depends(get_session)):
     return result.all()
 
 @router.post("/", response_model=Event)
-async def create_event(event: Event, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
+async def create_event(event: Event, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_admin)):
     event.qr_code_token = str(uuid.uuid4())
     session.add(event)
     await session.commit()
@@ -64,7 +64,8 @@ async def get_event_visitors(event_id: uuid.UUID, session: AsyncSession = Depend
 async def upload_visitors_csv(
     event_id: uuid.UUID,
     file: UploadFile = File(...),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_admin)
 ):
     event = await session.get(Event, event_id)
     if not event:
@@ -104,7 +105,8 @@ async def upload_visitors_csv(
 @router.post("/{event_id}/visitors/generate-passes")
 async def generate_passes(
     event_id: uuid.UUID,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_admin)
 ):
     event = await session.get(Event, event_id)
     if not event:
@@ -123,7 +125,8 @@ async def generate_passes(
 @router.post("/{event_id}/visitors/send-passes")
 async def send_passes_email(
     event_id: uuid.UUID,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_admin)
 ):
     event = await session.get(Event, event_id)
     if not event:

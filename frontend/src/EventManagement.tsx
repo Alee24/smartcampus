@@ -3,6 +3,8 @@ import { Plus, Calendar, Users, MapPin, QrCode, Download, X, Search, FileText, U
 import { QRCodeCanvas } from 'qrcode.react'
 
 export default function EventManagement() {
+    const role = localStorage.getItem('userRole')
+    const isAdmin = role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin'
     const [events, setEvents] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [showModal, setShowModal] = useState(false)
@@ -196,12 +198,14 @@ export default function EventManagement() {
                     <h2 className="text-3xl font-bold text-[var(--text-primary)]">Event Management</h2>
                     <p className="text-[var(--text-secondary)]">Create and manage events, visitors, and gate passes.</p>
                 </div>
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="flex items-center gap-2 bg-[image:var(--gradient-primary)] text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:opacity-90 transition-all"
-                >
-                    <Plus size={20} /> Create Event
-                </button>
+                {isAdmin && (
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="flex items-center gap-2 bg-[image:var(--gradient-primary)] text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:opacity-90 transition-all"
+                    >
+                        <Plus size={20} /> Create Event
+                    </button>
+                )}
             </div>
 
             {/* Events Grid */}
@@ -369,30 +373,34 @@ export default function EventManagement() {
 
                         {/* Toolbar */}
                         <div className="p-4 border-b border-[var(--border-color)] flex flex-wrap gap-3 items-center bg-[var(--bg-surface)]">
-                            {/* Upload CSV */}
-                            <label className={`flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-bold text-sm cursor-pointer hover:bg-blue-100 transition-colors ${uploading ? 'opacity-50 cursor-wait' : ''}`}>
-                                {uploading ? <Loader size={16} className="animate-spin" /> : <Upload size={16} />}
-                                {uploading ? 'Uploading...' : 'Upload CSV'}
-                                <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={uploading} />
-                            </label>
+                            {isAdmin && (
+                                <>
+                                    {/* Upload CSV */}
+                                    <label className={`flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-bold text-sm cursor-pointer hover:bg-blue-100 transition-colors ${uploading ? 'opacity-50 cursor-wait' : ''}`}>
+                                        {uploading ? <Loader size={16} className="animate-spin" /> : <Upload size={16} />}
+                                        {uploading ? 'Uploading...' : 'Upload CSV'}
+                                        <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={uploading} />
+                                    </label>
 
-                            {/* Generate Passes */}
-                            <button
-                                onClick={handleGeneratePasses}
-                                className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg font-bold text-sm hover:bg-purple-100 transition-colors"
-                            >
-                                <QrCode size={16} /> Generate Passes
-                            </button>
+                                    {/* Generate Passes */}
+                                    <button
+                                        onClick={handleGeneratePasses}
+                                        className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg font-bold text-sm hover:bg-purple-100 transition-colors"
+                                    >
+                                        <QrCode size={16} /> Generate Passes
+                                    </button>
 
-                            {/* Send Emails */}
-                            <button
-                                onClick={handleSendEmails}
-                                disabled={sending}
-                                className={`flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg font-bold text-sm hover:bg-green-100 transition-colors ${sending ? 'opacity-50 cursor-wait' : ''}`}
-                            >
-                                {sending ? <Loader size={16} className="animate-spin" /> : <Mail size={16} />}
-                                {sending ? 'Sending...' : 'Send Emails'}
-                            </button>
+                                    {/* Send Emails */}
+                                    <button
+                                        onClick={handleSendEmails}
+                                        disabled={sending}
+                                        className={`flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg font-bold text-sm hover:bg-green-100 transition-colors ${sending ? 'opacity-50 cursor-wait' : ''}`}
+                                    >
+                                        {sending ? <Loader size={16} className="animate-spin" /> : <Mail size={16} />}
+                                        {sending ? 'Sending...' : 'Send Emails'}
+                                    </button>
+                                </>
+                            )}
 
                             <div className="ml-auto text-xs text-[var(--text-secondary)]">
                                 Total Guests: <span className="font-bold text-[var(--text-primary)]">{visitors.length}</span>
