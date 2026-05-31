@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SAAsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text as sa_text
 from typing import List, Optional
+from pydantic import BaseModel
 from app.database import get_session, engine
 from app.models import User, Role, SystemConfig, EntryLog
 from app.auth import get_current_user, get_password_hash
@@ -205,6 +206,90 @@ async def get_current_user_info(
         "role": role.name if role else "Unknown",
         "role_id": current_user.role_id
     }
+
+class UserUpdateMe(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    gender: Optional[str] = None
+    password: Optional[str] = None
+
+@router.put("/me")
+async def update_current_user_info(
+    update_data: UserUpdateMe,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Update current logged-in user information"""
+    old_values = {}
+    new_values = {}
+
+    if update_data.first_name is not None:
+        old_values["first_name"] = current_user.first_name
+        current_user.first_name = update_data.first_name
+        new_values["first_name"] = update_data.first_name
+
+    if update_data.last_name is not None:
+        old_values["last_name"] = current_user.last_name
+        current_user.last_name = update_data.last_name
+        new_values["last_name"] = update_data.last_name
+
+    # Auto-compile or explicitly set full_name
+    if update_data.full_name is not None:
+        old_values["full_name"] = current_user.full_name
+        current_user.full_name = update_data.full_name
+        new_values["full_name"] = update_data.full_name
+    elif update_data.first_name is not None or update_data.last_name is not None:
+        old_values["full_name"] = current_user.full_name
+        f_name = current_user.first_name or ""
+        l_name = current_user.last_name or ""
+        current_user.full_name = f"{f_name} {l_name}".strip() or current_user.full_name
+        new_values["full_name"] = current_user.full_name
+
+    if update_data.email is not None:
+        # Check email uniqueness if changed
+        if update_data.email != current_user.email:
+            existing = await session.exec(select(User).where(User.email == update_data.email))
+            if existing.first():
+                raise HTTPException(status_code=400, detail="Email already in use")
+        old_values["email"] = current_user.email
+        current_user.email = update_data.email
+        new_values["email"] = update_data.email
+
+    if update_data.phone_number is not None:
+        old_values["phone_number"] = current_user.phone_number
+        current_user.phone_number = update_data.phone_number
+        new_values["phone_number"] = update_data.phone_number
+
+    if update_data.gender is not None:
+        old_values["gender"] = current_user.gender
+        current_user.gender = update_data.gender
+        new_values["gender"] = update_data.gender
+
+    if update_data.password is not None and len(update_data.password.strip()) >= 6:
+        current_user.hashed_password = get_password_hash(update_data.password)
+        new_values["password"] = "[CHANGED]"
+
+    session.add(current_user)
+    await session.commit()
+    await session.refresh(current_user)
+
+    await log_action(
+        session=session,
+        action_type="update_profile",
+        user=current_user,
+        table_name="users",
+        record_id=str(current_user.id),
+        description=f"Updated profile information",
+        old_values=old_values,
+        new_values=new_values,
+        request=request
+    )
+
+    return {"message": "Profile updated successfully", "user": current_user}
 
 @router.post("/log-access")
 async def log_user_access(
