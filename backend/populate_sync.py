@@ -9,7 +9,12 @@ sys.path.append(os.getcwd())
 
 def populate_sync():
     print("Populating DB (Sync)...")
-    db_url = "mysql+pymysql://root:@127.0.0.1:3306/gatepass_db"
+    import os
+    env_db_url = os.getenv("DATABASE_URL")
+    if env_db_url:
+        db_url = env_db_url.replace("mysql+aiomysql://", "mysql+pymysql://")
+    else:
+        db_url = "mysql+pymysql://root:@127.0.0.1:3306/gatepass_db"
     engine = create_engine(db_url)
     
     with Session(engine) as session:
