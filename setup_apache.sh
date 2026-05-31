@@ -68,6 +68,12 @@ if [ -f "$SSL_CERT" ] && [ -f "$SSL_KEY" ]; then
 
     DocumentRoot /var/www/html
 
+    <Directory /var/www/html>
+        Options FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+
     # Allow Let's Encrypt HTTP ACME challenges to pass through cleanly
     ProxyPass /.well-known/acme-challenge/ !
 
@@ -117,6 +123,12 @@ else
     ServerAlias www.$DOMAIN
 
     DocumentRoot /var/www/html
+
+    <Directory /var/www/html>
+        Options FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
 
     # Allow Let's Encrypt HTTP ACME challenges to bypass the reverse proxy
     ProxyPass /.well-known/acme-challenge/ !
