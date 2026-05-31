@@ -4,6 +4,9 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine
 import os
 
+# Import all models to ensure SQLModel has registered them before create_all is called
+from app.models import *
+
 # We use sync engine for 'create_all' and async for runtime
 DATABASE_URL = os.getenv("DATABASE_URL")
 # Adjust for asyncpg if needed: postgresql+asyncpg://...

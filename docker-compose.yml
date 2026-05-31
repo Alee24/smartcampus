@@ -30,10 +30,8 @@ services:
     volumes:
       - ./backend/static:/app/static
       - ./backend/uploads:/app/uploads
-    # Expose internally but not necessarily to the host in production
-    # Unless you need direct access to port 8000
-    expose:
-      - "8000"
+    ports:
+      - "971:8000"
     environment:
       DATABASE_URL: mysql+aiomysql://gatepass_user:user_password@db:3306/gatepass_v2
       REDIS_URL: redis://redis:6379
@@ -54,7 +52,7 @@ services:
     container_name: gatepass_frontend
     # Primary entry point for the entire application
     ports:
-      - "80:80"
+      - "9613:80"
     depends_on:
       - backend
     networks:
