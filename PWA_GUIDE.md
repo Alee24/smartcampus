@@ -47,7 +47,7 @@ location ~* (sw\.js|workbox-.+\.js)$ {
 ```
 
 ### C. Apache Proxy & IP Access Control
-To permit accessing the application on the IP address while blocking the old/restricted domain `smartcampus.kkh.co.ke`, configure Apache VPS VirtualHosts as detailed in [site_config/apache_ip_control.conf](file:///c:/Users/Metto/Desktop/Codes/gatepass/site_config/apache_ip_control.conf):
-1. **Domain VirtualHost**: Intercepts requests for `smartcampus.kkh.co.ke` and returns a `403 Forbidden` block.
+To permit accessing the application on the IP address while blocking the old/restricted domain `smartcampus.kkdes.co.ke`, configure Apache VPS VirtualHosts as detailed in [site_config/apache_ip_control.conf](file:///c:/Users/Metto/Desktop/Codes/gatepass/site_config/apache_ip_control.conf):
+1. **Domain VirtualHost**: Intercepts requests for `smartcampus.kkdes.co.ke` and returns a `403 Forbidden` block.
 2. **IP VirtualHost**: Intercepts requests to `185.192.97.84` (port 80) and proxies them to the Docker container at port `9613` (including WebSocket support).
 
