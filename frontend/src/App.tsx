@@ -53,7 +53,7 @@ const LecturerDashboard = lazy(() => import('./LecturerDashboard'))
 const QRRegistry = lazy(() => import('./QRRegistry'))
 
 // 3. Non-lazy components (small/critical)
-import InstallPWA from './components/InstallPWA'
+import InstallPWA, { InstallPWATrigger } from './components/InstallPWA'
 import PermissionsModal from './components/PermissionsModal'
 
 // Helper for Suspense Fallback
@@ -785,6 +785,7 @@ function App() {
                         )}
                         <SidebarGroup title="Support" isOpen={openGroups.support} onToggle={() => toggleGroup('support')} isSidebarCollapsed={isSidebarCollapsed}>
                             <NavItem icon={<HelpCircle size={18} />} label="Help Center" active={false} onClick={() => { }} />
+                            <InstallPWATrigger navStyle />
                         </SidebarGroup>
                     </nav>
 
@@ -811,6 +812,7 @@ function App() {
                             />
                         </SidebarGroup>
                     </div>
+
 
                     <div className="flex items-center justify-between px-4 py-2 border-t border-[var(--border-color)] mt-2">
                         <button
