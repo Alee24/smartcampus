@@ -19,7 +19,9 @@ async def get_classrooms(
     current_user: User = Depends(get_current_user)
 ):
     """Get all classrooms (filtered for students)"""
-    if current_user.role.lower() == 'student':
+    from app.models import Role
+    role = await session.get(Role, current_user.role_id)
+    if role and role.name.lower() == 'student':
         reg_stmt = select(StudentCourseRegistration).where(StudentCourseRegistration.student_id == current_user.id)
         registrations = (await session.exec(reg_stmt)).all()
         if not registrations:
@@ -152,12 +154,13 @@ async def get_classrooms_detailed(
     current_user: User = Depends(get_current_user)
 ):
     """Get all classrooms with detailed activity information"""
-    from app.models import AttendanceRecord, SystemActivity, ScanLog
+    from app.models import AttendanceRecord, SystemActivity, ScanLog, Role
     from sqlmodel import func
     
     try:
         # Get classrooms (filtered for students)
-        if current_user.role.lower() == 'student':
+        role = await session.get(Role, current_user.role_id)
+        if role and role.name.lower() == 'student':
             reg_stmt = select(StudentCourseRegistration).where(StudentCourseRegistration.student_id == current_user.id)
             registrations = (await session.exec(reg_stmt)).all()
             if not registrations:
@@ -639,7 +642,9 @@ async def get_courses(
     current_user: User = Depends(get_current_user)
 ):
     """Get all courses with lecturer and classroom info (filtered for students)"""
-    if current_user.role.lower() == 'student':
+    from app.models import Role
+    role = await session.get(Role, current_user.role_id)
+    if role and role.name.lower() == 'student':
         reg_stmt = select(StudentCourseRegistration).where(StudentCourseRegistration.student_id == current_user.id)
         registrations = (await session.exec(reg_stmt)).all()
         if not registrations:
@@ -859,7 +864,9 @@ async def get_weekly_timetable(
     current_user: User = Depends(get_current_user)
 ):
     """Get organized weekly timetable view (filtered for students)"""
-    if current_user.role.lower() == 'student':
+    from app.models import Role
+    role = await session.get(Role, current_user.role_id)
+    if role and role.name.lower() == 'student':
         reg_stmt = select(StudentCourseRegistration).where(StudentCourseRegistration.student_id == current_user.id)
         registrations = (await session.exec(reg_stmt)).all()
         if not registrations:
