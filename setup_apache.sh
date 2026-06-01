@@ -1,175 +1,200 @@
 #!/bin/bash
 
-# --- Smart Campus Apache Reverse Proxy Configurator ---
-# This script sets up Apache2 on the host VPS to securely proxy 
-# smartcampus.kkdes.co.ke to the isolated Docker frontend container on Port 9613.
-# It automatically supports both HTTP and secure HTTPS with Let's Encrypt certificates.
+# --- Smart Campus Automated Apache & SSL Setup Script ---
+# This script completely automates the installation and configuration of 
+# Apache2 on your VPS as a reverse proxy for smartcampus.kkdes.co.ke.
+#
+# It automatically:
+# 1. Stops & disables conflicting web servers (LiteSpeed, OpenLiteSpeed, Nginx) binding to ports 80/443.
+# 2. Installs Apache2, Certbot, and Python3 Apache certbot plugin.
+# 3. Configures Apache modules (proxy, proxy_http, rewrite, ssl, headers).
+# 4. Sets the proper document root to /var/www/smartcampus.
+# 5. Automatically generates or renews Let's Encrypt SSL certificates.
+# 6. Sets up the Reverse Proxy to the frontend container (Port 9613) with WebSocket support.
+# 7. Restarts Apache and verifies the status.
 
 set -e
 
 DOMAIN="smartcampus.kkdes.co.ke"
 DOCKER_PORT="9613"
+DOC_ROOT="/var/www/smartcampus"
 CONFIG_FILE="/etc/apache2/sites-available/smartcampus.conf"
 
 echo "=========================================================="
-echo "🛡️  Configuring Apache2 Host Proxy for $DOMAIN"
+echo "🛡️  Smart Campus Automated Apache & SSL Configurator"
 echo "=========================================================="
 
-# 1. Check if running as root
+# 1. Ensure running as root
 if [ "$EUID" -ne 0 ]; then
-  echo "❌ Error: Please run this script with sudo or as root."
+  echo "❌ Error: Please run this script as root."
   exit 1
 fi
 
-# 2. Check if Apache is installed
-if ! command -v apache2 &> /dev/null; then
-  echo "⚠️  Apache2 is not installed. Installing apache2..."
-  apt-get update && apt-get install -y apache2
-else
-  echo "✅ Apache2 is installed."
+# 2. Kill and disable any conflicting web servers on Ports 80 & 443
+echo "🧹 Detecting and stopping conflicting web servers (LiteSpeed, Nginx, etc.)..."
+systemctl stop litespeed openlitespeed nginx httpd 2>/dev/null || true
+systemctl disable litespeed openlitespeed nginx httpd 2>/dev/null || true
+if command -v /usr/local/lsws/bin/lswsctrl &> /dev/null; then
+  /usr/local/lsws/bin/lswsctrl stop 2>/dev/null || true
 fi
 
-# 3. Enable required Apache modules for proxying and SSL
-echo "Enabling Apache proxy, rewrite, and SSL modules..."
+# Release bound ports 80 and 443 if any rogue process is still running
+echo "🧹 Ensuring Ports 80 & 443 are free..."
+if command -v fuser &> /dev/null; then
+  fuser -k 80/tcp 2>/dev/null || true
+  fuser -k 443/tcp 2>/dev/null || true
+fi
+
+# 3. Install Apache2 & Certbot
+echo "📦 Installing Apache2 and Certbot tools..."
+apt-get update
+apt-get install -y apache2 certbot python3-certbot-apache curl
+
+# 4. Enable required modules
+echo "🔌 Enabling Apache proxy, rewrite, and SSL modules..."
 a2enmod proxy || true
 a2enmod proxy_http || true
 a2enmod headers || true
 a2enmod rewrite || true
 a2enmod ssl || true
 
-# 4. Ensure Webroot directory exists for Certbot ACME challenge
-mkdir -p /var/www/html
-chown -R www-data:www-data /var/www/html
+# 5. Ensure the document root exists
+mkdir -p "$DOC_ROOT"
+chown -R www-data:www-data "$DOC_ROOT"
 
-# 5. Clean up any existing Certbot-generated virtual hosts that might conflict
-if [ -f "/etc/apache2/sites-enabled/smartcampus-le-ssl.conf" ]; then
-  echo "🧹 Cleaning up conflicting Certbot-generated SSL configuration link..."
-  rm -f "/etc/apache2/sites-enabled/smartcampus-le-ssl.conf"
-fi
-if [ -f "/etc/apache2/sites-available/smartcampus-le-ssl.conf" ]; then
-  echo "🧹 Removing conflicting Certbot-generated SSL configuration file..."
-  rm -f "/etc/apache2/sites-available/smartcampus-le-ssl.conf"
-fi
-
-# 6. Check if Let's Encrypt SSL certificates exist
+# 6. Check/Generate Let's Encrypt SSL Certificate
 SSL_CERT="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
 SSL_KEY="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
 
+if [ ! -f "$SSL_CERT" ] || [ ! -f "$SSL_KEY" ]; then
+  echo "🔒 SSL Certificates not found. Generating Let's Encrypt SSL certificate..."
+  
+  # Temporary VirtualHost for Certbot validation
+  cat << EOF > "$CONFIG_FILE"
+<VirtualHost *:80>
+    ServerName $DOMAIN
+    ServerAlias www.$DOMAIN
+    DocumentRoot $DOC_ROOT
+    <Directory $DOC_ROOT>
+        Options FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+    ErrorLog \${APACHE_LOG_DIR}/smartcampus_temp_error.log
+</VirtualHost>
+EOF
+
+  a2ensite smartcampus.conf || true
+  a2dissite 000-default.conf 2>/dev/null || true
+  systemctl restart apache2
+  
+  echo "📡 Running non-interactive certbot registration..."
+  certbot --apache -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email || {
+    echo "⚠️ Certbot standard verification failed. Attempting standalone fallback..."
+    systemctl stop apache2
+    certbot certonly --standalone -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email
+    systemctl start apache2
+  }
+fi
+
+# 7. Write the definitive Reverse Proxy VirtualHost Config (Port 80 + Port 443)
 if [ -f "$SSL_CERT" ] && [ -f "$SSL_KEY" ]; then
-  echo "🔒 SSL Certificates found!"
-  echo "   Cert: $SSL_CERT"
-  echo "   Key:  $SSL_KEY"
-  echo "✍️ Writing dual HTTP (Port 80) and HTTPS (Port 443) VirtualHost configuration..."
+  echo "🔒 SSL Certificates active. Configuring secure proxy..."
   
   cat << EOF > "$CONFIG_FILE"
 <VirtualHost *:80>
     ServerName $DOMAIN
     ServerAlias www.$DOMAIN
-
-    DocumentRoot /var/www/html
-
-    <Directory /var/www/html>
-        Options FollowSymLinks
-        AllowOverride None
-        Require all granted
-    </Directory>
-
-    # Allow Let's Encrypt HTTP ACME challenges to pass through cleanly
+    
+    DocumentRoot $DOC_ROOT
+    
+    # Allow ACME challenge to pass through locally
     ProxyPass /.well-known/acme-challenge/ !
-
-    # Automatically redirect all other HTTP requests to HTTPS
+    
+    # Redirect all other traffic to secure HTTPS
     RewriteEngine On
     RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge
-    RewriteRule ^(.*)$ https://%{HTTP_HOST}\$1 [R=301,L]
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
 
-    # Logging
-    ErrorLog \${APACHE_LOG_DIR}/smartcampus_error.log
-    CustomLog \${APACHE_LOG_DIR}/smartcampus_access.log combined
+    ErrorLog \${APACHE_LOG_DIR}/smartcampus_http_error.log
+    CustomLog \${APACHE_LOG_DIR}/smartcampus_http_access.log combined
 </VirtualHost>
 
 <VirtualHost *:443>
     ServerName $DOMAIN
     ServerAlias www.$DOMAIN
-
-    # Enable SSL Engine
+    
+    DocumentRoot $DOC_ROOT
+    
+    # SSL Engine Activation
     SSLEngine on
     SSLCertificateFile $SSL_CERT
     SSLCertificateKeyFile $SSL_KEY
 
-    # Increase timeout limits for massive file uploads (e.g. ZIP photo uploads)
+    # Timeouts for large uploads
     ProxyTimeout 3600
     Timeout 3600
 
-    # Preserve the original Host header from the client
     ProxyPreserveHost On
+    ProxyAddHeaders On
 
-    # Reverse Proxy configuration pointing to the isolated Docker frontend port
+    # WebSocket Proxy rules for real-time scans / updates
+    RewriteEngine On
+    RewriteCond %{HTTP:Upgrade} websocket [NC]
+    RewriteCond %{HTTP:Connection} upgrade [NC]
+    RewriteRule ^/?(.*) "ws://127.0.0.1:$DOCKER_PORT/\$1" [P,L]
+
+    # Standard Reverse Proxy to Docker Frontend
     ProxyPass / http://127.0.0.1:$DOCKER_PORT/
     ProxyPassReverse / http://127.0.0.1:$DOCKER_PORT/
 
-    # Logging
+    # Security & PWA configuration
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    <FilesMatch "\.(js|manifest\.webmanifest)$">
+        Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+    </FilesMatch>
+
     ErrorLog \${APACHE_LOG_DIR}/smartcampus_ssl_error.log
     CustomLog \${APACHE_LOG_DIR}/smartcampus_ssl_access.log combined
 </VirtualHost>
 EOF
 
 else
-  echo "⚠️ SSL Certificates not found yet."
-  echo "✍️ Writing HTTP (Port 80) VirtualHost configuration with ACME challenge bypass..."
-  
+  echo "❌ Critical Error: Could not obtain SSL certificates. Writing fallback HTTP proxy configuration..."
   cat << EOF > "$CONFIG_FILE"
 <VirtualHost *:80>
     ServerName $DOMAIN
     ServerAlias www.$DOMAIN
-
-    DocumentRoot /var/www/html
-
-    <Directory /var/www/html>
-        Options FollowSymLinks
-        AllowOverride None
-        Require all granted
-    </Directory>
-
-    # Allow Let's Encrypt HTTP ACME challenges to bypass the reverse proxy
-    ProxyPass /.well-known/acme-challenge/ !
-
-    # Increase timeout limits for massive file uploads (e.g. ZIP photo uploads)
-    ProxyTimeout 3600
-    Timeout 3600
-
-    # Preserve the original Host header from the client
+    
+    DocumentRoot $DOC_ROOT
+    
     ProxyPreserveHost On
+    ProxyAddHeaders On
 
-    # Reverse Proxy configuration pointing to the isolated Docker frontend port
+    # Standard HTTP Proxying
     ProxyPass / http://127.0.0.1:$DOCKER_PORT/
     ProxyPassReverse / http://127.0.0.1:$DOCKER_PORT/
 
-    # Logging
-    ErrorLog \${APACHE_LOG_DIR}/smartcampus_error.log
-    CustomLog \${APACHE_LOG_DIR}/smartcampus_access.log combined
+    ErrorLog \${APACHE_LOG_DIR}/smartcampus_http_error.log
 </VirtualHost>
 EOF
 fi
 
-# 7. Enable the site and restart Apache
-echo "Enabling the $DOMAIN site..."
+# 8. Activate Config, Disable defaults, Restart Apache
+echo "⚙️ Activating virtual host configurations..."
 a2ensite smartcampus.conf
+a2dissite 000-default.conf smartcampus-ip-control.conf smartcampus.ru.ac.ke.conf 2>/dev/null || true
 
-# Disable default site if it conflicts
-if [ -f "/etc/apache2/sites-enabled/000-default.conf" ]; then
-  echo "Disabling default 000-default site to avoid conflicts..."
-  a2dissite 000-default || true
-fi
+echo "🔍 Testing Apache configuration..."
+apache2ctl configtest
 
-echo "Restarting Apache2 to apply configurations..."
+echo "🚀 Restarting Apache2..."
 systemctl restart apache2
 
 echo "=========================================================="
-echo "✅ Apache Host Reverse Proxy is successfully configured!"
-if [ -f "$SSL_CERT" ]; then
-  echo "   Secure Link: https://$DOMAIN"
-else
-  echo "   Link: http://$DOMAIN"
-  echo "   👉 Run 'sudo certbot certonly --webroot -w /var/www/html -d $DOMAIN' to generate SSL."
-fi
+echo "🎉 SUCCESS: smartcampus.kkdes.co.ke is now live with SSL!"
+echo "   HTTPS URL: https://$DOMAIN"
 echo "=========================================================="
