@@ -494,6 +494,8 @@ function App() {
 
     const handleLogout = () => {
         localStorage.removeItem('token')
+        localStorage.removeItem('userRole')
+        localStorage.removeItem('activeTab')
         setIsAuthenticated(false)
         setShowLanding(true) // Show landing page after logout
     }
@@ -570,7 +572,7 @@ function App() {
 
                     <nav className="space-y-1 overflow-y-auto max-h-[calc(100vh-250px)] scrollbar-hide">
                         <SidebarGroup title="Overview" isOpen={openGroups.overview} onToggle={() => toggleGroup('overview')} isSidebarCollapsed={isSidebarCollapsed}>
-                            {isMenuEnabled('dashboard') && (
+                            {(isMenuEnabled('dashboard') || isMenuEnabled('student-dashboard')) && (
                                 <NavItem
                                     icon={<LayoutDashboard size={18} />}
                                     label="Dashboard"
@@ -667,18 +669,22 @@ function App() {
                                         onClick={() => { setActiveTab('verification'); setSidebarOpen(false); }}
                                     />
                                 )}
-                                <NavItem
-                                    icon={<Printer size={18} />}
-                                    label="ID Printing"
-                                    active={activeTab === 'id-printing'}
-                                    onClick={() => { setActiveTab('id-printing'); setSidebarOpen(false); }}
-                                />
-                                <NavItem
-                                    icon={<QrCode size={18} />}
-                                    label="QR Asset Hub"
-                                    active={activeTab === 'qr-registry'}
-                                    onClick={() => { setActiveTab('qr-registry'); setSidebarOpen(false); }}
-                                />
+                                {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                                    <>
+                                        <NavItem
+                                            icon={<Printer size={18} />}
+                                            label="ID Printing"
+                                            active={activeTab === 'id-printing'}
+                                            onClick={() => { setActiveTab('id-printing'); setSidebarOpen(false); }}
+                                        />
+                                        <NavItem
+                                            icon={<QrCode size={18} />}
+                                            label="QR Asset Hub"
+                                            active={activeTab === 'qr-registry'}
+                                            onClick={() => { setActiveTab('qr-registry'); setSidebarOpen(false); }}
+                                        />
+                                    </>
+                                )}
                             </SidebarGroup>
                         )}
 
@@ -1019,6 +1025,15 @@ function App() {
                             }
                         })()}
                     </header>
+
+                    {/* Security Guard for Students */}
+                    {(() => {
+                        if (role?.toLowerCase() === 'student' && !['dashboard', 'attendance', 'timetable', 'courses', 'classrooms', 'events', 'calendar', 'privacy', 'cookies', 'rights', 'settings'].includes(activeTab)) {
+                            setTimeout(() => setActiveTab('dashboard'), 0);
+                            return null;
+                        }
+                        return null;
+                    })()}
 
                     {activeTab === 'dashboard' && role === 'Guardian' && <GuardianDashboard />}
                     {activeTab === 'dashboard' && role === 'Security' && <SecurityDashboard onNavigate={setActiveTab} />}

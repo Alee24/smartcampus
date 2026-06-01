@@ -246,9 +246,11 @@ export default function EventManagement() {
                             <span className={`px-2 py-1 rounded text-xs font-bold ${event.is_active ? 'text-green-600 bg-green-100' : 'text-gray-500 bg-gray-100'}`}>
                                 {event.is_active ? 'Active' : 'Closed'}
                             </span>
-                            <button onClick={() => openVisitorModal(event)} className="text-sm font-bold text-primary-600 hover:underline">
-                                Manage Guests
-                            </button>
+                            {isAdmin && (
+                                <button onClick={() => openVisitorModal(event)} className="text-sm font-bold text-primary-600 hover:underline">
+                                    Manage Guests
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}

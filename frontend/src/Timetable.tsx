@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Users, Book, CheckCircle, Search } from 'lucide-react'
 
 export default function Timetable() {
+    const userRole = localStorage.getItem('userRole') || ''
     const [activeTab, setActiveTab] = useState('timetable')
     const [classrooms, setClassrooms] = useState<any[]>([])
     const [courses, setCourses] = useState<any[]>([])
@@ -341,13 +342,15 @@ export default function Timetable() {
                 <div>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-xl font-bold text-[var(--text-primary)]">Weekly Schedule</h3>
-                        <button
-                            onClick={() => setShowSlotModal(true)}
-                            className="flex items-center gap-2 bg-[image:var(--gradient-primary)] hover:opacity-90 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all"
-                        >
-                            <Plus size={18} />
-                            Add Slot
-                        </button>
+                        {userRole?.toLowerCase() !== 'student' && (
+                            <button
+                                onClick={() => setShowSlotModal(true)}
+                                className="flex items-center gap-2 bg-[image:var(--gradient-primary)] hover:opacity-90 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all"
+                            >
+                                <Plus size={18} />
+                                Add Slot
+                            </button>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
@@ -551,8 +554,12 @@ export default function Timetable() {
                                                     /* View Mode */
                                                     <div
                                                         key={slot.id}
-                                                        className="flex gap-4 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] hover:border-[var(--primary-color)] transition-all group cursor-pointer"
-                                                        onClick={() => setEditingSlot(slot)}
+                                                        className={`flex gap-4 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] hover:border-[var(--primary-color)] transition-all group ${userRole?.toLowerCase() !== 'student' ? 'cursor-pointer' : ''}`}
+                                                        onClick={() => {
+                                                            if (userRole?.toLowerCase() !== 'student') {
+                                                                setEditingSlot(slot)
+                                                            }
+                                                        }}
                                                     >
                                                         <div className="flex flex-col items-center justify-center min-w-[80px] border-r border-[var(--border-color)] pr-4">
                                                             <span className="font-bold text-lg text-[var(--text-primary)]">{slot.start_time}</span>
@@ -586,9 +593,11 @@ export default function Timetable() {
                                                                 </span>
                                                             </div>
 
-                                                            <div className="mt-2 text-xs text-[var(--text-secondary)] opacity-60">
-                                                                Click to edit or delete
-                                                            </div>
+                                                            {userRole?.toLowerCase() !== 'student' && (
+                                                                <div className="mt-2 text-xs text-[var(--text-secondary)] opacity-60">
+                                                                    Click to edit or delete
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 )
@@ -627,13 +636,15 @@ export default function Timetable() {
                 <div>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-xl font-bold text-[var(--text-primary)]">Courses</h3>
-                        <button
-                            onClick={() => setShowCourseModal(true)}
-                            className="flex items-center gap-2 bg-[image:var(--gradient-primary)] hover:opacity-90 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all"
-                        >
-                            <Plus size={18} />
-                            Add Course
-                        </button>
+                        {userRole?.toLowerCase() !== 'student' && (
+                            <button
+                                onClick={() => setShowCourseModal(true)}
+                                className="flex items-center gap-2 bg-[image:var(--gradient-primary)] hover:opacity-90 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all"
+                            >
+                                <Plus size={18} />
+                                Add Course
+                            </button>
+                        )}
                     </div>
 
                     <div className="glass-card overflow-hidden">
@@ -670,13 +681,15 @@ export default function Timetable() {
                 <div>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-xl font-bold text-[var(--text-primary)]">Classrooms</h3>
-                        <button
-                            onClick={() => setShowClassroomModal(true)}
-                            className="flex items-center gap-2 bg-[image:var(--gradient-primary)] hover:opacity-90 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all"
-                        >
-                            <Plus size={18} />
-                            Add Classroom
-                        </button>
+                        {userRole?.toLowerCase() !== 'student' && (
+                            <button
+                                onClick={() => setShowClassroomModal(true)}
+                                className="flex items-center gap-2 bg-[image:var(--gradient-primary)] hover:opacity-90 px-6 py-3 rounded-xl font-bold text-white shadow-lg transition-all"
+                            >
+                                <Plus size={18} />
+                                Add Classroom
+                            </button>
+                        )}
                     </div>
 
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">

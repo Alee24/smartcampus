@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
     Calendar, Clock, MapPin, User, Book, CheckCircle,
-    XCircle, TrendingUp, Award, Bell, ChevronRight
+    XCircle, TrendingUp, Award, Bell, ChevronRight, Bookmark, Info, CalendarDays, Megaphone
 } from 'lucide-react'
 
 interface AttendanceRecord {
@@ -31,7 +31,17 @@ interface StudentStats {
     attendance_rate: number
 }
 
+interface EventItem {
+    id: string
+    event_name: string
+    event_date: string
+    location: string
+    coordinator_name?: string
+    description?: string
+}
+
 export default function StudentDashboard() {
+    const [subTab, setSubTab] = useState<'schedule' | 'events'>('schedule')
     const [todayClasses, setTodayClasses] = useState<TodayClass[]>([])
     const [recentAttendance, setRecentAttendance] = useState<AttendanceRecord[]>([])
     const [stats, setStats] = useState<StudentStats>({
@@ -40,8 +50,12 @@ export default function StudentDashboard() {
         missed: 0,
         attendance_rate: 0
     })
+    const [weeklyTimetable, setWeeklyTimetable] = useState<Record<string, any[]>>({})
+    const [eventsList, setEventsList] = useState<EventItem[]>([])
     const [loading, setLoading] = useState(true)
     const [currentTime, setCurrentTime] = useState(new Date())
+
+    const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
     useEffect(() => {
         fetchDashboardData()
@@ -88,6 +102,22 @@ export default function StudentDashboard() {
                 setStats(await statsRes.json())
             }
 
+            // Fetch weekly timetable (fully secure and filtered for this student)
+            const weeklyRes = await fetch('/api/timetable/timetable/weekly', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (weeklyRes.ok) {
+                setWeeklyTimetable(await weeklyRes.json())
+            }
+
+            // Fetch university events (read-only)
+            const eventsRes = await fetch('/api/events/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (eventsRes.ok) {
+                setEventsList(await eventsRes.json())
+            }
+
             setLoading(false)
         } catch (err) {
             console.error(err)
@@ -113,232 +143,248 @@ export default function StudentDashboard() {
         return now >= start && now <= end
     }
 
-    const isUpcoming = (startTime: string) => {
-        const now = currentTime.getHours() * 60 + currentTime.getMinutes()
-        const [startH, startM] = startTime.split(':').map(Number)
-        const start = startH * 60 + startM
-        return start > now && start - now <= 60 // Within next hour
-    }
-
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
             </div>
         )
     }
 
     return (
         <div className="animate-fade-in pb-8">
-            {/* Header */}
+            {/* Premium Header */}
             <header className="mb-8">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-4xl font-black bg-clip-text text-transparent bg-[image:var(--gradient-primary)]">
-                            My Dashboard
+                        <h1 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 dark:from-indigo-400 dark:to-purple-400 leading-tight">
+                            My Student Portal
                         </h1>
-                        <p className="text-[var(--text-secondary)] mt-2">
+                        <p className="text-[var(--text-secondary)] mt-2 font-medium">
                             {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </p>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className="text-right">
-                            <p className="text-3xl font-bold text-[var(--text-primary)]">
+                    <div className="bg-white dark:bg-slate-800 px-6 py-3 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-4 shrink-0">
+                        <Clock className="text-indigo-600" size={24} />
+                        <div>
+                            <p className="text-2xl font-black text-[var(--text-primary)] leading-none">
                                 {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                             </p>
-                            <p className="text-xs text-[var(--text-secondary)]">Current Time</p>
+                            <p className="text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-widest mt-1">Live Campus Time</p>
                         </div>
                     </div>
                 </div>
             </header>
 
-            {/* Stats Cards */}
+            {/* Health-oriented Theme Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div className="glass-card p-6 border-l-4 border-blue-500">
+                <div className="glass-card p-6 border-l-4 border-indigo-500 hover:scale-[1.02] transition-transform">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-[var(--text-secondary)]">Total Classes</p>
-                            <p className="text-3xl font-bold text-[var(--text-primary)] mt-2">{stats.total_classes}</p>
+                            <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Total Scheduled Classes</p>
+                            <p className="text-3xl font-black text-[var(--text-primary)] mt-2">{stats.total_classes}</p>
                         </div>
-                        <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                            <Book className="text-blue-600" size={24} />
+                        <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-inner">
+                            <Book size={24} />
                         </div>
                     </div>
                 </div>
 
-                <div className="glass-card p-6 border-l-4 border-green-500">
+                <div className="glass-card p-6 border-l-4 border-emerald-500 hover:scale-[1.02] transition-transform">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-[var(--text-secondary)]">Attended</p>
-                            <p className="text-3xl font-bold text-green-600 mt-2">{stats.attended}</p>
+                            <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Classes Attended</p>
+                            <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-2">{stats.attended}</p>
                         </div>
-                        <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                            <CheckCircle className="text-green-600" size={24} />
+                        <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-inner">
+                            <CheckCircle size={24} />
                         </div>
                     </div>
                 </div>
 
-                <div className="glass-card p-6 border-l-4 border-red-500">
+                <div className="glass-card p-6 border-l-4 border-rose-500 hover:scale-[1.02] transition-transform">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-[var(--text-secondary)]">Missed</p>
-                            <p className="text-3xl font-bold text-red-600 mt-2">{stats.missed}</p>
+                            <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Classes Missed</p>
+                            <p className="text-3xl font-black text-rose-600 dark:text-rose-400 mt-2">{stats.missed}</p>
                         </div>
-                        <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                            <XCircle className="text-red-600" size={24} />
+                        <div className="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/40 flex items-center justify-center text-rose-600 dark:text-rose-400 shadow-inner">
+                            <XCircle size={24} />
                         </div>
                     </div>
                 </div>
 
-                <div className="glass-card p-6 border-l-4 border-purple-500">
+                <div className="glass-card p-6 border-l-4 border-violet-500 hover:scale-[1.02] transition-transform">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-[var(--text-secondary)]">Attendance Rate</p>
-                            <p className="text-3xl font-bold text-purple-600 mt-2">{stats.attendance_rate}%</p>
+                            <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Attendance Rate</p>
+                            <p className="text-3xl font-black text-violet-600 dark:text-violet-400 mt-2">{stats.attendance_rate}%</p>
                         </div>
-                        <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                            <TrendingUp className="text-purple-600" size={24} />
+                        <div className="w-12 h-12 rounded-xl bg-violet-50 dark:bg-violet-950/40 flex items-center justify-center text-violet-600 dark:text-violet-400 shadow-inner">
+                            <TrendingUp size={24} />
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Today's Schedule */}
-                <div className="lg:col-span-2">
+            {/* Dashboard Subtabs Switcher */}
+            <div className="flex gap-4 mb-6 border-b border-[var(--border-color)]">
+                <button
+                    onClick={() => setSubTab('schedule')}
+                    className={`px-6 py-3.5 font-extrabold text-sm transition-all flex items-center gap-2 ${subTab === 'schedule'
+                        ? 'text-indigo-600 border-b-2 border-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                >
+                    <CalendarDays size={18} />
+                    My Timetable Slot
+                </button>
+                <button
+                    onClick={() => setSubTab('events')}
+                    className={`px-6 py-3.5 font-extrabold text-sm transition-all flex items-center gap-2 ${subTab === 'events'
+                        ? 'text-indigo-600 border-b-2 border-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                >
+                    <Megaphone size={18} />
+                    Upcoming University Events
+                </button>
+            </div>
+
+            {subTab === 'schedule' ? (
+                /* SECTION A: WEEKLY TIMETABLE FOR REGISTERED UNITS */
+                <div className="space-y-6">
+                    <div className="glass-card p-6">
+                        <div className="flex items-center gap-3 mb-6">
+                            <Info className="text-indigo-600" size={20} />
+                            <p className="text-xs text-[var(--text-secondary)] font-bold uppercase tracking-wider">
+                                Timetable slots filtered exclusively for your registered academic courses.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
+                            {DAYS.map((day) => {
+                                const slots = weeklyTimetable[day] || [];
+                                const isToday = day === currentTime.toLocaleDateString('en-US', { weekday: 'long' });
+
+                                return (
+                                    <div
+                                        key={day}
+                                        className={`glass-card p-4 border transition-all ${
+                                            isToday 
+                                                ? 'border-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/10 shadow-md' 
+                                                : 'border-[var(--border-color)]'
+                                        }`}
+                                    >
+                                        <h3 className={`font-black text-sm text-center pb-2 border-b border-[var(--border-color)] mb-4 ${
+                                            isToday ? 'text-indigo-600 dark:text-indigo-400 font-extrabold' : 'text-[var(--text-primary)]'
+                                        }`}>
+                                            {day} {isToday && '• TODAY'}
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {slots.length > 0 ? (
+                                                slots.map((slot, index) => {
+                                                    const isNow = isToday && isClassNow(slot.start_time, slot.end_time);
+                                                    return (
+                                                        <div
+                                                            key={index}
+                                                            className={`p-2.5 rounded-lg border text-xs transition-all ${
+                                                                isNow
+                                                                    ? 'bg-green-500/10 border-green-500 shadow-md animate-pulse'
+                                                                    : 'bg-[var(--bg-primary)] border-[var(--border-color)]'
+                                                            }`}
+                                                        >
+                                                            <div className="font-extrabold text-[var(--text-primary)] flex items-center justify-between mb-1">
+                                                                <span>{slot.course_code}</span>
+                                                                {isNow && (
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-[10px] text-[var(--text-secondary)] font-semibold truncate mb-1">
+                                                                {slot.course_name}
+                                                            </div>
+                                                            <div className="flex flex-col gap-0.5 text-[10px] text-[var(--text-secondary)] opacity-80">
+                                                                <span className="flex items-center gap-1">
+                                                                    <Clock size={10} /> {slot.start_time} - {slot.end_time}
+                                                                </span>
+                                                                <span className="flex items-center gap-1">
+                                                                    <MapPin size={10} /> {slot.room_code}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })
+                                            ) : (
+                                                <div className="text-center py-6 text-[10px] text-[var(--text-secondary)] opacity-50">
+                                                    No classes
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                /* SECTION B: UPCOMING UNIVERSITY EVENTS */
+                <div className="space-y-6">
                     <div className="glass-card p-6">
                         <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-                                <Calendar className="text-primary-600" size={28} />
-                                Today's Schedule
-                            </h2>
-                            <span className="px-3 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm font-bold">
-                                {todayClasses.length} Classes
+                            <h2 className="text-xl font-black text-[var(--text-primary)]">Upcoming Events Bulletin</h2>
+                            <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 rounded-full text-xs font-bold">
+                                {eventsList.length} Announcements
                             </span>
                         </div>
 
-                        {todayClasses.length > 0 ? (
-                            <div className="space-y-4">
-                                {todayClasses.map((cls, index) => {
-                                    const isNow = isClassNow(cls.start_time, cls.end_time)
-                                    const upcoming = isUpcoming(cls.start_time)
-
-                                    return (
-                                        <div
-                                            key={index}
-                                            className={`p-4 rounded-xl border-2 transition-all ${isNow
-                                                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20 shadow-lg shadow-green-500/20'
-                                                    : upcoming
-                                                        ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
-                                                        : cls.has_attended
-                                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                                                            : 'border-[var(--border-color)] bg-[var(--bg-primary)]'
-                                                }`}
-                                        >
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-2">
-                                                        <h3 className="text-lg font-bold text-[var(--text-primary)]">
-                                                            {cls.course_code}
-                                                        </h3>
-                                                        {isNow && (
-                                                            <span className="px-2 py-0.5 bg-green-600 text-white text-xs font-bold rounded-full animate-pulse">
-                                                                HAPPENING NOW
-                                                            </span>
-                                                        )}
-                                                        {upcoming && !isNow && (
-                                                            <span className="px-2 py-0.5 bg-yellow-600 text-white text-xs font-bold rounded-full">
-                                                                UPCOMING
-                                                            </span>
-                                                        )}
-                                                        {cls.has_attended && !isNow && (
-                                                            <CheckCircle className="text-green-600" size={20} />
-                                                        )}
-                                                    </div>
-                                                    <p className="text-sm font-medium text-[var(--text-primary)] mb-3">
-                                                        {cls.course_name}
-                                                    </p>
-                                                    <div className="grid grid-cols-2 gap-3 text-sm text-[var(--text-secondary)]">
-                                                        <div className="flex items-center gap-2">
-                                                            <Clock size={16} />
-                                                            <span>{cls.start_time} - {cls.end_time}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <MapPin size={16} />
-                                                            <span>{cls.room_code} - {cls.room_name}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 col-span-2">
-                                                            <User size={16} />
-                                                            <span>{cls.lecturer_name}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <ChevronRight className="text-[var(--text-secondary)]" size={20} />
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        ) : (
-                            <div className="text-center py-12">
-                                <Calendar className="mx-auto mb-4 text-gray-400" size={64} />
-                                <h3 className="text-xl font-bold mb-2">No Classes Today</h3>
-                                <p className="text-[var(--text-secondary)]">Enjoy your free day!</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Recent Attendance */}
-                <div>
-                    <div className="glass-card p-6">
-                        <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-6 flex items-center gap-2">
-                            <Award className="text-primary-600" size={28} />
-                            Recent Attendance
-                        </h2>
-
-                        {recentAttendance.length > 0 ? (
-                            <div className="space-y-3">
-                                {recentAttendance.slice(0, 10).map((record) => (
+                        {eventsList.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {eventsList.map((evt) => (
                                     <div
-                                        key={record.id}
-                                        className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] hover:shadow-md transition-all"
+                                        key={evt.id}
+                                        className="p-5 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] hover:shadow-lg transition-all relative overflow-hidden flex flex-col justify-between min-h-[180px]"
                                     >
-                                        <div className="flex items-start justify-between mb-2">
-                                            <div className="flex-1">
-                                                <p className="font-bold text-sm text-[var(--text-primary)]">
-                                                    {record.course_code}
-                                                </p>
-                                                <p className="text-xs text-[var(--text-secondary)] mt-1">
-                                                    {record.course_name}
-                                                </p>
+                                        <div>
+                                            <div className="flex items-start justify-between mb-3">
+                                                <h3 className="font-extrabold text-base text-[var(--text-primary)] tracking-tight leading-tight">
+                                                    {evt.event_name}
+                                                </h3>
+                                                <Bookmark className="text-indigo-600 shrink-0 ml-2" size={16} />
                                             </div>
-                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${getStatusColor(record.status)}`}>
-                                                {record.status.toUpperCase()}
-                                            </span>
+                                            <p className="text-xs text-[var(--text-secondary)] line-clamp-3 mb-4">
+                                                {evt.description || 'No description provided.'}
+                                            </p>
                                         </div>
-                                        <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
-                                            <div className="flex items-center gap-1">
-                                                <MapPin size={12} />
-                                                <span>{record.room_code}</span>
+
+                                        <div className="space-y-2 border-t border-[var(--border-color)] pt-3 text-[10px] text-[var(--text-secondary)] font-bold uppercase tracking-wider">
+                                            <div className="flex items-center gap-1.5">
+                                                <Clock size={12} className="text-indigo-600" />
+                                                <span>{new Date(evt.event_date).toLocaleDateString('en-US', { dateStyle: 'medium' })}</span>
                                             </div>
-                                            <div className="flex items-center gap-1">
-                                                <Clock size={12} />
-                                                <span>{new Date(record.timestamp).toLocaleString()}</span>
+                                            <div className="flex items-center gap-1.5">
+                                                <MapPin size={12} className="text-indigo-600" />
+                                                <span>{evt.location || 'Campus Grounds'}</span>
                                             </div>
+                                            {evt.coordinator_name && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <User size={12} className="text-indigo-600" />
+                                                    <span>Coord: {evt.coordinator_name}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-center py-8">
-                                <Bell className="mx-auto mb-3 text-gray-400" size={48} />
-                                <p className="text-sm text-[var(--text-secondary)]">No attendance records yet</p>
+                            <div className="text-center py-16">
+                                <Megaphone className="mx-auto mb-4 text-gray-400 opacity-40" size={64} />
+                                <h3 className="text-lg font-bold mb-2">No Active Events</h3>
+                                <p className="text-sm text-[var(--text-secondary)]">Check back later for university events.</p>
                             </div>
                         )}
                     </div>
                 </div>
-            </div>
+            )}
         </div>
     )
 }

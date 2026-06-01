@@ -4,7 +4,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List, Optional
 from datetime import date, time, datetime, timedelta
 from app.database import get_session
-from app.models import Classroom, Course, TimetableSlot, ClassSession, User
+from app.models import Classroom, Course, TimetableSlot, ClassSession, User, StudentCourseRegistration
 from app.auth import get_current_user, get_current_admin
 from app.logging_utils import log_system_activity
 import uuid
@@ -14,8 +14,27 @@ router = APIRouter()
 # ==================== CLASSROOMS ====================
 
 @router.get("/classrooms")
-async def get_classrooms(session: AsyncSession = Depends(get_session)):
-    """Get all classrooms"""
+async def get_classrooms(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all classrooms (filtered for students)"""
+    if current_user.role.lower() == 'student':
+        reg_stmt = select(StudentCourseRegistration).where(StudentCourseRegistration.student_id == current_user.id)
+        registrations = (await session.exec(reg_stmt)).all()
+        if not registrations:
+            return []
+        course_ids = [reg.course_id for reg in registrations]
+        slot_stmt = select(TimetableSlot.classroom_id).where(
+            (TimetableSlot.course_id.in_(course_ids)) &
+            (TimetableSlot.is_active == True)
+        )
+        classroom_ids = (await session.exec(slot_stmt)).all()
+        if not classroom_ids:
+            return []
+        res = await session.exec(select(Classroom).where(Classroom.id.in_(classroom_ids)))
+        return res.all()
+
     result = await session.exec(select(Classroom))
     return result.all()
 
@@ -137,8 +156,23 @@ async def get_classrooms_detailed(
     from sqlmodel import func
     
     try:
-        # Get all classrooms
-        classrooms_result = await session.exec(select(Classroom))
+        # Get classrooms (filtered for students)
+        if current_user.role.lower() == 'student':
+            reg_stmt = select(StudentCourseRegistration).where(StudentCourseRegistration.student_id == current_user.id)
+            registrations = (await session.exec(reg_stmt)).all()
+            if not registrations:
+                return {"classrooms": [], "stats": {"total": 0, "active": 0, "inactive": 0, "with_qr": 0}}
+            course_ids = [reg.course_id for reg in registrations]
+            slot_stmt = select(TimetableSlot.classroom_id).where(
+                (TimetableSlot.course_id.in_(course_ids)) &
+                (TimetableSlot.is_active == True)
+            )
+            classroom_ids = (await session.exec(slot_stmt)).all()
+            if not classroom_ids:
+                return {"classrooms": [], "stats": {"total": 0, "active": 0, "inactive": 0, "with_qr": 0}}
+            classrooms_result = await session.exec(select(Classroom).where(Classroom.id.in_(classroom_ids)))
+        else:
+            classrooms_result = await session.exec(select(Classroom))
         classrooms = classrooms_result.all()
         
         # Get recent activity (last 2 hours)
@@ -600,9 +634,21 @@ async def verify_classroom_scan(
 # ==================== COURSES ====================
 
 @router.get("/courses")
-async def get_courses(session: AsyncSession = Depends(get_session)):
-    """Get all courses with lecturer and classroom info"""
-    result = await session.exec(select(Course))
+async def get_courses(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all courses with lecturer and classroom info (filtered for students)"""
+    if current_user.role.lower() == 'student':
+        reg_stmt = select(StudentCourseRegistration).where(StudentCourseRegistration.student_id == current_user.id)
+        registrations = (await session.exec(reg_stmt)).all()
+        if not registrations:
+            return []
+        course_ids = [reg.course_id for reg in registrations]
+        result = await session.exec(select(Course).where(Course.id.in_(course_ids)))
+    else:
+        result = await session.exec(select(Course))
+        
     courses = result.all()
     
     # Enrich with lecturer and classroom names
@@ -808,9 +854,24 @@ async def delete_timetable_slot(
 # ==================== WEEKLY VIEW ====================
 
 @router.get("/timetable/weekly")
-async def get_weekly_timetable(session: AsyncSession = Depends(get_session)):
-    """Get organized weekly timetable view"""
-    result = await session.exec(select(TimetableSlot).where(TimetableSlot.is_active == True))
+async def get_weekly_timetable(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get organized weekly timetable view (filtered for students)"""
+    if current_user.role.lower() == 'student':
+        reg_stmt = select(StudentCourseRegistration).where(StudentCourseRegistration.student_id == current_user.id)
+        registrations = (await session.exec(reg_stmt)).all()
+        if not registrations:
+            return {day: [] for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]}
+        course_ids = [reg.course_id for reg in registrations]
+        result = await session.exec(select(TimetableSlot).where(
+            (TimetableSlot.is_active == True) &
+            (TimetableSlot.course_id.in_(course_ids))
+        ))
+    else:
+        result = await session.exec(select(TimetableSlot).where(TimetableSlot.is_active == True))
+        
     slots = result.all()
     
     # Organize by day

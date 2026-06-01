@@ -35,6 +35,7 @@ interface PrintableRoom {
 }
 
 export default function ClassroomManagement() {
+    const userRole = localStorage.getItem('userRole') || ''
     const [classrooms, setClassrooms] = useState<Classroom[]>([])
     const [printableRooms, setPrintableRooms] = useState<PrintableRoom[]>([])
     const [loading, setLoading] = useState(true)
@@ -444,52 +445,54 @@ export default function ClassroomManagement() {
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-3">
-                        <button
-                            onClick={deactivateAll}
-                            className="flex items-center gap-2 px-4 py-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-bold rounded-xl hover:bg-red-200 dark:hover:bg-red-900/50 transition-all border border-red-200 dark:border-red-800"
-                            title="Remove all QR codes"
-                        >
-                            <AlertCircle size={20} />
-                            Deactivate All
-                        </button>
+                    {userRole?.toLowerCase() !== 'student' && (
+                        <div className="flex flex-wrap gap-3">
+                            <button
+                                onClick={deactivateAll}
+                                className="flex items-center gap-2 px-4 py-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-bold rounded-xl hover:bg-red-200 dark:hover:bg-red-900/50 transition-all border border-red-200 dark:border-red-800"
+                                title="Remove all QR codes"
+                            >
+                                <AlertCircle size={20} />
+                                Deactivate All
+                            </button>
 
-                        <button
-                            onClick={generateAllQRCodes}
-                            disabled={generating}
-                            className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg disabled:opacity-50 transition-all"
-                        >
-                            {generating ? (
-                                <>
-                                    <RefreshCw className="animate-spin" size={20} />
-                                    Activating...
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle size={20} />
-                                    Activate All (Generate QRs)
-                                </>
-                            )}
-                        </button>
+                            <button
+                                onClick={generateAllQRCodes}
+                                disabled={generating}
+                                className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg disabled:opacity-50 transition-all"
+                            >
+                                {generating ? (
+                                    <>
+                                        <RefreshCw className="animate-spin" size={20} />
+                                        Activating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle size={20} />
+                                        Activate All (Generate QRs)
+                                    </>
+                                )}
+                            </button>
 
-                        <button
-                            onClick={() => generatePosters(printableRooms)}
-                            disabled={downloading || printableRooms.length === 0}
-                            className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg disabled:opacity-50 transition-all"
-                        >
-                            {downloading ? (
-                                <>
-                                    <RefreshCw className="animate-spin" size={20} />
-                                    PDF...
-                                </>
-                            ) : (
-                                <>
-                                    <Printer size={20} />
-                                    Download All Posters
-                                </>
-                            )}
-                        </button>
-                    </div>
+                            <button
+                                onClick={() => generatePosters(printableRooms)}
+                                disabled={downloading || printableRooms.length === 0}
+                                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg disabled:opacity-50 transition-all"
+                            >
+                                {downloading ? (
+                                    <>
+                                        <RefreshCw className="animate-spin" size={20} />
+                                        PDF...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Printer size={20} />
+                                        Download All Posters
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -597,7 +600,14 @@ export default function ClassroomManagement() {
 
                                 {!isEditing ? (
                                     /* View Mode */
-                                    <div className="p-6 cursor-pointer" onClick={() => handleEditRoom(room)}>
+                                    <div
+                                        className={`p-6 ${userRole?.toLowerCase() !== 'student' ? 'cursor-pointer' : ''}`}
+                                        onClick={() => {
+                                            if (userRole?.toLowerCase() !== 'student') {
+                                                handleEditRoom(room)
+                                            }
+                                        }}
+                                    >
                                         {/* Header */}
                                         <div className="flex items-start justify-between mb-4 relative z-10">
                                             <div className="flex-1">
@@ -698,9 +708,11 @@ export default function ClassroomManagement() {
                                             </div>
                                         )}
 
-                                        <div className="mt-4 text-center text-xs text-[var(--text-secondary)] opacity-60">
-                                            Click to edit details
-                                        </div>
+                                        {userRole?.toLowerCase() !== 'student' && (
+                                            <div className="mt-4 text-center text-xs text-[var(--text-secondary)] opacity-60">
+                                                Click to edit details
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     /* Edit Mode */
