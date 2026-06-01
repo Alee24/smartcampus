@@ -2,9 +2,15 @@ import { useState, useEffect } from 'react'
 import {
     QrCode, Printer, Download, Search, Users, Car,
     Building, BookOpen, Calendar, X, ChevronRight, Check,
-    Loader2, HelpCircle, Shield, Sliders, ChevronLeft
+    Loader2, HelpCircle, Shield, Sliders, ChevronLeft, Activity, Clock, Eye
 } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
+
+interface ScanStats {
+    scan_count: number
+    last_scan_at: string | null
+    last_scanner: string | null
+}
 
 interface QRAsset {
     id: string
@@ -13,6 +19,10 @@ interface QRAsset {
     subtext: string
     category: 'user' | 'vehicle' | 'classroom' | 'course' | 'event'
     status?: string
+    // Enriched from scan stats
+    scanCount?: number
+    lastScanner?: string | null
+    lastScanAt?: string | null
 }
 
 export default function QRRegistry() {
@@ -135,7 +145,7 @@ export default function QRRegistry() {
             console.error('Failed to load events for QR Registry')
         }
 
-        // Fallbacks if backend is unpopulated (Ensure premium user experience)
+        // Fallbacks if backend is unpopulated
         if (loadedAssets.length === 0) {
             loadedAssets = [
                 { id: '1', name: 'Alex Metto', identifier: 'ADMIN001', subtext: 'Role: SuperAdmin | Administration', category: 'user', status: 'active' },
@@ -150,12 +160,45 @@ export default function QRRegistry() {
             ]
         }
 
+        // 6. Fetch scan stats and enrich assets
+        try {
+            const statsRes = await fetch('/api/admin/scan-stats', { headers })
+            if (statsRes.ok) {
+                const statsData: Record<string, ScanStats> = await statsRes.json()
+                loadedAssets = loadedAssets.map(asset => {
+                    const stat = statsData[asset.identifier]
+                    if (stat) {
+                        return {
+                            ...asset,
+                            scanCount: stat.scan_count,
+                            lastScanner: stat.last_scanner,
+                            lastScanAt: stat.last_scan_at
+                        }
+                    }
+                    return asset
+                })
+            }
+        } catch (e) {
+            console.error('Failed to load scan stats for QR Registry')
+        }
+
+        // Sort: recently scanned first, then unsorted
+        loadedAssets.sort((a, b) => {
+            if (a.lastScanAt && b.lastScanAt) return new Date(b.lastScanAt).getTime() - new Date(a.lastScanAt).getTime()
+            if (a.lastScanAt) return -1
+            if (b.lastScanAt) return 1
+            return 0
+        })
+
         setAssets(loadedAssets)
         setLoading(false)
     }
 
     useEffect(() => {
         fetchAllAssets()
+        // Refresh scan stats every 30 seconds for live feel
+        const interval = setInterval(fetchAllAssets, 30000)
+        return () => clearInterval(interval)
     }, [])
 
     const getQRValue = (asset: QRAsset) => {
@@ -179,6 +222,23 @@ export default function QRRegistry() {
             case 'event': return <Calendar size={16} className="text-amber-500" />
             default: return <QrCode size={16} className="text-gray-500" />
         }
+    }
+
+    const formatRelativeTime = (isoStr: string | null | undefined) => {
+        if (!isoStr) return null
+        const diff = Date.now() - new Date(isoStr).getTime()
+        const mins = Math.floor(diff / 60000)
+        const hours = Math.floor(diff / 3600000)
+        const days = Math.floor(diff / 86400000)
+        if (mins < 1) return 'just now'
+        if (mins < 60) return `${mins}m ago`
+        if (hours < 24) return `${hours}h ago`
+        return `${days}d ago`
+    }
+
+    const isRecentScan = (isoStr: string | null | undefined) => {
+        if (!isoStr) return false
+        return Date.now() - new Date(isoStr).getTime() < 10 * 60 * 1000 // within 10 minutes
     }
 
     const downloadQR = (asset: QRAsset) => {
@@ -318,8 +378,31 @@ export default function QRRegistry() {
     const startIndex = (currentPage - 1) * itemsPerPage
     const paginatedAssets = filteredAssets.slice(startIndex, startIndex + itemsPerPage)
 
+    // Summary stats
+    const totalScans = assets.reduce((sum, a) => sum + (a.scanCount || 0), 0)
+    const scannedAssets = assets.filter(a => a.scanCount && a.scanCount > 0)
+    const lastScannedAsset = scannedAssets[0] // already sorted by recency
+
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in">
+            {/* CSS for blink animation */}
+            <style>{`
+                @keyframes blink-green {
+                    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
+                    50% { opacity: 0.5; box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+                }
+                .blink-dot {
+                    animation: blink-green 1.4s ease-in-out infinite;
+                }
+                @keyframes pulse-ring {
+                    0% { transform: scale(1); opacity: 0.8; }
+                    100% { transform: scale(2.2); opacity: 0; }
+                }
+                .pulse-ring {
+                    animation: pulse-ring 1.4s ease-out infinite;
+                }
+            `}</style>
+
             {/* Header */}
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -331,14 +414,52 @@ export default function QRRegistry() {
                     </p>
                 </div>
                 <button
-                    onClick={() => {
-                        window.print()
-                    }}
+                    onClick={() => { window.print() }}
                     className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/20 hover:scale-105 transition-all flex items-center gap-2"
                 >
                     <Printer size={16} /> Batch Print Registry
                 </button>
             </header>
+
+            {/* Live Stats Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="flex items-center gap-3 p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+                    <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl">
+                        <Activity size={18} className="text-indigo-600" />
+                    </div>
+                    <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Total QR Scans</p>
+                        <p className="text-2xl font-black text-gray-900 dark:text-white">{totalScans.toLocaleString()}</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3 p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+                    <div className="p-2.5 bg-green-50 dark:bg-green-900/30 rounded-xl">
+                        <Eye size={18} className="text-green-600" />
+                    </div>
+                    <div>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Assets Scanned</p>
+                        <p className="text-2xl font-black text-gray-900 dark:text-white">{scannedAssets.length} <span className="text-sm font-bold text-gray-400">/ {assets.length}</span></p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3 p-4 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-sm">
+                    <div className="relative flex-shrink-0">
+                        <div className="p-2.5 bg-emerald-50 dark:bg-emerald-900/30 rounded-xl">
+                            <Clock size={18} className="text-emerald-600" />
+                        </div>
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Last Scan</p>
+                        {lastScannedAsset ? (
+                            <p className="text-sm font-black text-gray-900 dark:text-white truncate">
+                                {lastScannedAsset.lastScanner || lastScannedAsset.name}
+                                <span className="text-xs font-bold text-emerald-600 ml-1">· {formatRelativeTime(lastScannedAsset.lastScanAt)}</span>
+                            </p>
+                        ) : (
+                            <p className="text-sm font-bold text-gray-400">No scans yet</p>
+                        )}
+                    </div>
+                </div>
+            </div>
 
             {/* Quick Actions & Search */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
@@ -394,44 +515,86 @@ export default function QRRegistry() {
                         ) : (
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {paginatedAssets.map(asset => (
-                                        <div
-                                            key={asset.id}
-                                            onClick={() => setSelectedAsset(asset)}
-                                            className={`glass-card p-5 cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all flex justify-between items-start border rounded-3xl ${
-                                                selectedAsset?.id === asset.id
-                                                    ? 'bg-indigo-50/50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
-                                                    : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800'
-                                            }`}
-                                        >
-                                            <div className="min-w-0 pr-3">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span className="p-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded-lg">
-                                                        {getCategoryIcon(asset.category)}
-                                                    </span>
-                                                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
-                                                        {asset.category}
-                                                    </span>
+                                    {paginatedAssets.map(asset => {
+                                        const hasBeenScanned = (asset.scanCount || 0) > 0
+                                        const isLive = isRecentScan(asset.lastScanAt)
+                                        return (
+                                            <div
+                                                key={asset.id}
+                                                onClick={() => setSelectedAsset(asset)}
+                                                className={`glass-card p-5 cursor-pointer hover:shadow-md hover:scale-[1.01] transition-all flex justify-between items-start border rounded-3xl relative overflow-hidden ${
+                                                    selectedAsset?.id === asset.id
+                                                        ? 'bg-indigo-50/50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800'
+                                                        : hasBeenScanned
+                                                        ? 'bg-white dark:bg-gray-900 border-green-100 dark:border-green-900/40'
+                                                        : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800'
+                                                }`}
+                                            >
+                                                {/* Top green accent for recently scanned */}
+                                                {hasBeenScanned && (
+                                                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-green-400 to-emerald-500" />
+                                                )}
+
+                                                <div className="min-w-0 pr-3 flex-1">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="p-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 rounded-lg">
+                                                            {getCategoryIcon(asset.category)}
+                                                        </span>
+                                                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">
+                                                            {asset.category}
+                                                        </span>
+                                                        {/* Live blinking dot */}
+                                                        {isLive && (
+                                                            <div className="relative flex items-center ml-auto">
+                                                                <div className="w-2 h-2 bg-green-500 rounded-full blink-dot" />
+                                                                <div className="absolute w-2 h-2 bg-green-400 rounded-full pulse-ring" />
+                                                            </div>
+                                                        )}
+                                                        {/* Static green dot for previously scanned */}
+                                                        {hasBeenScanned && !isLive && (
+                                                            <div className="w-2 h-2 bg-green-400 rounded-full ml-auto opacity-70" />
+                                                        )}
+                                                    </div>
+                                                    <h4 className="font-black text-gray-900 dark:text-white truncate">{asset.name}</h4>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{asset.subtext}</p>
+
+                                                    {/* Scan activity badge */}
+                                                    {hasBeenScanned && (
+                                                        <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-100 dark:border-green-800 rounded-full text-[10px] font-black">
+                                                                <Activity size={9} />
+                                                                {asset.scanCount?.toLocaleString()} scan{(asset.scanCount || 0) !== 1 ? 's' : ''}
+                                                            </span>
+                                                            {asset.lastScanner && (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-100 dark:border-gray-700 rounded-full text-[10px] font-bold truncate max-w-[120px]">
+                                                                    Last: {asset.lastScanner}
+                                                                </span>
+                                                            )}
+                                                            {asset.lastScanAt && (
+                                                                <span className="text-[10px] text-gray-400 font-bold">
+                                                                    {formatRelativeTime(asset.lastScanAt)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <h4 className="font-black text-gray-900 dark:text-white truncate">{asset.name}</h4>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{asset.subtext}</p>
-                                            </div>
-                                            <div className="flex flex-col items-end justify-between h-full shrink-0">
-                                                <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[9px] font-bold tracking-wider uppercase">
-                                                    {asset.identifier}
-                                                </span>
-                                                {/* Small preview of QR */}
-                                                <div className="mt-3 p-1.5 bg-slate-50 dark:bg-slate-800 border border-gray-100 dark:border-gray-700 rounded-lg shadow-inner">
-                                                    <QRCodeCanvas
-                                                        value={getQRValue(asset)}
-                                                        size={40}
-                                                        level="L"
-                                                        className="rounded"
-                                                    />
+                                                <div className="flex flex-col items-end justify-between h-full shrink-0">
+                                                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded text-[9px] font-bold tracking-wider uppercase">
+                                                        {asset.identifier}
+                                                    </span>
+                                                    {/* Small preview of QR */}
+                                                    <div className="mt-3 p-1.5 bg-slate-50 dark:bg-slate-800 border border-gray-100 dark:border-gray-700 rounded-lg shadow-inner">
+                                                        <QRCodeCanvas
+                                                            value={getQRValue(asset)}
+                                                            size={40}
+                                                            level="L"
+                                                            className="rounded"
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
 
                                 {/* Pagination Controls */}
@@ -492,7 +655,7 @@ export default function QRRegistry() {
                                 {/* Indigo Top Highlight Accent */}
                                 <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-indigo-500 to-purple-600" />
                                 
-                                <div className="mb-6 mt-4">
+                                <div className="mb-4 mt-4 w-full">
                                     <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider">
                                         Check-In Badge Registry
                                     </span>
@@ -505,7 +668,12 @@ export default function QRRegistry() {
                                 </div>
 
                                 {/* QR Canvas Frame */}
-                                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl mb-6 shadow-inner relative">
+                                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl mb-4 shadow-inner relative">
+                                    {selectedAsset.scanCount && selectedAsset.scanCount > 0 && (
+                                        <div className="absolute -top-2 -right-2 flex items-center gap-1 px-2 py-0.5 bg-green-500 text-white rounded-full text-[10px] font-black shadow-md">
+                                            <Activity size={9} /> {selectedAsset.scanCount} scans
+                                        </div>
+                                    )}
                                     <QRCodeCanvas
                                         id={`qr-canvas-${selectedAsset.id}`}
                                         value={getQRValue(selectedAsset)}
@@ -515,6 +683,34 @@ export default function QRRegistry() {
                                         className="mx-auto rounded-lg"
                                     />
                                 </div>
+
+                                {/* Scan Activity Section */}
+                                {(selectedAsset.scanCount || 0) > 0 && (
+                                    <div className="w-full mb-4 p-3.5 bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/40 rounded-2xl text-left space-y-2">
+                                        <p className="text-[10px] font-black uppercase tracking-wider text-green-700 dark:text-green-400 flex items-center gap-1.5">
+                                            <div className="relative">
+                                                <div className="w-2 h-2 bg-green-500 rounded-full blink-dot" />
+                                            </div>
+                                            Live Scan Activity
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase">Total Scans</p>
+                                                <p className="text-lg font-black text-green-700 dark:text-green-400">{selectedAsset.scanCount?.toLocaleString()}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase">Last Scan</p>
+                                                <p className="text-xs font-black text-gray-800 dark:text-gray-200">{formatRelativeTime(selectedAsset.lastScanAt)}</p>
+                                            </div>
+                                        </div>
+                                        {selectedAsset.lastScanner && (
+                                            <div>
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase">Last Scanned By</p>
+                                                <p className="text-xs font-black text-gray-800 dark:text-gray-200 truncate">{selectedAsset.lastScanner}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 <div className="space-y-2.5 w-full text-xs text-gray-600 dark:text-gray-400 mb-6 bg-gray-50 dark:bg-gray-850 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 text-left">
                                     <div className="flex justify-between border-b border-gray-100 dark:border-gray-800 pb-1.5">

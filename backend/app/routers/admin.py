@@ -1216,6 +1216,77 @@ async def get_scan_logs(limit: int = 100, session: AsyncSession = Depends(get_se
         })
     return data
 
+@router.get("/scan-stats")
+async def get_scan_stats(session: AsyncSession = Depends(get_session)):
+    """
+    Returns aggregated scan stats per asset identifier (room_code / admission_number).
+    Includes: total scan count, last scanner name, last scan timestamp.
+    Used by the QR Asset Hub to show scan activity on each card.
+    """
+    from sqlalchemy import func, desc
+    from sqlmodel import text as sa_text
+
+    # Aggregate scan_logs by room_code (classroom/course scans)
+    room_query = (
+        select(
+            ScanLog.room_code.label("identifier"),
+            func.count(ScanLog.id).label("scan_count"),
+            func.max(ScanLog.timestamp).label("last_scan_at")
+        )
+        .group_by(ScanLog.room_code)
+    )
+    room_results = (await session.exec(room_query)).all()
+
+    stats = {}
+    for row in room_results:
+        if row.identifier:
+            stats[row.identifier] = {
+                "scan_count": row.scan_count,
+                "last_scan_at": row.last_scan_at.isoformat() if row.last_scan_at else None,
+                "last_scanner": None
+            }
+
+    # For each identifier, get the most recent scanner name
+    for identifier in list(stats.keys()):
+        last_log_query = (
+            select(ScanLog, User)
+            .join(User, ScanLog.student_id == User.id)
+            .where(ScanLog.room_code == identifier)
+            .order_by(ScanLog.timestamp.desc())
+            .limit(1)
+        )
+        result = (await session.exec(last_log_query)).first()
+        if result:
+            log, user = result
+            stats[identifier]["last_scanner"] = user.full_name
+
+    # Also aggregate by student admission_number (user QR scans via gate_scan_logs if available)
+    try:
+        from app.models import GateScanLog
+        gate_query = (
+            select(
+                User.admission_number.label("identifier"),
+                func.count(GateScanLog.id).label("scan_count"),
+                func.max(GateScanLog.timestamp).label("last_scan_at"),
+                User.full_name.label("last_scanner")
+            )
+            .join(User, GateScanLog.user_id == User.id)
+            .group_by(User.admission_number, User.full_name)
+        )
+        gate_results = (await session.exec(gate_query)).all()
+        for row in gate_results:
+            if row.identifier:
+                if row.identifier not in stats or (row.last_scan_at and (not stats[row.identifier]["last_scan_at"] or row.last_scan_at.isoformat() > stats[row.identifier]["last_scan_at"])):
+                    stats[row.identifier] = {
+                        "scan_count": row.scan_count,
+                        "last_scan_at": row.last_scan_at.isoformat() if row.last_scan_at else None,
+                        "last_scanner": row.last_scanner
+                    }
+    except Exception:
+        pass  # gate_scan_logs may not exist or have different structure
+
+    return stats
+
 class LDAPTestConfig(BaseModel):
     server_uri: str
     bind_dn: str
