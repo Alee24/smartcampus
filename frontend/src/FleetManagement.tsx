@@ -7,6 +7,7 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 // Fix Leaflet icon issue
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -660,7 +661,11 @@ function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
     const [trip, setTrip] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'crew' | 'manifest' | 'emergency' | 'report'>('crew');
+    const [activeTab, setActiveTab] = useState<'crew' | 'manifest' | 'emergency' | 'report' | 'scanner'>('crew');
+    
+    // Scanner states
+    const [scanResult, setScanResult] = useState<{msg: string, type: 'success'|'error'} | null>(null);
+    const [isProcessingScan, setIsProcessingScan] = useState(false);
     
     // Trip Lead form states
     const [isEditingLead, setIsEditingLead] = useState(false);
@@ -726,6 +731,63 @@ function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
             fetchReport();
         }
     }, [activeTab]);
+
+    useEffect(() => {
+        let scanner: any = null;
+        let isProcessing = false;
+
+        if (activeTab === 'scanner') {
+            setScanResult(null);
+            setTimeout(() => {
+                const el = document.getElementById("qr-reader");
+                if (!el) return;
+                scanner = new Html5QrcodeScanner(
+                    "qr-reader",
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    false
+                );
+                scanner.render(async (decodedText: string) => {
+                    if (isProcessing) return;
+                    isProcessing = true;
+                    setScanResult(null);
+                    setIsProcessingScan(true);
+
+                    try {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch(`/api/fleet/trips/${tripId}/board`, {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}` 
+                            },
+                            body: JSON.stringify({ scanned_data: decodedText })
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            setScanResult({ msg: data.message, type: 'success' });
+                            fetchDetails();
+                            if (onUpdate) onUpdate();
+                        } else {
+                            setScanResult({ msg: data.detail || 'Scan failed', type: 'error' });
+                        }
+                    } catch (e: any) {
+                        setScanResult({ msg: e.message, type: 'error' });
+                    } finally {
+                        setIsProcessingScan(false);
+                        setTimeout(() => { isProcessing = false; }, 3000);
+                    }
+                }, undefined);
+            }, 100);
+        }
+
+        return () => {
+            if (scanner) {
+                try {
+                    scanner.clear().catch((e: any) => console.error(e));
+                } catch(e) {}
+            }
+        };
+    }, [activeTab, tripId]);
 
     const handleUpdateLead = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -851,6 +913,9 @@ function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
                 </button>
                 <button onClick={() => setActiveTab('emergency')} className={`px-6 py-4 text-xs font-black border-b-2 uppercase tracking-wider shrink-0 transition-all ${activeTab === 'emergency' ? 'border-primary-600 text-primary-600 bg-white dark:bg-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900'}`}>
                     Emergency Contacts
+                </button>
+                <button onClick={() => setActiveTab('scanner')} className={`px-6 py-4 text-xs font-black border-b-2 uppercase tracking-wider shrink-0 transition-all ${activeTab === 'scanner' ? 'border-primary-600 text-primary-600 bg-white dark:bg-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900'}`}>
+                    Scan Boarding Pass
                 </button>
                 <button onClick={() => setActiveTab('report')} className={`px-6 py-4 text-xs font-black border-b-2 uppercase tracking-wider shrink-0 transition-all ${activeTab === 'report' ? 'border-primary-600 text-primary-600 bg-white dark:bg-gray-900' : 'border-transparent text-gray-500 hover:text-gray-900'}`}>
                     QR & Trip Report
@@ -1042,6 +1107,36 @@ function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
                                 ))
                             )}
                         </div>
+                    </div>
+                )}
+
+                {/* Tab: Scanner */}
+                {activeTab === 'scanner' && (
+                    <div className="space-y-6 animate-fade-in max-w-md mx-auto">
+                        <div className="text-center mb-4">
+                            <h4 className="font-black text-gray-800 dark:text-white text-lg">Student Boarding Scanner</h4>
+                            <p className="text-xs text-gray-500 font-semibold">Scan student QR codes to mark them as checked in.</p>
+                        </div>
+                        
+                        {scanResult && (
+                            <div className={`p-4 rounded-xl border font-bold text-sm mb-4 text-center animate-fade-in ${
+                                scanResult.type === 'success' 
+                                ? 'bg-green-50 border-green-200 text-green-700' 
+                                : 'bg-red-50 border-red-200 text-red-700'
+                            }`}>
+                                {scanResult.msg}
+                            </div>
+                        )}
+                        
+                        <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700 shadow-inner bg-white">
+                            <div id="qr-reader" className="w-full min-h-[300px]"></div>
+                        </div>
+                        
+                        {isProcessingScan && (
+                            <div className="flex justify-center p-4">
+                                <Loader2 className="animate-spin text-primary-600" size={24} />
+                            </div>
+                        )}
                     </div>
                 )}
 

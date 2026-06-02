@@ -829,6 +829,58 @@ async def start_trip(
         await session.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to start trip: {str(e)}")
 
+@router.post("/trips/{trip_id}/board")
+async def board_passenger(
+    request: Request,
+    trip_id: UUID,
+    payload: dict,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_admin)
+):
+    try:
+        scanned_data = payload.get("scanned_data")
+        if not scanned_data:
+            raise HTTPException(status_code=400, detail="Missing scanned data")
+
+        # Basic parse if format is "STUDENT:RU-9921" or just "RU-9921"
+        admission_number = scanned_data
+        if ":" in scanned_data:
+            admission_number = scanned_data.split(":")[-1].strip()
+
+        # Find the passenger on this trip
+        passenger = (await session.exec(
+            select(FleetPassengerManifest)
+            .where(FleetPassengerManifest.trip_id == trip_id)
+            .where(FleetPassengerManifest.admission_number == admission_number)
+        )).first()
+
+        if not passenger:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Passenger with admission {admission_number} not found on this trip manifest."
+            )
+
+        if passenger.arrival_confirmed:
+            return {"status": "success", "message": f"{passenger.passenger_name} is already checked in."}
+
+        passenger.arrival_confirmed = True
+        passenger.check_in_time = datetime.utcnow()
+        session.add(passenger)
+        await session.commit()
+        await session.refresh(passenger)
+
+        return {
+            "status": "success", 
+            "message": f"Successfully checked in {passenger.passenger_name}."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to board passenger: {str(e)}")
+
+
 @router.post("/trips/{trip_id}/end")
 async def end_trip(
     request: Request,
