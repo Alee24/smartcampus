@@ -415,15 +415,15 @@ function IDCardFront({ student, companySettings }: any) {
                     {companySettings.logo_url ? (
                         <img src={companySettings.logo_url} className="h-9 w-auto object-contain" />
                     ) : (
-                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-[#7A1975] font-black text-xs shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-purple-105 flex items-center justify-center text-[#7A1975] font-black text-xs shrink-0">
                             RU
                         </div>
                     )}
-                    <div className="flex flex-col leading-none overflow-hidden">
-                        <span className="text-[10px] font-black text-[#7A1975] uppercase tracking-tight truncate">
+                    <div className="flex flex-col leading-[1.2] overflow-hidden">
+                        <span className="text-[9px] font-black text-[#7A1975] uppercase tracking-tight">
                             {companySettings.company_name || "Riara University"}
                         </span>
-                        <span className="text-[6px] font-bold text-gray-500 lowercase tracking-wider mt-0.5 truncate">
+                        <span className="text-[5px] font-bold text-gray-500 lowercase tracking-wider mt-0.5">
                             {companySettings.tagline || "nurturing innovators"}
                         </span>
                     </div>
@@ -431,16 +431,16 @@ function IDCardFront({ student, companySettings }: any) {
 
                 {/* Student Name */}
                 <div className="flex flex-col mt-1">
-                    <span className="font-serif text-[22px] font-bold text-[#7A1975] leading-none uppercase truncate">
+                    <span className="font-serif text-[20px] font-bold text-[#7A1975] leading-[1.2] uppercase">
                         {firstName}
                     </span>
-                    <span className="font-serif text-[22px] font-bold text-[#7A1975] leading-none uppercase mt-0.5 truncate">
+                    <span className="font-serif text-[20px] font-bold text-[#7A1975] leading-[1.2] uppercase mt-0.5">
                         {lastName}
                     </span>
                 </div>
 
                 {/* ID Number */}
-                <div className="text-[10px] font-black text-[#7A1975] uppercase tracking-wider mt-0.5">
+                <div className="text-[9px] font-black text-[#7A1975] uppercase tracking-wider mt-0.5 leading-normal">
                     ID NO: {student.admission_number}
                 </div>
 
@@ -468,18 +468,18 @@ function IDCardFront({ student, companySettings }: any) {
                 </div>
 
                 {/* Details Section (FACULTY, COURSE, VALIDITY) */}
-                <div className="flex-1 bg-white px-1 py-1.5 flex flex-col justify-center text-[7px] leading-tight text-indigo-950">
-                    <div className="flex gap-1 overflow-hidden whitespace-nowrap">
-                        <span className="text-[#7A1975] font-medium min-w-[42px] uppercase">FACULTY:</span>
-                        <span className="font-extrabold text-indigo-950 truncate">{student.school || "School of Business"}</span>
+                <div className="flex-1 bg-white px-1 py-1.5 flex flex-col justify-center text-[6px] leading-[1.25] text-indigo-950 font-sans">
+                    <div className="flex gap-1">
+                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase">FACULTY:</span>
+                        <span className="font-extrabold text-indigo-950">{student.school || "School of Business"}</span>
                     </div>
-                    <div className="flex gap-1 mt-0.5 overflow-hidden whitespace-nowrap">
-                        <span className="text-[#7A1975] font-medium min-w-[42px] uppercase">COURSE:</span>
-                        <span className="font-extrabold text-indigo-950 truncate">{student.program || "DBM/May 2026"}</span>
+                    <div className="flex gap-1 mt-0.5">
+                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase">COURSE:</span>
+                        <span className="font-extrabold text-indigo-950">{student.program || "DBM/May 2026"}</span>
                     </div>
-                    <div className="flex gap-1 mt-0.5 overflow-hidden whitespace-nowrap">
-                        <span className="text-[#7A1975] font-medium min-w-[42px] uppercase">VALIDITY:</span>
-                        <span className="font-extrabold text-indigo-950 truncate">
+                    <div className="flex gap-1 mt-0.5">
+                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase">VALIDITY:</span>
+                        <span className="font-extrabold text-indigo-950">
                             {student.expiry_date ? new Date(student.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
                         </span>
                     </div>

@@ -477,16 +477,16 @@ export default function StudentVerification() {
 
                                                 {/* Student Name */}
                                                 <div className="flex flex-col mt-4">
-                                                    <span className="font-serif text-[42px] font-bold text-[#7A1975] dark:text-purple-300 leading-none uppercase truncate">
+                                                    <span className="font-serif text-[42px] font-bold text-[#7A1975] dark:text-purple-300 leading-[1.2] uppercase">
                                                         {firstName}
                                                     </span>
-                                                    <span className="font-serif text-[42px] font-bold text-[#7A1975] dark:text-purple-300 leading-none uppercase mt-1 truncate">
+                                                    <span className="font-serif text-[42px] font-bold text-[#7A1975] dark:text-purple-300 leading-[1.2] uppercase mt-1">
                                                         {lastName}
                                                     </span>
                                                 </div>
 
                                                 {/* ID Number */}
-                                                <div className="text-xl font-black text-[#7A1975] dark:text-purple-400 uppercase tracking-widest mt-2">
+                                                <div className="text-xl font-black text-[#7A1975] dark:text-purple-400 uppercase tracking-widest mt-2 leading-normal">
                                                     ID NO: {result.admission_number}
                                                 </div>
 
@@ -525,18 +525,18 @@ export default function StudentVerification() {
                                                 </div>
 
                                                 {/* Details Section */}
-                                                <div className="flex-1 bg-white dark:bg-gray-900 p-6 flex flex-col justify-center text-sm leading-tight text-indigo-950 dark:text-gray-200">
-                                                    <div className="flex gap-2 overflow-hidden whitespace-nowrap">
+                                                <div className="flex-1 bg-white dark:bg-gray-900 p-6 flex flex-col justify-center text-sm leading-normal text-indigo-950 dark:text-gray-200">
+                                                    <div className="flex gap-2">
                                                         <span className="text-[#7A1975] dark:text-purple-400 font-bold min-w-[80px] uppercase">FACULTY:</span>
-                                                        <span className="font-extrabold text-indigo-950 dark:text-white truncate">{result.school || "School of Business"}</span>
+                                                        <span className="font-extrabold text-indigo-950 dark:text-white">{result.school || "School of Business"}</span>
                                                     </div>
-                                                    <div className="flex gap-2 mt-2 overflow-hidden whitespace-nowrap">
+                                                    <div className="flex gap-2 mt-2">
                                                         <span className="text-[#7A1975] dark:text-purple-400 font-bold min-w-[80px] uppercase">COURSE:</span>
-                                                        <span className="font-extrabold text-indigo-950 dark:text-white truncate">{result.program || "DBM/May 2026"}</span>
+                                                        <span className="font-extrabold text-indigo-950 dark:text-white">{result.program || "DBM/May 2026"}</span>
                                                     </div>
-                                                    <div className="flex gap-2 mt-2 overflow-hidden whitespace-nowrap">
+                                                    <div className="flex gap-2 mt-2">
                                                         <span className="text-[#7A1975] dark:text-purple-400 font-bold min-w-[80px] uppercase">VALIDITY:</span>
-                                                        <span className="font-extrabold text-indigo-950 dark:text-white truncate">
+                                                        <span className="font-extrabold text-indigo-950 dark:text-white">
                                                             {result.expiry_date ? new Date(result.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
                                                         </span>
                                                     </div>
@@ -695,11 +695,11 @@ export default function StudentVerification() {
                                                 RU
                                             </div>
                                         )}
-                                        <div className="flex flex-col leading-none overflow-hidden">
-                                            <span className="text-[30px] font-black text-[#7A1975] uppercase tracking-tight truncate">
+                                        <div className="flex flex-col leading-[1.2] overflow-hidden">
+                                            <span className="text-[26px] font-black text-[#7A1975] uppercase tracking-tight">
                                                 {companySettings.company_name || "Riara University"}
                                             </span>
-                                            <span className="text-[18px] font-bold text-gray-500 lowercase tracking-wider mt-1 truncate">
+                                            <span className="text-[16px] font-bold text-gray-500 lowercase tracking-wider mt-1">
                                                 {companySettings.tagline || "nurturing innovators"}
                                             </span>
                                         </div>
@@ -707,16 +707,16 @@ export default function StudentVerification() {
 
                                     {/* Student Name */}
                                     <div className="flex flex-col mt-4">
-                                        <span className="font-serif text-[66px] font-bold text-[#7A1975] leading-none uppercase truncate">
+                                        <span className="font-serif text-[60px] font-bold text-[#7A1975] leading-[1.2] uppercase">
                                             {firstName}
                                         </span>
-                                        <span className="font-serif text-[66px] font-bold text-[#7A1975] leading-none uppercase mt-2.5 truncate">
+                                        <span className="font-serif text-[60px] font-bold text-[#7A1975] leading-[1.2] uppercase mt-2.5">
                                             {lastName}
                                         </span>
                                     </div>
 
                                     {/* ID Number */}
-                                    <div className="text-[30px] font-black text-[#7A1975] uppercase tracking-wider mt-2">
+                                    <div className="text-[30px] font-black text-[#7A1975] uppercase tracking-wider mt-2 leading-normal">
                                         ID NO: {result.admission_number}
                                     </div>
 
@@ -744,18 +744,18 @@ export default function StudentVerification() {
                                     </div>
 
                                     {/* Details Section */}
-                                    <div className="flex-1 bg-white px-3 py-4 flex flex-col justify-center text-[21px] leading-tight text-indigo-950">
-                                        <div className="flex gap-3 overflow-hidden whitespace-nowrap">
-                                            <span className="text-[#7A1975] font-medium min-w-[130px] uppercase">FACULTY:</span>
-                                            <span className="font-extrabold text-indigo-950 truncate">{result.school || "School of Business"}</span>
+                                    <div className="flex-1 bg-white px-3 py-4 flex flex-col justify-center text-[19px] leading-[1.3] text-indigo-950">
+                                        <div className="flex gap-3">
+                                            <span className="text-[#7A1975] font-medium min-w-[120px] uppercase">FACULTY:</span>
+                                            <span className="font-extrabold text-indigo-950">{result.school || "School of Business"}</span>
                                         </div>
-                                        <div className="flex gap-3 mt-2 overflow-hidden whitespace-nowrap">
-                                            <span className="text-[#7A1975] font-medium min-w-[130px] uppercase">COURSE:</span>
-                                            <span className="font-extrabold text-indigo-950 truncate">{result.program || "DBM/May 2026"}</span>
+                                        <div className="flex gap-3 mt-2">
+                                            <span className="text-[#7A1975] font-medium min-w-[120px] uppercase">COURSE:</span>
+                                            <span className="font-extrabold text-indigo-950">{result.program || "DBM/May 2026"}</span>
                                         </div>
-                                        <div className="flex gap-3 mt-2 overflow-hidden whitespace-nowrap">
-                                            <span className="text-[#7A1975] font-medium min-w-[130px] uppercase">VALIDITY:</span>
-                                            <span className="font-extrabold text-indigo-950 truncate">
+                                        <div className="flex gap-3 mt-2">
+                                            <span className="text-[#7A1975] font-medium min-w-[120px] uppercase">VALIDITY:</span>
+                                            <span className="font-extrabold text-indigo-950">
                                                 {result.expiry_date ? new Date(result.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
                                             </span>
                                         </div>
