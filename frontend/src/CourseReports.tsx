@@ -1,4 +1,4 @@
-import { Download, Calendar, Users, ChevronRight, BookOpen, Clock, MapPin, ChevronDown, CheckCircle, XCircle, QrCode, X, Printer } from 'lucide-react';
+import { Download, Calendar, Users, ChevronRight, BookOpen, Clock, MapPin, ChevronDown, CheckCircle, XCircle, QrCode, X, Printer, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeCanvas } from 'qrcode.react';
 
@@ -13,6 +13,8 @@ export default function CourseReports() {
     const [sessionDetails, setSessionDetails] = useState<any[]>([]);
     const [loadingDetails, setLoadingDetails] = useState(false);
     const [showQRModal, setShowQRModal] = useState(false);
+    const [coursesPage, setCoursesPage] = useState(1);
+    const coursesPerPage = 10;
 
     const downloadQR = () => {
         const canvas = document.getElementById('course-qr-canvas') as HTMLCanvasElement;
@@ -241,23 +243,56 @@ export default function CourseReports() {
                         </h2>
                     </div>
                     <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                        {loading ? <div className="p-4 text-center text-sm text-[var(--text-secondary)]">Loading courses...</div> : courses.map(course => (
-                            <button
-                                key={course.id}
-                                onClick={() => handleSelectCourse(course)}
-                                className={`w-full text-left p-3 rounded-lg border transition-all flex justify-between items-center group
-                                    ${selectedCourse?.id === course.id
-                                        ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                                        : 'border-transparent hover:bg-[var(--bg-secondary)]'}`}
-                            >
-                                <div>
-                                    <div className="font-bold text-sm text-[var(--text-primary)]">{course.course_code}</div>
-                                    <div className="text-xs text-[var(--text-secondary)] line-clamp-1">{course.course_name}</div>
-                                </div>
-                                <ChevronRight size={16} className={`text-gray-400 group-hover:text-blue-500 transition-transform ${selectedCourse?.id === course.id ? 'rotate-90 text-blue-500' : ''}`} />
-                            </button>
-                        ))}
+                        {loading ? (
+                            <div className="p-4 text-center text-sm text-[var(--text-secondary)]">Loading courses...</div>
+                        ) : (
+                            (() => {
+                                const totalCoursesPages = Math.ceil(courses.length / coursesPerPage);
+                                const startIdx = (coursesPage - 1) * coursesPerPage;
+                                const paginatedCourses = courses.slice(startIdx, startIdx + coursesPerPage);
+                                
+                                return paginatedCourses.map(course => (
+                                    <button
+                                        key={course.id}
+                                        onClick={() => handleSelectCourse(course)}
+                                        className={`w-full text-left p-3 rounded-lg border transition-all flex justify-between items-center group
+                                            ${selectedCourse?.id === course.id
+                                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                                                : 'border-transparent hover:bg-[var(--bg-secondary)]'}`}
+                                    >
+                                        <div>
+                                            <div className="font-bold text-sm text-[var(--text-primary)]">{course.course_code}</div>
+                                            <div className="text-xs text-[var(--text-secondary)] line-clamp-1">{course.course_name}</div>
+                                        </div>
+                                        <ChevronRight size={16} className={`text-gray-400 group-hover:text-blue-500 transition-transform ${selectedCourse?.id === course.id ? 'rotate-90 text-blue-500' : ''}`} />
+                                    </button>
+                                ));
+                            })()
+                        )}
                     </div>
+                    
+                    {/* Sidebar Course Pagination */}
+                    {!loading && courses.length > coursesPerPage && (
+                        <div className="p-3 bg-[var(--bg-secondary)] border-t border-[var(--border-color)] flex items-center justify-between">
+                            <button
+                                onClick={() => setCoursesPage(p => Math.max(1, p - 1))}
+                                disabled={coursesPage === 1}
+                                className="p-1 rounded bg-[var(--bg-primary)] border border-[var(--border-color)] disabled:opacity-50 text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <span className="text-xs font-semibold text-[var(--text-secondary)]">
+                                Page {coursesPage} of {Math.ceil(courses.length / coursesPerPage)}
+                            </span>
+                            <button
+                                onClick={() => setCoursesPage(p => Math.min(Math.ceil(courses.length / coursesPerPage), p + 1))}
+                                disabled={coursesPage === Math.ceil(courses.length / coursesPerPage)}
+                                className="p-1 rounded bg-[var(--bg-primary)] border border-[var(--border-color)] disabled:opacity-50 text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Session Details */}

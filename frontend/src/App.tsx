@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import {
     LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut,
     Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode,
-    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, X, Activity, BarChart3, Play, History, Printer
+    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, X, Activity, BarChart3, Play, History, Printer, Download
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
@@ -35,6 +35,7 @@ const AISettings = lazy(() => import('./AISettings'))
 const CompanySettings = lazy(() => import('./CompanySettings'))
 const ClassroomManagement = lazy(() => import('./ClassroomManagement'))
 const CourseReports = lazy(() => import('./CourseReports'))
+const AllScansDownload = lazy(() => import('./AllScansDownload'))
 const EventManagement = lazy(() => import('./EventManagement'))
 const SecurityDashboard = lazy(() => import('./SecurityDashboard'))
 const VisitorManagement = lazy(() => import('./VisitorManagement'))
@@ -161,9 +162,11 @@ function App() {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search)
         const room = params.get('room')
-        if (room && isAuthenticated) {
-            // Store scanned room for Attendance component
-            localStorage.setItem('scannedRoom', room)
+        const course = params.get('course')
+        if ((room || course) && isAuthenticated) {
+            // Store scanned values for Attendance component
+            if (room) localStorage.setItem('scannedRoom', room)
+            if (course) localStorage.setItem('scannedCourse', course)
             setActiveTab('attendance')
             // Clean URL
             window.history.replaceState({}, '', window.location.pathname)
@@ -268,6 +271,9 @@ function App() {
                 'gate': false,
                 'vehicles': false,
                 'timetable': true,
+                'courses': true,
+                'classrooms': true,
+                'all-attendance': true,
                 'cameras': false,
                 'projects': true,
                 'bulk': false,
@@ -705,7 +711,7 @@ function App() {
                         </SidebarGroup>
 
                         {/* Academics */}
-                        {(isMenuEnabled('timetable') || isMenuEnabled('attendance')) && (
+                        {(isMenuEnabled('timetable') || isMenuEnabled('attendance') || isMenuEnabled('all-attendance')) && (
                             <SidebarGroup title="Academics" isOpen={openGroups.academics} onToggle={() => toggleGroup('academics')} isSidebarCollapsed={isSidebarCollapsed}>
                                 {isMenuEnabled('attendance') && (
                                     <NavItem
@@ -736,6 +742,14 @@ function App() {
                                             onClick={() => { setActiveTab('classrooms'); setSidebarOpen(false); }}
                                         />
                                     </>
+                                )}
+                                {isMenuEnabled('all-attendance') && (
+                                    <NavItem
+                                        icon={<Download size={18} />}
+                                        label="All Attendance"
+                                        active={activeTab === 'all-attendance'}
+                                        onClick={() => { setActiveTab('all-attendance'); setSidebarOpen(false); }}
+                                    />
                                 )}
                             </SidebarGroup>
                         )}
@@ -992,7 +1006,8 @@ function App() {
                                     { id: 'timetable', label: 'Schedule' },
                                     { id: 'attendance', label: 'Attendance' },
                                     { id: 'courses', label: 'Courses' },
-                                    { id: 'classrooms', label: 'Rooms' }
+                                    { id: 'classrooms', label: 'Rooms' },
+                                    { id: 'all-attendance', label: 'All Attendance' }
                                 ],
                                 people: [
                                     { id: 'users', label: 'Directory' },
@@ -1054,6 +1069,7 @@ function App() {
                     {activeTab === 'events' && <EventManagement />}
                     {activeTab === 'classrooms' && <ClassroomManagement />}
                     {activeTab === 'courses' && <CourseReports />}
+                    {activeTab === 'all-attendance' && <AllScansDownload />}
                     {activeTab === 'cameras' && <CameraMonitoring />}
                     {activeTab === 'settings' && <SettingsComp />}
                     {activeTab === 'integrations' && <Integrations />}

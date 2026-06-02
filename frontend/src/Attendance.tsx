@@ -145,15 +145,29 @@ function StudentView() {
     const handleScan = async (code: string) => {
         setStatus({ type: 'loading', msg: 'Verifying Attendance...' })
         try {
-            // Extract room code if the scanned text is a URL
-            let roomCode = code;
-            if (code.includes('?room=')) {
+            // Extract room and course codes if the scanned text is a URL
+            let roomCode = '';
+            let courseCode = '';
+            
+            if (code.includes('?room=') || code.includes('?course=')) {
                 try {
                     const url = new URL(code);
-                    roomCode = url.searchParams.get('room') || code;
+                    roomCode = url.searchParams.get('room') || '';
+                    courseCode = url.searchParams.get('course') || '';
                 } catch (e) {
-                    // Not a valid URL, use original code
+                    // Try parsing manually if browser URL fails
+                    const roomMatch = code.match(/[?&]room=([^&]+)/);
+                    const courseMatch = code.match(/[?&]course=([^&]+)/);
+                    roomCode = roomMatch ? roomMatch[1] : '';
+                    courseCode = courseMatch ? courseMatch[1] : '';
                 }
+            } else {
+                roomCode = code;
+            }
+
+            // Fallback for simple text scans
+            if (!roomCode && !courseCode) {
+                roomCode = code;
             }
 
             const meta = await gatherMetadata()
@@ -163,7 +177,8 @@ function StudentView() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
-                    room_code: roomCode,
+                    room_code: roomCode || null,
+                    course_code: courseCode || null,
                     latitude: meta.geolocation?.lat || null,
                     longitude: meta.geolocation?.lng || null,
                     metadata: meta
@@ -186,9 +201,18 @@ function StudentView() {
     // Auto-check deep link
     useEffect(() => {
         const room = localStorage.getItem('scannedRoom')
-        if (room) {
+        const course = localStorage.getItem('scannedCourse')
+        if (room || course) {
             localStorage.removeItem('scannedRoom')
-            handleScan(room)
+            localStorage.removeItem('scannedCourse')
+            
+            if (room && course) {
+                handleScan(`https://dummy.com/?room=${room}&course=${course}`)
+            } else if (room) {
+                handleScan(`https://dummy.com/?room=${room}`)
+            } else if (course) {
+                handleScan(`https://dummy.com/?course=${course}`)
+            }
         }
     }, [])
 

@@ -913,3 +913,57 @@ async def get_all_attendance_logs(
         })
     
     return {"total": len(logs), "logs": logs}
+
+@router.get("/download-all")
+async def download_all_attendance_logs(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Download CSV report for all attendance scans that have been made."""
+    import csv 
+    import io
+    
+    # Query all attendance records with related user, session, course, and classroom details
+    query = (
+        select(AttendanceRecord, User, ClassSession, Course, Classroom)
+        .join(User, AttendanceRecord.student_id == User.id)
+        .join(ClassSession, AttendanceRecord.session_id == ClassSession.id)
+        .join(Course, ClassSession.course_id == Course.id)
+        .outerjoin(Classroom, ClassSession.classroom_id == Classroom.id)
+        .order_by(AttendanceRecord.scan_time.desc())
+    )
+    results = await session.exec(query)
+    
+    # Create CSV in memory
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Scan ID", "Admission Number", "Student Name", "Course Code", "Course Name", 
+        "Room Code", "Room Name", "Session Date", "Session Start", "Session End", 
+        "Scan Date Time", "Status", "Connection Type"
+    ])
+    
+    for record, student, class_session, course, classroom in results.all():
+        writer.writerow([
+            str(record.id),
+            student.admission_number,
+            student.full_name,
+            course.course_code,
+            course.course_name,
+            classroom.room_code if classroom else (class_session.room_unique_number or "N/A"),
+            classroom.room_name if classroom else "Unknown",
+            class_session.session_date.isoformat(),
+            class_session.start_time.isoformat(),
+            class_session.end_time.isoformat(),
+            record.scan_time.isoformat() if record.scan_time else "-",
+            record.status,
+            record.connection_type or "QR_SCAN_LAN"
+        ])
+        
+    output.seek(0)
+    
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=all_attendance_scans.csv"}
+    )

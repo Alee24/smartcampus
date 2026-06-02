@@ -436,7 +436,8 @@ async def deactivate_all_classrooms(
 from pydantic import BaseModel
 
 class VerifyScanRequest(BaseModel):
-    room_code: str
+    room_code: Optional[str] = None
+    course_code: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     metadata: Optional[dict] = None
@@ -451,32 +452,54 @@ async def verify_classroom_scan(
     """
     Smart Verification with robust logging (ScanLog).
     1. Log Attempt.
-    2. Identify classroom.
+    2. Identify classroom or course.
     3. Check for ACTIVE Class Session.
     4. Verify Registration.
     5. Mark attendance with timestamp and client IP address.
     """
     from app.models import AttendanceRecord, ScanLog, StudentCourseRegistration
     
+    room_code_val = scan_data.room_code
+    course_code_val = scan_data.course_code
+
     # 0. Initialize Log
     scan_log = ScanLog(
         student_id=current_user.id,
-        room_code=scan_data.room_code,
+        room_code=room_code_val or course_code_val or "UNKNOWN",
         timestamp=datetime.utcnow(),
         is_successful=False,
         status_message="Initializing"
     )
     session.add(scan_log)
 
-    # 1. Find Classroom
-    room_query = select(Classroom).where(Classroom.room_code == scan_data.room_code)
-    room_result = await session.exec(room_query)
-    room = room_result.first()
-    
-    if not room:
-        scan_log.status_message = "Invalid Room Code"
+    if not room_code_val and not course_code_val:
+        scan_log.status_message = "No scan code parameters provided"
         await session.commit()
-        return {"success": False, "message": "Unknown Room Code (Logged)"}
+        return {"success": False, "message": "No room or course code provided"}
+
+    # 1. Find Classroom (if room_code provided)
+    room = None
+    if room_code_val:
+        room_query = select(Classroom).where(Classroom.room_code == room_code_val)
+        room_result = await session.exec(room_query)
+        room = room_result.first()
+        
+        if not room and not course_code_val:
+            scan_log.status_message = "Invalid Room Code"
+            await session.commit()
+            return {"success": False, "message": "Unknown Room Code (Logged)"}
+
+    # Find Course (if course_code provided)
+    course = None
+    if course_code_val:
+        course_query = select(Course).where(Course.course_code == course_code_val)
+        course_result = await session.exec(course_query)
+        course = course_result.first()
+        
+        if not course:
+            scan_log.status_message = f"Invalid Course Code: {course_code_val}"
+            await session.commit()
+            return {"success": False, "message": f"Unknown Course Code: {course_code_val}"}
         
     # 2. Determine Current Context
     now = datetime.now()
@@ -485,44 +508,119 @@ async def verify_classroom_scan(
     day_of_week = now.weekday() # 0=Monday
     
     # 3. Find Active Session
-    # Check ClassSession (Specific)
-    session_query = select(ClassSession).where(
-        (ClassSession.classroom_id == room.id) &
-        (ClassSession.session_date == today_date) &
-        (ClassSession.start_time <= current_time) &
-        (ClassSession.end_time >= current_time)
-    )
-    session_result = await session.exec(session_query)
-    active_session = session_result.first()
-    
-    # If no specific session, check TimetableSlot (Recurring) and auto-create session
-    if not active_session:
-        slot_query = select(TimetableSlot).where(
-            (TimetableSlot.classroom_id == room.id) &
-            (TimetableSlot.day_of_week == day_of_week) &
-            (TimetableSlot.start_time <= current_time) &
-            (TimetableSlot.end_time >= current_time) &
-            (TimetableSlot.is_active == True)
+    active_session = None
+
+    if course:
+        # Check active session for this course today and now
+        session_query = select(ClassSession).where(
+            (ClassSession.course_id == course.id) &
+            (ClassSession.session_date == today_date) &
+            (ClassSession.start_time <= current_time) &
+            (ClassSession.end_time >= current_time)
         )
-        slot_result = await session.exec(slot_query)
-        slot = slot_result.first()
-        
-        if slot:
-            # Auto-create session from slot
+        session_result = await session.exec(session_query)
+        active_session = session_result.first()
+
+        # If not active exactly now, check for any session for this course today
+        if not active_session:
+            session_query = select(ClassSession).where(
+                (ClassSession.course_id == course.id) &
+                (ClassSession.session_date == today_date)
+            )
+            session_result = await session.exec(session_query)
+            active_session = session_result.first()
+
+        # If still no session today, check TimetableSlot for this course today
+        if not active_session:
+            slot_query = select(TimetableSlot).where(
+                (TimetableSlot.course_id == course.id) &
+                (TimetableSlot.day_of_week == day_of_week) &
+                (TimetableSlot.is_active == True)
+            )
+            slot_result = await session.exec(slot_query)
+            slot = slot_result.first()
+
+            if slot:
+                active_session = ClassSession(
+                    course_id=slot.course_id,
+                    timetable_slot_id=slot.id,
+                    session_date=today_date,
+                    start_time=slot.start_time,
+                    end_time=slot.end_time,
+                    classroom_id=slot.classroom_id,
+                    lecturer_id=slot.lecturer_id or course.lecturer_id,
+                    status="ongoing",
+                    active=True
+                )
+                session.add(active_session)
+                await session.commit()
+                await session.refresh(active_session)
+
+        # If still no session/slot today, dynamically create an ad-hoc session
+        if not active_session:
+            from datetime import timedelta
+            start_time_val = current_time
+            end_dt = now + timedelta(hours=2)
+            end_time_val = end_dt.time()
+
+            classroom_id_val = course.classroom_id
+            if not classroom_id_val and room:
+                classroom_id_val = room.id
+
             active_session = ClassSession(
-                course_id=slot.course_id,
-                timetable_slot_id=slot.id,
+                course_id=course.id,
                 session_date=today_date,
-                start_time=slot.start_time,
-                end_time=slot.end_time,
-                classroom_id=room.id,
-                lecturer_id=slot.lecturer_id,
+                start_time=start_time_val,
+                end_time=end_time_val,
+                classroom_id=classroom_id_val,
+                lecturer_id=course.lecturer_id,
                 status="ongoing",
                 active=True
             )
             session.add(active_session)
             await session.commit()
             await session.refresh(active_session)
+
+    # Fallback to classroom-based checking if we only have room_code and no active session yet
+    if not active_session and room:
+        # Check ClassSession (Specific)
+        session_query = select(ClassSession).where(
+            (ClassSession.classroom_id == room.id) &
+            (ClassSession.session_date == today_date) &
+            (ClassSession.start_time <= current_time) &
+            (ClassSession.end_time >= current_time)
+        )
+        session_result = await session.exec(session_query)
+        active_session = session_result.first()
+        
+        # If no specific session, check TimetableSlot (Recurring) and auto-create session
+        if not active_session:
+            slot_query = select(TimetableSlot).where(
+                (TimetableSlot.classroom_id == room.id) &
+                (TimetableSlot.day_of_week == day_of_week) &
+                (TimetableSlot.start_time <= current_time) &
+                (TimetableSlot.end_time >= current_time) &
+                (TimetableSlot.is_active == True)
+            )
+            slot_result = await session.exec(slot_query)
+            slot = slot_result.first()
+            
+            if slot:
+                # Auto-create session from slot
+                active_session = ClassSession(
+                    course_id=slot.course_id,
+                    timetable_slot_id=slot.id,
+                    session_date=today_date,
+                    start_time=slot.start_time,
+                    end_time=slot.end_time,
+                    classroom_id=room.id,
+                    lecturer_id=slot.lecturer_id,
+                    status="ongoing",
+                    active=True
+                )
+                session.add(active_session)
+                await session.commit()
+                await session.refresh(active_session)
             
     if not active_session:
         scan_log.status_message = "unrelated student no class"
@@ -530,43 +628,26 @@ async def verify_classroom_scan(
         return {
             "success": False, 
             "message": "unrelated student no class",
-            "room_name": room.room_name
+            "room_name": room.room_name if room else "Unknown Room"
         }
     
     # Update log with session
     scan_log.class_session_id = active_session.id
         
-    # 3.5 Verify Student Registration
+    # 3.5 Verify Student Registration - auto-register student if not registered
     reg_query = select(StudentCourseRegistration).where(
         (StudentCourseRegistration.student_id == current_user.id) &
         (StudentCourseRegistration.course_id == active_session.course_id)
     )
     reg_result = await session.exec(reg_query)
     if not reg_result.first():
-        # Log failure in ScanLog
-        scan_log.is_successful = False
-        scan_log.status_message = "unrelated student no class"
-        
-        # Log System Activity
-        course = await session.get(Course, active_session.course_id)
-        log_meta = {"status": "Failed", "course": course.course_code, "reason": "unrelated student no class"}
-        if scan_data.metadata:
-            log_meta.update(scan_data.metadata)
-            
-        await log_system_activity(
-            session, "SCAN_FAILED", "ATTENDANCE", f"Unregistered Entry Attempt: {course.course_code}", 
-            actor_id=current_user.id, entity_id=str(room.id), 
-            metadata=log_meta
+        new_reg = StudentCourseRegistration(
+            student_id=current_user.id,
+            course_id=active_session.course_id,
+            semester="Current"
         )
-        
+        session.add(new_reg)
         await session.commit()
-
-        return {
-            "success": False,
-            "message": "unrelated student no class",
-            "course_name": course.course_name,
-            "room_name": room.room_name
-        }
         
     # 4. Check for Existing Attendance
     existing_query = select(AttendanceRecord).where(
@@ -586,7 +667,7 @@ async def verify_classroom_scan(
             "already_marked": True,
             "message": f"Already marked present for {course.course_code}",
             "course_name": course.course_name,
-            "room_name": room.room_name
+            "room_name": room.room_name if room else "General / Ad-hoc"
         }
 
     # 5. Mark Attendance with Client IP Address & timestamp
@@ -619,7 +700,7 @@ async def verify_classroom_scan(
 
     await log_system_activity(
         session, "SCAN_SUCCESS", "ATTENDANCE", f"Marked Present: {course.course_code}", 
-        actor_id=current_user.id, entity_id=str(room.id), 
+        actor_id=current_user.id, entity_id=str(room.id) if room else str(active_session.classroom_id or course.id), 
         metadata=log_meta,
         ip_address=client_ip
     )
@@ -630,7 +711,7 @@ async def verify_classroom_scan(
         "success": True,
         "message": f"Successfully marked present for {course.course_code}",
         "course_name": course.course_name,
-        "room_name": room.room_name,
+        "room_name": room.room_name if room else "General / Ad-hoc",
         "time": now.strftime("%H:%M")
     }
 
