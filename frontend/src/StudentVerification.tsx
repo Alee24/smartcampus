@@ -296,7 +296,46 @@ export default function StudentVerification() {
         }
     }
 
+    const handleVerificationFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setLoading(true)
+
+        // Setup temporary container if "qr-reader" is not in DOM
+        let tempDiv = document.getElementById("qr-reader");
+        let createdTemp = false;
+        if (!tempDiv) {
+            tempDiv = document.createElement("div");
+            tempDiv.id = "qr-reader";
+            tempDiv.style.display = "none";
+            document.body.appendChild(tempDiv);
+            createdTemp = true;
+        }
+
+        try {
+            const html5QrCode = new Html5Qrcode("qr-reader")
+            const decodedText = await html5QrCode.scanFile(file, false)
+            setQuery(decodedText)
+            await handleVerify(decodedText, true)
+        } catch (err: any) {
+            console.error("QR File Scan Error", err)
+            showNotification(`Could not read QR code: ${err?.message || "Invalid/blurry image"}`, "error")
+        } finally {
+            if (createdTemp && tempDiv) {
+                tempDiv.remove()
+            }
+            setLoading(false)
+            e.target.value = ''
+        }
+    }
+
     const startScanner = async () => {
+        if (!window.isSecureContext) {
+            showNotification("Insecure context: Opening device camera to capture photo...", "info")
+            const el = document.getElementById("insecure-verification-qr-file-input")
+            if (el) el.click()
+            return
+        }
         setIsScanning(true)
         setTimeout(async () => {
             try {
@@ -333,6 +372,14 @@ export default function StudentVerification() {
 
     return (
         <div className="p-3 md:p-6 relative overflow-hidden min-h-screen">
+            <input 
+                type="file" 
+                id="insecure-verification-qr-file-input" 
+                accept="image/*" 
+                capture="environment" 
+                onChange={handleVerificationFileScan} 
+                className="hidden" 
+            />
             <style>{`
                 .perspective-1000 { perspective: 1000px; }
                 .preserve-3d { transform-style: preserve-3d; }
@@ -690,6 +737,8 @@ export default function StudentVerification() {
                     const nameParts = result.full_name ? result.full_name.trim().split(/\s+/) : [];
                     const firstName = nameParts[0] || "";
                     const lastName = nameParts.slice(1).join(" ") || "";
+                    const statusText = result.status || 'ACTIVE';
+                    const isActive = statusText.toUpperCase() === 'ACTIVE';
                     return (
                         <div className="fixed -left-[5000px] top-0">
                             {/* Printable Front Side */}
