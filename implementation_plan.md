@@ -27,40 +27,40 @@ A production-ready Smart Campus System handling gate entry, attendance, and vehi
 7.  `nginx`: Gateway
 
 ## Phase 1: Core Architecture & Setup (Current)
-- [ ] Initialize Git & Project Structure.
-- [ ] Create `docker-compose.yml` foundations.
-- [ ] Setup PostgreSQL with `pgvector`.
-- [ ] Setup Backend (FastAPI) skeleton.
-- [ ] Setup Frontend (React) skeleton.
+- [x] Initialize Git & Project Structure.
+- [x] Create `docker-compose.yml` foundations.
+- [x] Setup PostgreSQL with `pgvector`.
+- [x] Setup Backend (FastAPI) skeleton.
+- [x] Setup Frontend (React) skeleton.
 
 ## Phase 2: Database & Authentication
-- [ ] Implement encryption for passwords.
-- [ ] Create Database Models (SQLAlchemy/SQLModel) matching the provided Schema.
+- [x] Implement encryption for passwords.
+- [x] Create Database Models (SQLAlchemy/SQLModel) matching the provided Schema.
     - Roles, Users, Gates, Logs, Vehicles, Courses, Attendance.
-- [ ] Implement Auth System (JWT).
+- [x] Implement Auth System (JWT).
     - RBAC (Role Based Access Control).
 
 ## Phase 3: Web Dashboard (Admin/Staff/Student)
-- [ ] Admin Dashboard (Stats, User Management).
-- [ ] Student Dashboard (QR Code generation, History).
-- [ ] Security Guard Interface (Manual Entry, Verification).
+- [x] Admin Dashboard (Stats, User Management).
+- [x] Student Dashboard (QR Code generation, History).
+- [x] Security Guard Interface (Manual Entry, Verification).
 
 ## Phase 4: AI Microservices Integration
-- [ ] **Face Recognition Service**:
+- [x] **Face Recognition Service**:
     - Endpoint to register face (generate embedding).
     - Endpoint to verify face (compare embedding).
-- [ ] **Vehicle Service**:
+- [x] **Vehicle Service**:
     - Endpoint to process car image -> Plate, Model, Color.
 
 ## Phase 5: Specific Workflows
-- [ ] Gate Entry Logic (Scan -> Verify -> Log).
-- [ ] Class Attendance Logic (Session -> Scan -> AI Check -> Log).
-- [ ] Student Assistant Mode.
+- [x] Gate Entry Logic (Scan -> Verify -> Log).
+- [x] Class Attendance Logic (Session -> Scan -> AI Check -> Log).
+- [x] Student Assistant Mode.
 
 ## Phase 6: Deployment & Security
-- [ ] Nginx SSL Configuration (Certbot).
-- [ ] Rate Limiting.
-- [ ] Audit Logging.
+- [x] Nginx SSL Configuration (Certbot).
+- [x] Rate Limiting.
+- [x] Audit Logging.
 
 ## User Credentials
 - Test Account: mettoalex@gmail.com / Digital2025
