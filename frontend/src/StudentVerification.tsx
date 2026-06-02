@@ -115,7 +115,7 @@ export default function StudentVerification() {
         }
     }
 
-    const handleVerify = async (qOverride?: string) => {
+    const handleVerify = async (qOverride?: string, isScanned = false) => {
         const searchQuery = qOverride || query
         if (!searchQuery.trim()) return
         setQuery(searchQuery)
@@ -134,6 +134,34 @@ export default function StudentVerification() {
                         setEditData({ full_name: data.full_name, school: data.school })
                         playSuccessSound()
                     }, 300)
+
+                    // If scanned via QR scanner, automatically check in / check out depending on current status
+                    if (isScanned) {
+                        try {
+                            const token = localStorage.getItem('token')
+                            const action = data.gate_status === 'In' ? 'check-out' : 'check-in'
+                            const gateRes = await fetch(`/api/gate/${action}/${encodeURIComponent(data.admission_number)}`, {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            })
+                            if (gateRes.ok) {
+                                const gateData = await gateRes.json()
+                                showNotification(`Auto ${action === 'check-in' ? 'Checked In' : 'Checked Out'}: ${data.full_name} at ${gateData.time}`, 'success')
+                                
+                                // Refresh verification details to show the updated gate status
+                                const refreshRes = await fetch(`/api/users/verify/${encodeURIComponent(searchQuery)}`)
+                                if (refreshRes.ok) {
+                                    const refreshedData = await refreshRes.json()
+                                    setResult(refreshedData)
+                                }
+                            } else {
+                                const errData = await gateRes.json()
+                                showNotification(errData.detail || `Auto ${action} failed`, 'error')
+                            }
+                        } catch (err) {
+                            showNotification('Auto gate-log failed', 'error')
+                        }
+                    }
                 }
             } else {
                 setResult({ error: 'Student not found' })
@@ -279,7 +307,7 @@ export default function StudentVerification() {
                     (decodedText) => {
                         setQuery(decodedText)
                         stopScanner()
-                        handleVerify(decodedText)
+                        handleVerify(decodedText, true)
                     },
                     () => {}
                 )
