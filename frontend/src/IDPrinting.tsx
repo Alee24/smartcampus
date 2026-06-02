@@ -88,8 +88,9 @@ export default function IDPrinting() {
         if (!front || !back) return
 
         try {
-            const canvasFront = await html2canvas(front, { scale: 2, useCORS: true })
-            const canvasBack = await html2canvas(back, { scale: 2, useCORS: true })
+            await document.fonts.ready;
+            const canvasFront = await html2canvas(front, { scale: 2, useCORS: true, backgroundColor: null })
+            const canvasBack = await html2canvas(back, { scale: 2, useCORS: true, backgroundColor: null })
             
             const link = document.createElement('a')
             
@@ -121,14 +122,15 @@ export default function IDPrinting() {
             
             const selectedUsers = users.filter(u => selectedIds.has(u.id))
             
+            await document.fonts.ready;
             for (let i = 0; i < selectedUsers.length; i++) {
                 const user = selectedUsers[i]
                 const front = document.getElementById(`id-card-front-${user.id}`)
                 const back = document.getElementById(`id-card-back-${user.id}`)
                 
                 if (front && back) {
-                    const canvasFront = await html2canvas(front, { scale: 2, useCORS: true })
-                    const canvasBack = await html2canvas(back, { scale: 2, useCORS: true })
+                    const canvasFront = await html2canvas(front, { scale: 2, useCORS: true, backgroundColor: null })
+                    const canvasBack = await html2canvas(back, { scale: 2, useCORS: true, backgroundColor: null })
                     
                     const imgFront = canvasFront.toDataURL('image/jpeg', 0.95)
                     const imgBack = canvasBack.toDataURL('image/jpeg', 0.95)
@@ -176,6 +178,7 @@ export default function IDPrinting() {
             
             const selectedUsers = users.filter(u => selectedIds.has(u.id))
             
+            await document.fonts.ready;
             for (let i = 0; i < selectedUsers.length; i++) {
                 const user = selectedUsers[i]
                 const back = document.getElementById(`id-card-back-${user.id}`)
@@ -183,7 +186,7 @@ export default function IDPrinting() {
                 if (back) {
                     const qrContainer = back.querySelector('.bg-white.rounded-2xl') as HTMLElement
                     if (qrContainer) {
-                        const canvas = await html2canvas(qrContainer, { scale: 3, useCORS: true })
+                        const canvas = await html2canvas(qrContainer, { scale: 3, useCORS: true, backgroundColor: null })
                         const imgData = canvas.toDataURL('image/png')
                         
                         pdf.addImage(imgData, 'PNG', x, y, qrSize, qrSize)
@@ -405,8 +408,8 @@ function IDCardFront({ student, companySettings }: any) {
     return (
         <div 
             id={`id-card-front-${student.id}`}
-            className="w-[340px] h-[216px] bg-white border border-black relative overflow-hidden select-none"
-            style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif" }}
+            className="w-[340px] h-[216px] bg-white border border-black rounded-[16px] relative overflow-hidden select-none"
+            style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif", letterSpacing: '0.01px' }}
         >
             {/* Left Column (Logo, Name, ID No, QR Code) */}
             <div className="absolute left-[15px] top-[15px] bottom-[15px] w-[145px] flex flex-col justify-between">
@@ -419,28 +422,28 @@ function IDCardFront({ student, companySettings }: any) {
                             RU
                         </div>
                     )}
-                    <div className="flex flex-col leading-[1.2] overflow-hidden">
-                        <span className="text-[9px] font-black text-[#7A1975] uppercase tracking-tight">
+                    <div className="flex flex-col leading-[1.2]">
+                        <div className="text-[9px] font-black text-[#7A1975] uppercase leading-[1.1]" style={{ letterSpacing: '0.01px' }}>
                             {companySettings.company_name || "Riara University"}
-                        </span>
-                        <span className="text-[5px] font-bold text-gray-500 lowercase tracking-wider mt-0.5">
+                        </div>
+                        <div className="text-[5px] font-bold text-gray-500 lowercase mt-0.5 leading-none" style={{ letterSpacing: '0.01px' }}>
                             {companySettings.tagline || "nurturing innovators"}
-                        </span>
+                        </div>
                     </div>
                 </div>
 
                 {/* Student Name */}
-                <div className="flex flex-col mt-1">
-                    <span className="font-serif text-[20px] font-bold text-[#7A1975] leading-[1.2] uppercase">
+                <div className="flex flex-col mt-1 space-y-0.5">
+                    <div className="font-serif text-[18px] font-bold text-[#7A1975] leading-[1.15] uppercase break-words" style={{ letterSpacing: '0.01px' }}>
                         {firstName}
-                    </span>
-                    <span className="font-serif text-[20px] font-bold text-[#7A1975] leading-[1.2] uppercase mt-0.5">
+                    </div>
+                    <div className="font-serif text-[18px] font-bold text-[#7A1975] leading-[1.15] uppercase break-words" style={{ letterSpacing: '0.01px' }}>
                         {lastName}
-                    </span>
+                    </div>
                 </div>
 
                 {/* ID Number */}
-                <div className="text-[9px] font-black text-[#7A1975] uppercase tracking-wider mt-0.5 leading-normal">
+                <div className="text-[9px] font-black text-[#7A1975] uppercase mt-0.5 leading-normal" style={{ letterSpacing: '0.01px' }}>
                     ID NO: {student.admission_number}
                 </div>
 
@@ -457,29 +460,29 @@ function IDCardFront({ student, companySettings }: any) {
             {/* Center-Right Column (Student Image at top, Faculty Details at bottom) */}
             <div className="absolute left-[165px] top-0 bottom-0 w-[130px] flex flex-col">
                 {/* Student Photo */}
-                <div className="w-full h-[148px] bg-gray-50 overflow-hidden border-b border-gray-200">
+                <div className="w-full h-[148px] bg-gray-55 overflow-hidden border-b border-gray-200">
                     {student.profile_image ? (
                         <img src={student.profile_image} className="w-full h-full object-cover" />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-100">
+                        <div className="w-full h-full flex items-center justify-center text-gray-305 bg-gray-100">
                             <User size={48} />
                         </div>
                     )}
                 </div>
 
                 {/* Details Section (FACULTY, COURSE, VALIDITY) */}
-                <div className="flex-1 bg-white px-1 py-1.5 flex flex-col justify-center text-[6px] leading-[1.25] text-indigo-950 font-sans">
+                <div className="flex-1 bg-white px-1 py-1.5 flex flex-col justify-center text-[6px] leading-[1.3] text-indigo-950 font-sans">
                     <div className="flex gap-1">
-                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase">FACULTY:</span>
-                        <span className="font-extrabold text-indigo-950">{student.school || "School of Business"}</span>
+                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase" style={{ letterSpacing: '0.01px' }}>FACULTY:</span>
+                        <span className="font-extrabold text-indigo-950 break-words" style={{ letterSpacing: '0.01px' }}>{student.school || "School of Business"}</span>
                     </div>
                     <div className="flex gap-1 mt-0.5">
-                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase">COURSE:</span>
-                        <span className="font-extrabold text-indigo-950">{student.program || "DBM/May 2026"}</span>
+                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase" style={{ letterSpacing: '0.01px' }}>COURSE:</span>
+                        <span className="font-extrabold text-indigo-950 break-words" style={{ letterSpacing: '0.01px' }}>{student.program || "DBM/May 2026"}</span>
                     </div>
                     <div className="flex gap-1 mt-0.5">
-                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase">VALIDITY:</span>
-                        <span className="font-extrabold text-indigo-950">
+                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase" style={{ letterSpacing: '0.01px' }}>VALIDITY:</span>
+                        <span className="font-extrabold text-indigo-950 break-words" style={{ letterSpacing: '0.01px' }}>
                             {student.expiry_date ? new Date(student.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
                         </span>
                     </div>
@@ -488,7 +491,7 @@ function IDCardFront({ student, companySettings }: any) {
 
             {/* Right-most Column (Vertical STUDENT bar) */}
             <div className="absolute right-0 top-0 bottom-0 w-[45px] bg-[#7A1975] flex items-center justify-center select-none">
-                <span className="text-white text-[20px] font-black tracking-[0.25em] uppercase absolute transform -rotate-90 whitespace-nowrap">
+                <span className="text-white text-[20px] font-black uppercase absolute transform -rotate-90 whitespace-nowrap" style={{ letterSpacing: '0.25em' }}>
                     STUDENT
                 </span>
             </div>
@@ -500,14 +503,14 @@ function IDCardBack({ student, companySettings }: any) {
     return (
         <div 
             id={`id-card-back-${student.id}`}
-            className="w-[340px] h-[216px] bg-white border border-black shadow-xl relative overflow-hidden flex flex-col items-center justify-between py-5"
-            style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif" }}
+            className="w-[340px] h-[216px] bg-white border border-black rounded-[16px] shadow-xl relative overflow-hidden flex flex-col items-center justify-between py-5"
+            style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif", letterSpacing: '0.01px' }}
         >
             <div className="absolute top-0 left-0 w-full h-1.5 bg-[#7A1975]"></div>
             
             <div className="text-center px-4 mt-2">
-                <h4 className="text-[11px] font-black text-gray-800 uppercase tracking-[0.15em] mb-0.5">Security & Access Control</h4>
-                <p className="text-[7px] text-gray-400 font-bold uppercase tracking-wider">Verification Required for Campus Entry</p>
+                <h4 className="text-[11px] font-black text-gray-800 uppercase mb-0.5" style={{ letterSpacing: '0.15em' }}>Security & Access Control</h4>
+                <p className="text-[7px] text-gray-400 font-bold uppercase" style={{ letterSpacing: '0.01px' }}>Verification Required for Campus Entry</p>
             </div>
 
             <div className="p-1 bg-white border border-gray-150 shadow-sm rounded-sm">
@@ -519,8 +522,8 @@ function IDCardBack({ student, companySettings }: any) {
             </div>
 
             <div className="text-center px-6 mb-2">
-                <p className="text-[11px] font-black text-[#7A1975] tracking-[0.1em]">{student.admission_number}</p>
-                <p className="text-[6px] text-gray-400 mt-1.5 font-bold uppercase leading-tight px-2">
+                <p className="text-[11px] font-black text-[#7A1975]" style={{ letterSpacing: '0.1em' }}>{student.admission_number}</p>
+                <p className="text-[6px] text-gray-400 mt-1.5 font-bold uppercase leading-tight px-2" style={{ letterSpacing: '0.01px' }}>
                     This card is the property of {companySettings.company_name || "the university"}. If found, please return it to the University Security Office.
                 </p>
             </div>

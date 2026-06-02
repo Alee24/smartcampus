@@ -26,6 +26,7 @@ export default {
             },
             fontFamily: {
                 sans: ['Inter', 'sans-serif'],
+                serif: ['Lora', 'Georgia', 'ui-serif', 'serif'],
             }
         },
     },

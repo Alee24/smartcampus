@@ -234,6 +234,7 @@ export default function StudentVerification() {
                 showNotification('Error: Printable elements not found', 'error')
                 return
             }
+            await document.fonts.ready;
             const canvasFront = await html2canvas(front, { scale: 3, useCORS: true, backgroundColor: null })
             const canvasBack = await html2canvas(back, { scale: 3, useCORS: true, backgroundColor: null })
             const pdf = new jsPDF('p', 'mm', 'a4')
@@ -681,8 +682,8 @@ export default function StudentVerification() {
                             {/* Printable Front Side */}
                             <div 
                                 id={`printable-front-${result.id}`} 
-                                className="w-[1011px] h-[638px] bg-white border border-black relative overflow-hidden select-none"
-                                style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif" }}
+                                className="w-[1011px] h-[638px] bg-white border border-black rounded-[48px] relative overflow-hidden select-none"
+                                style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif", letterSpacing: '0.01px' }}
                             >
                                 {/* Left Column */}
                                 <div className="absolute left-[45px] top-[45px] bottom-[45px] w-[430px] flex flex-col justify-between">
@@ -696,10 +697,10 @@ export default function StudentVerification() {
                                             </div>
                                         )}
                                         <div className="flex flex-col leading-[1.2] overflow-hidden">
-                                            <span className="text-[26px] font-black text-[#7A1975] uppercase tracking-tight">
+                                            <span className="text-[26px] font-black text-[#7A1975] uppercase" style={{ letterSpacing: '0.01px' }}>
                                                 {companySettings.company_name || "Riara University"}
                                             </span>
-                                            <span className="text-[16px] font-bold text-gray-500 lowercase tracking-wider mt-1">
+                                            <span className="text-[16px] font-bold text-gray-500 lowercase mt-1" style={{ letterSpacing: '0.01px' }}>
                                                 {companySettings.tagline || "nurturing innovators"}
                                             </span>
                                         </div>
@@ -707,16 +708,16 @@ export default function StudentVerification() {
 
                                     {/* Student Name */}
                                     <div className="flex flex-col mt-4">
-                                        <span className="font-serif text-[60px] font-bold text-[#7A1975] leading-[1.2] uppercase">
+                                        <span className="font-serif text-[54px] font-bold text-[#7A1975] leading-[1.15] uppercase" style={{ letterSpacing: '0.01px' }}>
                                             {firstName}
                                         </span>
-                                        <span className="font-serif text-[60px] font-bold text-[#7A1975] leading-[1.2] uppercase mt-2.5">
+                                        <span className="font-serif text-[54px] font-bold text-[#7A1975] leading-[1.15] uppercase mt-2.5" style={{ letterSpacing: '0.01px' }}>
                                             {lastName}
                                         </span>
                                     </div>
 
                                     {/* ID Number */}
-                                    <div className="text-[30px] font-black text-[#7A1975] uppercase tracking-wider mt-2 leading-normal">
+                                    <div className="text-[30px] font-black text-[#7A1975] uppercase mt-2 leading-normal" style={{ letterSpacing: '0.01px' }}>
                                         ID NO: {result.admission_number}
                                     </div>
 
@@ -746,16 +747,16 @@ export default function StudentVerification() {
                                     {/* Details Section */}
                                     <div className="flex-1 bg-white px-3 py-4 flex flex-col justify-center text-[19px] leading-[1.3] text-indigo-950">
                                         <div className="flex gap-3">
-                                            <span className="text-[#7A1975] font-medium min-w-[120px] uppercase">FACULTY:</span>
-                                            <span className="font-extrabold text-indigo-950">{result.school || "School of Business"}</span>
+                                            <span className="text-[#7A1975] font-medium min-w-[120px] uppercase" style={{ letterSpacing: '0.01px' }}>FACULTY:</span>
+                                            <span className="font-extrabold text-indigo-950" style={{ letterSpacing: '0.01px' }}>{result.school || "School of Business"}</span>
                                         </div>
                                         <div className="flex gap-3 mt-2">
-                                            <span className="text-[#7A1975] font-medium min-w-[120px] uppercase">COURSE:</span>
-                                            <span className="font-extrabold text-indigo-950">{result.program || "DBM/May 2026"}</span>
+                                            <span className="text-[#7A1975] font-medium min-w-[120px] uppercase" style={{ letterSpacing: '0.01px' }}>COURSE:</span>
+                                            <span className="font-extrabold text-indigo-950" style={{ letterSpacing: '0.01px' }}>{result.program || "DBM/May 2026"}</span>
                                         </div>
                                         <div className="flex gap-3 mt-2">
-                                            <span className="text-[#7A1975] font-medium min-w-[120px] uppercase">VALIDITY:</span>
-                                            <span className="font-extrabold text-indigo-950">
+                                            <span className="text-[#7A1975] font-medium min-w-[120px] uppercase" style={{ letterSpacing: '0.01px' }}>VALIDITY:</span>
+                                            <span className="font-extrabold text-indigo-950" style={{ letterSpacing: '0.01px' }}>
                                                 {result.expiry_date ? new Date(result.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
                                             </span>
                                         </div>
@@ -764,7 +765,7 @@ export default function StudentVerification() {
 
                                 {/* Right-most Column */}
                                 <div className="absolute right-0 top-0 bottom-0 w-[135px] bg-[#7A1975] flex items-center justify-center select-none">
-                                    <span className="text-white text-[60px] font-black tracking-[0.25em] uppercase absolute transform -rotate-90 whitespace-nowrap">
+                                    <span className="text-white text-[60px] font-black uppercase absolute transform -rotate-90 whitespace-nowrap" style={{ letterSpacing: '0.25em' }}>
                                         STUDENT
                                     </span>
                                 </div>
@@ -773,14 +774,14 @@ export default function StudentVerification() {
                             {/* Printable Back Side */}
                             <div 
                                 id={`printable-back-${result.id}`} 
-                                className="w-[1011px] h-[638px] bg-white border border-black relative overflow-hidden flex flex-col items-center justify-between py-16"
-                                style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif" }}
+                                className="w-[1011px] h-[638px] bg-white border border-black rounded-[48px] relative overflow-hidden flex flex-col items-center justify-between py-16"
+                                style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif", letterSpacing: '0.01px' }}
                             >
                                 <div className="absolute top-0 left-0 w-full h-[18px] bg-[#7A1975]"></div>
                                 
                                 <div className="text-center px-12 mt-4">
-                                    <h4 className="text-[33px] font-black text-gray-800 uppercase tracking-[0.15em] mb-1.5">Security & Access Control</h4>
-                                    <p className="text-[21px] text-gray-400 font-bold uppercase tracking-wider">Verification Required for Campus Entry</p>
+                                    <h4 className="text-[33px] font-black text-gray-800 uppercase mb-1.5" style={{ letterSpacing: '0.15em' }}>Security & Access Control</h4>
+                                    <p className="text-[21px] text-gray-400 font-bold uppercase" style={{ letterSpacing: '0.01px' }}>Verification Required for Campus Entry</p>
                                 </div>
 
                                 <div className="p-3 bg-white border border-gray-150 shadow-sm rounded-sm">
@@ -792,8 +793,8 @@ export default function StudentVerification() {
                                 </div>
 
                                 <div className="text-center px-16 mb-6">
-                                    <p className="text-[33px] font-black text-[#7A1975] tracking-[0.1em]">{result.admission_number}</p>
-                                    <p className="text-[18px] text-gray-400 mt-4 font-bold uppercase leading-relaxed px-6">
+                                    <p className="text-[33px] font-black text-[#7A1975]" style={{ letterSpacing: '0.1em' }}>{result.admission_number}</p>
+                                    <p className="text-[18px] text-gray-400 mt-4 font-bold uppercase leading-relaxed px-6" style={{ letterSpacing: '0.01px' }}>
                                         This card is the property of {companySettings.company_name || "the university"}. If found, please return it to the University Security Office.
                                     </p>
                                 </div>
