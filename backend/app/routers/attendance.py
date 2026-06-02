@@ -967,3 +967,163 @@ async def download_all_attendance_logs(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=all_attendance_scans.csv"}
     )
+
+@router.get("/courses-summary")
+async def get_courses_summary(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all courses with their total sessions count, student registration count, and total attendance records."""
+    from app.models import ClassSession, StudentCourseRegistration, AttendanceRecord
+    
+    courses_result = await session.exec(select(Course))
+    courses = courses_result.all()
+    
+    summary_data = []
+    for course in courses:
+        # Get count of sessions
+        sessions_query = select(func.count(ClassSession.id)).where(ClassSession.course_id == course.id)
+        sessions_count_res = await session.exec(sessions_query)
+        sessions_count = sessions_count_res.first() or 0
+        
+        # Get count of registered students
+        reg_query = select(func.count(StudentCourseRegistration.id)).where(StudentCourseRegistration.course_id == course.id)
+        reg_count_res = await session.exec(reg_query)
+        reg_count = reg_count_res.first() or 0
+        
+        # Get count of all attendance records across all sessions
+        att_query = select(func.count(AttendanceRecord.id)).join(ClassSession).where(ClassSession.course_id == course.id)
+        att_count_res = await session.exec(att_query)
+        att_count = att_count_res.first() or 0
+        
+        summary_data.append({
+            "id": str(course.id),
+            "course_code": course.course_code,
+            "course_name": course.course_name,
+            "sessions_count": sessions_count,
+            "students_registered": reg_count,
+            "total_attendance": att_count
+        })
+        
+    return summary_data
+
+@router.get("/courses/{course_id}/students")
+async def get_course_students_attendance(
+    course_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get list of all students registered or scanned for a specific course with attendance stats."""
+    from app.models import StudentCourseRegistration, ClassSession, AttendanceRecord
+    
+    # 1. Fetch registered students
+    reg_query = (
+        select(User)
+        .join(StudentCourseRegistration, User.id == StudentCourseRegistration.student_id)
+        .where(StudentCourseRegistration.course_id == course_id)
+    )
+    reg_students = (await session.exec(reg_query)).all()
+    
+    # 2. Fetch students who have attendance scans for this course
+    scanned_query = (
+        select(User)
+        .join(AttendanceRecord, User.id == AttendanceRecord.student_id)
+        .join(ClassSession, AttendanceRecord.session_id == ClassSession.id)
+        .where(ClassSession.course_id == course_id)
+    )
+    scanned_students = (await session.exec(scanned_query)).all()
+    
+    # Union the student list by ID
+    all_students_dict = {}
+    for student in reg_students:
+        all_students_dict[student.id] = {
+            "id": str(student.id),
+            "name": student.full_name,
+            "admission_number": student.admission_number,
+            "registered": True,
+            "scans_count": 0,
+            "last_scan": "-"
+        }
+        
+    for student in scanned_students:
+        if student.id not in all_students_dict:
+            all_students_dict[student.id] = {
+                "id": str(student.id),
+                "name": student.full_name,
+                "admission_number": student.admission_number,
+                "registered": False,
+                "scans_count": 0,
+                "last_scan": "-"
+            }
+            
+    # Calculate scan stats for each student
+    for student_id in all_students_dict.keys():
+        att_query = (
+            select(AttendanceRecord)
+            .join(ClassSession, AttendanceRecord.session_id == ClassSession.id)
+            .where(ClassSession.course_id == course_id)
+            .where(AttendanceRecord.student_id == uuid.UUID(student_id))
+            .order_by(AttendanceRecord.scan_time.desc())
+        )
+        att_records_res = await session.exec(att_query)
+        att_records = att_records_res.all()
+        all_students_dict[student_id]["scans_count"] = len(att_records)
+        if att_records:
+            all_students_dict[student_id]["last_scan"] = att_records[0].scan_time.strftime("%Y-%m-%d %H:%M")
+            
+    return list(all_students_dict.values())
+
+@router.get("/courses/{course_id}/download")
+async def download_course_attendance_report(
+    course_id: uuid.UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Download CSV report of all sessions and scans for a specific course."""
+    import csv 
+    import io
+    
+    # Check if course exists
+    course = await session.get(Course, course_id)
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+        
+    # Query all attendance records for this course session
+    query = (
+        select(AttendanceRecord, User, ClassSession, Classroom)
+        .join(User, AttendanceRecord.student_id == User.id)
+        .join(ClassSession, AttendanceRecord.session_id == ClassSession.id)
+        .outerjoin(Classroom, ClassSession.classroom_id == Classroom.id)
+        .where(ClassSession.course_id == course_id)
+        .order_by(ClassSession.session_date.desc(), AttendanceRecord.scan_time.desc())
+    )
+    results = await session.exec(query)
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Admission Number", "Student Name", "Course Code", "Course Name", 
+        "Room Code", "Session Date", "Session Time", "Scan Time", "Status", "Connection Type"
+    ])
+    
+    for record, student, class_session, classroom in results.all():
+        writer.writerow([
+            student.admission_number,
+            student.full_name,
+            course.course_code,
+            course.course_name,
+            classroom.room_code if classroom else (class_session.room_unique_number or "N/A"),
+            class_session.session_date.isoformat(),
+            f"{class_session.start_time.strftime('%H:%M')} - {class_session.end_time.strftime('%H:%M')}",
+            record.scan_time.strftime("%H:%M:%S") if record.scan_time else "-",
+            record.status,
+            record.connection_type or "QR_SCAN_LAN"
+        ])
+        
+    output.seek(0)
+    
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=attendance_{course.course_code}_all.csv"}
+    )
