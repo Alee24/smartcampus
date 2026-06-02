@@ -5,8 +5,10 @@ import {
     MoreVertical, CheckCircle, XCircle, AlertCircle, Camera, Key, LayoutGrid, Users as UsersIcon,
     Ban, Power, Lock, RefreshCw, Calendar
 } from 'lucide-react'
+import { useNotification } from './components/Notification'
 
 export default function Users() {
+    const { showConfirm, showNotification } = useNotification()
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
     const [users, setUsers] = useState<any[]>([])
     const [filteredUsers, setFilteredUsers] = useState<any[]>([])
@@ -106,7 +108,13 @@ export default function Users() {
     }
 
     const handleQuickStatusUpdate = async (user: any, newStatus: string) => {
-        if (!confirm(`Are you sure you want to change status to ${newStatus}?`)) return
+        const confirmed = await showConfirm({
+            title: "Update User Status",
+            message: `Are you sure you want to change the status of ${user.full_name || 'this user'} to ${newStatus}?`,
+            confirmText: "Change Status",
+            cancelText: "Cancel"
+        })
+        if (!confirmed) return
         try {
             const token = localStorage.getItem('token')
             const res = await fetch(`/api/users/${user.id}`, {
@@ -116,10 +124,14 @@ export default function Users() {
             })
             if (res.ok) {
                 fetchUsers() // Refresh
+                showNotification(`Status updated to ${newStatus}`, 'success')
             } else {
-                alert('Failed to update status')
+                showNotification('Failed to update status', 'error')
             }
-        } catch (e) { console.error(e) }
+        } catch (e) {
+            console.error(e)
+            showNotification('Error updating status', 'error')
+        }
     }
 
     const handleQuickPasswordReset = async (user: any) => {
@@ -134,14 +146,14 @@ export default function Users() {
                 body: JSON.stringify({ new_password: newPassword })
             })
             if (res.ok) {
-                alert('Password reset successfully')
+                showNotification('Password reset successfully', 'success')
             } else {
                 const data = await res.json().catch(() => ({}))
-                alert(`Failed to reset password: ${data.detail || 'Unknown error'}`)
+                showNotification(`Failed to reset password: ${data.detail || 'Unknown error'}`, 'error')
             }
         } catch (e) {
             console.error(e)
-            alert('Failed to reset password: Network error')
+            showNotification('Failed to reset password: Network error', 'error')
         }
     }
 
@@ -575,6 +587,7 @@ export default function Users() {
 
 // Side Panel Component
 function UserDetailPanel({ user, onClose, onRefresh }: any) {
+    const { showConfirm, showNotification } = useNotification()
     const [isEditing, setIsEditing] = useState(false)
     const [editForm, setEditForm] = useState(user)
 
@@ -601,21 +614,28 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
             })
 
             if (res.ok) {
-                // alert('User updated successfully!')
+                showNotification('User updated successfully!', 'success')
                 setIsEditing(false)
                 onRefresh()
             } else {
                 const data = await res.json()
-                alert(`Failed to update user: ${data.detail || res.statusText}`)
+                showNotification(`Failed to update user: ${data.detail || res.statusText}`, 'error')
             }
         } catch (e) {
             console.error(e)
-            alert('Error updating user: Network or Server Error')
+            showNotification('Error updating user: Network or Server Error', 'error')
         }
     }
 
     const handleDelete = async () => {
-        if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return
+        const confirmed = await showConfirm({
+            title: "Delete User",
+            message: `Are you sure you want to delete ${user.full_name || 'this user'}? This action cannot be undone.`,
+            confirmText: "Delete User",
+            cancelText: "Cancel",
+            isDanger: true
+        })
+        if (!confirmed) return
 
         try {
             const token = localStorage.getItem('token')
@@ -625,14 +645,15 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
             })
 
             if (res.ok) {
+                showNotification('User deleted successfully', 'success')
                 onRefresh()
                 onClose()
             } else {
-                alert('Failed to delete user')
+                showNotification('Failed to delete user', 'error')
             }
         } catch (e) {
             console.error(e)
-            alert('Error deleting user')
+            showNotification('Error deleting user', 'error')
         }
     }
 
@@ -651,20 +672,26 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
             })
 
             if (res.ok) {
-                alert(`Password reset to: ${passwordToSet}`)
+                showNotification(`Password reset to: ${passwordToSet}`, 'success')
             } else {
                 const data = await res.json().catch(() => ({}))
-                alert(`Failed to reset password: ${data.detail || 'Unknown error'}`)
+                showNotification(`Failed to reset password: ${data.detail || 'Unknown error'}`, 'error')
             }
         } catch (e) {
             console.error(e)
-            alert('Failed to reset password: Network error')
+            showNotification('Failed to reset password: Network error', 'error')
         }
     }
 
     const handleStatusToggle = async () => {
         const newStatus = user.status === 'active' ? 'suspended' : 'active'
-        if (!confirm(`Change status to ${newStatus}?`)) return
+        const confirmed = await showConfirm({
+            title: "Toggle User Status",
+            message: `Are you sure you want to change status to ${newStatus}?`,
+            confirmText: "Change Status",
+            cancelText: "Cancel"
+        })
+        if (!confirmed) return
 
         try {
             const token = localStorage.getItem('token')
@@ -674,10 +701,16 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                 body: JSON.stringify({ status: newStatus })
             })
             if (res.ok) {
+                showNotification(`Status changed to ${newStatus}`, 'success')
                 onRefresh()
                 onClose()
+            } else {
+                showNotification('Failed to update status', 'error')
             }
-        } catch (e) { console.error(e) }
+        } catch (e) {
+            console.error(e)
+            showNotification('Error changing status', 'error')
+        }
     }
 
     // Modern "Slide-over" with NO dark backdrop

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Car, AlertTriangle, RefreshCw, Search, ArrowDownCircle, ArrowUpCircle, Clock, LogIn, LogOut, MoreHorizontal, CheckCircle } from 'lucide-react'
+import { useNotification } from './components/Notification'
 
 export default function VehicleIntel() {
+    const { showConfirm } = useNotification()
     const [vehicles, setVehicles] = useState<any[]>([]) // Registered Vehicles
     const [logs, setLogs] = useState<any[]>([])         // Activity Logs
     const [loading, setLoading] = useState(true)
@@ -39,7 +41,8 @@ export default function VehicleIntel() {
         const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
 
         if (action === 'entry') {
-            if (!confirm(`Mark ${vehicle.plate_number} as Entered?`)) return
+            const confirmed = await showConfirm(`Mark ${vehicle.plate_number} as Entered?`)
+            if (!confirmed) return
             try {
                 await fetch('/api/gate/manual-vehicle-entry', {
                     method: 'POST',
@@ -55,7 +58,8 @@ export default function VehicleIntel() {
                 fetchData() // Refresh immediately
             } catch (e) { alert("Network Error") }
         } else {
-            if (!confirm(`Mark ${vehicle.plate_number} as Exited?`)) return
+            const confirmed = await showConfirm(`Mark ${vehicle.plate_number} as Exited?`)
+            if (!confirmed) return
             try {
                 await fetch('/api/gate/vehicle-exit', {
                     method: 'POST',

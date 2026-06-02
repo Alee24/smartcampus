@@ -5,8 +5,10 @@ import {
     Building2, CalendarDays, Loader2, ArrowRight, Image, Trash2
 } from 'lucide-react'
 import ThreeDProgressBar from './ThreeDProgressBar'
+import { useNotification } from './components/Notification'
 
 export default function BulkUpload() {
+    const { showConfirm, showNotification } = useNotification()
     const [loading, setLoading] = useState(false)
     const [messages, setMessages] = useState<{ type: string, text: string }[]>([])
     const [currentStep, setCurrentStep] = useState(0)
@@ -446,12 +448,18 @@ export default function BulkUpload() {
     }
 
     const handleFactoryReset = async () => {
-        const confirm1 = window.confirm("DANGER: This will delete ALL users, their gate pass logs, attendance records, and vehicles from the system (except SuperAdmins). This action CANNOT be undone.\n\nAre you absolutely sure you want to proceed?")
+        const confirm1 = await showConfirm({
+            title: "Factory Reset Database",
+            message: "DANGER: This will delete ALL users, their gate pass logs, attendance records, and vehicles from the system (except SuperAdmins). This action CANNOT be undone.\n\nAre you absolutely sure you want to proceed?",
+            confirmText: "Yes, Reset Everything",
+            cancelText: "Cancel",
+            isDanger: true
+        })
         if (!confirm1) return
         
         const confirm2 = window.prompt("To confirm, type 'RESET' in the box below:")
         if (confirm2 !== 'RESET') {
-            alert("Reset cancelled.")
+            showNotification("Reset cancelled.", "info")
             return
         }
         
@@ -465,14 +473,14 @@ export default function BulkUpload() {
             
             const data = await res.json()
             if (res.ok) {
-                alert("Success: " + data.message)
+                showNotification("Success: " + data.message, "success")
                 fetchStats()
             } else {
-                alert("Factory reset failed: " + (data.detail || data.message))
+                showNotification("Factory reset failed: " + (data.detail || data.message), "error")
             }
         } catch (e) {
             console.error(e)
-            alert("Network error during factory reset.")
+            showNotification("Network error during factory reset.", "error")
         } finally {
             setLoading(false)
         }

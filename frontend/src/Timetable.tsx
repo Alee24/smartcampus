@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Calendar, Clock, MapPin, Users, Book, CheckCircle, Search } from 'lucide-react'
+import { useNotification } from './components/Notification'
 
 export default function Timetable() {
+    const { showConfirm, showNotification } = useNotification()
     const userRole = localStorage.getItem('userRole') || ''
     const [activeTab, setActiveTab] = useState('timetable')
     const [classrooms, setClassrooms] = useState<any[]>([])
@@ -218,12 +220,14 @@ export default function Timetable() {
             if (res.ok) {
                 setShowSlotModal(false)
                 fetchTimetable()
+                showNotification('Timetable slot created successfully!', 'success')
             } else {
                 const error = await res.json()
-                alert(error.detail || 'Failed to create timetable slot')
+                showNotification(error.detail || 'Failed to create timetable slot', 'error')
             }
         } catch (err) {
             console.error(err)
+            showNotification('Error creating timetable slot', 'error')
         }
     }
 
@@ -256,22 +260,29 @@ export default function Timetable() {
             })
 
             if (res.ok) {
-                alert('✓ Class allocation updated successfully!')
+                showNotification('Class allocation updated successfully!', 'success')
                 setEditingSlot(null)
                 setSelectedSlot(null)
                 fetchTimetable()
             } else {
                 const error = await res.json()
-                alert(error.detail || 'Failed to update slot')
+                showNotification(error.detail || 'Failed to update slot', 'error')
             }
         } catch (err) {
             console.error(err)
-            alert('Error updating slot')
+            showNotification('Error updating slot', 'error')
         }
     }
 
     const handleDeleteSlot = async (slotId: string) => {
-        if (!confirm('Are you sure you want to delete this class allocation?')) return
+        const confirmed = await showConfirm({
+            title: "Delete Class Allocation",
+            message: "Are you sure you want to delete this class allocation?",
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            isDanger: true
+        })
+        if (!confirmed) return
 
         try {
             const token = localStorage.getItem('token')
@@ -281,18 +292,18 @@ export default function Timetable() {
             })
 
             if (res.ok) {
-                alert('✓ Class allocation deleted successfully!')
+                showNotification('Class allocation deleted successfully!', 'success')
                 setEditingSlot(null)
                 setSelectedSlot(null)
                 setSelectedDay(null)
                 fetchTimetable()
             } else {
                 const error = await res.json()
-                alert(error.detail || 'Failed to delete slot')
+                showNotification(error.detail || 'Failed to delete slot', 'error')
             }
         } catch (err) {
             console.error(err)
-            alert('Error deleting slot')
+            showNotification('Error deleting slot', 'error')
         }
     }
 

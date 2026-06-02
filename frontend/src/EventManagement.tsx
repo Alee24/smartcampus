@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Calendar, Users, MapPin, QrCode, Download, X, Search, FileText, Upload, Mail, Send, Check, Loader, Trash2, Eye } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
+import { useNotification } from './components/Notification'
 
 export default function EventManagement() {
+    const { showConfirm, showNotification } = useNotification()
     const role = localStorage.getItem('userRole')
     const isAdmin = role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin'
     const [events, setEvents] = useState<any[]>([])
@@ -72,12 +74,13 @@ export default function EventManagement() {
             if (res.ok) {
                 setShowModal(false)
                 fetchEvents()
-                alert("Event Created Successfully!")
+                showNotification("Event Created Successfully!", "success")
             } else {
-                alert("Failed to create event")
+                showNotification("Failed to create event", "error")
             }
         } catch (error) {
             console.error(error)
+            showNotification("Error creating event", "error")
         }
     }
 
@@ -141,14 +144,14 @@ export default function EventManagement() {
 
             if (res.ok) {
                 const data = await res.json()
-                alert(data.message)
+                showNotification(data.message, "success")
                 fetchVisitors(selectedEvent.id)
             } else {
                 const err = await res.json()
-                alert("Upload failed: " + (err.detail || "Unknown error"))
+                showNotification("Upload failed: " + (err.detail || "Unknown error"), "error")
             }
-        } catch (e) {
-            alert("Error uploading file: " + e)
+        } catch (err: any) {
+            showNotification("Error uploading file: " + err, "error")
         } finally {
             setUploading(false)
             // Reset input
@@ -157,19 +160,37 @@ export default function EventManagement() {
     }
 
     const handleGeneratePasses = async () => {
-        if (!confirm("Generate passes for all registered guests?")) return
+        const confirmed = await showConfirm({
+            title: "Generate Passes",
+            message: "Generate passes for all registered guests?",
+            confirmText: "Generate",
+            cancelText: "Cancel"
+        })
+        if (!confirmed) return
         try {
             const token = localStorage.getItem('token')
             const res = await fetch(`/api/events/${selectedEvent.id}/visitors/generate-passes`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             })
-            if (res.ok) alert("Passes generated successfully!")
-        } catch (e) { alert("Error generating passes") }
+            if (res.ok) {
+                showNotification("Passes generated successfully!", "success")
+            } else {
+                showNotification("Failed to generate passes", "error")
+            }
+        } catch (e) {
+            showNotification("Error generating passes", "error")
+        }
     }
 
     const handleSendEmails = async () => {
-        if (!confirm("Send emails to all guests with registered email addresses?")) return
+        const confirmed = await showConfirm({
+            title: "Send Passes via Email",
+            message: "Send emails to all guests with registered email addresses?",
+            confirmText: "Send Emails",
+            cancelText: "Cancel"
+        })
+        if (!confirmed) return
         setSending(true)
         try {
             const token = localStorage.getItem('token')
@@ -179,10 +200,15 @@ export default function EventManagement() {
             })
             if (res.ok) {
                 const data = await res.json()
-                alert(data.message)
+                showNotification(data.message, "success")
+            } else {
+                showNotification("Failed to send emails", "error")
             }
-        } catch (e) { alert("Error sending emails") }
-        finally { setSending(false) }
+        } catch (e) {
+            showNotification("Error sending emails", "error")
+        } finally {
+            setSending(false)
+        }
     }
 
     const openVisitorModal = (event: any) => {

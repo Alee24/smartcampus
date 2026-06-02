@@ -4,6 +4,7 @@ import {
     QrCode, Database, Settings, Server, Briefcase, ShieldCheck,
     MonitorPlay, Save, RefreshCw, CheckSquare, Square, Eye, EyeOff
 } from 'lucide-react'
+import { useNotification } from './components/Notification'
 
 interface MenuConfig {
     [role: string]: {
@@ -40,6 +41,7 @@ const ROLES = [
 ]
 
 export default function DashboardCustomizer() {
+    const { showConfirm, showNotification } = useNotification()
     const [config, setConfig] = useState<MenuConfig>({})
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -182,20 +184,26 @@ export default function DashboardCustomizer() {
             })
 
             if (res.ok) {
-                alert('✓ Dashboard configuration saved successfully!')
+                showNotification('Dashboard configuration saved successfully!', 'success')
             } else {
-                alert('Failed to save configuration')
+                showNotification('Failed to save configuration', 'error')
             }
         } catch (e) {
             console.error(e)
-            alert('Error saving configuration')
+            showNotification('Error saving configuration', 'error')
         } finally {
             setSaving(false)
         }
     }
 
-    const resetToDefaults = () => {
-        if (confirm('Reset all roles to default configuration?')) {
+    const resetToDefaults = async () => {
+        const confirmed = await showConfirm({
+            title: "Reset Dashboard Config",
+            message: "Are you sure you want to reset all roles to the default dashboard configuration?",
+            confirmText: "Reset Defaults",
+            cancelText: "Keep Current"
+        })
+        if (confirmed) {
             setConfig(getDefaultConfig())
         }
     }

@@ -12,7 +12,7 @@ interface GeofenceSetting {
 }
 
 export default function Geofencing() {
-    const { showNotification } = useNotification()
+    const { showNotification, showConfirm } = useNotification()
     const [settings, setSettings] = useState<GeofenceSetting[]>([])
     const [isEnabled, setIsEnabled] = useState(false)
     const [loading, setLoading] = useState(true)
@@ -113,7 +113,14 @@ export default function Geofencing() {
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this geofence rule?')) return
+        const confirmed = await showConfirm({
+            title: "Delete Geofence Rule",
+            message: "Are you sure you want to delete this geofence rule?",
+            confirmText: "Delete Rule",
+            cancelText: "Cancel",
+            isDanger: true
+        })
+        if (!confirmed) return
         try {
             const token = localStorage.getItem('token')
             const res = await fetch(`/api/admin/geofence/${id}`, {

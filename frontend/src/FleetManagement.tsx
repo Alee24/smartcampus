@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Car, MapPin, Navigation, Fuel, Wrench, AlertTriangle, Users, Plus, Search, Filter, ChevronRight, Activity, Calendar, Clock, Shield, Download, FileText, Settings, Map as MapIcon, TrendingUp, DollarSign, X, Check, Loader2, RefreshCw, Trash2, Edit, Phone, QrCode, FileSpreadsheet, Printer, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { useNotification } from './components/Notification';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
     ResponsiveContainer, AreaChart, Area, Cell
@@ -1839,6 +1840,7 @@ interface VehiclesManagerProps {
 }
 
 function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehicle }: VehiclesManagerProps) {
+    const { showConfirm, showNotification } = useNotification();
     const role = localStorage.getItem('userRole');
     const isAdmin = role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin';
     const [searchTerm, setSearchTerm] = useState('');
@@ -1853,7 +1855,14 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
     }, [searchTerm, statusFilter]);
 
     const handleDeleteVehicle = async (vehicleId: string, plateNumber: string) => {
-        if (!confirm(`Are you absolutely sure you want to delete vehicle ${plateNumber}? This will permanently remove all associated trips, fuel logs, and maintenance logs.`)) {
+        const confirmed = await showConfirm({
+            title: "Delete Vehicle",
+            message: `Are you absolutely sure you want to delete vehicle ${plateNumber}? This will permanently remove all associated trips, fuel logs, and maintenance logs.`,
+            confirmText: "Delete Vehicle",
+            cancelText: "Cancel",
+            isDanger: true
+        });
+        if (!confirmed) {
             return;
         }
         setDeletingId(vehicleId);
@@ -1864,14 +1873,14 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
-                alert(`✅ Vehicle ${plateNumber} successfully deleted.`);
+                showNotification(`Vehicle ${plateNumber} successfully deleted.`, 'success');
                 onUpdate();
             } else {
                 const err = await res.json();
-                alert(`❌ Error deleting vehicle: ${err.detail || 'Failed'}`);
+                showNotification(`Error deleting vehicle: ${err.detail || 'Failed'}`, 'error');
             }
         } catch (e: any) {
-            alert(`❌ Network error: ${e.message}`);
+            showNotification(`Network error: ${e.message}`, 'error');
         } finally {
             setDeletingId(null);
         }
@@ -1880,7 +1889,13 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
     const handleToggleStatus = async (vehicle: any) => {
         const action = vehicle.is_checked_in ? 'checkout' : 'checkin';
         const actionLabel = vehicle.is_checked_in ? 'Check Out' : 'Check In';
-        if (!confirm(`Do you want to manually ${actionLabel} vehicle ${vehicle.plate_number}?`)) {
+        const confirmed = await showConfirm({
+            title: `Confirm ${actionLabel}`,
+            message: `Do you want to manually ${actionLabel.toLowerCase()} vehicle ${vehicle.plate_number}?`,
+            confirmText: actionLabel,
+            cancelText: "Cancel"
+        });
+        if (!confirmed) {
             return;
         }
         setStatusUpdatingId(vehicle.id);
@@ -1895,14 +1910,14 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
                 body: JSON.stringify({ passengers: 1 })
             });
             if (res.ok) {
-                alert(`✅ Vehicle ${vehicle.plate_number} has been ${vehicle.is_checked_in ? 'checked out' : 'checked in'} successfully.`);
+                showNotification(`Vehicle ${vehicle.plate_number} has been ${vehicle.is_checked_in ? 'checked out' : 'checked in'} successfully.`, 'success');
                 onUpdate();
             } else {
                 const err = await res.json();
-                alert(`❌ Error updating status: ${err.detail || 'Failed'}`);
+                showNotification(`Error updating status: ${err.detail || 'Failed'}`, 'error');
             }
         } catch (e: any) {
-            alert(`❌ Network error: ${e.message}`);
+            showNotification(`Network error: ${e.message}`, 'error');
         } finally {
             setStatusUpdatingId(null);
         }

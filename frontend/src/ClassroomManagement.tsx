@@ -6,6 +6,7 @@ import {
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { QRCodeCanvas } from 'qrcode.react';
+import { useNotification } from './components/Notification'
 
 interface Classroom {
     id: string
@@ -35,6 +36,7 @@ interface PrintableRoom {
 }
 
 export default function ClassroomManagement() {
+    const { showConfirm, showNotification, showAlert } = useNotification()
     const userRole = localStorage.getItem('userRole') || ''
     const [classrooms, setClassrooms] = useState<Classroom[]>([])
     const [printableRooms, setPrintableRooms] = useState<PrintableRoom[]>([])
@@ -117,23 +119,30 @@ export default function ClassroomManagement() {
 
             if (res.ok) {
                 const data = await res.json()
-                alert(`✓ Generated ${data.generated} QR codes successfully!`)
+                showNotification(`Generated ${data.generated} QR codes successfully!`, 'success')
                 fetchClassrooms() // Refresh UI
                 fetchPrintableData() // Refresh printable data
             } else {
                 const error = await res.json()
-                alert(`Failed: ${error.detail || 'Unknown error'}`)
+                showNotification(`Failed: ${error.detail || 'Unknown error'}`, 'error')
             }
         } catch (e) {
             console.error(e)
-            alert('Error generating QR codes')
+            showNotification('Error generating QR codes', 'error')
         } finally {
             setGenerating(false)
         }
     }
 
     const deactivateAll = async () => {
-        if (!confirm("⚠️ Are you sure you want to DEACTIVATE all classrooms?\n\nThis will remove existing QR codes and prevent students from scanning attendance until you Activate again.")) return
+        const confirmed = await showConfirm({
+            title: "Deactivate System QR Codes",
+            message: "⚠️ Are you sure you want to DEACTIVATE all classrooms?\n\nThis will remove existing QR codes and prevent students from scanning attendance until you Activate again.",
+            confirmText: "Yes, Deactivate",
+            cancelText: "Cancel",
+            isDanger: true
+        })
+        if (!confirmed) return
 
         try {
             const token = localStorage.getItem('token')
@@ -146,14 +155,14 @@ export default function ClassroomManagement() {
 
             if (res.ok) {
                 const data = await res.json()
-                alert(`✓ System Deactivated: QR codes removed from ${data.deactivated} classrooms.`)
+                showNotification(`System Deactivated: QR codes removed from ${data.deactivated} classrooms.`, 'success')
                 fetchClassrooms()
             } else {
-                alert("Failed to deactivate system")
+                showNotification("Failed to deactivate system", 'error')
             }
         } catch (e) {
             console.error(e)
-            alert("Error deactivating system")
+            showNotification("Error deactivating system", 'error')
         }
     }
 
@@ -175,7 +184,7 @@ export default function ClassroomManagement() {
     // --- PDF Poster Generator (Matches LiveClasses.tsx) ---
     const generatePosters = async (targets: PrintableRoom[]) => {
         if (targets.length === 0) {
-            alert("No data available to print. Please regenerate QR codes first.")
+            showNotification("No data available to print. Please regenerate QR codes first.", "warning")
             return
         }
 
@@ -351,7 +360,7 @@ export default function ClassroomManagement() {
 
         } catch (error: any) {
             console.error('Error generating posters:', error);
-            alert(`Failed: ${error.message}`);
+            showNotification(`Failed: ${error.message}`, "error");
         } finally {
             setDownloading(false);
         }
@@ -363,7 +372,7 @@ export default function ClassroomManagement() {
             generatePosters([target]);
         } else {
             // Fallback if not found in printable list (should rarely happen if synced)
-            alert("Poster data not ready yet. Please try generating all QRs first.");
+            showNotification("Poster data not ready yet. Please try generating all QRs first.", "warning");
         }
     }
 
@@ -397,16 +406,16 @@ export default function ClassroomManagement() {
             })
 
             if (res.ok) {
-                alert('✓ Room updated successfully!')
+                showNotification('Room updated successfully!', 'success')
                 setShowEditModal(false)
                 setEditingRoom(null)
                 fetchClassrooms()
             } else {
-                alert('Failed to update room')
+                showNotification('Failed to update room', 'error')
             }
         } catch (e) {
             console.error(e)
-            alert('Error updating room')
+            showNotification('Error updating room', 'error')
         }
     }
 

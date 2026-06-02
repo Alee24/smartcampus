@@ -3,8 +3,10 @@ import {
     Search, Plus, Filter, Download, User, Clock,
     CheckCircle, XCircle, LogOut, Phone, CreditCard, Building, MapPin
 } from 'lucide-react'
+import { useNotification } from './components/Notification'
 
 export default function VisitorManagement() {
+    const { showConfirm } = useNotification()
     const [visitors, setVisitors] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
@@ -81,7 +83,8 @@ export default function VisitorManagement() {
     }
 
     const handleCheckOut = async (visitorId: string) => {
-        if (!confirm("Confirm check out for this visitor?")) return
+        const confirmed = await showConfirm("Confirm check out for this visitor?")
+        if (!confirmed) return
 
         try {
             const token = localStorage.getItem('token')

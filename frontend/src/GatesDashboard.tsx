@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Car, Users, Truck, MapPin, Activity, ArrowUpRight, Plus, Trash2, QrCode, X, Printer, Edit, ExternalLink } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
+import { useNotification } from './components/Notification'
 
 export default function GatesDashboard() {
+    const { showConfirm, showNotification } = useNotification()
     const [activeTab, setActiveTab] = useState<'overview' | 'manage'>('overview')
     const [gates, setGates] = useState<any[]>([])
     const [stats, setStats] = useState<any[]>([])
@@ -63,23 +65,38 @@ export default function GatesDashboard() {
                 setShowAddModal(false)
                 setNewGate({ name: '', location: '' })
                 fetchGates()
+                showNotification("Gate created successfully!", "success")
+            } else {
+                showNotification("Failed to create gate", "error")
             }
         } catch (e) {
-            alert("Failed to create gate")
+            showNotification("Failed to create gate", "error")
         }
     }
 
     const handleDeleteGate = async (id: string) => {
-        if (!confirm("Are you sure? This will delete all logs associated with this gate.")) return
+        const confirmed = await showConfirm({
+            title: "Delete Gate",
+            message: "Are you sure? This will delete all logs associated with this gate.",
+            confirmText: "Delete",
+            cancelText: "Cancel",
+            isDanger: true
+        })
+        if (!confirmed) return
         try {
             const token = localStorage.getItem('token')
-            await fetch(`/api/gate/manage/gates/${id}`, {
+            const res = await fetch(`/api/gate/manage/gates/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             })
-            fetchGates()
+            if (res.ok) {
+                showNotification("Gate deleted successfully!", "success")
+                fetchGates()
+            } else {
+                showNotification("Delete failed", "error")
+            }
         } catch (e) {
-            alert("Delete failed")
+            showNotification("Delete failed", "error")
         }
     }
 
