@@ -550,7 +550,7 @@ export default function StudentVerification() {
                                     </div>
                                 );
                             })()}
-                        </div>>
+                        </div>
                     </div>
                 )}
 
