@@ -404,85 +404,97 @@ function IDCardFront({ student, companySettings }: any) {
     const nameParts = student.full_name ? student.full_name.trim().split(/\s+/) : [];
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || "";
+    const statusText = student.status || 'ACTIVE';
+    const isActive = statusText.toUpperCase() === 'ACTIVE';
 
     return (
         <div 
             id={`id-card-front-${student.id}`}
-            className="w-[340px] h-[216px] bg-white border border-black rounded-[16px] relative overflow-hidden select-none"
-            style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif", letterSpacing: '0.01px' }}
+            className="w-[340px] h-[216px] bg-white border border-gray-200 rounded-[16px] relative overflow-hidden select-none shadow-sm"
+            style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
         >
             {/* Left Column (Logo, Name, ID No, QR Code) */}
-            <div className="absolute left-[15px] top-[15px] bottom-[15px] w-[145px] flex flex-col justify-between">
+            <div className="absolute left-[15px] top-[14px] bottom-[14px] w-[145px] flex flex-col justify-between">
                 {/* Logo & School Name */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-2">
                     {companySettings.logo_url ? (
                         <img src={companySettings.logo_url} className="h-9 w-auto object-contain" />
                     ) : (
-                        <div className="w-8 h-8 rounded-full bg-purple-105 flex items-center justify-center text-[#7A1975] font-black text-xs shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-[#7A1975] font-black text-xs shrink-0 border border-purple-100">
                             RU
                         </div>
                     )}
-                    <div className="flex flex-col leading-[1.2]">
-                        <div className="text-[9px] font-black text-[#7A1975] uppercase leading-[1.1]" style={{ letterSpacing: '0.01px' }}>
+                    <div className="flex flex-col leading-[1.1]">
+                        <div className="text-[10px] font-bold text-[#7A1975] uppercase tracking-wide leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>
                             {companySettings.company_name || "Riara University"}
                         </div>
-                        <div className="text-[5px] font-bold text-gray-500 lowercase mt-0.5 leading-none" style={{ letterSpacing: '0.01px' }}>
+                        <div className="text-[5.5px] font-bold text-gray-400 uppercase tracking-widest mt-1 leading-none">
                             {companySettings.tagline || "nurturing innovators"}
                         </div>
                     </div>
                 </div>
 
                 {/* Student Name */}
-                <div className="flex flex-col mt-1 space-y-0.5">
-                    <div className="font-serif text-[18px] font-bold text-[#7A1975] leading-[1.15] uppercase break-words" style={{ letterSpacing: '0.01px' }}>
+                <div className="flex flex-col mt-2 space-y-0.5">
+                    <div className="text-[18px] font-bold text-[#7A1975] leading-[1.1] uppercase break-words" style={{ fontFamily: "'Museo', sans-serif" }}>
                         {firstName}
                     </div>
-                    <div className="font-serif text-[18px] font-bold text-[#7A1975] leading-[1.15] uppercase break-words" style={{ letterSpacing: '0.01px' }}>
+                    <div className="text-[18px] font-bold text-[#7A1975] leading-[1.1] uppercase break-words" style={{ fontFamily: "'Museo', sans-serif" }}>
                         {lastName}
                     </div>
                 </div>
 
                 {/* ID Number */}
-                <div className="text-[9px] font-black text-[#7A1975] uppercase mt-0.5 leading-normal" style={{ letterSpacing: '0.01px' }}>
+                <div className="text-[10px] font-bold text-[#7A1975] uppercase mt-1 leading-none tracking-wide" style={{ fontFamily: "'Museo Sans', sans-serif" }}>
                     ID NO: {student.admission_number}
                 </div>
 
-                {/* QR Code */}
-                <div className="mt-1">
-                    <QRCodeSVG 
-                        value={student.admission_number} 
-                        size={55} 
-                        level="H"
-                    />
+                {/* QR Code & Status Pill */}
+                <div className="mt-1 flex items-end gap-2.5">
+                    <div className="p-0.5 bg-white border border-gray-200 rounded-lg shadow-sm shrink-0">
+                        <QRCodeSVG 
+                            value={student.admission_number} 
+                            size={44} 
+                            level="H"
+                        />
+                    </div>
+                    <div className="pb-0.5">
+                        <div className={`px-2 py-0.5 text-[6.5px] font-extrabold uppercase tracking-wider rounded-full flex items-center gap-1 shadow-sm select-none text-white ${
+                            isActive ? 'bg-[#22C55E]' : 'bg-[#EF4444]'
+                        }`}>
+                            <span className="w-1 h-1 bg-white rounded-full animate-pulse shrink-0"></span>
+                            {statusText}
+                        </div>
+                    </div>
                 </div>
             </div>
 
             {/* Center-Right Column (Student Image at top, Faculty Details at bottom) */}
-            <div className="absolute left-[165px] top-0 bottom-0 w-[130px] flex flex-col">
+            <div className="absolute left-[165px] top-0 bottom-0 w-[130px] flex flex-col border-l border-gray-100">
                 {/* Student Photo */}
-                <div className="w-full h-[148px] bg-gray-55 overflow-hidden border-b border-gray-200">
+                <div className="w-full h-[148px] bg-slate-50 overflow-hidden border-b border-gray-150 relative">
                     {student.profile_image ? (
                         <img src={student.profile_image} className="w-full h-full object-cover" />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-305 bg-gray-100">
-                            <User size={48} />
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 bg-slate-100">
+                            <User size={44} />
                         </div>
                     )}
                 </div>
 
                 {/* Details Section (FACULTY, COURSE, VALIDITY) */}
-                <div className="flex-1 bg-white px-2 py-1 flex flex-col justify-center text-[9.5px] leading-[1.3] text-indigo-950 font-sans">
-                    <div className="flex gap-1.5">
-                        <span className="text-[#7A1975] font-medium min-w-[62px] uppercase" style={{ letterSpacing: '0.01px' }}>FACULTY:</span>
-                        <span className="font-extrabold text-indigo-950 break-words" style={{ letterSpacing: '0.01px' }}>{student.school || "School of Business"}</span>
+                <div className="flex-1 bg-white px-2 py-1 flex flex-col justify-center text-[10px] leading-[1.3] text-slate-800 font-sans">
+                    <div className="flex gap-1 items-baseline">
+                        <span className="text-[#7A1975] font-bold text-[7.5px] tracking-wider min-w-[52px] uppercase shrink-0">FACULTY:</span>
+                        <span className="font-extrabold text-slate-800 break-words text-[8.5px]">{student.school || "School of Business"}</span>
                     </div>
-                    <div className="flex gap-1.5 mt-0.5">
-                        <span className="text-[#7A1975] font-medium min-w-[62px] uppercase" style={{ letterSpacing: '0.01px' }}>COURSE:</span>
-                        <span className="font-extrabold text-indigo-950 break-words" style={{ letterSpacing: '0.01px' }}>{student.program || "DBM/May 2026"}</span>
+                    <div className="flex gap-1 mt-0.5 items-baseline">
+                        <span className="text-[#7A1975] font-bold text-[7.5px] tracking-wider min-w-[52px] uppercase shrink-0">COURSE:</span>
+                        <span className="font-extrabold text-slate-800 break-words text-[8.5px]">{student.program || "DBM/May 2026"}</span>
                     </div>
-                    <div className="flex gap-1.5 mt-0.5">
-                        <span className="text-[#7A1975] font-medium min-w-[62px] uppercase" style={{ letterSpacing: '0.01px' }}>VALIDITY:</span>
-                        <span className="font-extrabold text-indigo-950 break-words" style={{ letterSpacing: '0.01px' }}>
+                    <div className="flex gap-1 mt-0.5 items-baseline">
+                        <span className="text-[#7A1975] font-bold text-[7.5px] tracking-wider min-w-[52px] uppercase shrink-0">VALIDITY:</span>
+                        <span className="font-extrabold text-slate-800 break-words text-[8.5px]">
                             {student.expiry_date ? new Date(student.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
                         </span>
                     </div>
@@ -491,7 +503,7 @@ function IDCardFront({ student, companySettings }: any) {
 
             {/* Right-most Column (Vertical STUDENT bar) */}
             <div className="absolute right-0 top-0 bottom-0 w-[45px] bg-[#7A1975] flex items-center justify-center select-none">
-                <span className="text-white text-[20px] font-black uppercase absolute transform -rotate-90 whitespace-nowrap" style={{ letterSpacing: '0.25em' }}>
+                <span className="text-white text-[18px] font-bold uppercase absolute transform -rotate-90 whitespace-nowrap tracking-[0.25em]" style={{ fontFamily: "'Museo', sans-serif" }}>
                     STUDENT
                 </span>
             </div>
@@ -503,27 +515,27 @@ function IDCardBack({ student, companySettings }: any) {
     return (
         <div 
             id={`id-card-back-${student.id}`}
-            className="w-[340px] h-[216px] bg-white border border-black rounded-[16px] shadow-xl relative overflow-hidden flex flex-col items-center justify-between py-5"
-            style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif", letterSpacing: '0.01px' }}
+            className="w-[340px] h-[216px] bg-white border border-gray-200 rounded-[16px] shadow-sm relative overflow-hidden flex flex-col items-center justify-between py-5"
+            style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
         >
             <div className="absolute top-0 left-0 w-full h-1.5 bg-[#7A1975]"></div>
             
             <div className="text-center px-4 mt-2">
-                <h4 className="text-[11px] font-black text-gray-800 uppercase mb-0.5" style={{ letterSpacing: '0.15em' }}>Security & Access Control</h4>
-                <p className="text-[7px] text-gray-400 font-bold uppercase" style={{ letterSpacing: '0.01px' }}>Verification Required for Campus Entry</p>
+                <h4 className="text-[12px] font-bold text-gray-800 uppercase mb-0.5 tracking-wider" style={{ fontFamily: "'Museo', sans-serif" }}>Security & Access Control</h4>
+                <p className="text-[7.5px] text-gray-400 font-bold uppercase tracking-wide">Verification Required for Campus Entry</p>
             </div>
 
-            <div className="p-1 bg-white border border-gray-150 shadow-sm rounded-sm">
+            <div className="p-1 bg-white border border-gray-150 shadow-sm rounded-lg">
                 <QRCodeSVG 
                     value={student.admission_number} 
-                    size={80} 
+                    size={76} 
                     level="H"
                 />
             </div>
 
             <div className="text-center px-6 mb-2">
-                <p className="text-[11px] font-black text-[#7A1975]" style={{ letterSpacing: '0.1em' }}>{student.admission_number}</p>
-                <p className="text-[6px] text-gray-400 mt-1.5 font-bold uppercase leading-tight px-2" style={{ letterSpacing: '0.01px' }}>
+                <p className="text-[12px] font-bold text-[#7A1975] tracking-wide" style={{ fontFamily: "'Museo Sans', sans-serif" }}>{student.admission_number}</p>
+                <p className="text-[6.5px] text-gray-400 mt-1.5 font-bold uppercase leading-tight px-2">
                     This card is the property of {companySettings.company_name || "the university"}. If found, please return it to the University Security Office.
                 </p>
             </div>

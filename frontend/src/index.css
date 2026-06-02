@@ -1,5 +1,29 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 
+/* Museo Fonts */
+@font-face {
+  font-family: 'Museo';
+  src: url('https://db.onlinewebfonts.com/t/e6755c61e4b34db0f5b601568967e143.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Museo';
+  src: url('https://db.onlinewebfonts.com/t/1aa5ac712cf3a4c33949767ac1abe194.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Museo Sans';
+  src: url('https://db.onlinewebfonts.com/t/b1de76f2d448dcdf44d092114d6ba04a.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
