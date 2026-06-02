@@ -229,6 +229,7 @@ class FleetPassengerManifest(UUIDModel, table=True):
     
     check_in_time: Optional[datetime] = None
     arrival_confirmed: bool = False
+    added_via_scan: bool = Field(default=False)
     
     trip: FleetTrip = Relationship(back_populates="passengers")
 

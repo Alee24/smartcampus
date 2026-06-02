@@ -1049,9 +1049,18 @@ function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
                                         </tr>
                                     ) : (
                                         trip.passengers.map((p: any, idx: number) => (
-                                            <tr key={p.id || idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/10">
-                                                <td className="px-6 py-4 font-black text-primary-600">{p.admission_number || 'N/A'}</td>
-                                                <td className="px-6 py-4 font-bold text-gray-900 dark:text-gray-100">{p.passenger_name}</td>
+                                            <tr key={p.id || idx} className={`hover:bg-gray-50/50 dark:hover:bg-gray-800/10 ${p.added_via_scan ? 'bg-amber-500/10 dark:bg-amber-500/5' : ''}`}>
+                                                <td className={`px-6 py-4 font-black ${p.added_via_scan ? 'text-amber-600 dark:text-amber-400 border-l-4 border-amber-500' : 'text-primary-600'}`}>{p.admission_number || 'N/A'}</td>
+                                                <td className="px-6 py-4 font-bold text-gray-900 dark:text-gray-100">
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{p.passenger_name}</span>
+                                                        {p.added_via_scan && (
+                                                            <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30 animate-pulse">
+                                                                Added via Scan
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
                                                 <td className="px-6 py-4 font-semibold text-gray-600 dark:text-gray-400">{p.phone_number || 'N/A'}</td>
                                                 <td className="px-6 py-4 text-xs font-semibold text-gray-500">{p.pickup_location || 'Campus'}</td>
                                                 <td className="px-6 py-4 text-xs font-semibold text-gray-500">{p.drop_off_location || 'Destination'}</td>
@@ -1091,10 +1100,21 @@ function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
                                 </div>
                             ) : (
                                 trip.passengers.map((p: any, idx: number) => (
-                                    <div key={p.id || idx} className="p-5 bg-white dark:bg-gray-800 rounded-2xl border border-gray-150 dark:border-gray-700/50 shadow-sm flex justify-between items-center hover:border-rose-300 dark:hover:border-rose-900/50 transition-colors">
+                                    <div key={p.id || idx} className={`p-5 bg-white dark:bg-gray-800 rounded-2xl border shadow-sm flex justify-between items-center transition-colors ${
+                                        p.added_via_scan 
+                                            ? 'border-amber-250 dark:border-amber-900/50 hover:border-amber-400 bg-amber-50/5 dark:bg-amber-950/2' 
+                                            : 'border-gray-150 dark:border-gray-700/50 hover:border-rose-300 dark:hover:border-rose-900/50'
+                                    }`}>
                                         <div>
                                             <p className="text-[10px] font-black text-gray-400 uppercase">{p.admission_number || 'STUDENT'}</p>
-                                            <h4 className="text-base font-black text-gray-900 dark:text-white mt-0.5">{p.passenger_name}</h4>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <h4 className="text-base font-black text-gray-900 dark:text-white">{p.passenger_name}</h4>
+                                                {p.added_via_scan && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-400 border border-amber-200 dark:border-amber-900/30 animate-pulse">
+                                                        Added via Scan
+                                                    </span>
+                                                )}
+                                            </div>
                                             <p className="text-xs font-bold text-rose-600 dark:text-rose-400 mt-1 flex items-center gap-1">
                                                 <Users size={12} /> Emergency: {p.emergency_contact_phone || 'None Listed'}
                                             </p>

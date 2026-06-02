@@ -607,7 +607,8 @@ async def get_trip_details(
                 "pickup_location": p.pickup_location or "N/A",
                 "drop_off_location": p.drop_off_location or "N/A",
                 "arrival_confirmed": p.arrival_confirmed,
-                "check_in_time": p.check_in_time.isoformat() if p.check_in_time else None
+                "check_in_time": p.check_in_time.isoformat() if p.check_in_time else None,
+                "added_via_scan": p.added_via_scan
             }
             for p in trip.passengers
         ]
@@ -855,10 +856,37 @@ async def board_passenger(
         )).first()
 
         if not passenger:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Passenger with admission {admission_number} not found on this trip manifest."
+            # Let's search the User database for this admission number
+            user_res = await session.exec(
+                select(User)
+                .where(User.admission_number == admission_number)
             )
+            db_user = user_res.first()
+            if not db_user:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"Passenger with admission {admission_number} not found on this trip manifest or student directory."
+                )
+            
+            # Dynamically add student to the manifest
+            passenger = FleetPassengerManifest(
+                trip_id=trip_id,
+                user_id=db_user.id,
+                passenger_name=db_user.full_name,
+                phone_number=db_user.phone_number,
+                admission_number=db_user.admission_number,
+                arrival_confirmed=True,
+                check_in_time=datetime.utcnow(),
+                added_via_scan=True
+            )
+            session.add(passenger)
+            await session.commit()
+            await session.refresh(passenger)
+            
+            return {
+                "status": "success",
+                "message": f"Successfully checked in {passenger.passenger_name} (dynamic addition)."
+            }
 
         if passenger.arrival_confirmed:
             return {"status": "success", "message": f"{passenger.passenger_name} is already checked in."}

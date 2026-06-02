@@ -158,6 +158,9 @@ async def migrate_fleet():
             if "emergency_contact_phone" not in pass_cols:
                 print("Adding emergency_contact_phone column to fleet_passenger_manifest...")
                 await conn.execute(text("ALTER TABLE fleet_passenger_manifest ADD COLUMN emergency_contact_phone VARCHAR(255) NULL"))
+            if "added_via_scan" not in pass_cols:
+                print("Adding added_via_scan column to fleet_passenger_manifest...")
+                await conn.execute(text("ALTER TABLE fleet_passenger_manifest ADD COLUMN added_via_scan BOOLEAN DEFAULT FALSE"))
             print("fleet_passenger_manifest table migration checked/applied.")
             
             print("Fleet migration checked/applied.")
