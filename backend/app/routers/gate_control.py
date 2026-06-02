@@ -165,16 +165,84 @@ async def scan_entry(
     scan_data: dict, # { "admission_number": "...", "gate_id": "optional" }
     session: AsyncSession = Depends(get_session)
 ):
-    adm_no = scan_data.get("admission_number")
+    import re
+    code = scan_data.get("admission_number", "").strip()
+    if not code:
+        return {"status": "rejected", "message": "Scanned code is empty", "data": None}
 
-    # Check for Event Pass
-    if adm_no and adm_no.startswith("EVENT:"):
-        token = adm_no.split("EVENT:")[1]
+    # 1. Check for Gate
+    gate_query = select(Gate).where(Gate.name == "Main Gate")
+    gate = (await session.exec(gate_query)).first()
+    if not gate:
+        gate = Gate(name="Main Gate", location="Main Entrance")
+        session.add(gate)
+        await session.commit()
+        await session.refresh(gate)
+
+    # 2. Check for Prefix
+    upper_code = code.upper()
+    parsed_code = code
+    entity_type = None
+
+    if upper_code.startswith("EVENT:"):
+        entity_type = "event"
+        parsed_code = code[6:].strip()
+    elif upper_code.startswith("VEHICLE:") or upper_code.startswith("BUS:"):
+        entity_type = "vehicle"
+        parsed_code = code.split(":", 1)[1].strip()
+    elif upper_code.startswith("VISITOR:"):
+        entity_type = "visitor"
+        parsed_code = code[8:].strip()
+    elif upper_code.startswith("STUDENT:") or upper_code.startswith("STAFF:"):
+        entity_type = "user"
+        parsed_code = code.split(":", 1)[1].strip()
+    
+    # 3. If no prefix matched, we auto-identify from the string format/data
+    if not entity_type:
+        # Check User first
+        user = (await session.exec(select(User).where(User.admission_number == code))).first()
+        if user:
+            entity_type = "user"
+            parsed_code = code
+        else:
+            # Check Vehicle table
+            vehicle = (await session.exec(select(Vehicle).where(Vehicle.plate_number == code.upper()))).first()
+            if vehicle:
+                entity_type = "vehicle"
+                parsed_code = code
+            else:
+                # Check Visitor table
+                visitor = (await session.exec(select(Visitor).where(Visitor.id_number == code))).first()
+                if not visitor:
+                    # check if code is UUID matching visitor ID
+                    try:
+                        import uuid
+                        val_uuid = uuid.UUID(code)
+                        visitor = await session.get(Visitor, val_uuid)
+                    except Exception:
+                        pass
+                
+                if visitor:
+                    entity_type = "visitor"
+                    parsed_code = code
+                else:
+                    # Check if code matches standard Kenyan vehicle plate formats or generic alphanumeric format
+                    is_plate = bool(re.match(r'^[A-Z]{2,3}\s?\d{3,4}\s?[A-Z]{0,2}$', upper_code)) or bool(re.match(r'^[A-Z0-9\s]{5,10}$', upper_code))
+                    if is_plate:
+                        entity_type = "vehicle"
+                        parsed_code = code
+                    else:
+                        entity_type = "user"
+                        parsed_code = code
+
+    # Now handle based on detected entity type
+    if entity_type == "event":
+        token = parsed_code
         ev = (await session.exec(select(Event).where(Event.qr_code_token == token))).first()
         if ev:
              return {
                  "status": "event_pass",
-                 "message": "Valid Event Pass",
+                 "message": f"Valid Event Pass: {ev.name}",
                  "data": {
                      "name": ev.name,
                      "host": ev.host,
@@ -185,73 +253,289 @@ async def scan_entry(
              }
         else:
              return {"status": "rejected", "message": "Invalid Event Pass"}
-             
-    # Normal User Flow
-    
-    # 1. Find User
-    user_query = select(User).where(User.admission_number == adm_no)
-    user = (await session.exec(user_query)).first()
-    
-    if not user:
-        # In a real system we might log "unknown attempt", but schema requires user_id
-        return {
-            "status": "rejected",
-            "message": "User not found",
-            "data": None
-        }
 
-    # 2. Find Gate (Default to Main Gate if not provided)
-    gate_query = select(Gate).where(Gate.name == "Main Gate")
-    gate = (await session.exec(gate_query)).first()
-    if not gate:
-         raise HTTPException(status_code=500, detail="System configuration error: No Gate Found")
+    elif entity_type == "vehicle":
+        plate = parsed_code.upper().replace("-", " ")
+        vehicle = (await session.exec(select(Vehicle).where(Vehicle.plate_number == plate))).first()
+        
+        # Auto-create vehicle if not exists
+        if not vehicle:
+            import random
+            ai_colors = ["White", "Silver", "Black", "Blue", "Red", "Grey"]
+            ai_makes = ["Toyota", "Subaru", "Mazda", "Nissan", "Honda", "Mercedes"]
+            ai_models = ["Corolla", "Outback", "Demio", "Note", "Fit", "C200"]
+            
+            vehicle = Vehicle(
+                plate_number=plate,
+                make=random.choice(ai_makes),
+                model=random.choice(ai_models),
+                color=random.choice(ai_colors),
+                vehicle_type="bus" if "BUS" in upper_code else "utility"
+            )
+            session.add(vehicle)
+            await session.commit()
+            await session.refresh(vehicle)
+            
+        # Check logs for open entry (exit_time is null)
+        open_log = (await session.exec(
+            select(VehicleLog)
+            .where(VehicleLog.vehicle_id == vehicle.id)
+            .where(VehicleLog.exit_time == None)
+            .order_by(VehicleLog.entry_time.desc())
+        )).first()
 
-    # 3. Validation Logic
-    status = "allowed"
-    message = "Access Granted"
-    if user.status != "active":
-        status = "rejected"
-        message = f"User is {user.status}"
+        if open_log:
+            # Check Out
+            open_log.exit_time = datetime.utcnow()
+            session.add(open_log)
+            await session.commit()
+            
+            await log_action(
+                session=session,
+                action_type="vehicle_scan_out",
+                table_name="vehicle_logs",
+                record_id=str(open_log.id),
+                description=f"Auto vehicle checkout for {plate} at {gate.name}",
+                request=request
+            )
+            
+            return {
+                "status": "allowed",
+                "message": f"Vehicle {plate} checked OUT successfully",
+                "data": {
+                    "name": plate,
+                    "role": f"Checked OUT - {vehicle.make} {vehicle.model} ({vehicle.color})",
+                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "image": "https://cdn-icons-png.flaticon.com/512/3202/3202926.png"
+                }
+            }
+        else:
+            # Check In
+            new_log = VehicleLog(
+                vehicle_id=vehicle.id,
+                gate_id=gate.id,
+                entry_time=datetime.utcnow(),
+                manual_override=False,
+                detected_passengers=1
+            )
+            session.add(new_log)
+            await session.commit()
+            await session.refresh(new_log)
 
-    # 4. Create Log
-    new_log = EntryLog(
-        user_id=user.id,
-        gate_id=gate.id,
-        entry_time=datetime.utcnow(),
-        method="manual_scan",
-        status=status
-    )
-    
-    session.add(new_log)
-    await session.commit()
-    await session.refresh(new_log)
-    
-    # Log the scan
-    await log_action(
-        session=session,
-        action_type="gate_scan",
-        table_name="entry_logs",
-        record_id=str(new_log.id),
-        description=f"Gate scan for {user.full_name} ({adm_no}) at {gate.name} - Status: {status}",
-        request=request
-    )
-    
-    # Return enriched data for Frontend
-    role_name = "Unknown"
-    if user.role_id:
-        # We could fetch role, but for speed let's assume we handle it or fetch it validly
-        pass
+            await log_action(
+                session=session,
+                action_type="vehicle_scan_in",
+                table_name="vehicle_logs",
+                record_id=str(new_log.id),
+                description=f"Auto vehicle checkin for {plate} at {gate.name}",
+                request=request
+            )
 
-    return {
-        "status": status,
-        "message": message,
-        "data": {
-            "name": user.full_name,
-            "role": user.school, # Mapping school to role logic for display, or fetch real role
-            "time": new_log.entry_time.strftime("%I:%M %p"),
-            "image": user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
-        }
-    }
+            return {
+                "status": "allowed",
+                "message": f"Vehicle {plate} checked IN successfully",
+                "data": {
+                    "name": plate,
+                    "role": f"Checked IN - {vehicle.make} {vehicle.model} ({vehicle.color})",
+                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "image": "https://cdn-icons-png.flaticon.com/512/3202/3202926.png"
+                }
+            }
+
+    elif entity_type == "visitor":
+        # Look up visitor by parsing details or ID number
+        import uuid
+        visitor = None
+        visitor_parts = parsed_code.split(":")
+        
+        if len(visitor_parts) >= 3:
+            name = visitor_parts[0]
+            id_no = visitor_parts[1]
+            phone = visitor_parts[2]
+            details = visitor_parts[3] if len(visitor_parts) > 3 else "Scanned Visitor Card"
+            
+            visitor = (await session.exec(select(Visitor).where(Visitor.id_number == id_no))).first()
+            if not visitor:
+                first_name = name.split(" ")[0]
+                last_name = " ".join(name.split(" ")[1:]) if len(name.split(" ")) > 1 else "Visitor"
+                visitor = Visitor(
+                    first_name=first_name,
+                    last_name=last_name,
+                    id_number=id_no,
+                    phone_number=phone,
+                    visit_details=details,
+                    status="checked_in",
+                    time_in=datetime.utcnow()
+                )
+                session.add(visitor)
+                await session.commit()
+                await session.refresh(visitor)
+        else:
+            visitor = (await session.exec(select(Visitor).where(Visitor.id_number == parsed_code))).first()
+            if not visitor:
+                try:
+                    val_uuid = uuid.UUID(parsed_code)
+                    visitor = await session.get(Visitor, val_uuid)
+                except Exception:
+                    pass
+            
+            if not visitor:
+                visitor = Visitor(
+                    first_name="Scanned",
+                    last_name=f"Guest-{parsed_code[-4:]}",
+                    id_number=parsed_code,
+                    phone_number="N/A",
+                    visit_details="Auto-Registered Guest",
+                    status="checked_in",
+                    time_in=datetime.utcnow()
+                )
+                session.add(visitor)
+                await session.commit()
+                await session.refresh(visitor)
+                
+        if visitor.status == "checked_in" and not visitor.time_out:
+            # Check Out
+            visitor.time_out = datetime.utcnow()
+            visitor.status = "checked_out"
+            session.add(visitor)
+            await session.commit()
+            
+            await log_action(
+                session=session,
+                action_type="visitor_scan_out",
+                table_name="visitors",
+                record_id=str(visitor.id),
+                description=f"Auto visitor checkout for {visitor.first_name} {visitor.last_name}",
+                request=request
+            )
+            
+            return {
+                "status": "allowed",
+                "message": f"Visitor {visitor.first_name} checked OUT successfully",
+                "data": {
+                    "name": f"{visitor.first_name} {visitor.last_name}",
+                    "role": f"Checked OUT - Visitor ({visitor.visit_details})",
+                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "image": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                }
+            }
+        else:
+            # Check In
+            visitor.time_in = datetime.utcnow()
+            visitor.time_out = None
+            visitor.status = "checked_in"
+            session.add(visitor)
+            await session.commit()
+            
+            await log_action(
+                session=session,
+                action_type="visitor_scan_in",
+                table_name="visitors",
+                record_id=str(visitor.id),
+                description=f"Auto visitor checkin for {visitor.first_name} {visitor.last_name}",
+                request=request
+            )
+            
+            return {
+                "status": "allowed",
+                "message": f"Visitor {visitor.first_name} checked IN successfully",
+                "data": {
+                    "name": f"{visitor.first_name} {visitor.last_name}",
+                    "role": f"Checked IN - Visitor ({visitor.visit_details})",
+                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "image": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                }
+            }
+
+    else: # user
+        user = (await session.exec(select(User).where(User.admission_number == parsed_code))).first()
+        if not user:
+            return {
+                "status": "rejected",
+                "message": f"User not found for code: {parsed_code}",
+                "data": None
+            }
+            
+        status = "allowed"
+        message = "Access Granted"
+        if user.status != "active":
+            status = "rejected"
+            message = f"User is inactive ({user.status})"
+            return {
+                "status": status,
+                "message": message,
+                "data": {
+                    "name": user.full_name,
+                    "role": user.school or "Inactive User",
+                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "image": user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                }
+            }
+
+        open_log = (await session.exec(
+            select(EntryLog)
+            .where(EntryLog.user_id == user.id)
+            .where(EntryLog.exit_time == None)
+            .order_by(EntryLog.entry_time.desc())
+        )).first()
+
+        if open_log:
+            # Check Out
+            open_log.exit_time = datetime.utcnow()
+            session.add(open_log)
+            await session.commit()
+            
+            await log_action(
+                session=session,
+                action_type="gate_scan_out",
+                table_name="entry_logs",
+                record_id=str(open_log.id),
+                description=f"Auto gate scan checkout for {user.full_name} at {gate.name}",
+                request=request
+            )
+            
+            return {
+                "status": "allowed",
+                "message": f"Checked OUT successfully: {user.full_name}",
+                "data": {
+                    "name": user.full_name,
+                    "role": f"Checked OUT ({user.school or 'Student'})",
+                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "image": user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                }
+            }
+        else:
+            # Check In
+            new_log = EntryLog(
+                user_id=user.id,
+                gate_id=gate.id,
+                entry_time=datetime.utcnow(),
+                method="qr",
+                status="allowed"
+            )
+            session.add(new_log)
+            await session.commit()
+            await session.refresh(new_log)
+            
+            await log_action(
+                session=session,
+                action_type="gate_scan_in",
+                table_name="entry_logs",
+                record_id=str(new_log.id),
+                description=f"Auto gate scan checkin for {user.full_name} at {gate.name}",
+                request=request
+            )
+            
+            return {
+                "status": "allowed",
+                "message": f"Checked IN successfully: {user.full_name}",
+                "data": {
+                    "name": user.full_name,
+                    "role": f"Checked IN ({user.school or 'Student'})",
+                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "image": user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                }
+            }
 
 @router.post("/check-in/{admission_number}")
 async def check_in_user(

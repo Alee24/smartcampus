@@ -19,7 +19,12 @@ export default function SelfServiceEntry() {
 
     const startCamera = async () => {
         if (!window.isSecureContext) {
-            alert("Camera access requires a secure (HTTPS) connection. Please contact administration.")
+            const el = document.getElementById("self-pass-photo-file-input")
+            if (el) {
+                el.click()
+            } else {
+                alert("Camera access requires a secure (HTTPS) connection.")
+            }
             return
         }
 
@@ -147,6 +152,23 @@ export default function SelfServiceEntry() {
 
     return (
         <div className="min-h-screen bg-gray-100 p-4">
+            <input 
+                type="file" 
+                id="self-pass-photo-file-input" 
+                accept="image/*" 
+                capture="environment" 
+                onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                        const reader = new FileReader()
+                        reader.onloadend = () => {
+                            setImage(reader.result as string)
+                        }
+                        reader.readAsDataURL(file)
+                    }
+                }} 
+                className="hidden" 
+            />
             <div className="max-w-md mx-auto">
                 <header className="mb-8 text-center pt-8">
                     <h1 className="text-2xl font-bold text-gray-900">Gate Pass Entry</h1>

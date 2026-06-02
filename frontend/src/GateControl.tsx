@@ -313,13 +313,100 @@ export default function GateControl() {
     }
 
     // Core Camera Operations
+    const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setScanStatus('scanning')
+
+        // Setup temporary container if "gate-qr-reader" is not in DOM
+        let tempDiv = document.getElementById("gate-qr-reader");
+        let createdTemp = false;
+        if (!tempDiv) {
+            tempDiv = document.createElement("div");
+            tempDiv.id = "gate-qr-reader";
+            tempDiv.style.display = "none";
+            document.body.appendChild(tempDiv);
+            createdTemp = true;
+        }
+
+        try {
+            const html5QrCode = new Html5Qrcode("gate-qr-reader")
+            const decodedText = await html5QrCode.scanFile(file, false)
+            setAdmissionNumber(decodedText)
+            await processQR(decodedText)
+        } catch (err: any) {
+            console.error("QR File Scan Error", err)
+            showNotification(`Could not read QR code: ${err?.message || "Invalid/blurry image"}`, "error")
+            setScanStatus('idle')
+        } finally {
+            if (createdTemp && tempDiv) {
+                tempDiv.remove()
+            }
+            e.target.value = ''
+        }
+    }
+
+    const handlePlateFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setScanStatus('scanning')
+
+        const formData = new FormData()
+        formData.append('file', file, 'plate_scan.jpg')
+
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/gate/scan-vehicle', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            })
+            const data = await res.json()
+
+            if (data.status === 'allowed' || data.status === 'visitor') {
+                setScanStatus('success')
+                setLastScan({
+                    name: data.data.plate,
+                    role: `${data.data.make} ${data.data.model} (${data.data.color})`,
+                    time: data.data.entry_time,
+                    image: data.data.image_url,
+                    isVehicle: true,
+                    passengers: data.data.passengers
+                })
+                showNotification(`Vehicle ${data.data.plate} logged successfully`, 'success')
+                refreshData()
+            } else {
+                setScanStatus('rejected')
+                setLastScan({
+                    name: data.data.plate || "Unknown",
+                    role: "Unauthorized Vehicle",
+                    time: new Date().toLocaleTimeString(),
+                    isVehicle: true,
+                    image: data.data.image_url,
+                })
+                showNotification(data.detail || 'Unauthorized vehicle flagged', 'warning')
+            }
+        } catch (err: any) {
+            showNotification(`Error scanning plate file: ${err.message || err}`, "error")
+            setScanStatus('idle')
+        } finally {
+            e.target.value = ''
+        }
+    }
+
     const startCamera = async (mode: 'qr' | 'plate') => {
         setPermissionError('')
         setScanMode(mode)
         
         if (!window.isSecureContext) {
-            showNotification("Camera access requires a secure (HTTPS) connection.", "error")
-            setScanStatus('idle')
+            showNotification("Insecure context: Opening device camera to capture photo...", "info")
+            if (mode === 'qr') {
+                const el = document.getElementById("insecure-qr-file-input")
+                if (el) el.click()
+            } else {
+                const el = document.getElementById("insecure-plate-file-input")
+                if (el) el.click()
+            }
             return
         }
 
@@ -406,7 +493,7 @@ export default function GateControl() {
             if (result.status === 'allowed') {
                 setScanStatus('success')
                 setLastScan(result.data)
-                showNotification(`Access granted for ${result.data.name}`, 'success')
+                showNotification(result.message || `Access granted for ${result.data.name}`, 'success')
             } else if (result.status === 'event_pass') {
                 setEventData(result.data)
                 setShowEventModal(true)
@@ -418,11 +505,12 @@ export default function GateControl() {
                     role: 'N/A',
                     time: new Date().toLocaleTimeString()
                 })
-                showNotification('Access Denied', 'error')
+                showNotification(result.message || 'Access Denied', 'error')
             }
             refreshData()
-        } catch (err) {
+        } catch (err: any) {
             setScanStatus('rejected')
+            showNotification(`Scanner error: ${err.message || err}`, 'error')
         }
     }
 
@@ -519,6 +607,22 @@ export default function GateControl() {
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 animate-fade-in font-sans space-y-6">
             <canvas ref={canvasRef} className="hidden" />
+            <input 
+                type="file" 
+                id="insecure-qr-file-input" 
+                accept="image/*" 
+                capture="environment" 
+                onChange={handleFileScan} 
+                className="hidden" 
+            />
+            <input 
+                type="file" 
+                id="insecure-plate-file-input" 
+                accept="image/*" 
+                capture="environment" 
+                onChange={handlePlateFileScan} 
+                className="hidden" 
+            />
 
             {/* 1. TOP STATS ROW (ON BOARD, ON TOP OF EVERYTHING ELSE) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -846,6 +950,28 @@ export default function GateControl() {
                                 </button>
                             )}
                         </div>
+
+                        {!window.isSecureContext && (
+                            <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 text-amber-800 dark:text-amber-300 text-xs font-medium">
+                                <div className="flex items-center gap-1.5 font-bold mb-1">
+                                    <AlertOctagon size={14} className="text-amber-500 shrink-0" />
+                                    <span>Insecure Origin (HTTP) Camera Bypass Active</span>
+                                </div>
+                                <p className="opacity-90 leading-relaxed">
+                                    Live streaming requires HTTPS. Clicking the scanner buttons will prompt your device to capture or upload a photo to decode instead.
+                                </p>
+                                <details className="mt-2 text-[10px] cursor-pointer">
+                                    <summary className="font-bold underline text-amber-700 dark:text-amber-400">
+                                        Enable live camera on HTTP
+                                    </summary>
+                                    <div className="mt-1 p-2 bg-white/50 dark:bg-black/20 rounded font-mono leading-normal select-all">
+                                        1. Open chrome://flags/#unsafely-treat-insecure-origin-as-secure<br />
+                                        2. Enable it and add: {window.location.origin}<br />
+                                        3. Relaunch Chrome.
+                                    </div>
+                                </details>
+                            </div>
+                        )}
 
                         <div className="flex-1 flex items-center justify-center relative overflow-hidden rounded-2xl min-h-[220px]">
                             {/* IDLE */}
