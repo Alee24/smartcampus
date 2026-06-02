@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
-import { FileText, Users, Activity, Car, Clock, Calendar, Download, Search, CheckCircle, XCircle, AlertTriangle, Truck, BookOpen, UserCheck, ShieldAlert } from 'lucide-react'
+import { FileText, Users, Activity, Car, Clock, Calendar, Download, Search, CheckCircle, XCircle, AlertTriangle, Truck, BookOpen, UserCheck, ShieldAlert, Printer } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#6366F1', '#8B5CF6']
 
@@ -131,6 +133,163 @@ export default function Reports() {
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
+    }
+
+    // Export generated logs as Professional PDF
+    const exportToPDF = async (type: 'people' | 'vehicles') => {
+        if (!genReport) return;
+        setGenLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            let companyLogo = null;
+            let companyName = "Smart Campus";
+            
+            try {
+                const settingsRes = await fetch('/api/admin/company-settings', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (settingsRes.ok) {
+                    const settings = await settingsRes.json();
+                    if (settings.logo_url) {
+                        companyLogo = await new Promise<string>((resolve) => {
+                            const img = new Image();
+                            img.crossOrigin = "Anonymous";
+                            img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                canvas.width = img.width;
+                                canvas.height = img.height;
+                                const ctx = canvas.getContext('2d');
+                                ctx?.drawImage(img, 0, 0);
+                                resolve(canvas.toDataURL('image/png'));
+                            };
+                            img.onerror = () => resolve("");
+                            img.src = settings.logo_url;
+                        });
+                    }
+                    if (settings.company_name) companyName = settings.company_name;
+                }
+            } catch (e) {
+                console.warn("Using default branding", e);
+            }
+
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            let currentY = 15;
+            const marginX = 14;
+
+            if (companyLogo) {
+                const logoSize = 25;
+                pdf.addImage(companyLogo, 'PNG', marginX, currentY, logoSize, logoSize);
+                pdf.setFontSize(22);
+                pdf.setFont('helvetica', 'bold');
+                pdf.setTextColor(31, 41, 55);
+                pdf.text(companyName, marginX + logoSize + 8, currentY + 10);
+                pdf.setFontSize(11);
+                pdf.setTextColor(107, 114, 128);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text("System Reports & Analytics", marginX + logoSize + 8, currentY + 18);
+                currentY += logoSize + 15;
+            } else {
+                pdf.setFontSize(22);
+                pdf.setFont('helvetica', 'bold');
+                pdf.setTextColor(31, 41, 55);
+                pdf.text(companyName, marginX, currentY + 10);
+                pdf.setFontSize(11);
+                pdf.setTextColor(107, 114, 128);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text("System Reports & Analytics", marginX, currentY + 18);
+                currentY += 30;
+            }
+
+            pdf.setDrawColor(229, 231, 235);
+            pdf.setLineWidth(0.5);
+            pdf.line(marginX, currentY, pageWidth - marginX, currentY);
+            currentY += 10;
+
+            pdf.setFontSize(16);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(17, 24, 39);
+            const reportTitle = type === 'people' ? "People Entry Logs Report" : "Vehicle Scan Logs Report";
+            pdf.text(reportTitle, marginX, currentY);
+            
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+            pdf.setTextColor(107, 114, 128);
+            pdf.text(`Date: ${selectedDate}  |  Generated on: ${new Date().toLocaleString()}`, marginX, currentY + 6);
+            currentY += 15;
+
+            pdf.setFillColor(249, 250, 251);
+            pdf.roundedRect(marginX, currentY, pageWidth - (marginX * 2), 25, 3, 3, 'F');
+            
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(75, 85, 99);
+            
+            if (type === 'people') {
+                pdf.text(`Total Entered: ${genReport.metrics.people_entered}`, marginX + 10, currentY + 10);
+                pdf.text(`Visitors: ${genReport.metrics.visitors_entered}`, marginX + 60, currentY + 10);
+                pdf.text(`Total Exited: ${genReport.metrics.people_exited}`, marginX + 10, currentY + 18);
+                pdf.text(`Flagged/Rejected: ${genReport.metrics.rejected_attempts}`, marginX + 60, currentY + 18);
+            } else {
+                pdf.text(`Vehicles Entered: ${genReport.metrics.vehicles_entered}`, marginX + 10, currentY + 10);
+                pdf.text(`Deliveries: ${genReport.metrics.deliveries_logged}`, marginX + 60, currentY + 10);
+            }
+            
+            currentY += 35;
+
+            const tableCols = type === 'people' 
+                ? ["Name", "Role", "Gate", "Method", "Entry Time", "Exit Time", "Status"]
+                : ["Plate Number", "Driver Name", "Type", "Gate", "Entry Time", "Exit Time"];
+
+            const tableRows = type === 'people'
+                ? genReport.entry_logs.map((log: any) => [
+                    log.name,
+                    log.role,
+                    log.gate,
+                    log.method,
+                    log.entry_time ? new Date(log.entry_time).toLocaleTimeString() : '-',
+                    log.exit_time ? new Date(log.exit_time).toLocaleTimeString() : 'On Campus',
+                    log.status
+                ])
+                : genReport.vehicle_logs.map((log: any) => [
+                    log.plate_number,
+                    log.driver_name,
+                    log.vehicle_type,
+                    log.gate,
+                    log.entry_time ? new Date(log.entry_time).toLocaleTimeString() : '-',
+                    log.exit_time ? new Date(log.exit_time).toLocaleTimeString() : 'Parked'
+                ]);
+
+            autoTable(pdf, {
+                startY: currentY,
+                head: [tableCols],
+                body: tableRows,
+                theme: 'striped',
+                headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, // primary-600
+                bodyStyles: { fontSize: 8 },
+                margin: { left: marginX, right: marginX },
+                didDrawPage: function () {
+                    pdf.setFontSize(8);
+                    pdf.setTextColor(156, 163, 175);
+                    const pageNumber = pdf.internal.getCurrentPageInfo().pageNumber;
+                    pdf.text(
+                        `Page ${pageNumber}`,
+                        pageWidth / 2,
+                        pdf.internal.pageSize.getHeight() - 10,
+                        { align: 'center' }
+                    );
+                }
+            });
+
+            pdf.save(`Report_${type}_${selectedDate}.pdf`);
+
+        } catch (error) {
+            console.error("PDF Export failed", error);
+            alert("Failed to export PDF.");
+        } finally {
+            setGenLoading(false);
+        }
     }
 
     if (summary?.error) return <div className="p-8 text-center text-red-500">Failed to load reports. Check console/network logs.</div>
@@ -380,7 +539,14 @@ export default function Reports() {
                                             className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 active:scale-95 transition-all flex items-center gap-1.5 whitespace-nowrap"
                                         >
                                             <Download size={12} />
-                                            Export CSV
+                                            CSV
+                                        </button>
+                                        <button
+                                            onClick={() => exportToPDF(generatorSubTab as 'people' | 'vehicles')}
+                                            className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                                        >
+                                            <Printer size={12} />
+                                            PDF
                                         </button>
                                     </div>
                                 </div>
