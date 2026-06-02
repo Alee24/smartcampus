@@ -1,0 +1,1 @@
+style: increase font size of details section labels and values on student ID cards

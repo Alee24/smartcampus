@@ -471,17 +471,17 @@ function IDCardFront({ student, companySettings }: any) {
                 </div>
 
                 {/* Details Section (FACULTY, COURSE, VALIDITY) */}
-                <div className="flex-1 bg-white px-1 py-1.5 flex flex-col justify-center text-[6px] leading-[1.3] text-indigo-950 font-sans">
-                    <div className="flex gap-1">
-                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase" style={{ letterSpacing: '0.01px' }}>FACULTY:</span>
+                <div className="flex-1 bg-white px-2 py-1 flex flex-col justify-center text-[9.5px] leading-[1.3] text-indigo-950 font-sans">
+                    <div className="flex gap-1.5">
+                        <span className="text-[#7A1975] font-medium min-w-[62px] uppercase" style={{ letterSpacing: '0.01px' }}>FACULTY:</span>
                         <span className="font-extrabold text-indigo-950 break-words" style={{ letterSpacing: '0.01px' }}>{student.school || "School of Business"}</span>
                     </div>
-                    <div className="flex gap-1 mt-0.5">
-                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase" style={{ letterSpacing: '0.01px' }}>COURSE:</span>
+                    <div className="flex gap-1.5 mt-0.5">
+                        <span className="text-[#7A1975] font-medium min-w-[62px] uppercase" style={{ letterSpacing: '0.01px' }}>COURSE:</span>
                         <span className="font-extrabold text-indigo-950 break-words" style={{ letterSpacing: '0.01px' }}>{student.program || "DBM/May 2026"}</span>
                     </div>
-                    <div className="flex gap-1 mt-0.5">
-                        <span className="text-[#7A1975] font-medium min-w-[38px] uppercase" style={{ letterSpacing: '0.01px' }}>VALIDITY:</span>
+                    <div className="flex gap-1.5 mt-0.5">
+                        <span className="text-[#7A1975] font-medium min-w-[62px] uppercase" style={{ letterSpacing: '0.01px' }}>VALIDITY:</span>
                         <span className="font-extrabold text-indigo-950 break-words" style={{ letterSpacing: '0.01px' }}>
                             {student.expiry_date ? new Date(student.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
                         </span>
