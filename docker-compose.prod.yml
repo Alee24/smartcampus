@@ -26,7 +26,9 @@ services:
       - gatepass-net
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      network: host
     container_name: gatepass_backend
     volumes:
       - ./backend/static:/app/static
@@ -46,7 +48,9 @@ services:
       - gatepass-net
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      network: host
     container_name: gatepass_frontend
     ports:
       - "8080:80" # Apache proxies to 8080
@@ -59,7 +63,9 @@ services:
       - gatepass-net
 
   ai-face:
-    build: ./ai_services/face_recognition
+    build:
+      context: ./ai_services/face_recognition
+      network: host
     container_name: gatepass_ai_face
     environment:
       TZ: Africa/Nairobi

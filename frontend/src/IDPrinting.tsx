@@ -398,68 +398,99 @@ export default function IDPrinting() {
 
 // Sub-components for actual ID rendering (High Resolution Professional Design)
 function IDCardFront({ student, companySettings }: any) {
+    const nameParts = student.full_name ? student.full_name.trim().split(/\s+/) : [];
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+
     return (
         <div 
             id={`id-card-front-${student.id}`}
-            className="w-[340px] h-[216px] bg-white border border-gray-200 shadow-xl relative overflow-hidden"
-            style={{ fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
+            className="w-[340px] h-[216px] bg-white border border-black relative overflow-hidden select-none"
+            style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif" }}
         >
-            {/* Top Security Bar */}
-            <div className="h-2 bg-indigo-900 w-full"></div>
-            
-            {/* Main Header */}
-            <div className="h-[55px] bg-white border-b border-gray-100 flex items-center px-4 justify-between">
-                <div className="flex items-center gap-3">
-                    <img src={companySettings.logo_url || "/logo.png"} className="h-10 w-auto object-contain" />
-                    <div className="h-8 w-[1px] bg-gray-200"></div>
-                    <div>
-                        <h2 className="text-[11px] font-black text-indigo-900 uppercase leading-none tracking-tight">{companySettings.company_name}</h2>
-                        <p className="text-[8px] font-bold text-gray-500 uppercase mt-0.5 tracking-widest">Student Identity Card</p>
+            {/* Left Column (Logo, Name, ID No, QR Code) */}
+            <div className="absolute left-[15px] top-[15px] bottom-[15px] w-[145px] flex flex-col justify-between">
+                {/* Logo & School Name */}
+                <div className="flex items-center gap-1.5">
+                    {companySettings.logo_url ? (
+                        <img src={companySettings.logo_url} className="h-9 w-auto object-contain" />
+                    ) : (
+                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-[#7A1975] font-black text-xs shrink-0">
+                            RU
+                        </div>
+                    )}
+                    <div className="flex flex-col leading-none overflow-hidden">
+                        <span className="text-[10px] font-black text-[#7A1975] uppercase tracking-tight truncate">
+                            {companySettings.company_name || "Riara University"}
+                        </span>
+                        <span className="text-[6px] font-bold text-gray-500 lowercase tracking-wider mt-0.5 truncate">
+                            {companySettings.tagline || "nurturing innovators"}
+                        </span>
                     </div>
                 </div>
-                <div className="text-[7px] font-black text-indigo-900 border-2 border-indigo-900 px-2 py-0.5 rounded-sm uppercase tracking-tighter italic">Official</div>
+
+                {/* Student Name */}
+                <div className="flex flex-col mt-1">
+                    <span className="font-serif text-[22px] font-bold text-[#7A1975] leading-none uppercase truncate">
+                        {firstName}
+                    </span>
+                    <span className="font-serif text-[22px] font-bold text-[#7A1975] leading-none uppercase mt-0.5 truncate">
+                        {lastName}
+                    </span>
+                </div>
+
+                {/* ID Number */}
+                <div className="text-[10px] font-black text-[#7A1975] uppercase tracking-wider mt-0.5">
+                    ID NO: {student.admission_number}
+                </div>
+
+                {/* QR Code */}
+                <div className="mt-1">
+                    <QRCodeSVG 
+                        value={student.admission_number} 
+                        size={55} 
+                        level="H"
+                    />
+                </div>
             </div>
 
-            {/* Body Content */}
-            <div className="p-3 flex gap-4">
-                <div className="w-[105px] h-[125px] bg-gray-50 border-2 border-gray-200 rounded-sm overflow-hidden shadow-sm relative">
+            {/* Center-Right Column (Student Image at top, Faculty Details at bottom) */}
+            <div className="absolute left-[165px] top-0 bottom-0 w-[130px] flex flex-col">
+                {/* Student Photo */}
+                <div className="w-full h-[148px] bg-gray-50 overflow-hidden border-b border-gray-200">
                     {student.profile_image ? (
                         <img src={student.profile_image} className="w-full h-full object-cover" />
                     ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-200"><User size={48} /></div>
+                        <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-100">
+                            <User size={48} />
+                        </div>
                     )}
                 </div>
-                <div className="flex-1 pt-1">
-                    <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest mb-1">Full Name</p>
-                    <h3 className="text-gray-900 text-[16px] font-black leading-tight uppercase mb-3 border-b border-gray-100 pb-1">{student.full_name}</h3>
-                    
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                        <div>
-                            <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Admission No.</p>
-                            <p className="text-[12px] font-black text-indigo-900 tracking-tight">{student.admission_number}</p>
-                        </div>
-                        <div>
-                            <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest mb-0.5">School / Dept.</p>
-                            <p className="text-[9px] font-bold text-gray-800 uppercase leading-none">{student.school || 'Academics'}</p>
-                        </div>
-                    </div>
 
-                    <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-2">
-                        <div>
-                            <p className="text-[7px] font-black text-green-600 uppercase tracking-widest">Status: ACTIVE</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Valid Thru: 2026</p>
-                        </div>
+                {/* Details Section (FACULTY, COURSE, VALIDITY) */}
+                <div className="flex-1 bg-white px-1 py-1.5 flex flex-col justify-center text-[7px] leading-tight text-indigo-950">
+                    <div className="flex gap-1 overflow-hidden whitespace-nowrap">
+                        <span className="text-[#7A1975] font-medium min-w-[42px] uppercase">FACULTY:</span>
+                        <span className="font-extrabold text-indigo-950 truncate">{student.school || "School of Business"}</span>
+                    </div>
+                    <div className="flex gap-1 mt-0.5 overflow-hidden whitespace-nowrap">
+                        <span className="text-[#7A1975] font-medium min-w-[42px] uppercase">COURSE:</span>
+                        <span className="font-extrabold text-indigo-950 truncate">{student.program || "DBM/May 2026"}</span>
+                    </div>
+                    <div className="flex gap-1 mt-0.5 overflow-hidden whitespace-nowrap">
+                        <span className="text-[#7A1975] font-medium min-w-[42px] uppercase">VALIDITY:</span>
+                        <span className="font-extrabold text-indigo-950 truncate">
+                            {student.expiry_date ? new Date(student.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
+                        </span>
                     </div>
                 </div>
             </div>
 
-            {/* Bottom Security Element */}
-            <div className="absolute bottom-0 left-0 w-full h-[6px] flex">
-                <div className="flex-1 bg-indigo-900"></div>
-                <div className="flex-1 bg-purple-700"></div>
-                <div className="flex-1 bg-indigo-900"></div>
+            {/* Right-most Column (Vertical STUDENT bar) */}
+            <div className="absolute right-0 top-0 bottom-0 w-[45px] bg-[#7A1975] flex items-center justify-center select-none">
+                <span className="text-white text-[20px] font-black tracking-[0.25em] uppercase absolute transform -rotate-90 whitespace-nowrap">
+                    STUDENT
+                </span>
             </div>
         </div>
     )
@@ -469,40 +500,38 @@ function IDCardBack({ student, companySettings }: any) {
     return (
         <div 
             id={`id-card-back-${student.id}`}
-            className="w-[340px] h-[216px] bg-white border border-gray-200 shadow-xl relative overflow-hidden flex flex-col items-center pt-8"
-            style={{ fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif" }}
+            className="w-[340px] h-[216px] bg-white border border-black shadow-xl relative overflow-hidden flex flex-col items-center justify-between py-5"
+            style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif" }}
         >
-            <div className="absolute top-0 left-0 w-full h-1 bg-indigo-900"></div>
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-[#7A1975]"></div>
             
-            <h4 className="text-[11px] font-black text-gray-800 uppercase tracking-[0.25em] mb-1">Security & Access Control</h4>
-            <p className="text-[7px] text-gray-400 font-bold uppercase mb-4">Verification Required for Campus Entry</p>
+            <div className="text-center px-4 mt-2">
+                <h4 className="text-[11px] font-black text-gray-800 uppercase tracking-[0.15em] mb-0.5">Security & Access Control</h4>
+                <p className="text-[7px] text-gray-400 font-bold uppercase tracking-wider">Verification Required for Campus Entry</p>
+            </div>
 
-            <div className="p-2 bg-white border-2 border-gray-100 shadow-sm rounded-sm">
+            <div className="p-1 bg-white border border-gray-150 shadow-sm rounded-sm">
                 <QRCodeSVG 
                     value={student.admission_number} 
-                    size={105} 
-                    level="H" 
-                    imageSettings={{
-                        src: companySettings.logo_url || "/logo.png",
-                        height: 20,
-                        width: 20,
-                        excavate: true
-                    }}
+                    size={80} 
+                    level="H"
                 />
             </div>
 
-            <div className="mt-3 text-center px-8">
-                <p className="text-[11px] font-black text-indigo-900 tracking-[0.1em]">{student.admission_number}</p>
-                <p className="text-[6px] text-gray-400 mt-2 font-bold uppercase leading-tight">
-                    This card is the property of the university. If found, please return it to the University Security Office or nearest Police Station.
+            <div className="text-center px-6 mb-2">
+                <p className="text-[11px] font-black text-[#7A1975] tracking-[0.1em]">{student.admission_number}</p>
+                <p className="text-[6px] text-gray-400 mt-1.5 font-bold uppercase leading-tight px-2">
+                    This card is the property of {companySettings.company_name || "the university"}. If found, please return it to the University Security Office.
                 </p>
             </div>
 
-            <div className="absolute bottom-3 right-4 opacity-10">
-                <img src={companySettings.logo_url || "/logo.png"} className="w-16 h-16 object-contain grayscale" />
+            <div className="absolute bottom-3 right-4 opacity-5 pointer-events-none">
+                {companySettings.logo_url && (
+                    <img src={companySettings.logo_url} className="w-12 h-12 object-contain grayscale" />
+                )}
             </div>
             
-            <div className="absolute bottom-0 left-0 w-full h-1 bg-indigo-900"></div>
+            <div className="absolute bottom-0 left-0 w-full h-1.5 bg-[#7A1975]"></div>
         </div>
     )
 }

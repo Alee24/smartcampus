@@ -418,150 +418,139 @@ export default function StudentVerification() {
                         </div>
 
                         <div className="w-full max-w-4xl mx-auto">
-                            <div className={`relative transition-all duration-700 preserve-3d h-[520px] w-full ${isFlipped ? 'rotate-y-180' : ''}`}>
-                                {/* Front Side - Premium Template */}
-                                <div className="absolute inset-0 backface-hidden bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20 flex flex-col scale-100 origin-center transition-transform hover:scale-[1.01]">
-                                    {/* Top Branding Bar */}
-                                    <div className="h-24 bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 flex items-center justify-between px-8">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl p-1.5 border border-white/20 flex items-center justify-center overflow-hidden">
-                                                {companySettings.logo_url ? (
-                                                    <img src={companySettings.logo_url} className="w-full h-full object-contain" />
-                                                ) : (
-                                                    <img src="/logo.png" className="w-full h-full object-contain" />
-                                                )}
-                                            </div>
-                                            <div className="text-white">
-                                                <h2 className="font-black text-2xl leading-none tracking-tight uppercase">{companySettings.company_name}</h2>
-                                                <p className="text-[10px] font-bold opacity-80 tracking-[0.2em] mt-1 uppercase">Official Student ID Card</p>
-                                            </div>
-                                        </div>
-                                        <div className="px-5 py-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center gap-2 text-white font-bold text-sm">
-                                            <CheckCircle size={18} className="text-white" />
-                                            VERIFIED
-                                        </div>
-                                    </div>
+                            {(() => {
+                                const nameParts = result.full_name ? result.full_name.trim().split(/\s+/) : [];
+                                const firstName = nameParts[0] || "";
+                                const lastName = nameParts.slice(1).join(" ") || "";
+                                return (
+                                    <div className={`relative transition-all duration-700 preserve-3d h-[520px] w-full ${isFlipped ? 'rotate-y-180' : ''}`}>
+                                        {/* Front Side - Premium Template */}
+                                        <div className="absolute inset-0 backface-hidden bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-row transition-transform hover:scale-[1.005]">
+                                            {/* Left Column (Logo, Name, ID No, QR Code) */}
+                                            <div className="flex-1 flex flex-col justify-between p-8">
+                                                {/* Logo & School Name */}
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-14 h-14 bg-purple-50 dark:bg-purple-950/30 rounded-2xl p-1.5 border border-purple-100 dark:border-purple-900/30 flex items-center justify-center shrink-0">
+                                                        {companySettings.logo_url ? (
+                                                            <img src={companySettings.logo_url} className="w-full h-full object-contain" />
+                                                        ) : (
+                                                            <div className="text-xl font-black text-[#7A1975]">RU</div>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[#7A1975] dark:text-purple-400 leading-none">
+                                                        <h2 className="font-black text-2xl tracking-tight uppercase">
+                                                            {companySettings.company_name || "Riara University"}
+                                                        </h2>
+                                                        <p className="text-[10px] font-bold opacity-80 tracking-[0.2em] mt-1.5 uppercase">
+                                                            {companySettings.tagline || "nurturing innovators"}
+                                                        </p>
+                                                    </div>
+                                                </div>
 
-                                    <div className="p-8 flex gap-10 flex-1 bg-white dark:bg-gray-900">
-                                        {/* Photo Section */}
-                                        <div className="relative group">
-                                            <div className="w-64 h-64 rounded-[2rem] bg-gradient-to-br from-pink-400 to-purple-500 p-1.5 shadow-2xl overflow-hidden">
-                                                <div className="w-full h-full rounded-[1.8rem] overflow-hidden bg-white/20 backdrop-blur-xl relative">
+                                                {/* Student Name */}
+                                                <div className="flex flex-col mt-4">
+                                                    <span className="font-serif text-[42px] font-bold text-[#7A1975] dark:text-purple-300 leading-none uppercase truncate">
+                                                        {firstName}
+                                                    </span>
+                                                    <span className="font-serif text-[42px] font-bold text-[#7A1975] dark:text-purple-300 leading-none uppercase mt-1 truncate">
+                                                        {lastName}
+                                                    </span>
+                                                </div>
+
+                                                {/* ID Number */}
+                                                <div className="text-xl font-black text-[#7A1975] dark:text-purple-400 uppercase tracking-widest mt-2">
+                                                    ID NO: {result.admission_number}
+                                                </div>
+
+                                                {/* QR Code & Status */}
+                                                <div className="flex items-end gap-6 mt-4">
+                                                    <div className="p-2 bg-white rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm shrink-0">
+                                                        <QRCodeSVG value={result.admission_number} size={110} level="H" />
+                                                    </div>
+                                                    <div className="pb-2">
+                                                        <div className="px-5 py-2 bg-green-500 text-white font-black text-xs uppercase tracking-widest rounded-full shadow-lg shadow-green-500/20 flex items-center gap-1.5 select-none">
+                                                            <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
+                                                            {result.status || 'ACTIVE'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Center-Right Column (Photo & Details) */}
+                                            <div className="w-[300px] border-l border-gray-150 dark:border-gray-800 flex flex-col">
+                                                {/* Student Photo */}
+                                                <div className="w-full h-[350px] bg-slate-50 dark:bg-slate-900/50 overflow-hidden relative">
                                                     {result.profile_image ? (
                                                         <img src={result.profile_image} className="w-full h-full object-cover" />
                                                     ) : (
-                                                        <div className="w-full h-full flex flex-col items-center justify-center text-white/50">
+                                                        <div className="w-full h-full flex items-center justify-center text-gray-355 bg-gray-100 dark:bg-gray-800">
                                                             <User size={80} strokeWidth={1.5} />
                                                         </div>
                                                     )}
                                                     
-                                                    {/* Status Badge Over Image */}
-                                                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-green-500 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1.5">
-                                                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                                                        {result.status || 'ACTIVE'}
+                                                    {canEdit && (
+                                                        <label className="absolute bottom-4 right-4 w-12 h-12 bg-white dark:bg-gray-800 shadow-xl rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700 text-[#7A1975]">
+                                                            <Camera size={24} />
+                                                            <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
+                                                        </label>
+                                                    )}
+                                                </div>
+
+                                                {/* Details Section */}
+                                                <div className="flex-1 bg-white dark:bg-gray-900 p-6 flex flex-col justify-center text-sm leading-tight text-indigo-950 dark:text-gray-200">
+                                                    <div className="flex gap-2 overflow-hidden whitespace-nowrap">
+                                                        <span className="text-[#7A1975] dark:text-purple-400 font-bold min-w-[80px] uppercase">FACULTY:</span>
+                                                        <span className="font-extrabold text-indigo-950 dark:text-white truncate">{result.school || "School of Business"}</span>
+                                                    </div>
+                                                    <div className="flex gap-2 mt-2 overflow-hidden whitespace-nowrap">
+                                                        <span className="text-[#7A1975] dark:text-purple-400 font-bold min-w-[80px] uppercase">COURSE:</span>
+                                                        <span className="font-extrabold text-indigo-950 dark:text-white truncate">{result.program || "DBM/May 2026"}</span>
+                                                    </div>
+                                                    <div className="flex gap-2 mt-2 overflow-hidden whitespace-nowrap">
+                                                        <span className="text-[#7A1975] dark:text-purple-400 font-bold min-w-[80px] uppercase">VALIDITY:</span>
+                                                        <span className="font-extrabold text-indigo-950 dark:text-white truncate">
+                                                            {result.expiry_date ? new Date(result.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
-                                            
-                                            {canEdit && (
-                                                <label className="absolute -bottom-2 -right-2 w-12 h-12 bg-white dark:bg-gray-800 shadow-xl rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 transition-transform border border-gray-100 dark:border-gray-700 text-purple-600">
-                                                    <Camera size={24} />
-                                                    <input type="file" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])} />
-                                                </label>
-                                            )}
+
+                                            {/* Right-most Column (Vertical STUDENT bar) */}
+                                            <div className="w-[80px] bg-[#7A1975] flex items-center justify-center relative select-none">
+                                                <span className="text-white text-[32px] font-black tracking-[0.25em] uppercase absolute transform -rotate-90 whitespace-nowrap">
+                                                    STUDENT
+                                                </span>
+                                            </div>
                                         </div>
 
-                                        {/* Info Section */}
-                                        <div className="flex-1 space-y-6">
-                                            <div className="space-y-1">
-                                                <h3 className="text-5xl font-black text-gray-900 dark:text-white tracking-tight">{result.full_name}</h3>
-                                                <p className="text-3xl font-bold text-purple-600/90 tracking-wide">{result.admission_number}</p>
+                                        {/* Back Side - Premium QR Template */}
+                                        <div className="absolute inset-0 backface-hidden rotate-y-180 bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col justify-between py-8">
+                                            <div className="absolute top-0 left-0 w-full h-3 bg-[#7A1975]"></div>
+                                            
+                                            <div className="text-center px-4 mt-6">
+                                                <h2 className="text-[#7A1975] dark:text-purple-400 font-black tracking-[0.2em] text-2xl uppercase">Security & Access Control</h2>
+                                                <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-1">Verification Required for Campus Entry</p>
                                             </div>
-
-                                            <div className="grid gap-4">
-                                                {/* School Box */}
-                                                <div className="bg-slate-50/50 dark:bg-white/5 p-4 rounded-2xl border border-slate-100 dark:border-white/10 flex items-start gap-3">
-                                                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-lg">
-                                                        <Building size={18} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[10px] font-bold text-purple-400 uppercase tracking-[0.2em] mb-1">School/Department</p>
-                                                        <p className="font-bold text-gray-800 dark:text-gray-200 text-xl">{result.school}</p>
-                                                    </div>
-                                                </div>
-
-                                                {/* Account Status Box */}
-                                                <div className="bg-blue-50/30 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/20 flex items-start gap-3">
-                                                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-lg">
-                                                        <Shield size={18} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em] mb-1">Account Status</p>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-2.5 h-2.5 bg-green-500 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
-                                                            <p className="font-black text-gray-900 dark:text-white text-xl">{result.status || 'Active'}</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Last Accessed Box */}
-                                                <div className="bg-pink-50/30 dark:bg-pink-900/10 p-4 rounded-2xl border border-pink-100 dark:border-pink-900/20 flex items-start gap-3">
-                                                    <div className="p-2 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-lg">
-                                                        <Calendar size={18} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[10px] font-bold text-pink-400 uppercase tracking-[0.2em] mb-1">Last Accessed</p>
-                                                        <p className="font-bold text-gray-800 dark:text-gray-200 text-xl">
-                                                            {new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
-                                                        </p>
-                                                    </div>
+                                            
+                                            <div className="flex justify-center my-4">
+                                                <div className="p-4 bg-white rounded-[2rem] shadow-2xl border border-gray-100 dark:border-gray-800">
+                                                    <QRCodeSVG value={result.admission_number} size={200} level="H" />
                                                 </div>
                                             </div>
                                             
-                                            {/* Disclaimer */}
-                                            <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border-l-4 border-amber-400 rounded-xl">
-                                                <p className="text-[10px] text-amber-800 dark:text-amber-400 font-medium leading-relaxed">
-                                                    <AlertTriangle size={12} className="inline mr-1 mb-0.5" />
-                                                    <strong className="font-bold uppercase tracking-wider">Official Document:</strong> This card is property of {companySettings.company_name}. If found, please return to Security Office.
+                                            <div className="text-center px-8 mb-6">
+                                                <p className="mt-2 font-black text-3xl text-[#7A1975] dark:text-purple-400 tracking-[0.15em]">{result.admission_number}</p>
+                                                <p className="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase leading-relaxed max-w-md mx-auto mt-3">
+                                                    This card is the property of {companySettings.company_name || "the university"}. If found, please return it to the University Security Office or nearest Police Station.
                                                 </p>
                                             </div>
+                                            
+                                            <div className="absolute bottom-0 left-0 w-full h-3 bg-[#7A1975]"></div>
                                         </div>
                                     </div>
-
-                                    {/* Bottom Info Bar */}
-                                    <div className="h-8 bg-gradient-to-r from-fuchsia-600 via-purple-600 to-indigo-600 px-8 flex items-center justify-between text-white/90 text-[10px] font-black uppercase tracking-widest">
-                                        <span>© 2026 {companySettings.company_name}</span>
-                                        <div className="flex items-center gap-4">
-                                            <span className="flex items-center gap-1.5">
-                                                <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
-                                                Verified & Active
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Back Side - Premium QR Template */}
-                                <div className="absolute inset-0 backface-hidden rotate-y-180 bg-white dark:bg-gray-900 rounded-[2.5rem] shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col">
-                                    <div className="h-24 bg-slate-900 flex flex-col items-center justify-center">
-                                        <h2 className="text-white font-black tracking-[0.3em] text-xl uppercase">Digital Identity</h2>
-                                        <p className="text-[10px] text-white/50 font-bold uppercase mt-1">Smart Campus Authentication</p>
-                                    </div>
-                                    <div className="flex-1 flex flex-col items-center justify-center p-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-900">
-                                        <div className="p-6 bg-white rounded-[2rem] shadow-2xl border border-gray-100 transform transition-transform hover:scale-105">
-                                            <QRCodeSVG value={result.admission_number} size={240} level="H" includeMargin={true} />
-                                        </div>
-                                        <p className="mt-8 font-black text-4xl text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 tracking-[0.2em]">{result.admission_number}</p>
-                                        <div className="mt-6 text-center space-y-1">
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest">Scan for Campus Access Control</p>
-                                            <p className="text-[10px] text-gray-400 dark:text-gray-500 font-medium italic">Encryption Level: SEC-AES-256</p>
-                                        </div>
-                                    </div>
-                                    <div className="h-10 bg-slate-900 flex items-center justify-center">
-                                        <p className="text-[10px] text-white/40 font-bold uppercase tracking-[0.5em]">Gatepass Integrated Security System</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                                );
+                            })()}
+                        </div>>
                     </div>
                 )}
 
@@ -655,31 +644,143 @@ export default function StudentVerification() {
                 )}
 
                 {/* Print Capture Area (Hidden) */}
-                {result && !result.error && (
-                    <div className="fixed -left-[5000px] top-0">
-                        <div id={`printable-front-${result.id}`} className="w-[1011px] h-[638px] bg-white relative flex flex-col">
-                            <div className="h-[150px] bg-purple-700 flex items-center px-12 gap-8">
-                                <img src={companySettings.logo_url || "/logo.png"} className="h-24" />
-                                <h1 className="text-white text-5xl font-black uppercase">{companySettings.company_name}</h1>
-                            </div>
-                            <div className="flex-1 flex p-12 gap-12">
-                                <img src={result.profile_image} className="w-[320px] h-[400px] object-cover rounded-3xl" />
-                                <div className="flex-1 py-8">
-                                    <h2 className="text-6xl font-black uppercase text-gray-900">{result.full_name}</h2>
-                                    <p className="text-4xl font-bold text-purple-600 mt-2">{result.admission_number}</p>
-                                    <div className="mt-12 space-y-4">
-                                        <p className="text-2xl font-bold text-gray-400 uppercase tracking-widest">Department</p>
-                                        <p className="text-4xl font-black text-gray-900">{result.school}</p>
+                {result && !result.error && (() => {
+                    const nameParts = result.full_name ? result.full_name.trim().split(/\s+/) : [];
+                    const firstName = nameParts[0] || "";
+                    const lastName = nameParts.slice(1).join(" ") || "";
+                    return (
+                        <div className="fixed -left-[5000px] top-0">
+                            {/* Printable Front Side */}
+                            <div 
+                                id={`printable-front-${result.id}`} 
+                                className="w-[1011px] h-[638px] bg-white border border-black relative overflow-hidden select-none"
+                                style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif" }}
+                            >
+                                {/* Left Column */}
+                                <div className="absolute left-[45px] top-[45px] bottom-[45px] w-[430px] flex flex-col justify-between">
+                                    {/* Logo & School Name */}
+                                    <div className="flex items-center gap-4">
+                                        {companySettings.logo_url ? (
+                                            <img src={companySettings.logo_url} className="h-28 w-auto object-contain" />
+                                        ) : (
+                                            <div className="w-24 h-24 rounded-full bg-purple-100 flex items-center justify-center text-[#7A1975] font-black text-3xl shrink-0">
+                                                RU
+                                            </div>
+                                        )}
+                                        <div className="flex flex-col leading-none overflow-hidden">
+                                            <span className="text-[30px] font-black text-[#7A1975] uppercase tracking-tight truncate">
+                                                {companySettings.company_name || "Riara University"}
+                                            </span>
+                                            <span className="text-[18px] font-bold text-gray-500 lowercase tracking-wider mt-1 truncate">
+                                                {companySettings.tagline || "nurturing innovators"}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Student Name */}
+                                    <div className="flex flex-col mt-4">
+                                        <span className="font-serif text-[66px] font-bold text-[#7A1975] leading-none uppercase truncate">
+                                            {firstName}
+                                        </span>
+                                        <span className="font-serif text-[66px] font-bold text-[#7A1975] leading-none uppercase mt-2.5 truncate">
+                                            {lastName}
+                                        </span>
+                                    </div>
+
+                                    {/* ID Number */}
+                                    <div className="text-[30px] font-black text-[#7A1975] uppercase tracking-wider mt-2">
+                                        ID NO: {result.admission_number}
+                                    </div>
+
+                                    {/* QR Code */}
+                                    <div className="mt-3">
+                                        <QRCodeSVG 
+                                            value={result.admission_number} 
+                                            size={165} 
+                                            level="H"
+                                        />
                                     </div>
                                 </div>
+
+                                {/* Center-Right Column */}
+                                <div className="absolute left-[490px] top-0 bottom-0 w-[385px] flex flex-col">
+                                    {/* Student Photo */}
+                                    <div className="w-full h-[438px] bg-gray-50 overflow-hidden border-b border-gray-200">
+                                        {result.profile_image ? (
+                                            <img src={result.profile_image} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-gray-305 bg-gray-100">
+                                                <User size={120} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Details Section */}
+                                    <div className="flex-1 bg-white px-3 py-4 flex flex-col justify-center text-[21px] leading-tight text-indigo-950">
+                                        <div className="flex gap-3 overflow-hidden whitespace-nowrap">
+                                            <span className="text-[#7A1975] font-medium min-w-[130px] uppercase">FACULTY:</span>
+                                            <span className="font-extrabold text-indigo-950 truncate">{result.school || "School of Business"}</span>
+                                        </div>
+                                        <div className="flex gap-3 mt-2 overflow-hidden whitespace-nowrap">
+                                            <span className="text-[#7A1975] font-medium min-w-[130px] uppercase">COURSE:</span>
+                                            <span className="font-extrabold text-indigo-950 truncate">{result.program || "DBM/May 2026"}</span>
+                                        </div>
+                                        <div className="flex gap-3 mt-2 overflow-hidden whitespace-nowrap">
+                                            <span className="text-[#7A1975] font-medium min-w-[130px] uppercase">VALIDITY:</span>
+                                            <span className="font-extrabold text-indigo-950 truncate">
+                                                {result.expiry_date ? new Date(result.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right-most Column */}
+                                <div className="absolute right-0 top-0 bottom-0 w-[135px] bg-[#7A1975] flex items-center justify-center select-none">
+                                    <span className="text-white text-[60px] font-black tracking-[0.25em] uppercase absolute transform -rotate-90 whitespace-nowrap">
+                                        STUDENT
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Printable Back Side */}
+                            <div 
+                                id={`printable-back-${result.id}`} 
+                                className="w-[1011px] h-[638px] bg-white border border-black relative overflow-hidden flex flex-col items-center justify-between py-16"
+                                style={{ fontFamily: "'Inter', 'Segoe UI', Roboto, sans-serif" }}
+                            >
+                                <div className="absolute top-0 left-0 w-full h-[18px] bg-[#7A1975]"></div>
+                                
+                                <div className="text-center px-12 mt-4">
+                                    <h4 className="text-[33px] font-black text-gray-800 uppercase tracking-[0.15em] mb-1.5">Security & Access Control</h4>
+                                    <p className="text-[21px] text-gray-400 font-bold uppercase tracking-wider">Verification Required for Campus Entry</p>
+                                </div>
+
+                                <div className="p-3 bg-white border border-gray-150 shadow-sm rounded-sm">
+                                    <QRCodeSVG 
+                                        value={result.admission_number} 
+                                        size={240} 
+                                        level="H"
+                                    />
+                                </div>
+
+                                <div className="text-center px-16 mb-6">
+                                    <p className="text-[33px] font-black text-[#7A1975] tracking-[0.1em]">{result.admission_number}</p>
+                                    <p className="text-[18px] text-gray-400 mt-4 font-bold uppercase leading-relaxed px-6">
+                                        This card is the property of {companySettings.company_name || "the university"}. If found, please return it to the University Security Office.
+                                    </p>
+                                </div>
+
+                                <div className="absolute bottom-[35px] right-[45px] opacity-5 pointer-events-none">
+                                    {companySettings.logo_url && (
+                                        <img src={companySettings.logo_url} className="w-36 h-36 object-contain grayscale" />
+                                    )}
+                                </div>
+                                
+                                <div className="absolute bottom-0 left-0 w-full h-[18px] bg-[#7A1975]"></div>
                             </div>
                         </div>
-                        <div id={`printable-back-${result.id}`} className="w-[1011px] h-[638px] bg-white flex flex-col items-center justify-center p-12">
-                            <QRCodeSVG value={result.admission_number} size={400} />
-                            <p className="text-7xl font-black text-purple-600 mt-12">{result.admission_number}</p>
-                        </div>
-                    </div>
-                )}
+                    );
+                })()}
             </div>
         </div>
     )
