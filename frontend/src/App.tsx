@@ -965,6 +965,17 @@ function App() {
 
                             {/* Right: Notifications & Profile */}
                             <div className="flex items-center gap-3 relative shrink-0">
+                                <button
+                                    onClick={() => setActiveTab('notice-board')}
+                                    className={`p-2 rounded-lg relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all ${
+                                        activeTab === 'notice-board'
+                                            ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 ring-1 ring-indigo-200 dark:ring-indigo-800/30'
+                                            : ''
+                                    }`}
+                                    title="University Notice Board"
+                                >
+                                    <Megaphone size={20} />
+                                </button>
                                 <div className="relative">
                                     <button
                                         onClick={() => setShowNotifications(!showNotifications)}
@@ -1099,7 +1110,7 @@ function App() {
 
                     {/* Security Guard for Students */}
                     {(() => {
-                        if (role?.toLowerCase() === 'student' && !['dashboard', 'attendance', 'timetable', 'courses', 'classrooms', 'events', 'calendar', 'privacy', 'cookies', 'rights', 'settings'].includes(activeTab)) {
+                        if (role?.toLowerCase() === 'student' && !['dashboard', 'attendance', 'timetable', 'courses', 'classrooms', 'events', 'calendar', 'privacy', 'cookies', 'rights', 'settings', 'notice-board'].includes(activeTab)) {
                             setTimeout(() => setActiveTab('dashboard'), 0);
                             return null;
                         }
@@ -1122,6 +1133,7 @@ function App() {
                     {activeTab === 'gate' && <GateControl />}
                     {activeTab === 'vehicles' && <VehicleIntel />}
                     {activeTab === 'timetable' && <Timetable />}
+                    {activeTab === 'notice-board' && <NoticeBoard />}
                     {activeTab === 'events' && <EventManagement />}
                     {activeTab === 'classrooms' && <ClassroomManagement />}
                     {activeTab === 'courses' && <CourseReports />}
