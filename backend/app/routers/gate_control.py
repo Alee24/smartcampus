@@ -6,6 +6,7 @@ from app.models import User, EntryLog, Gate, Vehicle, VehicleLog, Visitor, Event
 from app.utils.audit import log_action
 from app.auth import get_current_user, get_current_admin
 from datetime import datetime
+from app.utils.timezone import get_eat_time
 import shutil
 import os
 import uuid
@@ -54,7 +55,7 @@ async def self_checkout(
     if not open_log:
         raise HTTPException(status_code=400, detail="You are not currently checked in")
     
-    open_log.exit_time = datetime.utcnow()
+    open_log.exit_time = get_eat_time()
     session.add(open_log)
     await session.commit()
     
@@ -127,7 +128,7 @@ async def manual_vehicle_entry(
     log = VehicleLog(
         vehicle_id=vehicle.id,
         gate_id=gate.id,
-        entry_time=datetime.utcnow(),
+        entry_time=get_eat_time(),
         vehicle_images={},
         manual_override=True,
         detected_passengers=passengers
@@ -286,7 +287,7 @@ async def scan_entry(
 
         if open_log:
             # Check Out
-            open_log.exit_time = datetime.utcnow()
+            open_log.exit_time = get_eat_time()
             session.add(open_log)
             await session.commit()
             
@@ -305,7 +306,7 @@ async def scan_entry(
                 "data": {
                     "name": plate,
                     "role": f"Checked OUT - {vehicle.make} {vehicle.model} ({vehicle.color})",
-                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "time": get_eat_time().strftime("%I:%M %p"),
                     "image": "https://cdn-icons-png.flaticon.com/512/3202/3202926.png"
                 }
             }
@@ -314,7 +315,7 @@ async def scan_entry(
             new_log = VehicleLog(
                 vehicle_id=vehicle.id,
                 gate_id=gate.id,
-                entry_time=datetime.utcnow(),
+                entry_time=get_eat_time(),
                 manual_override=False,
                 detected_passengers=1
             )
@@ -337,7 +338,7 @@ async def scan_entry(
                 "data": {
                     "name": plate,
                     "role": f"Checked IN - {vehicle.make} {vehicle.model} ({vehicle.color})",
-                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "time": get_eat_time().strftime("%I:%M %p"),
                     "image": "https://cdn-icons-png.flaticon.com/512/3202/3202926.png"
                 }
             }
@@ -365,7 +366,7 @@ async def scan_entry(
                     phone_number=phone,
                     visit_details=details,
                     status="checked_in",
-                    time_in=datetime.utcnow()
+                    time_in=get_eat_time()
                 )
                 session.add(visitor)
                 await session.commit()
@@ -387,7 +388,7 @@ async def scan_entry(
                     phone_number="N/A",
                     visit_details="Auto-Registered Guest",
                     status="checked_in",
-                    time_in=datetime.utcnow()
+                    time_in=get_eat_time()
                 )
                 session.add(visitor)
                 await session.commit()
@@ -395,7 +396,7 @@ async def scan_entry(
                 
         if visitor.status == "checked_in" and not visitor.time_out:
             # Check Out
-            visitor.time_out = datetime.utcnow()
+            visitor.time_out = get_eat_time()
             visitor.status = "checked_out"
             session.add(visitor)
             await session.commit()
@@ -415,13 +416,13 @@ async def scan_entry(
                 "data": {
                     "name": f"{visitor.first_name} {visitor.last_name}",
                     "role": f"Checked OUT - Visitor ({visitor.visit_details})",
-                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "time": get_eat_time().strftime("%I:%M %p"),
                     "image": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
                 }
             }
         else:
             # Check In
-            visitor.time_in = datetime.utcnow()
+            visitor.time_in = get_eat_time()
             visitor.time_out = None
             visitor.status = "checked_in"
             session.add(visitor)
@@ -442,7 +443,7 @@ async def scan_entry(
                 "data": {
                     "name": f"{visitor.first_name} {visitor.last_name}",
                     "role": f"Checked IN - Visitor ({visitor.visit_details})",
-                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "time": get_eat_time().strftime("%I:%M %p"),
                     "image": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
                 }
             }
@@ -467,7 +468,7 @@ async def scan_entry(
                 "data": {
                     "name": user.full_name,
                     "role": user.school or "Inactive User",
-                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "time": get_eat_time().strftime("%I:%M %p"),
                     "image": user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
                 }
             }
@@ -481,7 +482,7 @@ async def scan_entry(
 
         if open_log:
             # Check Out
-            open_log.exit_time = datetime.utcnow()
+            open_log.exit_time = get_eat_time()
             session.add(open_log)
             await session.commit()
             
@@ -500,7 +501,7 @@ async def scan_entry(
                 "data": {
                     "name": user.full_name,
                     "role": f"Checked OUT ({user.school or 'Student'})",
-                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "time": get_eat_time().strftime("%I:%M %p"),
                     "image": user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
                 }
             }
@@ -509,7 +510,7 @@ async def scan_entry(
             new_log = EntryLog(
                 user_id=user.id,
                 gate_id=gate.id,
-                entry_time=datetime.utcnow(),
+                entry_time=get_eat_time(),
                 method="qr",
                 status="allowed"
             )
@@ -532,7 +533,7 @@ async def scan_entry(
                 "data": {
                     "name": user.full_name,
                     "role": f"Checked IN ({user.school or 'Student'})",
-                    "time": datetime.utcnow().strftime("%I:%M %p"),
+                    "time": get_eat_time().strftime("%I:%M %p"),
                     "image": user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
                 }
             }
@@ -550,7 +551,7 @@ async def check_in_user(
     # 1. Close any open sessions
     open_logs = (await session.exec(select(EntryLog).where(EntryLog.user_id == user.id).where(EntryLog.exit_time == None))).all()
     for log in open_logs:
-        log.exit_time = datetime.utcnow()
+        log.exit_time = get_eat_time()
         session.add(log)
     
     # 2. Create new Entry
@@ -564,7 +565,7 @@ async def check_in_user(
     new_log = EntryLog(
         user_id=user.id,
         gate_id=gate.id,
-        entry_time=datetime.utcnow(),
+        entry_time=get_eat_time(),
         method="manual",
         status="allowed"
     )
@@ -603,13 +604,13 @@ async def check_out_user(
         log = EntryLog(
             user_id=user.id,
             gate_id=gate.id,
-            entry_time=datetime.utcnow(),
-            exit_time=datetime.utcnow(),
+            entry_time=get_eat_time(),
+            exit_time=get_eat_time(),
             method="manual",
             status="allowed"
         )
     else:
-        log.exit_time = datetime.utcnow()
+        log.exit_time = get_eat_time()
     
     session.add(log)
     await session.commit()
@@ -716,7 +717,7 @@ async def scan_vehicle_plate(
     log = VehicleLog(
         vehicle_id=vehicle.id,
         gate_id=gate.id,
-        entry_time=datetime.utcnow(),
+        entry_time=get_eat_time(),
         vehicle_images={"front": f"/{filepath}"},
         manual_override=False,
         detected_passengers=random.randint(1, 4)
@@ -804,14 +805,14 @@ async def vehicle_exit(payload: dict, session: AsyncSession = Depends(get_sessio
     if not log:
          raise HTTPException(status_code=404, detail="Vehicle not inside")
     
-    log.exit_time = datetime.utcnow()
+    log.exit_time = get_eat_time()
     session.add(log)
     await session.commit()
     return {"message": "Exit recorded", "time": log.exit_time.strftime("%H:%M:%S")}
 
 @router.get("/vehicle-stats")
 async def get_vehicle_stats(session: AsyncSession = Depends(get_session)):
-    today = datetime.utcnow().date()
+    today = get_eat_time().date()
     start_of_day = datetime.combine(today, datetime.min.time())
     
     # Fetch logs with vehicle details
@@ -831,7 +832,7 @@ async def get_vehicle_stats(session: AsyncSession = Depends(get_session)):
     manual_entries = len([d for d in logs_data if d["log"].manual_override])
     
     # Calculate Longest Stays
-    now = datetime.utcnow()
+    now = get_eat_time()
     durations = []
     
     # Init Hourly Traffic (0-23)
@@ -963,7 +964,7 @@ async def check_in_visitor(
             id_number=payload.get("id_number"),
             visit_details=payload.get("visit_details"),
             status="checked_in",
-            time_in=datetime.utcnow()
+            time_in=get_eat_time()
         )
         session.add(visitor)
         await session.commit()
@@ -1001,7 +1002,7 @@ async def check_out_visitor(
     if not visitor:
         raise HTTPException(status_code=404, detail="Visitor not found")
         
-    visitor.time_out = datetime.utcnow()
+    visitor.time_out = get_eat_time()
     visitor.status = "checked_out"
     session.add(visitor)
     await session.commit()
@@ -1021,7 +1022,7 @@ async def check_out_visitor(
 
 @router.get("/visitor-stats")
 async def get_visitor_stats(session: AsyncSession = Depends(get_session)):
-    today = datetime.utcnow().date()
+    today = get_eat_time().date()
     start_of_day = datetime.combine(today, datetime.min.time())
     
     # Query all visitors from today
@@ -1263,7 +1264,7 @@ async def public_access_request(
              v_log = VehicleLog(
                  vehicle_id=vehicle.id,
                  gate_id=gate.id,
-                 entry_time=datetime.utcnow(),
+                 entry_time=get_eat_time(),
                  vehicle_images={},
                  manual_override=True, # Flag as manual/self-service
                  detected_passengers=int(data.get("passengers", 1))
@@ -1279,7 +1280,7 @@ async def public_access_request(
                  id_number=data.get("id_number"),
                  visit_details=f"{role.title()}: {data.get('purpose') or data.get('delivery_details')}",
                  status="checked_in",
-                 time_in=datetime.utcnow(),
+                 time_in=get_eat_time(),
                  gate_id=gate.id, # LINK TO GATE
                  visitor_type=role  # RECORD TYPE
              )
@@ -1357,7 +1358,7 @@ async def public_access_request(
                  log = EntryLog(
                      user_id=user.id,
                      gate_id=gate.id,
-                     entry_time=datetime.utcnow(),
+                     entry_time=get_eat_time(),
                      method="self_service_verification",
                      status=final_status,
                      ip_address=client_ip,
@@ -1407,7 +1408,7 @@ async def create_scan_log(session: AsyncSession, gate_id: Optional[uuid.UUID], s
             details=details,
             guard_id=guard_id,
             scanner_name=scanner_name,
-            timestamp=datetime.utcnow()
+            timestamp=get_eat_time()
         )
         session.add(log)
         await session.commit()

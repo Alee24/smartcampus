@@ -5,6 +5,7 @@ from app.database import get_session
 from app.models import User, EntryLog, VehicleLog, AttendanceRecord, Role, Gate, ClassSession
 from app.auth import get_current_user
 from datetime import datetime, timedelta
+from app.utils.timezone import get_eat_time
 from typing import List, Dict, Any
 
 router = APIRouter()
@@ -25,7 +26,7 @@ async def get_summary_stats(session: AsyncSession = Depends(get_session), user: 
     total_entries = (await session.exec(select(func.count(EntryLog.id)))).one()
     
     # Entries Today
-    today = datetime.utcnow().date()
+    today = get_eat_time().date()
     entries_today = (await session.exec(select(func.count(EntryLog.id)).where(func.date(EntryLog.entry_time) == today))).one()
     
     # Vehicles Parked (logs without exit time)
@@ -46,7 +47,7 @@ async def get_summary_stats(session: AsyncSession = Depends(get_session), user: 
 @router.get("/traffic/weekly")
 async def get_weekly_traffic(session: AsyncSession = Depends(get_session), user: User = Depends(ensure_admin)):
     """Entries for the last 7 days"""
-    end_date = datetime.utcnow().date()
+    end_date = get_eat_time().date()
     start_date = end_date - timedelta(days=6)
     
     query = (
@@ -146,7 +147,7 @@ async def get_detailed_report(
 ):
     """Generate detailed daily reports containing scans, vehicles, and key metrics."""
     if not date:
-        date_obj = datetime.utcnow().date()
+        date_obj = get_eat_time().date()
     else:
         try:
             date_obj = datetime.strptime(date, "%Y-%m-%d").date()

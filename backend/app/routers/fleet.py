@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, date as date_type, timedelta
+from app.utils.timezone import get_eat_time
 
 from app.database import get_session
 from app.models import (
@@ -386,7 +387,7 @@ async def check_in_fleet_vehicle(
         log = VehicleLog(
             vehicle_id=vehicle_id,
             gate_id=gate.id,
-            entry_time=datetime.utcnow(),
+            entry_time=get_eat_time(),
             vehicle_images={},
             manual_override=True,
             detected_passengers=payload.get("passengers", 1)
@@ -430,12 +431,12 @@ async def check_out_fleet_vehicle(
             open_log = VehicleLog(
                 vehicle_id=vehicle_id,
                 gate_id=gate.id,
-                entry_time=datetime.utcnow() - timedelta(minutes=5),
+                entry_time=get_eat_time() - timedelta(minutes=5),
                 vehicle_images={},
                 manual_override=True
             )
             
-        open_log.exit_time = datetime.utcnow()
+        open_log.exit_time = get_eat_time()
         session.add(open_log)
         await session.commit()
         return {"status": "success", "message": f"Vehicle {vehicle.plate_number} checked out successfully."}
@@ -744,7 +745,7 @@ async def get_trip_report_summary(
             mins, _ = divmod(remainder, 60)
             duration_str = f"{int(hrs)}h {int(mins)}m"
         elif trip.actual_departure:
-            diff = datetime.utcnow() - trip.actual_departure
+            diff = get_eat_time() - trip.actual_departure
             hrs, remainder = divmod(diff.total_seconds(), 3600)
             mins, _ = divmod(remainder, 60)
             duration_str = f"{int(hrs)}h {int(mins)}m (ongoing)"
@@ -758,7 +759,7 @@ async def get_trip_report_summary(
         fuel_cost = 0.0
         fuel_liters = 0.0
         if trip.actual_departure:
-            end_time = trip.actual_arrival or datetime.utcnow()
+            end_time = trip.actual_arrival or get_eat_time()
             fuel_query = select(FleetFuelLog).where(
                 (FleetFuelLog.vehicle_id == trip.vehicle_id) & 
                 (FleetFuelLog.timestamp >= trip.actual_departure) & 
@@ -806,7 +807,7 @@ async def start_trip(
         if not trip:
             raise HTTPException(status_code=404, detail="Trip not found")
 
-        trip.actual_departure = datetime.utcnow()
+        trip.actual_departure = get_eat_time()
         trip.start_odometer = odometer
         trip.status = "ongoing"
 
@@ -876,7 +877,7 @@ async def board_passenger(
                 phone_number=db_user.phone_number,
                 admission_number=db_user.admission_number,
                 arrival_confirmed=True,
-                check_in_time=datetime.utcnow(),
+                check_in_time=get_eat_time(),
                 added_via_scan=True
             )
             session.add(passenger)
@@ -892,7 +893,7 @@ async def board_passenger(
             return {"status": "success", "message": f"{passenger.passenger_name} is already checked in."}
 
         passenger.arrival_confirmed = True
-        passenger.check_in_time = datetime.utcnow()
+        passenger.check_in_time = get_eat_time()
         session.add(passenger)
         await session.commit()
         await session.refresh(passenger)
@@ -923,7 +924,7 @@ async def end_trip(
         if not trip:
             raise HTTPException(status_code=404, detail="Trip not found")
 
-        trip.actual_arrival = datetime.utcnow()
+        trip.actual_arrival = get_eat_time()
         trip.end_odometer = odometer
         trip.status = "completed"
         trip.notes = notes

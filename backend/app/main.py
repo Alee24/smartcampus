@@ -609,12 +609,13 @@ async def register(
         except: pass
         
     from datetime import datetime
+    from app.utils.timezone import get_eat_time
     expiry_date = None
     if user_data.get('expiry_date'):
         try: expiry_date = datetime.strptime(user_data['expiry_date'], '%Y-%m-%d').date()
         except: pass
         
-    admission_date = datetime.utcnow().date()
+    admission_date = get_eat_time().date()
     if user_data.get('admission_date'):
         try: admission_date = datetime.strptime(user_data['admission_date'], '%Y-%m-%d').date()
         except: pass

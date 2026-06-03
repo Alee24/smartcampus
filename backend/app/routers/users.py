@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request, Form, BackgroundTasks
 from datetime import datetime
+from app.utils.timezone import get_eat_time
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import AsyncSession as SAAsyncSession
@@ -372,7 +373,7 @@ async def create_user(
         role_id=role.id,
         status="active",
         has_smartphone=new_user.get('has_smartphone', False),
-        admission_date=datetime.strptime(new_user['admission_date'], '%Y-%m-%d').date() if new_user.get('admission_date') else datetime.utcnow().date()
+        admission_date=datetime.strptime(new_user['admission_date'], '%Y-%m-%d').date() if new_user.get('admission_date') else get_eat_time().date()
     )
     
     session.add(db_user)
@@ -566,7 +567,7 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                             "pwd": default_hashed_pwd,
                             "role_id": role_id_val,
                             "profile_image": profile_val,
-                            "created_at": datetime.utcnow(),
+                            "created_at": get_eat_time(),
                         })
                         existing_map[adm_no] = (new_id, profile_val)  # prevent CSV duplicates
                         added_count += 1

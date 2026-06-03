@@ -6,6 +6,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List, Optional
 from datetime import datetime
+from app.utils.timezone import get_eat_time
 import uuid
 import os
 import shutil
@@ -32,7 +33,7 @@ async def get_notices(
             author_id=current_user.id,
             author_name="Campus Admin Team",
             author_role="Administrator",
-            created_at=datetime.utcnow()
+            created_at=get_eat_time()
         )
         session.add(welcome_notice)
         await session.commit()
@@ -77,7 +78,7 @@ async def create_notice(
         author_id=current_user.id,
         author_name=current_user.full_name,
         author_role=role.name if role else "User",
-        created_at=datetime.utcnow()
+        created_at=get_eat_time()
     )
     
     session.add(new_notice)

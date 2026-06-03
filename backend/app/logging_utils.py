@@ -2,6 +2,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models import SystemActivity
 import uuid
 from datetime import datetime
+from app.utils.timezone import get_eat_time
 
 async def log_system_activity(
     session: AsyncSession,
@@ -25,7 +26,7 @@ async def log_system_activity(
             description=description,
             metadata_info=metadata or {},
             ip_address=ip_address,
-            timestamp=datetime.utcnow()
+            timestamp=get_eat_time()
         )
         session.add(activity)
         # Note: We do not commit here to allow the caller to group it with their transaction

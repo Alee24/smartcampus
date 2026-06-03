@@ -3,6 +3,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List, Optional
 from datetime import date, time, datetime, timedelta
+from app.utils.timezone import get_eat_time
 from app.database import get_session
 from app.models import Classroom, Course, TimetableSlot, ClassSession, User, StudentCourseRegistration
 from app.auth import get_current_user, get_current_admin
@@ -180,8 +181,8 @@ async def get_classrooms_detailed(
         
         # Get recent activity (last 2 hours)
         # 2. Batch: Scans Today & Last Activity (Optimized)
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        recent_threshold = datetime.utcnow() - timedelta(minutes=10) # 10 mins considered "Active"
+        today_start = get_eat_time().replace(hour=0, minute=0, second=0, microsecond=0)
+        recent_threshold = get_eat_time() - timedelta(minutes=10) # 10 mins considered "Active"
         
         # Scans Today Map
         count_stmt = (
@@ -466,7 +467,7 @@ async def verify_classroom_scan(
     scan_log = ScanLog(
         student_id=current_user.id,
         room_code=room_code_val or course_code_val or "UNKNOWN",
-        timestamp=datetime.utcnow(),
+        timestamp=get_eat_time(),
         is_successful=False,
         status_message="Initializing"
     )
@@ -502,7 +503,7 @@ async def verify_classroom_scan(
             return {"success": False, "message": f"Unknown Course Code: {course_code_val}"}
         
     # 2. Determine Current Context
-    now = datetime.now()
+    now = get_eat_time()
     today_date = now.date()
     current_time = now.time()
     day_of_week = now.weekday() # 0=Monday

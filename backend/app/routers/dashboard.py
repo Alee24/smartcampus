@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 from datetime import datetime
+from app.utils.timezone import get_eat_time
 from sqlmodel import select, func
 from app.database import get_session
 from app.models import User, AttendanceRecord, Gate, EntryLog, Vehicle, VehicleLog, SystemActivity, Role, FleetTrip, Event
@@ -11,7 +12,7 @@ router = APIRouter()
 
 @router.get("/stats")
 async def get_dashboard_stats(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = get_eat_time().replace(hour=0, minute=0, second=0, microsecond=0)
     
     total_users_query = select(func.count(User.id)).where(User.status == "active")
     total_users = (await session.exec(total_users_query)).one()
@@ -41,7 +42,7 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session), curr
 @router.get("/kpi")
 async def get_kpi_data(session: AsyncSession = Depends(get_session), current_user: User = Depends(get_current_user)):
     from datetime import timedelta
-    today = datetime.utcnow().date()
+    today = get_eat_time().date()
     
     data = []
     labels = []
@@ -188,7 +189,7 @@ async def get_analytics(session: AsyncSession = Depends(get_session), current_us
     roles_data = [{"name": r, "value": c} for r, c in roles_res]
     
     # 2. Gate Usage (Last 30 Days)
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = get_eat_time() - timedelta(days=30)
     
     # Check-ins
     q_in = select(Gate.name, func.count(EntryLog.id))\
@@ -223,7 +224,7 @@ async def get_analytics(session: AsyncSession = Depends(get_session), current_us
 
 @router.get("/live-monitor-stats")
 async def get_live_monitor_stats(session: AsyncSession = Depends(get_session)):
-    today = datetime.utcnow().date()
+    today = get_eat_time().date()
     today_start = datetime.combine(today, datetime.min.time())
     today_end = datetime.combine(today, datetime.max.time())
     

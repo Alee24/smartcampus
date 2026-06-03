@@ -1145,9 +1145,9 @@ async def bulk_upload_photos(
                             
                             # Audit Trail Logging
                             from app.models import AuditLog
-                            from datetime import datetime
+                            from app.utils.timezone import get_eat_time
                             log = AuditLog(
-                                timestamp=datetime.utcnow(),
+                                timestamp=get_eat_time(),
                                 user_id=admin.id,
                                 user_name=admin.full_name,
                                 action_type="BULK_PHOTO_UPDATE",

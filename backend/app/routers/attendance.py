@@ -6,6 +6,7 @@ from app.database import get_session
 from app.models import Course, ClassSession, AttendanceRecord, User, TimetableSlot, Classroom, ScanLog
 from app.auth import get_current_user
 from datetime import datetime, date, timedelta
+from app.utils.timezone import get_eat_time
 import uuid
 import json
 from typing import List
@@ -65,7 +66,7 @@ async def start_session(
         raise HTTPException(status_code=400, detail="course_id is required")
         
     duration = data.get('duration_minutes', 120)
-    start_time = datetime.now()
+    start_time = get_eat_time()
     end_time = start_time + timedelta(minutes=duration)
     
     # Generate unique codes
@@ -126,8 +127,8 @@ async def activate_all_classes(
     1. Activates scheduled classes from Timetable.
     2. Activates 'Open Study' sessions for any room without a schedule to ensure GLOBAL system availability.
     """
-    today = date.today()
-    now = datetime.now()
+    today = get_eat_time().date()
+    now = get_eat_time()
     day_of_week = now.weekday()
     
     activated_count = 0
@@ -313,7 +314,7 @@ async def mark_attendance(
             session_id=class_session.id,
             student_id=current_user.id,
             status=status,
-            scan_time=datetime.now(),
+            scan_time=get_eat_time(),
             live_image=meta.get('evidence_url'), # Explicitly save path to column
             connection_type=meta.get('connection', {}).get('type', 'unknown') if isinstance(meta.get('connection'), dict) else 'unknown',
             metadata_info=json.dumps(meta)
@@ -492,8 +493,8 @@ async def scan_room_qr(
          return {"status": "start_log_only", "message": "Location recorded (Unknown Room)"}
 
     # 4. Find Active Session in Room
-    now_time = datetime.now().time()
-    today = date.today()
+    now_time = get_eat_time().time()
+    today = get_eat_time().date()
     
     query = select(ClassSession).where(
         ClassSession.classroom_id == room.id,
@@ -536,7 +537,7 @@ async def scan_room_qr(
     
     # 6. Add to ScanLog for Real-time Dashboard
     scan_log = ScanLog(
-        timestamp=datetime.now(),
+        timestamp=get_eat_time(),
         student_id=current_user.id,
         room_code=qr_content, 
         is_successful=True,

@@ -4,6 +4,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List, Dict, Any, Optional
 from datetime import datetime, date, timedelta, time
 import uuid
+from app.utils.timezone import get_eat_time
 
 from app.database import get_session
 from app.models import (
@@ -25,7 +26,7 @@ async def get_my_classes_today(
         reg_stmt = select(StudentCourseRegistration).where(StudentCourseRegistration.student_id == user.id)
         registrations = (await session.exec(reg_stmt)).all()
         
-        today_date = datetime.today().date()
+        today_date = get_eat_time().date()
         classes_list = []
         
         if registrations:
@@ -119,7 +120,7 @@ async def get_my_attendance_recent(
                     "course_code": course.course_code if course else "N/A",
                     "course_name": course.course_name if course else "N/A",
                     "room_code": classroom.room_code if classroom else "N/A",
-                    "timestamp": rec.scan_time.isoformat() if rec.scan_time else datetime.utcnow().isoformat(),
+                    "timestamp": rec.scan_time.isoformat() if rec.scan_time else get_eat_time().isoformat(),
                     "status": rec.status
                 })
     except Exception as e:
@@ -128,7 +129,7 @@ async def get_my_attendance_recent(
             
     if not recent_list:
         # Fallback beautiful history
-        now = datetime.utcnow()
+        now = get_eat_time()
         recent_list = [
             {
                 "id": str(uuid.uuid4()),
@@ -223,7 +224,7 @@ async def get_lecturer_stats(
         total_courses = (await session.exec(courses_stmt)).first() or 0
         
         # Active sessions today
-        today_date = datetime.today().date()
+        today_date = get_eat_time().date()
         sessions_stmt = select(func.count(ClassSession.id)).where(
             (ClassSession.lecturer_id == user.id) &
             (ClassSession.session_date == today_date)
@@ -464,7 +465,7 @@ async def get_lecturer_upcoming_events(
             events_list.append({
                 "name": event.name,
                 "host": event.host,
-                "event_date": event.event_date.isoformat() if event.event_date else datetime.today().date().isoformat(),
+                "event_date": event.event_date.isoformat() if event.event_date else get_eat_time().date().isoformat(),
                 "description": event.description or "",
                 "event_type": event.event_type
             })
@@ -473,7 +474,7 @@ async def get_lecturer_upcoming_events(
         events_list = []
         
     if not events_list:
-        today = datetime.today().date()
+        today = get_eat_time().date()
         events_list = [
             {
                 "name": "Annual General Science Congress",

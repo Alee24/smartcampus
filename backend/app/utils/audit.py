@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import Request
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models import AuditLog, User
+from app.utils.timezone import get_eat_time
 
 def json_safe_dict(d: Any) -> Any:
     """Recursively convert UUIDs and datetimes to strings for JSON serialization."""
@@ -61,7 +62,7 @@ async def log_action(
         new_values["browser_metadata"] = browser_info
 
     log = AuditLog(
-        timestamp=datetime.utcnow(),
+        timestamp=get_eat_time(),
         user_id=user.id if user else None,
         user_name=user.full_name if user else "System",
         action_type=action_type,

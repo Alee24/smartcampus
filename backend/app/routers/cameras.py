@@ -3,6 +3,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List, Optional
 from datetime import datetime, timedelta
+from app.utils.timezone import get_eat_time
 from app.database import get_session
 from app.models import Camera, CameraAnalytics, Classroom, ClassSession
 from app.auth import get_current_user, get_current_admin, User
@@ -212,7 +213,7 @@ async def create_camera(
                 description=test_result.get('message'),
                 metadata={"rtsp_url": test_result.get('rtsp_url')},
                 ip_address=camera.ip_address,
-                timestamp=datetime.utcnow()
+                timestamp=get_eat_time()
             )
             session.add(log)
             await session.flush()
@@ -280,7 +281,7 @@ async def test_camera(camera_id: str, session: AsyncSession = Depends(get_sessio
     
     # Update camera status fields
     cam.status = result.get('status')
-    cam.last_seen = datetime.utcnow() if result.get('status') == 'online' else cam.last_seen
+    cam.last_seen = get_eat_time() if result.get('status') == 'online' else cam.last_seen
     cam.last_error = result.get('message') if result.get('status') != 'online' else None
     
     # Log failures to SystemActivity for audit
@@ -294,7 +295,7 @@ async def test_camera(camera_id: str, session: AsyncSession = Depends(get_sessio
             description=result.get('message'),
             metadata={"rtsp_url": result.get('rtsp_url')},
             ip_address=cam.ip_address,
-            timestamp=datetime.utcnow()
+            timestamp=get_eat_time()
         )
         session.add(log)
     
@@ -311,7 +312,7 @@ async def get_camera_analytics(
     current_user: User = Depends(get_current_user)
 ):
     """Get analytics for a specific camera"""
-    since = datetime.utcnow() - timedelta(hours=hours)
+    since = get_eat_time() - timedelta(hours=hours)
     
     result = await session.exec(
         select(CameraAnalytics)
@@ -330,7 +331,7 @@ async def get_room_analytics(
     current_user: User = Depends(get_current_user)
 ):
     """Get aggregated analytics for a room"""
-    since = datetime.utcnow() - timedelta(hours=hours)
+    since = get_eat_time() - timedelta(hours=hours)
     
     # Get all cameras in this room
     cameras_result = await session.exec(
@@ -419,7 +420,7 @@ async def get_camera_dashboard_stats(
     # Recent analytics
     recent_analytics = await session.exec(
         select(CameraAnalytics)
-        .where(CameraAnalytics.timestamp >= datetime.utcnow() - timedelta(hours=1))
+        .where(CameraAnalytics.timestamp >= get_eat_time() - timedelta(hours=1))
     )
     recent = recent_analytics.all()
     

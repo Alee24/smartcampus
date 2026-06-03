@@ -5,6 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models import ClassSession, AttendanceRecord, User, Course, EntryLog, Visitor
 from app.email_utils import send_attendance_email
 from datetime import datetime
+from app.utils.timezone import get_eat_time
 import csv
 import os
 
@@ -12,7 +13,7 @@ scheduler = AsyncIOScheduler()
 
 async def generate_and_send_daily_reports():
     print("Running Daily Attendance Reporting Job...")
-    today = datetime.now().date()
+    today = get_eat_time().date()
     
     async with AsyncSession(engine) as session:
         # Find distinct sessions today
@@ -88,7 +89,7 @@ async def generate_and_send_daily_reports():
 
 async def auto_checkout_users_and_visitors():
     print("Running Auto Checkout Job...")
-    now = datetime.utcnow()
+    now = get_eat_time()
     
     async with AsyncSession(engine) as session:
         # Checkout Users (EntryLog)

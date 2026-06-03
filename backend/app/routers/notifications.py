@@ -6,6 +6,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List
 from datetime import datetime
+from app.utils.timezone import get_eat_time
 
 router = APIRouter()
 
@@ -56,7 +57,7 @@ async def get_notifications(
                 "title": "Welcome to Smart Campus",
                 "message": f"Welcome, {current_user.full_name}! Your account is fully activated. We have secured your campus journey with our AI-driven security protocols.",
                 "severity": "success",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": get_eat_time().isoformat(),
                 "is_read": False,
                 "category": "system"
             },
@@ -65,7 +66,7 @@ async def get_notifications(
                 "title": "Action Required: Setup Security PIN",
                 "message": "To authorize restricted operations like profile image updates or QR scanning, please verify and set your 4-digit PIN in the Security tab.",
                 "severity": "warning",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": get_eat_time().isoformat(),
                 "is_read": False,
                 "category": "security"
             },
@@ -74,7 +75,7 @@ async def get_notifications(
                 "title": "AI Geofencing Shield Active",
                 "message": "Geofencing protocols are fully armed. Campus security perimeter is actively monitored to prevent unauthorized entry.",
                 "severity": "info",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": get_eat_time().isoformat(),
                 "is_read": True,
                 "category": "geofence"
             }

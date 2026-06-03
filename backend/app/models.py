@@ -4,6 +4,8 @@ from uuid import UUID, uuid4
 from sqlmodel import SQLModel, Field, Relationship, Column, ARRAY
 # from pgvector.sqlalchemy import Vector # Commented out for MySQL Local Dev
 from sqlalchemy import JSON, Text
+from app.utils.timezone import get_eat_time
+
 
 # Shared properties
 class UUIDModel(SQLModel):
@@ -26,7 +28,7 @@ class User(UUIDModel, table=True):
     role_id: UUID = Field(foreign_key="roles.id")
     status: str = Field(default="Active") # Active, Graduated, Suspended, Registered, Deferred, Unregistered
     has_smartphone: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=get_eat_time)
     
     # New Fields
     profile_image: Optional[str] = None
@@ -83,7 +85,7 @@ class UserLocationLog(UUIDModel, table=True):
     scanned_code: Optional[str] = None # The QR code content (e.g. Class Room Code)
     context_type: str = "scan" # scan, login, background
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=get_eat_time)
     
     # Device Info
     device_info: Optional[dict] = Field(default={}, sa_column=Column(JSON))
@@ -102,7 +104,7 @@ class EntryLog(UUIDModel, table=True):
     __tablename__ = "entry_logs"
     user_id: UUID = Field(foreign_key="users.id")
     gate_id: UUID = Field(foreign_key="gates.id")
-    entry_time: datetime = Field(default_factory=datetime.utcnow, index=True)
+    entry_time: datetime = Field(default_factory=get_eat_time, index=True)
     exit_time: Optional[datetime] = None
     method: str # qr, face, manual
     guard_id: Optional[UUID] = Field(foreign_key="users.id", nullable=True)
@@ -114,7 +116,7 @@ class EntryLog(UUIDModel, table=True):
 
 class GateScanLog(UUIDModel, table=True):
     __tablename__ = "gate_scan_logs"
-    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    timestamp: datetime = Field(default_factory=get_eat_time, index=True)
     scan_type: str
     scanned_value: Optional[str] = None
     status: str
@@ -173,7 +175,7 @@ class VehicleLog(UUIDModel, table=True):
     vehicle_id: UUID = Field(foreign_key="vehicles.id")
     vehicle_images: Optional[dict] = Field(default={}, sa_column=Column(JSON))
     detected_passengers: Optional[int] = None
-    entry_time: datetime = Field(default_factory=datetime.utcnow, index=True)
+    entry_time: datetime = Field(default_factory=get_eat_time, index=True)
     exit_time: Optional[datetime] = None
     gate_id: UUID = Field(foreign_key="gates.id")
     guard_id: Optional[UUID] = Field(foreign_key="users.id")
@@ -244,7 +246,7 @@ class FleetFuelLog(UUIDModel, table=True):
     odometer_reading: float
     receipt_image: Optional[str] = None
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=get_eat_time)
     
     vehicle: Vehicle = Relationship(back_populates="fuel_logs")
 
@@ -258,7 +260,7 @@ class FleetGPSLog(UUIDModel, table=True):
     heading: Optional[float] = None
     ignition_status: bool = False
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=get_eat_time)
     
     vehicle: Vehicle = Relationship(back_populates="gps_logs")
 
@@ -289,7 +291,7 @@ class FleetNotification(UUIDModel, table=True):
     severity: str = "info" # info, warning, critical
     is_read: bool = False
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=get_eat_time)
 
 # Classroom/Room Management
 class Classroom(UUIDModel, table=True):
@@ -338,7 +340,7 @@ class StudentCourseRegistration(UUIDModel, table=True):
     student_id: UUID = Field(foreign_key="users.id")
     course_id: UUID = Field(foreign_key="courses.id")
     semester: Optional[str] = "Current" 
-    registered_at: datetime = Field(default_factory=datetime.utcnow)
+    registered_at: datetime = Field(default_factory=get_eat_time)
     
     student: User = Relationship(back_populates="registrations")
     course: Course = Relationship(back_populates="registrations")
@@ -395,7 +397,7 @@ class AttendanceRecord(UUIDModel, table=True):
     __tablename__ = "attendance_records"
     session_id: UUID = Field(foreign_key="class_sessions.id")
     student_id: UUID = Field(foreign_key="users.id")
-    scan_time: datetime = Field(default_factory=datetime.utcnow)
+    scan_time: datetime = Field(default_factory=get_eat_time)
     live_image: Optional[str] = None
     face_match_score: Optional[float] = None
     assisted_by: Optional[UUID] = Field(foreign_key="users.id", nullable=True)
@@ -436,7 +438,7 @@ class SystemActivity(UUIDModel, table=True):
     description: str
     metadata_info: Optional[dict] = Field(default={}, sa_column=Column(JSON))
     ip_address: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    timestamp: datetime = Field(default_factory=get_eat_time, index=True)
     
     # Optional relationship to actor (User)
     actor: Optional["User"] = Relationship()
@@ -485,7 +487,7 @@ class CameraAnalytics(UUIDModel, table=True):
     __tablename__ = "camera_analytics"
     
     camera_id: UUID = Field(foreign_key="cameras.id")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=get_eat_time)
     
     # People Analytics
     people_count: Optional[int] = None
@@ -521,7 +523,7 @@ class ScanLog(UUIDModel, table=True):
     """Immutable log of all QR scan attempts"""
     __tablename__ = "scan_logs"
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=get_eat_time)
     
     # Who
     student_id: UUID = Field(foreign_key="users.id")
@@ -552,7 +554,7 @@ class Visitor(UUIDModel, table=True):
     visit_details: str 
     visitor_type: str = "visitor" # visitor, taxi, delivery
     
-    time_in: datetime = Field(default_factory=datetime.utcnow)
+    time_in: datetime = Field(default_factory=get_eat_time)
     time_out: Optional[datetime] = None
     
     gate_id: Optional[UUID] = Field(foreign_key="gates.id", nullable=True) # Link to Gate
@@ -572,7 +574,7 @@ class Event(UUIDModel, table=True):
     end_time: Optional[time] = None
     qr_code_token: str = Field(unique=True, index=True)
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=get_eat_time)
     
     visitors: List["EventVisitor"] = Relationship(back_populates="event")
 
@@ -585,7 +587,7 @@ class EventVisitor(UUIDModel, table=True):
     email: Optional[str] = None
     status: str = "pre_registered" # pre_registered, checked_in
     bio_data: Optional[dict] = Field(default={}, sa_column=Column(JSON)) 
-    entry_time: datetime = Field(default_factory=datetime.utcnow)
+    entry_time: datetime = Field(default_factory=get_eat_time)
     scanned_by: Optional[UUID] = Field(foreign_key="users.id", nullable=True)
 
     event: Event = Relationship(back_populates="visitors")
@@ -593,7 +595,7 @@ class EventVisitor(UUIDModel, table=True):
 class AuditLog(UUIDModel, table=True):
     __tablename__ = "audit_logs"
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    timestamp: datetime = Field(default_factory=get_eat_time, index=True)
     user_id: Optional[UUID] = Field(foreign_key="users.id", nullable=True)
     user_name: Optional[str] = None 
     
@@ -617,7 +619,7 @@ class GeofenceSetting(UUIDModel, table=True):
     name: str = Field(unique=True, index=True) # e.g., "University Wi-Fi", "Main Gate"
     ip_range: str # e.g., "192.168.1.0/24", "10.0.0.1", or comma-separated list
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=get_eat_time)
     description: Optional[str] = None
 
 class NoticeBoardItem(UUIDModel, table=True):
@@ -628,4 +630,4 @@ class NoticeBoardItem(UUIDModel, table=True):
     author_id: UUID = Field(foreign_key="users.id")
     author_name: str
     author_role: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=get_eat_time)

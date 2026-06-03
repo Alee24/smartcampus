@@ -11,6 +11,7 @@ from sqlalchemy import func as sa_func
 from ..database import get_session
 from ..models import Event, EventVisitor, User, EntryLog, VehicleLog, ClassSession, GateScanLog, TimetableSlot
 from ..auth import get_current_user, get_current_admin
+from app.utils.timezone import get_eat_time
 
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
@@ -48,7 +49,7 @@ async def register_visitor(
         
     visitor.event_id = event_id
     visitor.scanned_by = user.id
-    visitor.entry_time = datetime.utcnow()
+    visitor.entry_time = get_eat_time()
     
     session.add(visitor)
     await session.commit()
