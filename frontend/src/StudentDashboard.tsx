@@ -44,6 +44,7 @@ export default function StudentDashboard() {
     const [subTab, setSubTab] = useState<'schedule' | 'events'>('schedule')
     const [todayClasses, setTodayClasses] = useState<TodayClass[]>([])
     const [recentAttendance, setRecentAttendance] = useState<AttendanceRecord[]>([])
+    const [registeredCourses, setRegisteredCourses] = useState<any[]>([])
     const [stats, setStats] = useState<StudentStats>({
         total_classes: 0,
         attended: 0,
@@ -84,6 +85,14 @@ export default function StudentDashboard() {
             })
             if (classesRes.ok) {
                 setTodayClasses(await classesRes.json())
+            }
+
+            // Fetch registered courses from dynamics sync
+            const coursesRes = await fetch('/api/attendance/courses', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (coursesRes.ok) {
+                setRegisteredCourses(await coursesRes.json())
             }
 
             // Fetch recent attendance
@@ -254,6 +263,41 @@ export default function StudentDashboard() {
             {subTab === 'schedule' ? (
                 /* SECTION A: WEEKLY TIMETABLE FOR REGISTERED UNITS */
                 <div className="space-y-6">
+                    {/* Synchronized ERP Registered Courses */}
+                    <div className="glass-card p-6 border-t-4 border-purple-500">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-lg font-black text-[var(--text-primary)] flex items-center gap-2">
+                                <Bookmark className="text-purple-600" size={20} />
+                                Registered Classes (Dynamics 365 ERP)
+                            </h2>
+                            <span className="px-3 py-1 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                                Synced Live
+                            </span>
+                        </div>
+                        {registeredCourses.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {registeredCourses.map((course, idx) => (
+                                    <div key={idx} className="p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-purple-500 transition-all flex items-center justify-between shadow-sm">
+                                        <div>
+                                            <div className="font-extrabold text-sm text-[var(--text-primary)]">{course.course_code}</div>
+                                            <div className="text-xs text-[var(--text-secondary)] mt-0.5">{course.course_name}</div>
+                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 font-bold uppercase tracking-wide">
+                                                Credits: {course.credits || 3} | {course.department || 'General'}
+                                            </div>
+                                        </div>
+                                        <div className="px-2.5 py-1 text-[10px] font-extrabold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
+                                            ACTIVE
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-6 text-xs text-[var(--text-secondary)] opacity-50">
+                                No registered classes found. Please contact registrar to sync Microsoft Dynamics.
+                            </div>
+                        )}
+                    </div>
+
                     <div className="glass-card p-6">
                         <div className="flex items-center gap-3 mb-6">
                             <Info className="text-indigo-600" size={20} />

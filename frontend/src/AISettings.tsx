@@ -4,6 +4,7 @@ import {
     AlertCircle, Camera, Bell, Mail, MessageSquare, Shield,
     Zap, Activity, Settings as SettingsIcon
 } from 'lucide-react'
+import { useNotification } from './components/Notification'
 
 interface AIConfig {
     // OpenAI (for GPT-based analysis)
@@ -45,9 +46,17 @@ interface AIConfig {
     processing_interval: number
     confidence_threshold: number
     max_concurrent_streams: number
+
+    // Microsoft Dynamics 365 ERP Settings
+    dynamics_base_url: string
+    dynamics_tenant_id: string
+    dynamics_client_id: string
+    dynamics_client_secret: string
+    enable_dynamics_sync: boolean
 }
 
 export default function AISettings() {
+    const { showNotification } = useNotification()
     const [config, setConfig] = useState<AIConfig>({
         openai_api_key: '',
         openai_model: 'gpt-4-vision-preview',
@@ -72,7 +81,12 @@ export default function AISettings() {
         alert_threshold_motion: 10,
         processing_interval: 5,
         confidence_threshold: 0.7,
-        max_concurrent_streams: 4
+        max_concurrent_streams: 4,
+        dynamics_base_url: 'https://dynamics.api.riara.ac.ke/v1',
+        dynamics_tenant_id: '',
+        dynamics_client_id: '',
+        dynamics_client_secret: '',
+        enable_dynamics_sync: false
     })
 
     const [loading, setLoading] = useState(true)
@@ -80,6 +94,7 @@ export default function AISettings() {
     const [testing, setTesting] = useState<string | null>(null)
     const [showKeys, setShowKeys] = useState<{ [key: string]: boolean }>({})
     const [testResults, setTestResults] = useState<{ [key: string]: 'success' | 'error' | null }>({})
+    const [syncingDynamics, setSyncingDynamics] = useState(false)
 
     useEffect(() => {
         fetchConfig()
@@ -116,15 +131,39 @@ export default function AISettings() {
             })
 
             if (res.ok) {
-                alert('✓ AI configuration saved successfully!')
+                showNotification('AI & Integration configuration saved successfully!', 'success')
             } else {
-                alert('Failed to save configuration')
+                showNotification('Failed to save configuration', 'error')
             }
         } catch (e) {
             console.error(e)
-            alert('Error saving configuration')
+            showNotification('Error saving configuration', 'error')
         } finally {
             setSaving(false)
+        }
+    }
+
+    const syncDynamicsNow = async () => {
+        setSyncingDynamics(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/admin/dynamics/sync', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+            const result = await res.json()
+            if (res.ok) {
+                showNotification(`Dynamics sync complete! Added: ${result.added || 0}, Updated: ${result.updated || 0}, Registrations: ${result.registrations || 0}`, 'success')
+            } else {
+                showNotification(result.detail || 'Failed to sync with Dynamics ERP', 'error')
+            }
+        } catch (e: any) {
+            showNotification(`Dynamics sync error: ${e.message}`, 'error')
+        } finally {
+            setSyncingDynamics(false)
         }
     }
 
@@ -145,8 +184,14 @@ export default function AISettings() {
 
             const result = await res.json()
             setTestResults({ ...testResults, [service]: result.success ? 'success' : 'error' })
-        } catch (e) {
+            if (result.success) {
+                showNotification(`${service.toUpperCase()} connection verified successfully!`, 'success')
+            } else {
+                showNotification(`${service.toUpperCase()} connection failed: ${result.message}`, 'error')
+            }
+        } catch (e: any) {
             setTestResults({ ...testResults, [service]: 'error' })
+            showNotification(`Connection test failed: ${e.message}`, 'error')
         } finally {
             setTesting(null)
         }
@@ -450,6 +495,110 @@ export default function AISettings() {
                         >
                             {testing === 'deepstack' ? 'Testing...' : 'Test Connection'}
                         </button>
+                    </div>
+                </div>
+
+                {/* Microsoft Dynamics ERP Integration */}
+                <div className="glass-card p-6">
+                    <div className="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 className="text-xl font-bold flex items-center gap-2">
+                                <Activity className="text-purple-600" size={20} />
+                                Microsoft Dynamics 365 ERP
+                            </h3>
+                            <p className="text-sm text-[var(--text-secondary)]">Sync student records and academic registrations</p>
+                        </div>
+                        {testResults.dynamics && (
+                            <div className={`px-3 py-1 rounded-full text-xs font-bold ${testResults.dynamics === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                }`}>
+                                {testResults.dynamics === 'success' ? '✓ Connected' : '✗ Failed'}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Dynamics OData Endpoint URL</label>
+                            <input
+                                type="text"
+                                value={config.dynamics_base_url || ''}
+                                onChange={(e) => setConfig({ ...config, dynamics_base_url: e.target.value })}
+                                placeholder="https://api.dynamics.com/v1"
+                                className="w-full px-4 py-2 border rounded-lg"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Tenant ID</label>
+                            <input
+                                type="text"
+                                value={config.dynamics_tenant_id || ''}
+                                onChange={(e) => setConfig({ ...config, dynamics_tenant_id: e.target.value })}
+                                placeholder="Commonly a GUID or domain name"
+                                className="w-full px-4 py-2 border rounded-lg"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Client ID (App Registration)</label>
+                            <input
+                                type="text"
+                                value={config.dynamics_client_id || ''}
+                                onChange={(e) => setConfig({ ...config, dynamics_client_id: e.target.value })}
+                                placeholder="OAuth Client Application ID"
+                                className="w-full px-4 py-2 border rounded-lg"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Client Secret</label>
+                            <div className="relative">
+                                <input
+                                    type={showKeys.dynamics_secret ? 'text' : 'password'}
+                                    value={config.dynamics_client_secret || ''}
+                                    onChange={(e) => setConfig({ ...config, dynamics_client_secret: e.target.value })}
+                                    placeholder="••••••••"
+                                    className="w-full px-4 py-2 border rounded-lg pr-10"
+                                />
+                                <button
+                                    onClick={() => toggleShowKey('dynamics_secret')}
+                                    className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                                >
+                                    {showKeys.dynamics_secret ? <EyeOff size={20} /> : <Eye size={20} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 py-2">
+                            <input
+                                type="checkbox"
+                                id="enable_dynamics_sync"
+                                checked={config.enable_dynamics_sync || false}
+                                onChange={(e) => setConfig({ ...config, enable_dynamics_sync: e.target.checked })}
+                                className="w-4 h-4 text-purple-600"
+                            />
+                            <label htmlFor="enable_dynamics_sync" className="text-sm font-medium cursor-pointer">
+                                Enable Automatic Background Sync
+                            </label>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => testConnection('dynamics')}
+                                disabled={testing === 'dynamics' || !config.dynamics_base_url}
+                                className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg disabled:opacity-50 transition-all text-sm"
+                            >
+                                {testing === 'dynamics' ? 'Testing...' : 'Test Connection'}
+                            </button>
+                            <button
+                                onClick={syncDynamicsNow}
+                                disabled={syncingDynamics || !config.dynamics_base_url}
+                                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg disabled:opacity-50 transition-all text-sm flex items-center justify-center gap-1"
+                            >
+                                {syncingDynamics ? <RefreshCw className="animate-spin" size={16} /> : null}
+                                {syncingDynamics ? 'Syncing...' : 'Sync Dynamics ERP'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

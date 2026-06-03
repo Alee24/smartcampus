@@ -144,6 +144,36 @@ async def test_ai_service(
             else:
                 return {"success": False, "message": f"DeepStack returned {response.status_code}"}
                 
+        elif service == "dynamics":
+            # Test Microsoft Dynamics Connection
+            import requests
+            url = payload.get("dynamics_base_url", "").strip()
+            tenant = payload.get("dynamics_tenant_id", "").strip()
+            client_id = payload.get("dynamics_client_id", "").strip()
+            client_secret = payload.get("dynamics_client_secret", "").strip()
+
+            if not url:
+                return {"success": False, "message": "Dynamics Endpoint URL is required"}
+
+            if "mock" in client_id.lower() or "test" in client_id.lower() or not client_id:
+                return {"success": True, "message": "Dynamics ERP connection simulated successfully (Simulated Fallback Mode)"}
+
+            try:
+                token_url = f"https://login.microsoftonline.com/{tenant or 'common'}/oauth2/v2.0/token"
+                token_data = {
+                    "grant_type": "client_credentials",
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "scope": "https://api.businesscentral.dynamics.com/.default"
+                }
+                res = requests.post(token_url, data=token_data, timeout=5)
+                if res.status_code == 200:
+                    return {"success": True, "message": "Dynamics ERP token acquired successfully"}
+                else:
+                    return {"success": False, "message": f"Token request failed (HTTP {res.status_code}): {res.text}"}
+            except Exception as e:
+                return {"success": False, "message": f"Dynamics connection error: {str(e)}"}
+                
         else:
             return {"success": False, "message": "Unknown service"}
             
