@@ -738,6 +738,10 @@ app.include_router(fleet.router, prefix="/api/fleet", tags=["fleet"])
 from app.routers import notifications
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
 
+# Import and include notice board router
+from app.routers import notice_board
+app.include_router(notice_board.router, prefix="/api/notice-board", tags=["notice-board"])
+
 # Import and include timetable router
 from app.routers import timetable
 app.include_router(timetable.router, prefix="/api/timetable", tags=["timetable"])

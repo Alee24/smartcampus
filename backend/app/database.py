@@ -36,6 +36,7 @@ async def init_db():
     await migrate_audit_logs()
     await migrate_external_sync()
     await migrate_system_configs()
+    await migrate_notice_board()
 
 async def get_session() -> AsyncSession:
     async_session = sessionmaker(
@@ -238,3 +239,26 @@ async def migrate_system_configs():
             print("System Configs value column changed to TEXT successfully.")
     except Exception as e:
         print(f"System Configs migration skipped/failed: {e}")
+
+async def migrate_notice_board():
+    """Manual migration to create the notice_board table if not exists."""
+    print("Checking notice_board table...")
+    try:
+        async with engine.begin() as conn:
+            # Create notice_board table if it does not exist
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS notice_board (
+                    id VARCHAR(36) NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    content TEXT NOT NULL,
+                    attachment_url VARCHAR(255) DEFAULT NULL,
+                    author_id VARCHAR(36) NOT NULL,
+                    author_name VARCHAR(255) NOT NULL,
+                    author_role VARCHAR(100) NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """))
+            print("Notice board table checked/created successfully.")
+    except Exception as e:
+        print(f"Notice board table migration skipped/failed: {e}")

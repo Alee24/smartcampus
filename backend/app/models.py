@@ -619,3 +619,13 @@ class GeofenceSetting(UUIDModel, table=True):
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     description: Optional[str] = None
+
+class NoticeBoardItem(UUIDModel, table=True):
+    __tablename__ = "notice_board"
+    title: str
+    content: str = Field(sa_column=Column(Text))
+    attachment_url: Optional[str] = None
+    author_id: UUID = Field(foreign_key="users.id")
+    author_name: str
+    author_role: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)

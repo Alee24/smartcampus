@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import {
     LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut,
-    Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode,
+    Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode, Megaphone, Trash2, Plus,
     Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, X, Activity, BarChart3, Play, History, Printer, Download
 } from 'lucide-react'
 import {
@@ -52,6 +52,7 @@ const Geofencing = lazy(() => import('./Geofencing'))
 const AdminDashboard = lazy(() => import('./AdminDashboard'))
 const LecturerDashboard = lazy(() => import('./LecturerDashboard'))
 const QRRegistry = lazy(() => import('./QRRegistry'))
+const NoticeBoard = lazy(() => import('./NoticeBoard'))
 
 // 3. Non-lazy components (small/critical)
 import InstallPWA, { InstallPWATrigger } from './components/InstallPWA'
@@ -534,6 +535,258 @@ function App() {
         return <Login onLogin={handleLogin} />
     }
 
+    const renderSidebarItems = () => {
+        if (role?.toLowerCase() === 'student') {
+            return (
+                <>
+                    <SidebarGroup title="Overview" isOpen={openGroups.overview} onToggle={() => toggleGroup('overview')} isSidebarCollapsed={isSidebarCollapsed}>
+                        <NavItem
+                            icon={<LayoutDashboard size={18} />}
+                            label="Dashboard"
+                            active={activeTab === 'dashboard' || activeTab === 'student-dashboard'}
+                            onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
+                        />
+                    </SidebarGroup>
+
+                    <SidebarGroup title="Events" isOpen={openGroups.events} onToggle={() => toggleGroup('events')} isSidebarCollapsed={isSidebarCollapsed}>
+                        <NavItem
+                            icon={<Calendar size={18} />}
+                            label="Events & Guests"
+                            active={activeTab === 'events'}
+                            onClick={() => { setActiveTab('events'); setSidebarOpen(false); }}
+                        />
+                        <NavItem
+                            icon={<CalendarDays size={18} />}
+                            label="Campus Calendar"
+                            active={activeTab === 'calendar'}
+                            onClick={() => { setActiveTab('calendar'); setSidebarOpen(false); }}
+                        />
+                    </SidebarGroup>
+
+                    <SidebarGroup title="Academics" isOpen={openGroups.academics} onToggle={() => toggleGroup('academics')} isSidebarCollapsed={isSidebarCollapsed}>
+                        <NavItem
+                            icon={<Calendar size={18} />}
+                            label="Timetable"
+                            active={activeTab === 'timetable'}
+                            onClick={() => { setActiveTab('timetable'); setSidebarOpen(false); }}
+                        />
+                        <NavItem
+                            icon={<Building size={18} />}
+                            label="Classrooms"
+                            active={activeTab === 'classrooms'}
+                            onClick={() => { setActiveTab('classrooms'); setSidebarOpen(false); }}
+                        />
+                    </SidebarGroup>
+                </>
+            )
+        }
+
+        return (
+            <>
+                <SidebarGroup title="Overview" isOpen={openGroups.overview} onToggle={() => toggleGroup('overview')} isSidebarCollapsed={isSidebarCollapsed}>
+                    {(isMenuEnabled('dashboard') || isMenuEnabled('student-dashboard')) && (
+                        <NavItem
+                            icon={<LayoutDashboard size={18} />}
+                            label="Dashboard"
+                            active={activeTab === 'dashboard'}
+                            onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
+                        />
+                    )}
+                </SidebarGroup>
+
+                {/* Gate Operations - Core Functionality */}
+                {(isMenuEnabled('gate') || isMenuEnabled('vehicles')) && (
+                    <SidebarGroup title="Gate Operations" isOpen={openGroups.gate_ops} onToggle={() => toggleGroup('gate_ops')} isSidebarCollapsed={isSidebarCollapsed}>
+                        {isMenuEnabled('gate') && (
+                            <NavItem
+                                icon={<Shield size={18} />}
+                                label="Gate Control"
+                                active={activeTab === 'gate'}
+                                onClick={() => { setActiveTab('gate'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('gate') && (
+                            <NavItem
+                                icon={<ClipboardList size={18} />}
+                                label="Visitor Logs"
+                                active={activeTab === 'visitors'}
+                                onClick={() => { setActiveTab('visitors'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('vehicles') && (
+                            <NavItem
+                                icon={<Car size={18} />}
+                                label="Vehicle Intel"
+                                active={activeTab === 'vehicles'}
+                                onClick={() => { setActiveTab('vehicles'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                            <NavItem
+                                icon={<ClipboardList size={18} />}
+                                label="Scan Logs"
+                                active={activeTab === 'scan-logs'}
+                                onClick={() => { setActiveTab('scan-logs'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                            <NavItem
+                                icon={<Activity size={18} />}
+                                label="Gates Analytics"
+                                active={activeTab === 'gates-dashboard'}
+                                onClick={() => { setActiveTab('gates-dashboard'); setSidebarOpen(false); }}
+                            />
+                        )}
+                    </SidebarGroup>
+                )}
+
+                {/* Security Monitor */}
+                {(isMenuEnabled('live') || isMenuEnabled('cameras')) && (
+                    <SidebarGroup title="Security Monitor" isOpen={openGroups.security_monitor} onToggle={() => toggleGroup('security_monitor')} isSidebarCollapsed={isSidebarCollapsed}>
+                        {isMenuEnabled('live') && (
+                            <NavItem
+                                icon={<MonitorPlay size={18} />}
+                                label="Live Monitor"
+                                active={activeTab === 'live'}
+                                onClick={() => { setActiveTab('live'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('cameras') && (
+                            <NavItem
+                                icon={<Video size={18} />}
+                                label="Surveillance"
+                                active={activeTab === 'cameras'}
+                                onClick={() => { setActiveTab('cameras'); setSidebarOpen(false); }}
+                            />
+                        )}
+                    </SidebarGroup>
+                )}
+
+                {/* People Management */}
+                {(isMenuEnabled('users') || isMenuEnabled('verification')) && (
+                    <SidebarGroup title="People" isOpen={true} onToggle={() => {}} isSidebarCollapsed={isSidebarCollapsed}>
+                        {isMenuEnabled('users') && (
+                            <NavItem
+                                icon={<Users size={18} />}
+                                label="Students / Staff"
+                                active={activeTab === 'users'}
+                                onClick={() => { setActiveTab('users'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('verification') && (
+                            <NavItem
+                                icon={<ShieldCheck size={18} />}
+                                label="ID Verification"
+                                active={activeTab === 'verification'}
+                                onClick={() => { setActiveTab('verification'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                            <>
+                                <NavItem
+                                    icon={<Printer size={18} />}
+                                    label="ID Printing"
+                                    active={activeTab === 'id-printing'}
+                                    onClick={() => { setActiveTab('id-printing'); setSidebarOpen(false); }}
+                                />
+                                <NavItem
+                                    icon={<QrCode size={18} />}
+                                    label="QR Asset Hub"
+                                    active={activeTab === 'qr-registry'}
+                                    onClick={() => { setActiveTab('qr-registry'); setSidebarOpen(false); }}
+                                />
+                            </>
+                        )}
+                    </SidebarGroup>
+                )}
+
+                {/* Events Section */}
+                <SidebarGroup title="Events" isOpen={openGroups.events} onToggle={() => toggleGroup('events')} isSidebarCollapsed={isSidebarCollapsed}>
+                    <NavItem
+                        icon={<Calendar size={18} />}
+                        label="Events & Guests"
+                        active={activeTab === 'events'}
+                        onClick={() => { setActiveTab('events'); setSidebarOpen(false); }}
+                    />
+                    <NavItem
+                        icon={<CalendarDays size={18} />}
+                        label="Campus Calendar"
+                        active={activeTab === 'calendar'}
+                        onClick={() => { setActiveTab('calendar'); setSidebarOpen(false); }}
+                    />
+                </SidebarGroup>
+
+                {/* Academics */}
+                {(isMenuEnabled('timetable') || isMenuEnabled('attendance') || isMenuEnabled('all-attendance')) && (
+                    <SidebarGroup title="Academics" isOpen={openGroups.academics} onToggle={() => toggleGroup('academics')} isSidebarCollapsed={isSidebarCollapsed}>
+                        {isMenuEnabled('attendance') && (
+                            <NavItem
+                                icon={<QrCode size={18} />}
+                                label="Class Attendance"
+                                active={activeTab === 'attendance'}
+                                onClick={() => { setActiveTab('attendance'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('timetable') && (
+                            <>
+                                <NavItem
+                                    icon={<Calendar size={18} />}
+                                    label="Timetable"
+                                    active={activeTab === 'timetable'}
+                                    onClick={() => { setActiveTab('timetable'); setSidebarOpen(false); }}
+                                />
+                                <NavItem
+                                    icon={<FileText size={18} />}
+                                    label="Courses"
+                                    active={activeTab === 'courses'}
+                                    onClick={() => { setActiveTab('courses'); setSidebarOpen(false); }}
+                                />
+                                <NavItem
+                                    icon={<Building size={18} />}
+                                    label="Classrooms"
+                                    active={activeTab === 'classrooms'}
+                                    onClick={() => { setActiveTab('classrooms'); setSidebarOpen(false); }}
+                                />
+                            </>
+                        )}
+                        {isMenuEnabled('all-attendance') && (
+                            <NavItem
+                                icon={<Download size={18} />}
+                                label="All Attendance"
+                                active={activeTab === 'all-attendance'}
+                                onClick={() => { setActiveTab('all-attendance'); setSidebarOpen(false); }}
+                            />
+                        )}
+                    </SidebarGroup>
+                )}
+
+                {/* Fleet Management */}
+                {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'fleetmanager') && (
+                    <SidebarGroup title="Fleet Management" isOpen={openGroups.fleet} onToggle={() => toggleGroup('fleet')} isSidebarCollapsed={isSidebarCollapsed}>
+                        <NavItem
+                            icon={<Car size={18} />}
+                            label="Fleet Dashboard"
+                            active={activeTab === 'fleet'}
+                            onClick={() => { setActiveTab('fleet'); setSidebarOpen(false); }}
+                        />
+                        <NavItem
+                            icon={<MapPin size={18} />}
+                            label="Live Tracking"
+                            active={activeTab === 'fleet-tracking'}
+                            onClick={() => { setActiveTab('fleet-tracking'); setSidebarOpen(false); }}
+                        />
+                        <NavItem
+                            icon={<Briefcase size={18} />}
+                            label="Trips & Trips"
+                            active={activeTab === 'fleet-trips'}
+                            onClick={() => { setActiveTab('fleet-trips'); setSidebarOpen(false); }}
+                        />
+                    </SidebarGroup>
+                )}
+            </>
+        )
+    }
+
     return (
         <div className="min-h-screen flex bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300 font-sans">
             {/* Security Check Modal */}
@@ -577,208 +830,7 @@ function App() {
                     </div>
 
                     <nav className="space-y-1 overflow-y-auto max-h-[calc(100vh-250px)] scrollbar-hide">
-                        <SidebarGroup title="Overview" isOpen={openGroups.overview} onToggle={() => toggleGroup('overview')} isSidebarCollapsed={isSidebarCollapsed}>
-                            {(isMenuEnabled('dashboard') || isMenuEnabled('student-dashboard')) && (
-                                <NavItem
-                                    icon={<LayoutDashboard size={18} />}
-                                    label="Dashboard"
-                                    active={activeTab === 'dashboard'}
-                                    onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
-                                />
-                            )}
-                        </SidebarGroup>
-
-                        {/* Gate Operations - Core Functionality */}
-                        {(isMenuEnabled('gate') || isMenuEnabled('vehicles')) && (
-                            <SidebarGroup title="Gate Operations" isOpen={openGroups.gate_ops} onToggle={() => toggleGroup('gate_ops')} isSidebarCollapsed={isSidebarCollapsed}>
-                                {isMenuEnabled('gate') && (
-                                    <NavItem
-                                        icon={<Shield size={18} />}
-                                        label="Gate Control"
-                                        active={activeTab === 'gate'}
-                                        onClick={() => { setActiveTab('gate'); setSidebarOpen(false); }}
-                                    />
-                                )}
-                                {isMenuEnabled('gate') && (
-                                    <NavItem
-                                        icon={<ClipboardList size={18} />}
-                                        label="Visitor Logs"
-                                        active={activeTab === 'visitors'}
-                                        onClick={() => { setActiveTab('visitors'); setSidebarOpen(false); }}
-                                    />
-                                )}
-                                {isMenuEnabled('vehicles') && (
-                                    <NavItem
-                                        icon={<Car size={18} />}
-                                        label="Vehicle Intel"
-                                        active={activeTab === 'vehicles'}
-                                        onClick={() => { setActiveTab('vehicles'); setSidebarOpen(false); }}
-                                    />
-                                )}
-                                {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
-                                    <NavItem
-                                        icon={<ClipboardList size={18} />}
-                                        label="Scan Logs"
-                                        active={activeTab === 'scan-logs'}
-                                        onClick={() => { setActiveTab('scan-logs'); setSidebarOpen(false); }}
-                                    />
-                                )}
-                                {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
-                                    <NavItem
-                                        icon={<Activity size={18} />}
-                                        label="Gates Analytics"
-                                        active={activeTab === 'gates-dashboard'}
-                                        onClick={() => { setActiveTab('gates-dashboard'); setSidebarOpen(false); }}
-                                    />
-                                )}
-                            </SidebarGroup>
-                        )}
-
-                        {/* Security Monitor */}
-                        {(isMenuEnabled('live') || isMenuEnabled('cameras')) && (
-                            <SidebarGroup title="Security Monitor" isOpen={openGroups.security_monitor} onToggle={() => toggleGroup('security_monitor')} isSidebarCollapsed={isSidebarCollapsed}>
-                                {isMenuEnabled('live') && (
-                                    <NavItem
-                                        icon={<MonitorPlay size={18} />}
-                                        label="Live Monitor"
-                                        active={activeTab === 'live'}
-                                        onClick={() => { setActiveTab('live'); setSidebarOpen(false); }}
-                                    />
-                                )}
-                                {isMenuEnabled('cameras') && (
-                                    <NavItem
-                                        icon={<Video size={18} />}
-                                        label="Surveillance"
-                                        active={activeTab === 'cameras'}
-                                        onClick={() => { setActiveTab('cameras'); setSidebarOpen(false); }}
-                                    />
-                                )}
-                            </SidebarGroup>
-                        )}
-
-                        {/* People Management */}
-                        {(isMenuEnabled('users') || isMenuEnabled('verification')) && (
-                            <SidebarGroup title="People" isOpen={true} onToggle={() => {}} isSidebarCollapsed={isSidebarCollapsed}>
-                                {isMenuEnabled('users') && (
-                                    <NavItem
-                                        icon={<Users size={18} />}
-                                        label="Students / Staff"
-                                        active={activeTab === 'users'}
-                                        onClick={() => { setActiveTab('users'); setSidebarOpen(false); }}
-                                    />
-                                )}
-                                {isMenuEnabled('verification') && (
-                                    <NavItem
-                                        icon={<ShieldCheck size={18} />}
-                                        label="ID Verification"
-                                        active={activeTab === 'verification'}
-                                        onClick={() => { setActiveTab('verification'); setSidebarOpen(false); }}
-                                    />
-                                )}
-                                {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
-                                    <>
-                                        <NavItem
-                                            icon={<Printer size={18} />}
-                                            label="ID Printing"
-                                            active={activeTab === 'id-printing'}
-                                            onClick={() => { setActiveTab('id-printing'); setSidebarOpen(false); }}
-                                        />
-                                        <NavItem
-                                            icon={<QrCode size={18} />}
-                                            label="QR Asset Hub"
-                                            active={activeTab === 'qr-registry'}
-                                            onClick={() => { setActiveTab('qr-registry'); setSidebarOpen(false); }}
-                                        />
-                                    </>
-                                )}
-                            </SidebarGroup>
-                        )}
-
-                        {/* Events Section */}
-                        <SidebarGroup title="Events" isOpen={openGroups.events} onToggle={() => toggleGroup('events')} isSidebarCollapsed={isSidebarCollapsed}>
-                            <NavItem
-                                icon={<Calendar size={18} />}
-                                label="Events & Guests"
-                                active={activeTab === 'events'}
-                                onClick={() => { setActiveTab('events'); setSidebarOpen(false); }}
-                            />
-                            <NavItem
-                                icon={<CalendarDays size={18} />}
-                                label="Campus Calendar"
-                                active={activeTab === 'calendar'}
-                                onClick={() => { setActiveTab('calendar'); setSidebarOpen(false); }}
-                            />
-                        </SidebarGroup>
-
-                        {/* Academics */}
-                        {(isMenuEnabled('timetable') || isMenuEnabled('attendance') || isMenuEnabled('all-attendance')) && (
-                            <SidebarGroup title="Academics" isOpen={openGroups.academics} onToggle={() => toggleGroup('academics')} isSidebarCollapsed={isSidebarCollapsed}>
-                                {isMenuEnabled('attendance') && (
-                                    <NavItem
-                                        icon={<QrCode size={18} />}
-                                        label="Class Attendance"
-                                        active={activeTab === 'attendance'}
-                                        onClick={() => { setActiveTab('attendance'); setSidebarOpen(false); }}
-                                    />
-                                )}
-                                {isMenuEnabled('timetable') && (
-                                    <>
-                                        <NavItem
-                                            icon={<Calendar size={18} />}
-                                            label="Timetable"
-                                            active={activeTab === 'timetable'}
-                                            onClick={() => { setActiveTab('timetable'); setSidebarOpen(false); }}
-                                        />
-                                        <NavItem
-                                            icon={<FileText size={18} />}
-                                            label="Courses"
-                                            active={activeTab === 'courses'}
-                                            onClick={() => { setActiveTab('courses'); setSidebarOpen(false); }}
-                                        />
-                                        <NavItem
-                                            icon={<Building size={18} />}
-                                            label="Classrooms"
-                                            active={activeTab === 'classrooms'}
-                                            onClick={() => { setActiveTab('classrooms'); setSidebarOpen(false); }}
-                                        />
-                                    </>
-                                )}
-                                {isMenuEnabled('all-attendance') && (
-                                    <NavItem
-                                        icon={<Download size={18} />}
-                                        label="All Attendance"
-                                        active={activeTab === 'all-attendance'}
-                                        onClick={() => { setActiveTab('all-attendance'); setSidebarOpen(false); }}
-                                    />
-                                )}
-                            </SidebarGroup>
-                        )}
-
-                        {/* Analytics - Only for Admins */}
-                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'fleetmanager') && (
-                            <SidebarGroup title="Fleet Management" isOpen={openGroups.fleet} onToggle={() => toggleGroup('fleet')} isSidebarCollapsed={isSidebarCollapsed}>
-                                <NavItem
-                                    icon={<Car size={18} />}
-                                    label="Fleet Dashboard"
-                                    active={activeTab === 'fleet'}
-                                    onClick={() => { setActiveTab('fleet'); setSidebarOpen(false); }}
-                                />
-                                <NavItem
-                                    icon={<MapPin size={18} />}
-                                    label="Live Tracking"
-                                    active={activeTab === 'fleet-tracking'}
-                                    onClick={() => { setActiveTab('fleet-tracking'); setSidebarOpen(false); }}
-                                />
-                                <NavItem
-                                    icon={<Briefcase size={18} />}
-                                    label="Trips & Trips"
-                                    active={activeTab === 'fleet-trips'}
-                                    onClick={() => { setActiveTab('fleet-trips'); setSidebarOpen(false); }}
-                                />
-                            </SidebarGroup>
-                        )}
-
-                        {/* Analytics - Only for Admins */}
+                        {renderSidebarItems()}
                     </nav>
                 </div>
 
@@ -791,7 +843,7 @@ function App() {
                 <div className="mt-auto p-4 border-t border-[var(--border-color)]">
                     <nav className="space-y-1 mb-4">
                         {/* Administration - Visible on Mobile for Admins since Top Bar is hidden */}
-                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                        {role?.toLowerCase() !== 'student' && (role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
                             <SidebarGroup title="Administration" isOpen={openGroups.admin} onToggle={() => toggleGroup('admin')} isSidebarCollapsed={isSidebarCollapsed}>
                                 <NavItem icon={<Settings size={18} />} label="General Settings" active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }} />
                                 <NavItem icon={<Database size={18} />} label="Data Management" active={activeTab === 'bulk'} onClick={() => { setActiveTab('bulk'); setSidebarOpen(false); }} />
@@ -803,35 +855,39 @@ function App() {
                                 <NavItem icon={<Shield size={18} />} label="IP Geofencing" active={activeTab === 'geofencing'} onClick={() => { setActiveTab('geofencing'); setSidebarOpen(false); }} />
                             </SidebarGroup>
                         )}
-                        <SidebarGroup title="Support" isOpen={openGroups.support} onToggle={() => toggleGroup('support')} isSidebarCollapsed={isSidebarCollapsed}>
-                            <NavItem icon={<HelpCircle size={18} />} label="Help Center" active={false} onClick={() => { }} />
-                            <InstallPWATrigger navStyle />
-                        </SidebarGroup>
+                        {role?.toLowerCase() !== 'student' && (
+                            <SidebarGroup title="Support" isOpen={openGroups.support} onToggle={() => toggleGroup('support')} isSidebarCollapsed={isSidebarCollapsed}>
+                                <NavItem icon={<HelpCircle size={18} />} label="Help Center" active={false} onClick={() => { }} />
+                                <InstallPWATrigger navStyle />
+                            </SidebarGroup>
+                        )}
                     </nav>
 
                     {/* Legal Section */}
-                    <div className="mb-2">
-                        <SidebarGroup title="Privacy & Legal" isOpen={openGroups.legal} onToggle={() => toggleGroup('legal')} isSidebarCollapsed={isSidebarCollapsed}>
-                            <NavItem
-                                icon={<ShieldCheck size={18} />}
-                                label="Privacy Policy"
-                                active={activeTab === 'privacy'}
-                                onClick={() => { setActiveTab('privacy'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
-                            />
-                            <NavItem
-                                icon={<Scale size={18} />}
-                                label="Data Rights"
-                                active={activeTab === 'rights'}
-                                onClick={() => { setActiveTab('rights'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
-                            />
-                            <NavItem
-                                icon={<Database size={18} />}
-                                label="Cookie Policy"
-                                active={activeTab === 'cookies'}
-                                onClick={() => { setActiveTab('cookies'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
-                            />
-                        </SidebarGroup>
-                    </div>
+                    {role?.toLowerCase() !== 'student' && (
+                        <div className="mb-2">
+                            <SidebarGroup title="Privacy & Legal" isOpen={openGroups.legal} onToggle={() => toggleGroup('legal')} isSidebarCollapsed={isSidebarCollapsed}>
+                                <NavItem
+                                    icon={<ShieldCheck size={18} />}
+                                    label="Privacy Policy"
+                                    active={activeTab === 'privacy'}
+                                    onClick={() => { setActiveTab('privacy'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
+                                />
+                                <NavItem
+                                    icon={<Scale size={18} />}
+                                    label="Data Rights"
+                                    active={activeTab === 'rights'}
+                                    onClick={() => { setActiveTab('rights'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
+                                />
+                                <NavItem
+                                    icon={<Database size={18} />}
+                                    label="Cookie Policy"
+                                    active={activeTab === 'cookies'}
+                                    onClick={() => { setActiveTab('cookies'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
+                                />
+                            </SidebarGroup>
+                        </div>
+                    )}
 
 
                     <div className="flex items-center justify-between px-4 py-2 border-t border-[var(--border-color)] mt-2">
