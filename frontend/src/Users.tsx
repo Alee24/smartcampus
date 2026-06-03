@@ -16,6 +16,7 @@ export default function Users() {
     const [searchQuery, setSearchQuery] = useState('')
     const [filterRole, setFilterRole] = useState('all')
     const [filterStatus, setFilterStatus] = useState('all')
+    const [filterPhoto, setFilterPhoto] = useState('all')
     const [selectedUser, setSelectedUser] = useState<any>(null)
     const [showAddModal, setShowAddModal] = useState(false)
 
@@ -29,7 +30,7 @@ export default function Users() {
 
     useEffect(() => {
         filterUsers()
-    }, [users, searchQuery, filterRole, filterStatus])
+    }, [users, searchQuery, filterRole, filterStatus, filterPhoto])
 
     const fetchUsers = async () => {
         try {
@@ -73,6 +74,13 @@ export default function Users() {
         // Status filter
         if (filterStatus !== 'all') {
             filtered = filtered.filter(u => u.status?.toLowerCase() === filterStatus.toLowerCase())
+        }
+
+        // Photo filter
+        if (filterPhoto === 'has_photo') {
+            filtered = filtered.filter(u => !!u.profile_image && u.profile_image.trim() !== '')
+        } else if (filterPhoto === 'missing_photo') {
+            filtered = filtered.filter(u => !u.profile_image || u.profile_image.trim() === '')
         }
 
         setFilteredUsers(filtered)
@@ -248,8 +256,8 @@ export default function Users() {
             {/* Search & Filter Bar */}
             <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                    {/* Search - Takes up more space */}
-                    <div className="md:col-span-6 relative">
+                    {/* Search - Takes up 3 columns */}
+                    <div className="md:col-span-3 relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <Search className="h-5 w-5 text-gray-400" />
                         </div>
@@ -290,6 +298,18 @@ export default function Users() {
                             <option value="suspended">Suspended</option>
                             <option value="graduated">Graduated</option>
                             <option value="deferred">Deferred</option>
+                        </select>
+                    </div>
+
+                    <div className="md:col-span-3">
+                        <select
+                            value={filterPhoto}
+                            onChange={(e) => setFilterPhoto(e.target.value)}
+                            className="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-xl bg-gray-50 dark:bg-gray-900"
+                        >
+                            <option value="all">All Photo Status</option>
+                            <option value="has_photo">With Photo ID</option>
+                            <option value="missing_photo">Missing Photo ID</option>
                         </select>
                     </div>
                 </div>

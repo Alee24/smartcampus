@@ -157,27 +157,12 @@ export default function StudentVerification() {
             }
         }
 
-        if (online) {
-            try {
-                const token = localStorage.getItem('token')
-                const res = await fetch('/api/users', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                })
-                if (res.ok) {
-                    const users = await res.json()
-                    const studentUsers = users.filter((u: any) => u.role?.toLowerCase() === 'student' || u.admission_number)
-                    localStorage.setItem('cached_students', JSON.stringify(studentUsers))
-                    setCachedCount(studentUsers.length)
-                    showNotification(`Offline directory updated with ${studentUsers.length} student records`, 'success')
-                } else {
-                    showNotification('Could not download updated student database.', 'error')
-                }
-            } catch (e: any) {
-                showNotification(`Error downloading student database: ${e.message}`, 'error')
-            }
-        } else {
-            showNotification('Offline mode. Refreshed with locally cached data.', 'warning')
-        }
+        // Just clear search inputs & cards to let the guard scan next person easily
+        setQuery('')
+        setResult(null)
+        setShowCard(false)
+        setSuggestions([])
+        showNotification('View refreshed. Ready for next scan.', 'success')
         setSyncing(false)
     }
 
@@ -196,8 +181,25 @@ export default function StudentVerification() {
                 if (res.ok) {
                     const data = await res.json()
                     playSuccessSound()
-                    showNotification(`${action === 'check-in' ? 'Check-in' : 'Check-out'} recorded at ${data.time}`, 'success')
-                    handleVerify()
+                    showNotification(`${action === 'check-in' ? 'Check-in' : 'Check-out'} recorded for ${result.full_name || result.admission_number} at ${data.time}`, 'success')
+                    
+                    // Update cache status for offline
+                    try {
+                        const cached = JSON.parse(localStorage.getItem('cached_students') || '[]')
+                        const updated = cached.map((s: any) => {
+                            if (s.admission_number === result.admission_number) {
+                                return { ...s, gate_status: action === 'check-in' ? 'In' : 'Out' }
+                            }
+                            return s
+                        })
+                        localStorage.setItem('cached_students', JSON.stringify(updated))
+                    } catch (e) {}
+
+                    // Reset search page for next scan
+                    setQuery('')
+                    setResult(null)
+                    setShowCard(false)
+                    setSuggestions([])
                     setActionLoading(null)
                     return;
                 }
@@ -226,9 +228,14 @@ export default function StudentVerification() {
         })
         localStorage.setItem('cached_students', JSON.stringify(updatedCached))
         
-        setResult((prev: any) => prev ? { ...prev, gate_status: action === 'check-in' ? 'In' : 'Out' } : null)
         playSuccessSound()
-        showNotification(`Offline Check-log: Queued ${action} for ${result.full_name || result.admission_number}`, 'warning')
+        showNotification(`Offline Queued: ${action} for ${result.full_name || result.admission_number}`, 'warning')
+        
+        // Reset search page for next scan
+        setQuery('')
+        setResult(null)
+        setShowCard(false)
+        setSuggestions([])
         setActionLoading(null)
     }
 
@@ -248,6 +255,26 @@ export default function StudentVerification() {
                 if (res.ok) {
                     const data = await res.json()
                     setResult(data)
+                    
+                    // Dynamically cache this verified student (no full database quota limits)
+                    try {
+                        const cached = JSON.parse(localStorage.getItem('cached_students') || '[]')
+                        const filtered = cached.filter((s: any) => s.admission_number !== data.admission_number)
+                        filtered.push({
+                            id: data.id,
+                            full_name: data.full_name,
+                            admission_number: data.admission_number,
+                            email: data.email,
+                            school: data.school,
+                            status: data.status,
+                            profile_image: data.profile_image,
+                            role: data.role,
+                            gate_status: data.gate_status
+                        })
+                        localStorage.setItem('cached_students', JSON.stringify(filtered))
+                        setCachedCount(filtered.length)
+                    } catch (e) {}
+
                     if (!data.ad_found) {
                         setTimeout(() => {
                             setShowCard(true)
@@ -264,14 +291,14 @@ export default function StudentVerification() {
                                     headers: { 'Authorization': `Bearer ${token}` }
                                 })
                                 if (gateRes.ok) {
-                                    const gateData = await gateRes.json()
-                                    showNotification(`Auto ${action === 'check-in' ? 'Checked In' : 'Checked Out'}: ${data.full_name} at ${gateData.time}`, 'success')
+                                    playSuccessSound()
+                                    showNotification(`Auto ${action === 'check-in' ? 'Checked In' : 'Checked Out'}: ${data.full_name}`, 'success')
                                     
-                                    const refreshRes = await fetch(`/api/users/verify/${encodeURIComponent(searchQuery)}`)
-                                    if (refreshRes.ok) {
-                                        const refreshedData = await refreshRes.json()
-                                        setResult(refreshedData)
-                                    }
+                                    // Reset immediately so the guard can scan the next person easily
+                                    setQuery('')
+                                    setResult(null)
+                                    setShowCard(false)
+                                    setSuggestions([])
                                 } else {
                                     const errData = await gateRes.json()
                                     showNotification(errData.detail || `Auto ${action} failed`, 'error')
@@ -335,8 +362,13 @@ export default function StudentVerification() {
                 })
                 localStorage.setItem('cached_students', JSON.stringify(updatedCached))
                 
-                setResult((prev: any) => prev ? { ...prev, gate_status: action === 'check-in' ? 'In' : 'Out' } : null)
                 showNotification(`Offline Auto ${action === 'check-in' ? 'Checked In' : 'Checked Out'}: ${data.full_name}`, 'warning')
+                
+                // Clear immediately for next scan
+                setQuery('')
+                setResult(null)
+                setShowCard(false)
+                setSuggestions([])
             }
         } else {
             setResult({ error: 'Student not found in local offline database.' })

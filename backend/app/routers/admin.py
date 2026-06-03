@@ -343,8 +343,9 @@ async def bulk_upload_lecturers(
                     existing.school = school
                     existing.role_id = lecturer_role.id
                     existing.status = "active"
-                    if phone_number: existing.phone_number = phone_number
-                    if profile_image: existing.profile_image = profile_image
+                    existing.phone_number = phone_number
+                    if profile_image and not existing.profile_image:
+                        existing.profile_image = profile_image
                     session.add(existing)
                     try:
                         await session.commit()
@@ -465,13 +466,14 @@ async def bulk_upload_students(
                     existing.school = school
                     existing.role_id = assigned_role.id
                     existing.status = status_val
-                    if first_name: existing.first_name = first_name
-                    if last_name: existing.last_name = last_name
-                    if email: existing.email = email
-                    if gender: existing.gender = gender
-                    if program: existing.program = program
-                    if phone_number: existing.phone_number = phone_number
-                    if profile_image: existing.profile_image = profile_image
+                    existing.first_name = first_name
+                    existing.last_name = last_name
+                    existing.email = email
+                    existing.gender = gender
+                    existing.program = program
+                    existing.phone_number = phone_number
+                    if profile_image and not existing.profile_image:
+                        existing.profile_image = profile_image
                     session.add(existing)
                     try:
                         await session.commit()

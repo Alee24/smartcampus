@@ -433,8 +433,8 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
 
             # ── Load ALL existing users into memory (ONE query) ──────────────────
             # id is VARCHAR — read directly
-            existing_res = await session.execute(sa_text("SELECT admission_number, id FROM users"))
-            existing_map = {row[0]: str(row[1]) for row in existing_res.fetchall()}
+            existing_res = await session.execute(sa_text("SELECT admission_number, id, profile_image FROM users"))
+            existing_map = {row[0]: (str(row[1]), row[2]) for row in existing_res.fetchall()}
 
             # ── Parse CSV rows ───────────────────────────────────────────────────
             to_insert = []
@@ -536,14 +536,18 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                             break
 
                     if adm_no in existing_map:
+                        existing_id, existing_img = existing_map[adm_no]
                         to_update.append({
-                            "existing_id": existing_map[adm_no],
+                            "existing_id": existing_id,
                             "full_name": full_n,
                             "first_name": f_name,
                             "last_name": l_name,
                             "phone": phone_val,
                             "school": school_val,
                             "email": email_val,
+                            "gender": gender_val,
+                            "program": program_val,
+                            "profile_image": existing_img or profile_val
                         })
                         updated_count += 1
                     else:
@@ -564,7 +568,7 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                             "profile_image": profile_val,
                             "created_at": datetime.utcnow(),
                         })
-                        existing_map[adm_no] = new_id  # prevent CSV duplicates
+                        existing_map[adm_no] = (new_id, profile_val)  # prevent CSV duplicates
                         added_count += 1
 
                 except Exception as e:
@@ -610,13 +614,16 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                     for rec in batch:
                         await session.execute(sa_text("""
                             UPDATE users SET
-                                full_name    = :full_name,
-                                first_name   = :first_name,
-                                last_name    = :last_name,
-                                phone_number = COALESCE(:phone, phone_number),
-                                school       = :school,
-                                email        = COALESCE(:email, email),
-                                status       = 'active'
+                                full_name     = :full_name,
+                                first_name    = :first_name,
+                                last_name     = :last_name,
+                                phone_number  = :phone,
+                                school        = :school,
+                                email         = :email,
+                                gender        = :gender,
+                                program       = :program,
+                                profile_image = :profile_image,
+                                status        = 'active'
                             WHERE id = :existing_id
                         """), rec)
                     await session.commit()
