@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
     UserPlus, Search, Filter, X, Edit, Trash2, Mail, Phone,
     Building, GraduationCap, Shield, ChevronLeft, ChevronRight,
@@ -610,6 +610,82 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
     const { showConfirm, showNotification } = useNotification()
     const [isEditing, setIsEditing] = useState(false)
     const [editForm, setEditForm] = useState(user)
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // Sync state when user prop changes
+    useEffect(() => {
+        setEditForm(user)
+    }, [user])
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('user_id', user.id)
+        
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/users/upload-profile-image', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            })
+            
+            if (res.ok) {
+                const data = await res.json()
+                showNotification('Profile image uploaded successfully!', 'success')
+                setEditForm((prev: any) => ({ ...prev, profile_image: data.image_url }))
+                onRefresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                showNotification(`Upload failed: ${data.detail || 'Unknown error'}`, 'error')
+            }
+        } catch (err) {
+            console.error(err)
+            showNotification('Error uploading file', 'error')
+        }
+    }
+
+    const handleRemovePhoto = async () => {
+        const confirmed = await showConfirm({
+            title: "Remove Profile Photo",
+            message: "Are you sure you want to remove this user's profile photo?",
+            confirmText: "Remove Photo",
+            cancelText: "Cancel",
+            isDanger: true
+        })
+        if (!confirmed) return
+
+        try {
+            const token = localStorage.getItem('token')
+            const formData = new FormData()
+            formData.append('user_id', user.id)
+            
+            const res = await fetch('/api/users/remove-profile-image', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            })
+            
+            if (res.ok) {
+                showNotification('Profile image removed successfully!', 'success')
+                setEditForm((prev: any) => ({ ...prev, profile_image: null }))
+                onRefresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                showNotification(`Failed to remove image: ${data.detail || 'Unknown error'}`, 'error')
+            }
+        } catch (err) {
+            console.error(err)
+            showNotification('Error removing profile photo', 'error')
+        }
+    }
 
     const handleUpdate = async () => {
         try {
@@ -780,20 +856,74 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                 <div className="flex-1 overflow-y-auto p-6">
                     {/* Identity Section */}
                     <div className="flex flex-col items-center mb-8">
-                        <div className="relative">
-                            {user.profile_image ? (
+                        <div className="relative group">
+                            {editForm.profile_image ? (
                                 <img
-                                    src={user.profile_image.startsWith('http') ? user.profile_image : user.profile_image}
-                                    alt={user.full_name}
-                                    className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg"
+                                    src={editForm.profile_image}
+                                    alt={editForm.full_name || user.full_name}
+                                    className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg transition-transform duration-200 group-hover:scale-105"
                                 />
                             ) : (
                                 <div className="w-32 h-32 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-5xl font-bold shadow-lg">
-                                    {user.full_name?.charAt(0) || '?'}
+                                    {(editForm.full_name || user.full_name)?.charAt(0) || '?'}
                                 </div>
                             )}
-                            <div className={`absolute bottom-1 right-1 w-6 h-6 border-4 border-white dark:border-gray-900 rounded-full ${user.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                            <div className={`absolute bottom-1 right-1 w-6 h-6 border-4 border-white dark:border-gray-900 rounded-full ${editForm.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                            
+                            {isEditing && (
+                                <div className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer">
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="text-white hover:text-purple-300 p-1 flex items-center gap-1 text-xs font-semibold"
+                                        title="Upload New Photo"
+                                    >
+                                        <Camera size={16} />
+                                        <span>Change</span>
+                                    </button>
+                                    {editForm.profile_image && (
+                                        <button
+                                            type="button"
+                                            onClick={handleRemovePhoto}
+                                            className="text-red-400 hover:text-red-300 p-1 flex items-center gap-1 text-xs font-semibold"
+                                            title="Remove Photo"
+                                        >
+                                            <Trash2 size={16} />
+                                            <span>Remove</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
+
+                        {isEditing && (
+                            <div className="mt-3 flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="px-3 py-1 text-xs bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-lg font-medium transition-colors flex items-center gap-1"
+                                >
+                                    <Camera size={14} /> Upload Photo
+                                </button>
+                                {editForm.profile_image && (
+                                    <button
+                                        type="button"
+                                        onClick={handleRemovePhoto}
+                                        className="px-3 py-1 text-xs bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg font-medium transition-colors flex items-center gap-1"
+                                    >
+                                        <Trash2 size={14} /> Remove Photo
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            accept="image/*"
+                            className="hidden"
+                        />
 
                         {!isEditing && (
                             <div className="text-center mt-4">
@@ -812,82 +942,159 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
 
                     {isEditing ? (
                         /* EDIT FORM */
-                        <div className="space-y-5 animate-fade-in">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">First Name</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.first_name || ''}
-                                        onChange={e => setEditForm({ ...editForm, first_name: e.target.value })}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Last Name</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.last_name || ''}
-                                        onChange={e => setEditForm({ ...editForm, last_name: e.target.value })}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                                    <input
-                                        type="email"
-                                        value={editForm.email || ''}
-                                        onChange={e => setEditForm({ ...editForm, email: e.target.value })}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Phone</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.phone_number || ''}
-                                        onChange={e => setEditForm({ ...editForm, phone_number: e.target.value })}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Gender</label>
-                                    <select
-                                        value={editForm.gender || ''}
-                                        onChange={e => setEditForm({ ...editForm, gender: e.target.value })}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
-                                    >
-                                        <option value="">Select Gender</option>
-                                        <option value="male">Male</option>
-                                        <option value="female">Female</option>
-                                        <option value="other">Other</option>
-                                    </select>
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Program / Course</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.program || ''}
-                                        onChange={e => setEditForm({ ...editForm, program: e.target.value })}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
-                                    />
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">School / Department</label>
-                                    <input
-                                        type="text"
-                                        value={editForm.school || ''}
-                                        onChange={e => setEditForm({ ...editForm, school: e.target.value })}
-                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 transition-all"
-                                    />
+                        <div className="space-y-6 animate-fade-in">
+                            {/* Personal Information */}
+                            <div className="bg-gray-50 dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800 space-y-4">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Personal Details</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">First Name</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.first_name || ''}
+                                            onChange={e => setEditForm({ ...editForm, first_name: e.target.value })}
+                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Last Name</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.last_name || ''}
+                                            onChange={e => setEditForm({ ...editForm, last_name: e.target.value })}
+                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Email Address</label>
+                                        <input
+                                            type="email"
+                                            value={editForm.email || ''}
+                                            onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Phone Number</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.phone_number || ''}
+                                            onChange={e => setEditForm({ ...editForm, phone_number: e.target.value })}
+                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Gender</label>
+                                        <select
+                                            value={editForm.gender || ''}
+                                            onChange={e => setEditForm({ ...editForm, gender: e.target.value })}
+                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
+                                        >
+                                            <option value="">Select Gender</option>
+                                            <option value="male">Male</option>
+                                            <option value="female">Female</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="pt-4">
+
+                            {/* Institution Profile */}
+                            <div className="bg-gray-50 dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800 space-y-4">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Institution Profile</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Admission / ID Number</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.admission_number || ''}
+                                            onChange={e => setEditForm({ ...editForm, admission_number: e.target.value })}
+                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white font-mono"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">User Role</label>
+                                        <select
+                                            value={editForm.role || ''}
+                                            onChange={e => setEditForm({ ...editForm, role: e.target.value })}
+                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
+                                        >
+                                            <option value="student">Student</option>
+                                            <option value="staff">Staff</option>
+                                            <option value="gatekeeper">Gatekeeper</option>
+                                            <option value="admin">Admin</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Program / Course</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.program || ''}
+                                            onChange={e => setEditForm({ ...editForm, program: e.target.value })}
+                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">School / Department</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.school || ''}
+                                            onChange={e => setEditForm({ ...editForm, school: e.target.value })}
+                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Account Administration */}
+                            <div className="bg-gray-50 dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800 space-y-4">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Account Settings</h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Account Status</label>
+                                        <select
+                                            value={editForm.status || 'active'}
+                                            onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
+                                        >
+                                            <option value="active">Active</option>
+                                            <option value="suspended">Suspended</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Expiry Date</label>
+                                        <input
+                                            type="date"
+                                            value={editForm.expiry_date ? editForm.expiry_date.split('T')[0] : ''}
+                                            onChange={e => setEditForm({ ...editForm, expiry_date: e.target.value })}
+                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 flex justify-between gap-3 border-t border-gray-200/50 dark:border-gray-700/50">
+                                    <button
+                                        type="button"
+                                        onClick={handleResetPassword}
+                                        className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-bold transition-all"
+                                    >
+                                        <Key size={14} /> Reset Password
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 flex gap-3">
                                 <button
                                     onClick={handleUpdate}
-                                    className="w-full py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all active:scale-[0.98]"
+                                    className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl hover:shadow-purple-500/10 transition-all active:scale-[0.98]"
                                 >
                                     Save Changes
+                                </button>
+                                <button
+                                    onClick={() => setIsEditing(false)}
+                                    className="px-5 py-3 bg-gray-100 hover:bg-gray-250 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-xl font-bold transition-all"
+                                >
+                                    Cancel
                                 </button>
                             </div>
                         </div>

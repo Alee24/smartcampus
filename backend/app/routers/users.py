@@ -1135,6 +1135,53 @@ async def upload_profile_image(
     }
 
 
+@router.post("/remove-profile-image")
+async def remove_profile_image(
+    user_id: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    target_user = current_user
+    if user_id:
+        try:
+            from uuid import UUID
+            uuid_obj = UUID(user_id)
+            target_user = await session.get(User, uuid_obj)
+        except Exception:
+            target_user = None
+        if not target_user:
+            try:
+                target_user = await session.get(User, user_id)
+            except: pass
+        if not target_user:
+            q = select(User).where(User.admission_number == user_id)
+            target_user = (await session.exec(q)).first()
+        if not target_user:
+            raise HTTPException(status_code=404, detail=f"User not found by ID '{user_id}'")
+            
+    # Delete file physically if it exists and is local
+    import os
+    if target_user.profile_image and target_user.profile_image.startswith("/static/profiles/"):
+        file_path = target_user.profile_image.lstrip("/")
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print(f"Error removing file {file_path}: {e}")
+
+    target_user.profile_image = None
+    session.add(target_user)
+    try:
+        await session.commit()
+        await session.refresh(target_user)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
+        
+    return {"status": "success", "message": "Profile image removed successfully"}
+
+
+
+
 @router.post("/{user_id}/reset-password")
 async def reset_user_password(
     request: Request,
