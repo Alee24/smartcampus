@@ -784,33 +784,35 @@ export default function StudentVerification() {
                                                 </div>
 
                                                 {/* Student Name */}
-                                                <div className="flex flex-col mt-4 space-y-1">
-                                                    <span className="text-[40px] font-bold text-[#7A1975] dark:text-purple-300 leading-[1.1] uppercase break-words" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                                <div className="flex-1 flex flex-col justify-center my-4">
+                                                    <span className="text-[56px] font-extrabold text-[#7A1975] dark:text-purple-300 leading-[0.95] uppercase break-words tracking-tighter" style={{ fontFamily: "'Museo', sans-serif" }}>
                                                         {firstName}
                                                     </span>
-                                                    <span className="text-[40px] font-bold text-[#7A1975] dark:text-purple-300 leading-[1.1] uppercase break-words" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                                    <span className="text-[56px] font-extrabold text-[#7A1975] dark:text-purple-300 leading-[0.95] uppercase break-words tracking-tighter mt-1" style={{ fontFamily: "'Museo', sans-serif" }}>
                                                         {lastName}
                                                     </span>
                                                 </div>
 
-                                                {/* ID Number */}
-                                                <div className="text-[20px] font-bold text-[#7A1975] dark:text-purple-400 uppercase tracking-wider mt-3 leading-none" style={{ fontFamily: "'Museo Sans', sans-serif" }}>
-                                                    ID NO: {result.admission_number}
-                                                </div>
-
-                                                {/* QR Code & Status */}
-                                                <div className="flex items-end gap-6 mt-4">
-                                                    <div className="p-1.5 bg-white rounded-2xl border border-gray-250 dark:border-gray-800 shadow-sm shrink-0">
-                                                        <QRCodeSVG value={result.admission_number} size={105} level="H" />
+                                                <div className="space-y-4">
+                                                    {/* ID Number */}
+                                                    <div className="text-[20px] font-bold text-[#7A1975] dark:text-purple-400 uppercase tracking-wider leading-none" style={{ fontFamily: "'Museo Sans', sans-serif" }}>
+                                                        ID NO: {result.admission_number}
                                                     </div>
-                                                    <div className="pb-2">
-                                                        <div className={`px-5 py-2 text-white font-bold text-xs uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1.5 select-none ${
-                                                            isActive 
-                                                                ? 'bg-[#22C55E] shadow-[#22C55E]/20' 
-                                                                : 'bg-[#EF4444] shadow-[#EF4444]/20'
-                                                        }`}>
-                                                            <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
-                                                            {statusText}
+
+                                                    {/* QR Code & Status */}
+                                                    <div className="flex items-end gap-6">
+                                                        <div className="p-1.5 bg-white rounded-2xl border border-gray-250 dark:border-gray-800 shadow-sm shrink-0">
+                                                            <QRCodeSVG value={result.admission_number} size={105} level="H" />
+                                                        </div>
+                                                        <div className="pb-2">
+                                                            <div className={`px-5 py-2 text-white font-bold text-xs uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1.5 select-none ${
+                                                                isActive 
+                                                                    ? 'bg-[#22C55E] shadow-[#22C55E]/20' 
+                                                                    : 'bg-[#EF4444] shadow-[#EF4444]/20'
+                                                            }`}>
+                                                                <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
+                                                                {statusText}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
