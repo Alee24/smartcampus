@@ -90,29 +90,146 @@ export default function StudentVerification() {
         oscillator.stop(audioContext.currentTime + 0.5)
     }
 
+    const [offlineQueue, setOfflineQueue] = useState<any[]>([])
+    const [isOffline, setIsOffline] = useState(!navigator.onLine)
+    const [syncing, setSyncing] = useState(false)
+    const [cachedCount, setCachedCount] = useState(0)
+
+    useEffect(() => {
+        const localCached = JSON.parse(localStorage.getItem('cached_students') || '[]')
+        setCachedCount(localCached.length)
+        const localQueue = JSON.parse(localStorage.getItem('offline_scans') || '[]')
+        setOfflineQueue(localQueue)
+
+        const handleOnline = () => {
+            setIsOffline(false)
+            showNotification('Connection restored. Syncing offline data...', 'info')
+            syncOfflineDataAndRefresh()
+        }
+        const handleOffline = () => {
+            setIsOffline(true)
+            showNotification('Working offline. Access logs will be queued locally.', 'warning')
+        }
+
+        window.addEventListener('online', handleOnline)
+        window.addEventListener('offline', handleOffline)
+        return () => {
+            window.removeEventListener('online', handleOnline)
+            window.removeEventListener('offline', handleOffline)
+        }
+    }, [])
+
+    const syncOfflineDataAndRefresh = async () => {
+        setSyncing(true)
+        const online = navigator.onLine
+        setIsOffline(!online)
+        const queue = JSON.parse(localStorage.getItem('offline_scans') || '[]')
+        
+        let syncedCount = 0
+        if (online && queue.length > 0) {
+            const token = localStorage.getItem('token')
+            const remaining = []
+            for (const scan of queue) {
+                try {
+                    const res = await fetch(`/api/gate/${scan.action}/${encodeURIComponent(scan.admission_number)}`, {
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    if (res.ok) {
+                        syncedCount++
+                    } else {
+                        const err = await res.json()
+                        showNotification(`Offline sync failed for ${scan.admission_number}: ${err.detail || 'Server rejected request'}`, 'error')
+                        remaining.push(scan)
+                    }
+                } catch (e: any) {
+                    showNotification(`Offline sync connection error for ${scan.admission_number}: ${e.message}`, 'error')
+                    remaining.push(scan)
+                }
+            }
+            localStorage.setItem('offline_scans', JSON.stringify(remaining))
+            setOfflineQueue(remaining)
+            if (syncedCount > 0) {
+                showNotification(`Synchronized ${syncedCount} queued scan logs with the server!`, 'success')
+            }
+        }
+
+        if (online) {
+            try {
+                const token = localStorage.getItem('token')
+                const res = await fetch('/api/users', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (res.ok) {
+                    const users = await res.json()
+                    const studentUsers = users.filter((u: any) => u.role?.toLowerCase() === 'student' || u.admission_number)
+                    localStorage.setItem('cached_students', JSON.stringify(studentUsers))
+                    setCachedCount(studentUsers.length)
+                    showNotification(`Offline directory updated with ${studentUsers.length} student records`, 'success')
+                } else {
+                    showNotification('Could not download updated student database.', 'error')
+                }
+            } catch (e: any) {
+                showNotification(`Error downloading student database: ${e.message}`, 'error')
+            }
+        } else {
+            showNotification('Offline mode. Refreshed with locally cached data.', 'warning')
+        }
+        setSyncing(false)
+    }
+
     const handleGateAction = async (action: 'check-in' | 'check-out') => {
         if (!result || !result.admission_number) return
         setActionLoading(action)
-        try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`/api/gate/${action}/${result.admission_number}`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if (res.ok) {
-                const data = await res.json()
-                playSuccessSound()
-                showNotification(`${action === 'check-in' ? 'Check-in' : 'Check-out'} recorded at ${data.time}`, 'success')
-                handleVerify()
-            } else {
-                const err = await res.json()
-                showNotification(err.detail || `Failed to ${action}`, 'error')
+        
+        let online = navigator.onLine
+        if (online) {
+            try {
+                const token = localStorage.getItem('token')
+                const res = await fetch(`/api/gate/${action}/${result.admission_number}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (res.ok) {
+                    const data = await res.json()
+                    playSuccessSound()
+                    showNotification(`${action === 'check-in' ? 'Check-in' : 'Check-out'} recorded at ${data.time}`, 'success')
+                    handleVerify()
+                    setActionLoading(null)
+                    return;
+                }
+            } catch (e) {
+                online = false
             }
-        } catch (e) {
-            showNotification(`Network error during ${action}`, 'error')
-        } finally {
-            setActionLoading(null)
         }
+
+        // Offline check-in/out fallback
+        const queue = JSON.parse(localStorage.getItem('offline_scans') || '[]')
+        queue.push({
+            admission_number: result.admission_number,
+            action,
+            timestamp: new Date().toISOString()
+        })
+        localStorage.setItem('offline_scans', JSON.stringify(queue))
+        setOfflineQueue(queue)
+
+        // Update current result state and cached students state
+        const cached = JSON.parse(localStorage.getItem('cached_students') || '[]')
+        const updatedCached = cached.map((s: any) => {
+            if (s.admission_number === result.admission_number) {
+                return { ...s, gate_status: action === 'check-in' ? 'In' : 'Out' }
+            }
+            return s
+        })
+        localStorage.setItem('cached_students', JSON.stringify(updatedCached))
+        
+        setResult((prev: any) => prev ? { ...prev, gate_status: action === 'check-in' ? 'In' : 'Out' } : null)
+        playSuccessSound()
+        showNotification(`Offline Check-log: Queued ${action} for ${result.full_name || result.admission_number}`, 'warning')
+        setActionLoading(null)
     }
 
     const handleVerify = async (qOverride?: string, isScanned = false) => {
@@ -123,67 +240,136 @@ export default function StudentVerification() {
         setShowCard(false)
         setResult(null)
         setShowSuggestions(false)
-        try {
-            const res = await fetch(`/api/users/verify/${encodeURIComponent(searchQuery)}`)
-            if (res.ok) {
-                const data = await res.json()
-                setResult(data)
-                if (!data.ad_found) {
-                    setTimeout(() => {
-                        setShowCard(true)
-                        setEditData({ full_name: data.full_name, school: data.school })
-                        playSuccessSound()
-                    }, 300)
 
-                    // If scanned via QR scanner, automatically check in / check out depending on current status
-                    if (isScanned) {
-                        try {
-                            const token = localStorage.getItem('token')
-                            const action = data.gate_status === 'In' ? 'check-out' : 'check-in'
-                            const gateRes = await fetch(`/api/gate/${action}/${encodeURIComponent(data.admission_number)}`, {
-                                method: 'POST',
-                                headers: { 'Authorization': `Bearer ${token}` }
-                            })
-                            if (gateRes.ok) {
-                                const gateData = await gateRes.json()
-                                showNotification(`Auto ${action === 'check-in' ? 'Checked In' : 'Checked Out'}: ${data.full_name} at ${gateData.time}`, 'success')
-                                
-                                // Refresh verification details to show the updated gate status
-                                const refreshRes = await fetch(`/api/users/verify/${encodeURIComponent(searchQuery)}`)
-                                if (refreshRes.ok) {
-                                    const refreshedData = await refreshRes.json()
-                                    setResult(refreshedData)
+        let online = navigator.onLine
+        if (online) {
+            try {
+                const res = await fetch(`/api/users/verify/${encodeURIComponent(searchQuery)}`)
+                if (res.ok) {
+                    const data = await res.json()
+                    setResult(data)
+                    if (!data.ad_found) {
+                        setTimeout(() => {
+                            setShowCard(true)
+                            setEditData({ full_name: data.full_name, school: data.school })
+                            playSuccessSound()
+                        }, 300)
+
+                        if (isScanned) {
+                            try {
+                                const token = localStorage.getItem('token')
+                                const action = data.gate_status === 'In' ? 'check-out' : 'check-in'
+                                const gateRes = await fetch(`/api/gate/${action}/${encodeURIComponent(data.admission_number)}`, {
+                                    method: 'POST',
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                })
+                                if (gateRes.ok) {
+                                    const gateData = await gateRes.json()
+                                    showNotification(`Auto ${action === 'check-in' ? 'Checked In' : 'Checked Out'}: ${data.full_name} at ${gateData.time}`, 'success')
+                                    
+                                    const refreshRes = await fetch(`/api/users/verify/${encodeURIComponent(searchQuery)}`)
+                                    if (refreshRes.ok) {
+                                        const refreshedData = await refreshRes.json()
+                                        setResult(refreshedData)
+                                    }
+                                } else {
+                                    const errData = await gateRes.json()
+                                    showNotification(errData.detail || `Auto ${action} failed`, 'error')
                                 }
-                            } else {
-                                const errData = await gateRes.json()
-                                showNotification(errData.detail || `Auto ${action} failed`, 'error')
+                            } catch (err) {
+                                showNotification('Auto gate-log failed', 'error')
                             }
-                        } catch (err) {
-                            showNotification('Auto gate-log failed', 'error')
                         }
                     }
+                    setLoading(false)
+                    return;
                 }
-            } else {
-                setResult({ error: 'Student not found' })
+            } catch (e) {
+                online = false
             }
-        } catch (e) {
-            setResult({ error: 'Verification failed. Please try again.' })
-        } finally {
-            setLoading(false)
         }
+
+        // Offline / cached lookup
+        const cached = JSON.parse(localStorage.getItem('cached_students') || '[]')
+        const found = cached.find((s: any) => 
+            s.admission_number.toUpperCase() === searchQuery.toUpperCase() ||
+            (s.email && s.email.toLowerCase() === searchQuery.toLowerCase())
+        )
+
+        if (found) {
+            const data = {
+                id: found.id || found.admission_number,
+                full_name: found.full_name,
+                admission_number: found.admission_number,
+                email: found.email || '',
+                school: found.school || 'General',
+                status: found.status || 'Active',
+                profile_image: found.profile_image || '',
+                role: found.role || 'Student',
+                gate_status: found.gate_status || 'Out'
+            }
+            setResult(data)
+            setTimeout(() => {
+                setShowCard(true)
+                setEditData({ full_name: found.full_name, school: found.school })
+                playSuccessSound()
+            }, 300)
+
+            if (isScanned) {
+                // Auto offline gate action
+                const action = data.gate_status === 'In' ? 'check-out' : 'check-in'
+                const queue = JSON.parse(localStorage.getItem('offline_scans') || '[]')
+                queue.push({
+                    admission_number: data.admission_number,
+                    action,
+                    timestamp: new Date().toISOString()
+                })
+                localStorage.setItem('offline_scans', JSON.stringify(queue))
+                setOfflineQueue(queue)
+
+                const updatedCached = cached.map((s: any) => {
+                    if (s.admission_number === data.admission_number) {
+                        return { ...s, gate_status: action === 'check-in' ? 'In' : 'Out' }
+                    }
+                    return s
+                })
+                localStorage.setItem('cached_students', JSON.stringify(updatedCached))
+                
+                setResult((prev: any) => prev ? { ...prev, gate_status: action === 'check-in' ? 'In' : 'Out' } : null)
+                showNotification(`Offline Auto ${action === 'check-in' ? 'Checked In' : 'Checked Out'}: ${data.full_name}`, 'warning')
+            }
+        } else {
+            setResult({ error: 'Student not found in local offline database.' })
+        }
+        setLoading(false)
     }
 
     const handleQueryChange = async (val: string) => {
         setQuery(val)
         if (val.length >= 2) {
-            try {
-                const token = localStorage.getItem('token')
-                const res = await fetch(`/api/users/search?q=${val}`, { headers: { 'Authorization': `Bearer ${token}` } })
-                if (res.ok) {
-                    setSuggestions(await res.json())
-                    setShowSuggestions(true)
+            let online = navigator.onLine
+            if (online) {
+                try {
+                    const token = localStorage.getItem('token')
+                    const res = await fetch(`/api/users/search?q=${val}`, { headers: { 'Authorization': `Bearer ${token}` } })
+                    if (res.ok) {
+                        setSuggestions(await res.json())
+                        setShowSuggestions(true)
+                        return;
+                    }
+                } catch (e) {
+                    online = false
                 }
-            } catch (e) { }
+            }
+
+            // Local Autocomplete filter
+            const cached = JSON.parse(localStorage.getItem('cached_students') || '[]')
+            const matched = cached.filter((s: any) => 
+                s.admission_number.toUpperCase().includes(val.toUpperCase()) ||
+                s.full_name.toUpperCase().includes(val.toUpperCase())
+            ).slice(0, 10)
+            setSuggestions(matched)
+            setShowSuggestions(true)
         } else {
             setSuggestions([])
             setShowSuggestions(false)
@@ -402,6 +588,42 @@ export default function StudentVerification() {
                         <h1 className="text-3xl font-black bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
                             ID Verification
                         </h1>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-center gap-3 mt-4 max-w-2xl mx-auto bg-white/65 dark:bg-gray-800/65 backdrop-blur-md px-5 py-3 rounded-2xl border border-gray-150/80 dark:border-gray-700/80 shadow-md">
+                        <div className="flex items-center gap-2">
+                            {isOffline ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/30 text-amber-600 border border-amber-200/50">
+                                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                    Offline Mode
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 border border-emerald-250/50">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    Online
+                                </span>
+                            )}
+                            
+                            {offlineQueue.length > 0 && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 dark:bg-rose-950/30 text-rose-600 border border-rose-200/50 animate-bounce">
+                                    {offlineQueue.length} Pending Sync
+                                </span>
+                            )}
+                            
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 dark:bg-purple-950/30 text-purple-600 border border-purple-200/50">
+                                {cachedCount} Cached Records
+                            </span>
+                        </div>
+                        
+                        <button
+                            onClick={syncOfflineDataAndRefresh}
+                            disabled={syncing}
+                            className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 disabled:opacity-50 text-white rounded-xl text-xs font-black shadow-sm transition-all"
+                            title="Refresh system status and synchronize offline logs"
+                        >
+                            <RefreshCcw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                            {syncing ? 'Syncing...' : 'Refresh & Sync'}
+                        </button>
                     </div>
                 </div>
 
