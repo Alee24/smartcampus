@@ -473,24 +473,15 @@ export default function StudentVerification() {
         }
     }
 
-    const handleImageUpload = (file: File) => {
+    const handleImageUpload = async (file: File) => {
         if (!result) return
-        const url = URL.createObjectURL(file)
-        setPreviewUrl(url)
-        setRotation(0)
-        setPinModal({ show: true, pin: '', file })
-    }
-
-    const rotateImage = () => setRotation((prev) => (prev + 90) % 360)
-
-    const submitSecureImageUpdate = async () => {
-        if (!pinModal.file || !result) return
         setUploadingImage(true)
+        showNotification('Uploading profile photo...', 'info')
         try {
             const formData = new FormData()
-            formData.append('file', pinModal.file)
+            formData.append('file', file)
             formData.append('user_id', result.id)
-            formData.append('supervisor_pin', pinModal.pin)
+            formData.append('supervisor_pin', '') // PIN is no longer required by backend
             const token = localStorage.getItem('token')
             const res = await fetch('/api/users/secure-profile-image-update', {
                 method: 'POST',
@@ -500,18 +491,22 @@ export default function StudentVerification() {
             if (res.ok) {
                 const data = await res.json()
                 setResult({ ...result, profile_image: data.image_url })
-                setPinModal({ show: false, pin: '', file: null })
-                setPreviewUrl(null)
                 showNotification('Profile picture updated successfully', 'success')
             } else {
                 const data = await res.json()
-                showNotification(data.detail || 'Invalid Supervisor PIN', 'error')
+                showNotification(data.detail || 'Failed to update profile picture', 'error')
             }
         } catch (e) {
             showNotification('Network error updating image', 'error')
         } finally {
             setUploadingImage(false)
         }
+    }
+
+    const rotateImage = () => setRotation((prev) => (prev + 90) % 360)
+
+    const submitSecureImageUpdate = async () => {
+        // Obsoleted - uploads are now direct and PIN-free
     }
 
     const handleVerificationFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {

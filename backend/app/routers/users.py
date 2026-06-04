@@ -999,13 +999,10 @@ async def secure_profile_image_update(
     request: Request,
     file: UploadFile = File(...),
     user_id: str = Form(...),
-    supervisor_pin: str = Form(...),
+    supervisor_pin: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session)
 ):
-    if current_user.pin != supervisor_pin:
-        raise HTTPException(status_code=401, detail="Invalid Authorization PIN")
-        
     # 2. Get Target User
     from uuid import UUID
     target_user = await session.get(User, UUID(user_id))
