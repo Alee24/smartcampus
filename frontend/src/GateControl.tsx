@@ -64,6 +64,11 @@ export default function GateControl() {
         active_now: 0,
         exited_today: 0
     })
+    const [studentStats, setStudentStats] = useState<any>({
+        total_today: 0,
+        active_now: 0,
+        exited_today: 0
+    })
     const [recentVehicles, setRecentVehicles] = useState<any[]>([])
     const [registeredVehicles, setRegisteredVehicles] = useState<any[]>([])
     const [recentVisitors, setRecentVisitors] = useState<any[]>([])
@@ -163,7 +168,18 @@ export default function GateControl() {
     // Submit Visitor Check-In
     const handleVisitorCheckIn = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!visitorForm.name || !visitorForm.id || !visitorForm.phone) return
+        if (!visitorForm.name.trim()) {
+            showNotification("Guest Full Name is required", "error")
+            return
+        }
+        if (!visitorForm.id.trim()) {
+            showNotification("National ID / Passport number is required", "error")
+            return
+        }
+        if (!visitorForm.phone.trim()) {
+            showNotification("Phone number is required", "error")
+            return
+        }
         setIsSubmitting(true)
         try {
             const token = localStorage.getItem('token')
@@ -595,14 +611,18 @@ export default function GateControl() {
                 const visitorsRes = await fetch('/api/gate/visitors', { headers })
                 if (visitorsRes.ok) setRecentVisitors(await visitorsRes.json())
 
+                // Fetch Student details
+                const studentStatsRes = await fetch('/api/gate/student-stats', { headers })
+                if (studentStatsRes.ok) setStudentStats(await studentStatsRes.json())
+
             } catch (e) { console.error("Error loading gate data:", e) }
         }
         fetchGateData()
     }, [refreshTrigger])
 
     // Calculate aggregated stats
-    const totalEntriesToday = vehicleStats.total_today + visitorStats.total_today
-    const currentInsideToday = vehicleStats.current_inside + visitorStats.active_now
+    const totalEntriesToday = vehicleStats.total_today + visitorStats.total_today + studentStats.total_today
+    const currentInsideToday = vehicleStats.current_inside + visitorStats.active_now + studentStats.active_now
 
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 animate-fade-in font-sans space-y-6">
@@ -635,7 +655,9 @@ export default function GateControl() {
                         <span className="text-4xl font-black text-slate-900 dark:text-white">{totalEntriesToday}</span>
                         <span className="text-xs text-slate-400 font-bold">total entries</span>
                     </div>
-                    <div className="mt-2 text-[10px] text-slate-400 font-bold flex gap-2">
+                    <div className="mt-2 text-[10px] text-slate-400 font-bold flex flex-wrap gap-2">
+                        <span>🎓 {studentStats.total_today} Students</span>
+                        <span>•</span>
                         <span>🚗 {vehicleStats.total_today} Vehicles</span>
                         <span>•</span>
                         <span>🎫 {visitorStats.total_today} Visitors</span>
@@ -651,7 +673,9 @@ export default function GateControl() {
                         <span className="text-4xl font-black text-slate-900 dark:text-white">{currentInsideToday}</span>
                         <span className="text-xs text-slate-400 font-bold">active now</span>
                     </div>
-                    <div className="mt-2 text-[10px] text-slate-400 font-bold flex gap-2">
+                    <div className="mt-2 text-[10px] text-slate-400 font-bold flex flex-wrap gap-2">
+                        <span>🎓 {studentStats.active_now} Students</span>
+                        <span>•</span>
                         <span>🚗 {vehicleStats.current_inside} Parked</span>
                         <span>•</span>
                         <span>🎫 {visitorStats.active_now} Visitors</span>
@@ -665,11 +689,13 @@ export default function GateControl() {
                     <p className="text-xs font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest mb-1">Total Checked Out</p>
                     <div className="flex items-baseline gap-2">
                         <span className="text-4xl font-black text-slate-900 dark:text-white">
-                            {vehicleStats.total_exited + visitorStats.exited_today}
+                            {vehicleStats.total_exited + visitorStats.exited_today + studentStats.exited_today}
                         </span>
                         <span className="text-xs text-slate-400 font-bold">exited</span>
                     </div>
-                    <div className="mt-2 text-[10px] text-slate-400 font-bold flex gap-2">
+                    <div className="mt-2 text-[10px] text-slate-400 font-bold flex flex-wrap gap-2">
+                        <span>🎓 {studentStats.exited_today} Students</span>
+                        <span>•</span>
                         <span>🚗 {vehicleStats.total_exited} Cars</span>
                         <span>•</span>
                         <span>🎫 {visitorStats.exited_today} Guests</span>
@@ -1295,6 +1321,18 @@ export default function GateControl() {
 
                         <form onSubmit={async (e) => {
                             e.preventDefault()
+                            if (!visitorForm.name.trim()) {
+                                showNotification("Visitor Full Name is required", "error")
+                                return
+                            }
+                            if (!visitorForm.id.trim()) {
+                                showNotification("ID Number is required", "error")
+                                return
+                            }
+                            if (!visitorForm.phone.trim()) {
+                                showNotification("Phone number is required", "error")
+                                return
+                            }
                             try {
                                 const token = localStorage.getItem('token')
                                 const res = await fetch(`/api/events/${eventData.event_id}/register-visitor`, {

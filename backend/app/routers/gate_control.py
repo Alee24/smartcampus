@@ -942,6 +942,25 @@ async def trigger_alarm(session: AsyncSession = Depends(get_session)):
     print("!!! SECURITY ALARM TRIGGERED !!!")
     return {"status": "triggered", "message": "Security Alert Broadcasted"}
 
+@router.get("/student-stats")
+async def get_student_stats(session: AsyncSession = Depends(get_session)):
+    today = get_eat_time().date()
+    start_of_day = datetime.combine(today, datetime.min.time())
+    
+    # Query all entry logs from today
+    query = select(EntryLog).where(EntryLog.entry_time >= start_of_day)
+    logs = (await session.exec(query)).all()
+    
+    total = len(logs)
+    active = len([log for log in logs if not log.exit_time])
+    exited = len([log for log in logs if log.exit_time])
+    
+    return {
+        "total_today": total,
+        "active_now": active,
+        "exited_today": exited
+    }
+
 # --- Visitor Management ---
 
 @router.get("/visitors")
@@ -957,10 +976,14 @@ async def check_in_visitor(
     session: AsyncSession = Depends(get_session)
 ):
     try:
+        phone_number = payload.get("phone_number")
+        if not phone_number or not str(phone_number).strip():
+            raise ValueError("Phone number is required")
+            
         visitor = Visitor(
             first_name=payload.get("first_name"),
             last_name=payload.get("last_name"),
-            phone_number=payload.get("phone_number"),
+            phone_number=str(phone_number).strip(),
             id_number=payload.get("id_number"),
             visit_details=payload.get("visit_details"),
             status="checked_in",
