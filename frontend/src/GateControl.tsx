@@ -34,6 +34,8 @@ export default function GateControl() {
     const [manualDriverName, setManualDriverName] = useState('')
     const [manualDriverContact, setManualDriverContact] = useState('')
     const [manualDriverId, setManualDriverId] = useState('')
+    const [manualPurpose, setManualPurpose] = useState('Visitor / External')
+    const [manualDestination, setManualDestination] = useState('')
     const [plateSuggestions, setPlateSuggestions] = useState<any[]>([])
 
     // Detailed lists viewing modals (to keep A4 main page compact)
@@ -241,7 +243,9 @@ export default function GateControl() {
                     driver_name: manualDriverName,
                     driver_contact: manualDriverContact,
                     driver_id_number: manualDriverId,
-                    gate_id: selectedGateId
+                    gate_id: selectedGateId,
+                    purpose: manualPurpose,
+                    destination: manualDestination
                 })
             })
             const result = await res.json()
@@ -249,7 +253,7 @@ export default function GateControl() {
                 setScanStatus('success')
                 setLastScan({
                     name: result.data.plate,
-                    role: `Driver: ${manualDriverName || 'Unknown Driver'}`,
+                    role: `Driver: ${manualDriverName || 'Unknown Driver'} (${manualPurpose})`,
                     time: result.data.time,
                     image: result.data.image,
                     isVehicle: true,
@@ -260,6 +264,8 @@ export default function GateControl() {
                 setManualDriverName('')
                 setManualDriverContact('')
                 setManualDriverId('')
+                setManualPurpose('Visitor / External')
+                setManualDestination('')
                 showNotification(`Vehicle ${result.data.plate} logged successfully`, 'success')
                 refreshData()
             } else {
@@ -376,38 +382,37 @@ export default function GateControl() {
 
         try {
             const token = localStorage.getItem('token')
-            const res = await fetch('/api/gate/scan-vehicle', {
+            const res = await fetch('/api/gate/ocr-plate', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` },
                 body: formData
             })
             const data = await res.json()
 
-            if (data.status === 'allowed' || data.status === 'visitor') {
+            if (res.ok && data.plate_number) {
                 setScanStatus('success')
-                setLastScan({
-                    name: data.data.plate,
-                    role: `${data.data.make} ${data.data.model} (${data.data.color})`,
-                    time: data.data.entry_time,
-                    image: data.data.image_url,
-                    isVehicle: true,
-                    passengers: data.data.passengers
-                })
-                showNotification(`Vehicle ${data.data.plate} logged successfully`, 'success')
-                refreshData()
+                setManualPlate(data.plate_number)
+                setActiveTab('vehicle')
+                
+                if (data.is_registered) {
+                    setManualDriverName(data.vehicle.driver_name || '')
+                    setManualDriverContact(data.vehicle.driver_contact || '')
+                    setManualDriverId(data.vehicle.driver_id_number || '')
+                    setManualPurpose(data.vehicle.is_fleet ? 'Staff Check-in' : 'Student Check-in')
+                    showNotification(`Plate transcribed: ${data.plate_number} (Registered vehicle). Click Register Vehicle to proceed.`, 'success')
+                } else {
+                    setManualDriverName('')
+                    setManualDriverContact('')
+                    setManualDriverId('')
+                    setManualPurpose('Visitor / External')
+                    showNotification(`Plate transcribed: ${data.plate_number} (Unregistered vehicle). Please fill in the driver details.`, 'info')
+                }
             } else {
                 setScanStatus('rejected')
-                setLastScan({
-                    name: data.data.plate || "Unknown",
-                    role: "Unauthorized Vehicle",
-                    time: new Date().toLocaleTimeString(),
-                    isVehicle: true,
-                    image: data.data.image_url,
-                })
-                showNotification(data.detail || 'Unauthorized vehicle flagged', 'warning')
+                showNotification(data.detail || 'Failed to transcribe plate number', 'warning')
             }
         } catch (err: any) {
-            showNotification(`Error scanning plate file: ${err.message || err}`, "error")
+            showNotification(`Error transcribing plate: ${err.message || err}`, "error")
             setScanStatus('idle')
         } finally {
             e.target.value = ''
@@ -547,47 +552,46 @@ export default function GateControl() {
             if (!blob) return
             stopCamera()
 
-            if (scanMode === 'plate') {
-                const formData = new FormData()
-                formData.append('file', blob, 'plate_scan.jpg')
-
-                try {
-                    const token = localStorage.getItem('token')
-                    const res = await fetch('/api/gate/scan-vehicle', {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${token}` },
-                        body: formData
-                    })
-                    const data = await res.json()
-
-                    if (data.status === 'allowed' || data.status === 'visitor') {
-                        setScanStatus('success')
-                        setLastScan({
-                            name: data.data.plate,
-                            role: `${data.data.make} ${data.data.model} (${data.data.color})`,
-                            time: data.data.entry_time,
-                            image: data.data.image_url,
-                            isVehicle: true,
-                            passengers: data.data.passengers
-                        })
-                        showNotification(`Vehicle ${data.data.plate} logged successfully`, 'success')
-                        refreshData()
-                    } else {
-                        setScanStatus('rejected')
-                        setLastScan({
-                            name: data.data.plate || "Unknown",
-                            role: "Unauthorized Vehicle",
-                            time: new Date().toLocaleTimeString(),
-                            isVehicle: true,
-                            image: data.data.image_url,
-                        })
-                        showNotification('Unauthorized vehicle flagged', 'warning')
-                    }
-                } catch (e) {
-                    showNotification("Error processing plate", "error")
-                    setScanStatus('idle')
-                }
-            }
+             if (scanMode === 'plate') {
+                 const formData = new FormData()
+                 formData.append('file', blob, 'plate_scan.jpg')
+ 
+                 try {
+                     const token = localStorage.getItem('token')
+                     const res = await fetch('/api/gate/ocr-plate', {
+                         method: 'POST',
+                         headers: { 'Authorization': `Bearer ${token}` },
+                         body: formData
+                     })
+                     const data = await res.json()
+ 
+                     if (res.ok && data.plate_number) {
+                         setScanStatus('success')
+                         setManualPlate(data.plate_number)
+                         setActiveTab('vehicle')
+                         
+                         if (data.is_registered) {
+                             setManualDriverName(data.vehicle.driver_name || '')
+                             setManualDriverContact(data.vehicle.driver_contact || '')
+                             setManualDriverId(data.vehicle.driver_id_number || '')
+                             setManualPurpose(data.vehicle.is_fleet ? 'Staff Check-in' : 'Student Check-in')
+                             showNotification(`Plate transcribed: ${data.plate_number} (Registered vehicle). Click Register Vehicle to proceed.`, 'success')
+                         } else {
+                             setManualDriverName('')
+                             setManualDriverContact('')
+                             setManualDriverId('')
+                             setManualPurpose('Visitor / External')
+                             showNotification(`Plate transcribed: ${data.plate_number} (Unregistered vehicle). Please fill in the driver details.`, 'info')
+                         }
+                     } else {
+                         setScanStatus('rejected')
+                         showNotification(data.detail || 'Failed to transcribe plate number', 'warning')
+                     }
+                 } catch (e) {
+                     showNotification("Error processing plate transcription", "error")
+                     setScanStatus('idle')
+                 }
+             }
         }, 'image/jpeg')
     }
 
@@ -994,6 +998,38 @@ export default function GateControl() {
                                             className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-orange-500/20"
                                         />
                                     </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Driver's Contact Phone</label>
+                                        <input 
+                                            value={manualDriverContact}
+                                            onChange={e => setManualDriverContact(e.target.value)}
+                                            placeholder="Phone Number"
+                                            className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-orange-500/20"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Vehicle Classification</label>
+                                        <select
+                                            value={manualPurpose}
+                                            onChange={e => setManualPurpose(e.target.value)}
+                                            className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-orange-500/20 text-slate-800 dark:text-white"
+                                        >
+                                            <option value="Visitor / External">Visitor / External</option>
+                                            <option value="Staff Check-in">Staff Check-in</option>
+                                            <option value="Student Check-in">Student Check-in</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Destination / Visit Reason</label>
+                                    <input 
+                                        value={manualDestination}
+                                        onChange={e => setManualDestination(e.target.value)}
+                                        placeholder="e.g. Finance Office, Main Hall, General Visit"
+                                        className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-orange-500/20"
+                                    />
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button 

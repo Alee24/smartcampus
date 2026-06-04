@@ -182,6 +182,8 @@ class VehicleLog(UUIDModel, table=True):
     exit_gate_id: Optional[UUID] = Field(default=None, foreign_key="gates.id", nullable=True)
     guard_id: Optional[UUID] = Field(foreign_key="users.id")
     manual_override: bool = Field(default=False)
+    purpose: Optional[str] = None
+    destination: Optional[str] = None
 
     vehicle: Vehicle = Relationship(back_populates="logs")
 

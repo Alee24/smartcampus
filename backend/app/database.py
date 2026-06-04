@@ -289,9 +289,16 @@ async def migrate_gate_exits():
                 return [c['name'] for c in inspector.get_columns('vehicle_logs')]
             
             vehicle_cols = await conn.run_sync(get_vehicle_cols)
-            if vehicle_cols and "exit_gate_id" not in vehicle_cols:
-                print("Adding exit_gate_id column to vehicle_logs...")
-                await conn.execute(text("ALTER TABLE vehicle_logs ADD COLUMN exit_gate_id VARCHAR(36) NULL"))
+            if vehicle_cols:
+                if "exit_gate_id" not in vehicle_cols:
+                    print("Adding exit_gate_id column to vehicle_logs...")
+                    await conn.execute(text("ALTER TABLE vehicle_logs ADD COLUMN exit_gate_id VARCHAR(36) NULL"))
+                if "purpose" not in vehicle_cols:
+                    print("Adding purpose column to vehicle_logs...")
+                    await conn.execute(text("ALTER TABLE vehicle_logs ADD COLUMN purpose VARCHAR(255) NULL"))
+                if "destination" not in vehicle_cols:
+                    print("Adding destination column to vehicle_logs...")
+                    await conn.execute(text("ALTER TABLE vehicle_logs ADD COLUMN destination VARCHAR(255) NULL"))
             
             print("Gate exits schema migration checked/applied successfully.")
     except Exception as e:

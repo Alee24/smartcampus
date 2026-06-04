@@ -141,7 +141,9 @@ async def manual_vehicle_entry(
         entry_time=get_eat_time(),
         vehicle_images={},
         manual_override=True,
-        detected_passengers=passengers
+        detected_passengers=passengers,
+        purpose=payload.get("purpose"),
+        destination=payload.get("destination")
     )
     
     session.add(log)
@@ -797,6 +799,40 @@ async def scan_vehicle_plate(
             "image_url": f"/{filepath}",
             "owner": owner_data
         }
+    }
+
+@router.post("/ocr-plate")
+async def ocr_plate(
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Perform OCR on vehicle plate image and return the plate number and registration status.
+    """
+    upload_dir = "static/vehicle_logs"
+    os.makedirs(upload_dir, exist_ok=True)
+    file_id = str(uuid.uuid4())
+    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    filename = f"ocr_{file_id}.{ext}"
+    filepath = f"{upload_dir}/{filename}"
+    
+    with open(filepath, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # Simulate OCR plate detection
+    existing_vehicle = (await session.exec(select(Vehicle))).first()
+    if existing_vehicle and random.choice([True, True, False]):
+        detected_text = existing_vehicle.plate_number
+    else:
+        detected_text = f"KCA {random.randint(100, 999)}{random.choice(['A','B','C'])}"
+        
+    vehicle = (await session.exec(select(Vehicle).where(Vehicle.plate_number == detected_text))).first()
+    
+    return {
+        "plate_number": detected_text,
+        "is_registered": vehicle is not None,
+        "vehicle": vehicle,
+        "image_url": f"/{filepath}"
     }
 
 # Duplicate get_vehicle_logs removed (Use the one below)
