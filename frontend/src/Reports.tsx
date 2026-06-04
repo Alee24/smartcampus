@@ -91,13 +91,14 @@ export default function Reports() {
         if (type === 'people') {
             filename = `people_scans_report_${selectedDate}.csv`
             // Headers
-            csvContent += "Name,Email,Role,Gate,Entry Time,Exit Time,Method,Guard,Status\n"
+            csvContent += "Name,Email,Role,Gate Entered,Gate Exited,Entry Time,Exit Time,Method,Guard,Status\n"
             genReport.entry_logs.forEach((log: any) => {
                 const row = [
                     `"${log.name}"`,
                     `"${log.email}"`,
                     `"${log.role}"`,
                     `"${log.gate}"`,
+                    `"${log.exit_gate || '-'}"`,
                     `"${log.entry_time || '-'}"`,
                     `"${log.exit_time || '-'}"`,
                     `"${log.method}"`,
@@ -109,13 +110,14 @@ export default function Reports() {
         } else {
             filename = `vehicle_scans_report_${selectedDate}.csv`
             // Headers
-            csvContent += "Plate Number,Driver Name,Vehicle Type,Gate,Entry Time,Exit Time,Guard\n"
+            csvContent += "Plate Number,Driver Name,Vehicle Type,Gate Entered,Gate Exited,Entry Time,Exit Time,Guard\n"
             genReport.vehicle_logs.forEach((log: any) => {
                 const row = [
                     `"${log.plate_number}"`,
                     `"${log.driver_name}"`,
                     `"${log.vehicle_type}"`,
                     `"${log.gate}"`,
+                    `"${log.exit_gate || '-'}"`,
                     `"${log.entry_time || '-'}"`,
                     `"${log.exit_time || '-'}"`,
                     `"${log.guard}"`
@@ -239,14 +241,15 @@ export default function Reports() {
             currentY += 35;
 
             const tableCols = type === 'people' 
-                ? ["Name", "Role", "Gate", "Method", "Entry Time", "Exit Time", "Status"]
-                : ["Plate Number", "Driver Name", "Type", "Gate", "Entry Time", "Exit Time"];
+                ? ["Name", "Role", "Gate Entered", "Gate Exited", "Method", "Entry Time", "Exit Time", "Status"]
+                : ["Plate Number", "Driver Name", "Type", "Gate Entered", "Gate Exited", "Entry Time", "Exit Time"];
 
             const tableRows = type === 'people'
                 ? genReport.entry_logs.map((log: any) => [
                     log.name,
                     log.role,
                     log.gate,
+                    log.exit_gate || '-',
                     log.method,
                     log.entry_time ? new Date(log.entry_time).toLocaleTimeString() : '-',
                     log.exit_time ? new Date(log.exit_time).toLocaleTimeString() : 'On Campus',
@@ -257,6 +260,7 @@ export default function Reports() {
                     log.driver_name,
                     log.vehicle_type,
                     log.gate,
+                    log.exit_gate || '-',
                     log.entry_time ? new Date(log.entry_time).toLocaleTimeString() : '-',
                     log.exit_time ? new Date(log.exit_time).toLocaleTimeString() : 'Parked'
                 ]);
@@ -558,7 +562,8 @@ export default function Reports() {
                                                 <tr className="border-b border-[var(--border-color)] bg-[var(--bg-primary)]/10 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                                                     <th className="p-4">Name</th>
                                                     <th className="p-4">Role</th>
-                                                    <th className="p-4">Gate</th>
+                                                    <th className="p-4">Gate Entered</th>
+                                                    <th className="p-4">Gate Exited</th>
                                                     <th className="p-4">Method</th>
                                                     <th className="p-4">Entry Time</th>
                                                     <th className="p-4">Exit Time</th>
@@ -572,6 +577,7 @@ export default function Reports() {
                                                         log.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                                         log.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                                         log.gate.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                        (log.exit_gate && log.exit_gate.toLowerCase().includes(searchQuery.toLowerCase())) ||
                                                         log.method.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                                         log.guard.toLowerCase().includes(searchQuery.toLowerCase())
                                                     )
@@ -580,6 +586,7 @@ export default function Reports() {
                                                             <td className="p-4 font-bold text-[var(--text-primary)]">{log.name}</td>
                                                             <td className="p-4 text-[var(--text-secondary)] text-xs"><span className="px-2 py-0.5 rounded bg-[var(--bg-primary)] border border-[var(--border-color)]">{log.role}</span></td>
                                                             <td className="p-4 font-semibold">{log.gate}</td>
+                                                            <td className="p-4 font-semibold text-[var(--text-secondary)]">{log.exit_gate || '-'}</td>
                                                             <td className="p-4 text-xs font-bold uppercase">{log.method}</td>
                                                             <td className="p-4 text-xs text-[var(--text-secondary)]">{log.entry_time ? new Date(log.entry_time).toLocaleTimeString() : '-'}</td>
                                                             <td className="p-4 text-xs text-[var(--text-secondary)]">{log.exit_time ? new Date(log.exit_time).toLocaleTimeString() : <span className="text-gray-400">On Campus</span>}</td>
@@ -606,7 +613,8 @@ export default function Reports() {
                                                     <th className="p-4">Plate Number</th>
                                                     <th className="p-4">Driver Name</th>
                                                     <th className="p-4">Type</th>
-                                                    <th className="p-4">Gate</th>
+                                                    <th className="p-4">Gate Entered</th>
+                                                    <th className="p-4">Gate Exited</th>
                                                     <th className="p-4">Entry Time</th>
                                                     <th className="p-4">Exit Time</th>
                                                     <th className="p-4">Guard</th>
@@ -618,14 +626,16 @@ export default function Reports() {
                                                         log.plate_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                                         log.driver_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                                         log.vehicle_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                        log.gate.toLowerCase().includes(searchQuery.toLowerCase())
+                                                        log.gate.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                        (log.exit_gate && log.exit_gate.toLowerCase().includes(searchQuery.toLowerCase()))
                                                     )
                                                     .map((log: any) => (
                                                         <tr key={log.id} className="hover:bg-[var(--bg-primary)]/30 transition-colors">
                                                             <td className="p-4 font-black tracking-wider text-indigo-600 dark:text-indigo-400">{log.plate_number}</td>
                                                             <td className="p-4 font-semibold">{log.driver_name}</td>
                                                             <td className="p-4 text-xs capitalize"><span className="px-2 py-0.5 rounded bg-[var(--bg-primary)]">{log.vehicle_type}</span></td>
-                                                            <td className="p-4">{log.gate}</td>
+                                                            <td className="p-4 font-semibold">{log.gate}</td>
+                                                            <td className="p-4 font-semibold text-[var(--text-secondary)]">{log.exit_gate || '-'}</td>
                                                             <td className="p-4 text-xs text-[var(--text-secondary)]">{log.entry_time ? new Date(log.entry_time).toLocaleTimeString() : '-'}</td>
                                                             <td className="p-4 text-xs text-[var(--text-secondary)]">{log.exit_time ? new Date(log.exit_time).toLocaleTimeString() : <span className="text-gray-400">Parked</span>}</td>
                                                             <td className="p-4 text-xs font-medium">{log.guard}</td>

@@ -104,6 +104,7 @@ class EntryLog(UUIDModel, table=True):
     __tablename__ = "entry_logs"
     user_id: UUID = Field(foreign_key="users.id")
     gate_id: UUID = Field(foreign_key="gates.id")
+    exit_gate_id: Optional[UUID] = Field(default=None, foreign_key="gates.id", nullable=True)
     entry_time: datetime = Field(default_factory=get_eat_time, index=True)
     exit_time: Optional[datetime] = None
     method: str # qr, face, manual
@@ -178,6 +179,7 @@ class VehicleLog(UUIDModel, table=True):
     entry_time: datetime = Field(default_factory=get_eat_time, index=True)
     exit_time: Optional[datetime] = None
     gate_id: UUID = Field(foreign_key="gates.id")
+    exit_gate_id: Optional[UUID] = Field(default=None, foreign_key="gates.id", nullable=True)
     guard_id: Optional[UUID] = Field(foreign_key="users.id")
     manual_override: bool = Field(default=False)
 

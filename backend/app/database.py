@@ -37,6 +37,7 @@ async def init_db():
     await migrate_external_sync()
     await migrate_system_configs()
     await migrate_notice_board()
+    await migrate_gate_exits()
 
 async def get_session() -> AsyncSession:
     async_session = sessionmaker(
@@ -262,3 +263,37 @@ async def migrate_notice_board():
             print("Notice board table checked/created successfully.")
     except Exception as e:
         print(f"Notice board table migration skipped/failed: {e}")
+
+async def migrate_gate_exits():
+    """Manual migration to add exit_gate_id column to entry_logs and vehicle_logs."""
+    print("Checking gate exits schema migration...")
+    try:
+        async with engine.begin() as conn:
+            # check columns for entry_logs
+            def get_entry_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                if not inspector.has_table('entry_logs'): return []
+                return [c['name'] for c in inspector.get_columns('entry_logs')]
+            
+            entry_cols = await conn.run_sync(get_entry_cols)
+            if entry_cols and "exit_gate_id" not in entry_cols:
+                print("Adding exit_gate_id column to entry_logs...")
+                await conn.execute(text("ALTER TABLE entry_logs ADD COLUMN exit_gate_id VARCHAR(36) NULL"))
+            
+            # check columns for vehicle_logs
+            def get_vehicle_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                if not inspector.has_table('vehicle_logs'): return []
+                return [c['name'] for c in inspector.get_columns('vehicle_logs')]
+            
+            vehicle_cols = await conn.run_sync(get_vehicle_cols)
+            if vehicle_cols and "exit_gate_id" not in vehicle_cols:
+                print("Adding exit_gate_id column to vehicle_logs...")
+                await conn.execute(text("ALTER TABLE vehicle_logs ADD COLUMN exit_gate_id VARCHAR(36) NULL"))
+            
+            print("Gate exits schema migration checked/applied successfully.")
+    except Exception as e:
+        print(f"Gate exits schema migration skipped/failed: {e}")
+

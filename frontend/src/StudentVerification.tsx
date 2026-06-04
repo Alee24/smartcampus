@@ -38,6 +38,8 @@ export default function StudentVerification() {
     const [importing, setImporting] = useState(false)
     const qrScannerRef = useRef<Html5Qrcode | null>(null)
     const printRef = useRef<HTMLDivElement>(null)
+    const [gates, setGates] = useState<any[]>([])
+    const [selectedGateId, setSelectedGateId] = useState<string>('')
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -72,8 +74,31 @@ export default function StudentVerification() {
             }
         }
 
+        const fetchGates = async () => {
+            const token = localStorage.getItem('token')
+            try {
+                const res = await fetch('/api/gate/manage/gates', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (res.ok) {
+                    const data = await res.json()
+                    setGates(data)
+                    const storedGateId = localStorage.getItem('active_gate_id')
+                    if (storedGateId && data.some((g: any) => g.id === storedGateId)) {
+                        setSelectedGateId(storedGateId)
+                    } else if (data.length > 0) {
+                        setSelectedGateId(data[0].id)
+                        localStorage.setItem('active_gate_id', data[0].id)
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch gates', e)
+            }
+        }
+
         fetchUserData()
         fetchCompanySettings()
+        fetchGates()
     }, [])
 
     const playSuccessSound = () => {
@@ -131,7 +156,7 @@ export default function StudentVerification() {
             const remaining = []
             for (const scan of queue) {
                 try {
-                    const res = await fetch(`/api/gate/${scan.action}/${encodeURIComponent(scan.admission_number)}`, {
+                    const res = await fetch(`/api/gate/${scan.action}/${encodeURIComponent(scan.admission_number)}?gate_id=${scan.gate_id || ''}`, {
                         method: 'POST',
                         headers: { 
                             'Authorization': `Bearer ${token}`,
@@ -174,7 +199,7 @@ export default function StudentVerification() {
         if (online) {
             try {
                 const token = localStorage.getItem('token')
-                const res = await fetch(`/api/gate/${action}/${result.admission_number}`, {
+                const res = await fetch(`/api/gate/${action}/${result.admission_number}?gate_id=${selectedGateId || ''}`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
@@ -213,6 +238,7 @@ export default function StudentVerification() {
         queue.push({
             admission_number: result.admission_number,
             action,
+            gate_id: selectedGateId,
             timestamp: new Date().toISOString()
         })
         localStorage.setItem('offline_scans', JSON.stringify(queue))
@@ -286,7 +312,7 @@ export default function StudentVerification() {
                             try {
                                 const token = localStorage.getItem('token')
                                 const action = data.gate_status === 'In' ? 'check-out' : 'check-in'
-                                const gateRes = await fetch(`/api/gate/${action}/${encodeURIComponent(data.admission_number)}`, {
+                                const gateRes = await fetch(`/api/gate/${action}/${encodeURIComponent(data.admission_number)}?gate_id=${selectedGateId || ''}`, {
                                     method: 'POST',
                                     headers: { 'Authorization': `Bearer ${token}` }
                                 })
@@ -349,6 +375,7 @@ export default function StudentVerification() {
                 queue.push({
                     admission_number: data.admission_number,
                     action,
+                    gate_id: selectedGateId,
                     timestamp: new Date().toISOString()
                 })
                 localStorage.setItem('offline_scans', JSON.stringify(queue))
@@ -651,6 +678,26 @@ export default function StudentVerification() {
                             <RefreshCcw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
                             {syncing ? 'Syncing...' : 'Refresh & Sync'}
                         </button>
+
+                        {gates.length > 0 && (
+                            <div className="flex items-center gap-2 text-xs font-bold border-l border-gray-200 dark:border-gray-700 pl-3">
+                                <span className="text-[var(--text-secondary)]">Gate:</span>
+                                <select
+                                    value={selectedGateId}
+                                    onChange={(e) => {
+                                        const newGateId = e.target.value;
+                                        setSelectedGateId(newGateId);
+                                        localStorage.setItem('active_gate_id', newGateId);
+                                        showNotification(`Active gate set to: ${gates.find(g => g.id === newGateId)?.name || 'Unknown'}`, 'success');
+                                    }}
+                                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-xl border-none outline-none cursor-pointer font-black transition-all"
+                                >
+                                    {gates.map((g) => (
+                                        <option key={g.id} value={g.id}>{g.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                     </div>
                 </div>
 

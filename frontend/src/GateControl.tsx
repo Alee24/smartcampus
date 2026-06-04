@@ -72,6 +72,8 @@ export default function GateControl() {
     const [recentVehicles, setRecentVehicles] = useState<any[]>([])
     const [registeredVehicles, setRegisteredVehicles] = useState<any[]>([])
     const [recentVisitors, setRecentVisitors] = useState<any[]>([])
+    const [gates, setGates] = useState<any[]>([])
+    const [selectedGateId, setSelectedGateId] = useState<string>('')
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -133,7 +135,7 @@ export default function GateControl() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ admission_number: admissionNumber })
+                body: JSON.stringify({ admission_number: admissionNumber, gate_id: selectedGateId })
             })
 
             const result = await res.json()
@@ -194,7 +196,8 @@ export default function GateControl() {
                     last_name: visitorForm.name.split(' ').slice(1).join(' ') || 'Visitor',
                     phone_number: visitorForm.phone,
                     id_number: visitorForm.id,
-                    visit_details: visitorForm.details || 'General Campus Visit'
+                    visit_details: visitorForm.details || 'General Campus Visit',
+                    gate_id: selectedGateId
                 })
             })
             const result = await res.json()
@@ -237,7 +240,8 @@ export default function GateControl() {
                     passengers: manualPassengers,
                     driver_name: manualDriverName,
                     driver_contact: manualDriverContact,
-                    driver_id_number: manualDriverId
+                    driver_id_number: manualDriverId,
+                    gate_id: selectedGateId
                 })
             })
             const result = await res.json()
@@ -294,7 +298,7 @@ export default function GateControl() {
             const res = await fetch('/api/gate/vehicle-exit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ plate_number: plate })
+                body: JSON.stringify({ plate_number: plate, gate_id: selectedGateId })
             })
             if (res.ok) {
                 showNotification(`Vehicle ${plate} has exited`, 'success')
@@ -502,7 +506,7 @@ export default function GateControl() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ admission_number: code })
+                body: JSON.stringify({ admission_number: code, gate_id: selectedGateId })
             })
 
             const result = await res.json()
@@ -587,15 +591,41 @@ export default function GateControl() {
         }, 'image/jpeg')
     }
 
+    useEffect(() => {
+        const fetchGates = async () => {
+            const token = localStorage.getItem('token')
+            try {
+                const res = await fetch('/api/gate/manage/gates', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (res.ok) {
+                    const data = await res.json()
+                    setGates(data)
+                    const storedGateId = localStorage.getItem('active_gate_id')
+                    if (storedGateId && data.some((g: any) => g.id === storedGateId)) {
+                        setSelectedGateId(storedGateId)
+                    } else if (data.length > 0) {
+                        setSelectedGateId(data[0].id)
+                        localStorage.setItem('active_gate_id', data[0].id)
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch gates', e)
+            }
+        }
+        fetchGates()
+    }, [])
+
     // Load Stats & Data
     useEffect(() => {
         const fetchGateData = async () => {
             try {
                 const token = localStorage.getItem('token')
                 const headers = { 'Authorization': `Bearer ${token}` }
+                const gateParam = selectedGateId ? `?gate_id=${selectedGateId}` : ''
 
                 // Fetch Vehicle details
-                const statsRes = await fetch('/api/gate/vehicle-stats', { headers })
+                const statsRes = await fetch(`/api/gate/vehicle-stats${gateParam}`, { headers })
                 if (statsRes.ok) setVehicleStats(await statsRes.json())
 
                 const regRes = await fetch(`/api/gate/vehicles?_t=${Date.now()}`, { headers })
@@ -605,20 +635,20 @@ export default function GateControl() {
                 if (logsRes.ok) setRecentVehicles(await logsRes.json())
 
                 // Fetch Visitor details
-                const visitorStatsRes = await fetch('/api/gate/visitor-stats', { headers })
+                const visitorStatsRes = await fetch(`/api/gate/visitor-stats${gateParam}`, { headers })
                 if (visitorStatsRes.ok) setVisitorStats(await visitorStatsRes.json())
 
-                const visitorsRes = await fetch('/api/gate/visitors', { headers })
+                const visitorsRes = await fetch(`/api/gate/visitors?_t=${Date.now()}`, { headers })
                 if (visitorsRes.ok) setRecentVisitors(await visitorsRes.json())
 
                 // Fetch Student details
-                const studentStatsRes = await fetch('/api/gate/student-stats', { headers })
+                const studentStatsRes = await fetch(`/api/gate/student-stats${gateParam}`, { headers })
                 if (studentStatsRes.ok) setStudentStats(await studentStatsRes.json())
 
             } catch (e) { console.error("Error loading gate data:", e) }
         }
         fetchGateData()
-    }, [refreshTrigger])
+    }, [refreshTrigger, selectedGateId])
 
     // Calculate aggregated stats
     const totalEntriesToday = vehicleStats.total_today + visitorStats.total_today + studentStats.total_today
@@ -643,6 +673,32 @@ export default function GateControl() {
                 onChange={handlePlateFileScan} 
                 className="hidden" 
             />
+
+            {gates.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white/60 dark:bg-slate-900/60 backdrop-blur-md px-6 py-4 rounded-3xl border border-slate-150/80 dark:border-slate-850 shadow-sm mb-4">
+                    <div>
+                        <h2 className="text-xl font-black text-slate-900 dark:text-white">Gate Operations & Control</h2>
+                        <p className="text-xs text-slate-400 font-bold">Monitor traffic and manage entries/exits at your designated terminal.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Active Device Terminal:</span>
+                        <select
+                            value={selectedGateId}
+                            onChange={(e) => {
+                                const newGateId = e.target.value;
+                                setSelectedGateId(newGateId);
+                                localStorage.setItem('active_gate_id', newGateId);
+                                showNotification(`Switched active terminal to: ${gates.find(g => g.id === newGateId)?.name || 'Unknown'}`, 'success');
+                            }}
+                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-2xl border-none outline-none cursor-pointer font-black transition-all shadow-sm text-sm"
+                        >
+                            {gates.map((g) => (
+                                <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+            )}
 
             {/* 1. TOP STATS ROW (ON BOARD, ON TOP OF EVERYTHING ELSE) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

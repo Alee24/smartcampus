@@ -1,0 +1,6 @@
+# 1. Pull the latest code updates from Git
+git pull origin no-ai
+
+# 2. Shut down and rebuild the Docker containers
+docker-compose down
+docker-compose up -d --build

@@ -118,11 +118,21 @@ async def manual_vehicle_entry(
     await session.refresh(vehicle)
     
     # 2. Get Gate
-    gate = (await session.exec(select(Gate).where(Gate.name == "Main Gate"))).first()
+    gate_id = payload.get("gate_id")
+    gate = None
+    if gate_id:
+        try:
+            import uuid
+            gate = await session.get(Gate, uuid.UUID(str(gate_id)))
+        except Exception:
+            pass
     if not gate:
-        gate = Gate(name="Main Gate", location="Main Entrance")
-        session.add(gate)
-        await session.commit()
+        gate = (await session.exec(select(Gate).where(Gate.name == "Main Gate"))).first()
+        if not gate:
+            gate = Gate(name="Main Gate", location="Main Entrance")
+            session.add(gate)
+            await session.commit()
+            await session.refresh(gate)
 
     # 3. Log Entry
     log = VehicleLog(
@@ -172,13 +182,22 @@ async def scan_entry(
         return {"status": "rejected", "message": "Scanned code is empty", "data": None}
 
     # 1. Check for Gate
-    gate_query = select(Gate).where(Gate.name == "Main Gate")
-    gate = (await session.exec(gate_query)).first()
+    gate = None
+    gate_id = scan_data.get("gate_id")
+    if gate_id:
+        try:
+            import uuid
+            gate = await session.get(Gate, uuid.UUID(str(gate_id)))
+        except Exception:
+            pass
     if not gate:
-        gate = Gate(name="Main Gate", location="Main Entrance")
-        session.add(gate)
-        await session.commit()
-        await session.refresh(gate)
+        gate_query = select(Gate).where(Gate.name == "Main Gate")
+        gate = (await session.exec(gate_query)).first()
+        if not gate:
+            gate = Gate(name="Main Gate", location="Main Entrance")
+            session.add(gate)
+            await session.commit()
+            await session.refresh(gate)
 
     # 2. Check for Prefix
     upper_code = code.upper()
@@ -288,6 +307,7 @@ async def scan_entry(
         if open_log:
             # Check Out
             open_log.exit_time = get_eat_time()
+            open_log.exit_gate_id = gate.id
             session.add(open_log)
             await session.commit()
             
@@ -483,6 +503,7 @@ async def scan_entry(
         if open_log:
             # Check Out
             open_log.exit_time = get_eat_time()
+            open_log.exit_gate_id = gate.id
             session.add(open_log)
             await session.commit()
             
@@ -542,26 +563,36 @@ async def scan_entry(
 async def check_in_user(
     request: Request,
     admission_number: str, 
+    gate_id: Optional[str] = Query(None),
     session: AsyncSession = Depends(get_session)
 ):
     user = (await session.exec(select(User).where(User.admission_number == admission_number))).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # 2. Get Gate
+    gate = None
+    if gate_id:
+        try:
+            import uuid
+            gate = await session.get(Gate, uuid.UUID(str(gate_id)))
+        except Exception:
+            pass
+    if not gate:
+        gate = (await session.exec(select(Gate).where(Gate.name == "Main Gate"))).first()
+        if not gate:
+            gate = Gate(name="Main Gate", location="Main Entrance")
+            session.add(gate)
+            await session.commit()
+            await session.refresh(gate)
+
     # 1. Close any open sessions
     open_logs = (await session.exec(select(EntryLog).where(EntryLog.user_id == user.id).where(EntryLog.exit_time == None))).all()
     for log in open_logs:
         log.exit_time = get_eat_time()
+        log.exit_gate_id = gate.id
         session.add(log)
     
-    # 2. Create new Entry
-    gate = (await session.exec(select(Gate).where(Gate.name == "Main Gate"))).first()
-    if not gate:
-         gate = Gate(name="Main Gate", location="Main Entrance")
-         session.add(gate)
-         await session.commit()
-         await session.refresh(gate)
-
     new_log = EntryLog(
         user_id=user.id,
         gate_id=gate.id,
@@ -578,7 +609,7 @@ async def check_in_user(
         action_type="create",
         table_name="entry_logs",
         record_id=str(new_log.id),
-        description=f"Manual check-in for student {user.full_name} ({admission_number})",
+        description=f"Manual check-in for student {user.full_name} ({admission_number}) at {gate.name}",
         request=request
     )
 
@@ -588,29 +619,46 @@ async def check_in_user(
 async def check_out_user(
     request: Request,
     admission_number: str, 
+    gate_id: Optional[str] = Query(None),
     session: AsyncSession = Depends(get_session)
 ):
     user = (await session.exec(select(User).where(User.admission_number == admission_number))).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Get Gate
+    gate = None
+    if gate_id:
+        try:
+            import uuid
+            gate = await session.get(Gate, uuid.UUID(str(gate_id)))
+        except Exception:
+            pass
+    if not gate:
+        gate = (await session.exec(select(Gate).where(Gate.name == "Main Gate"))).first()
+        if not gate:
+            gate = Gate(name="Main Gate", location="Main Entrance")
+            session.add(gate)
+            await session.commit()
+            await session.refresh(gate)
+
     # Find last open entry
     log = (await session.exec(select(EntryLog).where(EntryLog.user_id == user.id).where(EntryLog.exit_time == None).order_by(EntryLog.entry_time.desc()))).first()
     
     if not log:
-        # Create a mock entry if none found, to allow checking out? Or just error.
-        # User wants to log them.
-        gate = (await session.exec(select(Gate).where(Gate.name == "Main Gate"))).first()
+        # Create a mock entry if none found, to allow checking out.
         log = EntryLog(
             user_id=user.id,
             gate_id=gate.id,
             entry_time=get_eat_time(),
             exit_time=get_eat_time(),
+            exit_gate_id=gate.id,
             method="manual",
             status="allowed"
         )
     else:
         log.exit_time = get_eat_time()
+        log.exit_gate_id = gate.id
     
     session.add(log)
     await session.commit()
@@ -621,7 +669,7 @@ async def check_out_user(
         action_type="update",
         table_name="entry_logs",
         record_id=str(log.id),
-        description=f"Manual check-out for student {user.full_name} ({admission_number})",
+        description=f"Manual check-out for student {user.full_name} ({admission_number}) at {gate.name}",
         request=request
     )
 
@@ -806,17 +854,35 @@ async def vehicle_exit(payload: dict, session: AsyncSession = Depends(get_sessio
          raise HTTPException(status_code=404, detail="Vehicle not inside")
     
     log.exit_time = get_eat_time()
+    
+    gate_id = payload.get("gate_id")
+    if gate_id:
+        try:
+            import uuid
+            log.exit_gate_id = uuid.UUID(str(gate_id))
+        except Exception:
+            pass
+
     session.add(log)
     await session.commit()
     return {"message": "Exit recorded", "time": log.exit_time.strftime("%H:%M:%S")}
 
 @router.get("/vehicle-stats")
-async def get_vehicle_stats(session: AsyncSession = Depends(get_session)):
+async def get_vehicle_stats(
+    gate_id: Optional[str] = Query(None),
+    session: AsyncSession = Depends(get_session)
+):
     today = get_eat_time().date()
     start_of_day = datetime.combine(today, datetime.min.time())
     
-    # Fetch logs with vehicle details
     query_today = select(VehicleLog, Vehicle).join(Vehicle).where(VehicleLog.entry_time >= start_of_day)
+    if gate_id:
+        try:
+            import uuid
+            gate_uuid = uuid.UUID(gate_id)
+            query_today = query_today.where((VehicleLog.gate_id == gate_uuid) | (VehicleLog.exit_gate_id == gate_uuid))
+        except Exception:
+            pass
     results = (await session.exec(query_today)).all()
     
     logs_data = [] # List of dicts
@@ -943,17 +1009,32 @@ async def trigger_alarm(session: AsyncSession = Depends(get_session)):
     return {"status": "triggered", "message": "Security Alert Broadcasted"}
 
 @router.get("/student-stats")
-async def get_student_stats(session: AsyncSession = Depends(get_session)):
+async def get_student_stats(
+    gate_id: Optional[str] = Query(None),
+    session: AsyncSession = Depends(get_session)
+):
     today = get_eat_time().date()
     start_of_day = datetime.combine(today, datetime.min.time())
     
-    # Query all entry logs from today
     query = select(EntryLog).where(EntryLog.entry_time >= start_of_day)
+    if gate_id:
+        try:
+            import uuid
+            gate_uuid = uuid.UUID(gate_id)
+            query = query.where((EntryLog.gate_id == gate_uuid) | (EntryLog.exit_gate_id == gate_uuid))
+        except Exception:
+            pass
+            
     logs = (await session.exec(query)).all()
     
-    total = len(logs)
-    active = len([log for log in logs if not log.exit_time])
-    exited = len([log for log in logs if log.exit_time])
+    if gate_id:
+        total = len([log for log in logs if str(log.gate_id) == gate_id])
+        active = len([log for log in logs if str(log.gate_id) == gate_id and not log.exit_time])
+        exited = len([log for log in logs if log.exit_time and (str(log.exit_gate_id) == gate_id or str(log.gate_id) == gate_id)])
+    else:
+        total = len(logs)
+        active = len([log for log in logs if not log.exit_time])
+        exited = len([log for log in logs if log.exit_time])
     
     return {
         "total_today": total,
@@ -980,6 +1061,15 @@ async def check_in_visitor(
         if not phone_number or not str(phone_number).strip():
             raise ValueError("Phone number is required")
             
+        gate_id = payload.get("gate_id")
+        gate_uuid = None
+        if gate_id:
+            try:
+                import uuid
+                gate_uuid = uuid.UUID(str(gate_id))
+            except Exception:
+                pass
+
         visitor = Visitor(
             first_name=payload.get("first_name"),
             last_name=payload.get("last_name"),
@@ -987,6 +1077,7 @@ async def check_in_visitor(
             id_number=payload.get("id_number"),
             visit_details=payload.get("visit_details"),
             status="checked_in",
+            gate_id=gate_uuid,
             time_in=get_eat_time()
         )
         session.add(visitor)
@@ -1044,12 +1135,20 @@ async def check_out_visitor(
     return visitor
 
 @router.get("/visitor-stats")
-async def get_visitor_stats(session: AsyncSession = Depends(get_session)):
+async def get_visitor_stats(
+    gate_id: Optional[str] = Query(None),
+    session: AsyncSession = Depends(get_session)
+):
     today = get_eat_time().date()
     start_of_day = datetime.combine(today, datetime.min.time())
     
-    # Query all visitors from today
     query = select(Visitor).where(Visitor.time_in >= start_of_day)
+    if gate_id:
+        try:
+            import uuid
+            query = query.where(Visitor.gate_id == uuid.UUID(gate_id))
+        except Exception:
+            pass
     visitors = (await session.exec(query)).all()
     
     total = len(visitors)

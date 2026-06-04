@@ -191,6 +191,17 @@ async def get_detailed_report(
                 gate_name = gate_obj.name
         except Exception as e:
             print(f"Error loading gate for entry: {e}")
+
+        exit_gate_name = "-"
+        try:
+            if entry.exit_gate_id:
+                exit_gate_stmt = select(Gate).where(Gate.id == entry.exit_gate_id)
+                exit_gate_res = await session.exec(exit_gate_stmt)
+                exit_gate_obj = exit_gate_res.first()
+                if exit_gate_obj:
+                    exit_gate_name = exit_gate_obj.name
+        except Exception as e:
+            print(f"Error loading exit gate for entry: {e}")
             
         guard_name = "System"
         try:
@@ -209,6 +220,7 @@ async def get_detailed_report(
             "email": user_obj.email if user_obj else "-",
             "role": role_name,
             "gate": gate_name,
+            "exit_gate": exit_gate_name,
             "entry_time": entry.entry_time.isoformat() if entry.entry_time else None,
             "exit_time": entry.exit_time.isoformat() if entry.exit_time else None,
             "method": entry.method,
@@ -243,6 +255,17 @@ async def get_detailed_report(
                 gate_name = gate_obj.name
         except Exception as e:
             print(f"Error loading gate for vehicle: {e}")
+
+        exit_gate_name = "-"
+        try:
+            if vlog.exit_gate_id:
+                exit_gate_stmt = select(Gate).where(Gate.id == vlog.exit_gate_id)
+                exit_gate_res = await session.exec(exit_gate_stmt)
+                exit_gate_obj = exit_gate_res.first()
+                if exit_gate_obj:
+                    exit_gate_name = exit_gate_obj.name
+        except Exception as e:
+            print(f"Error loading exit gate for vehicle: {e}")
             
         guard_name = "System"
         try:
@@ -261,6 +284,7 @@ async def get_detailed_report(
             "driver_name": vehicle_obj.driver_name if vehicle_obj else "-",
             "vehicle_type": vehicle_obj.vehicle_type if vehicle_obj else "utility",
             "gate": gate_name,
+            "exit_gate": exit_gate_name,
             "entry_time": vlog.entry_time.isoformat() if vlog.entry_time else None,
             "exit_time": vlog.exit_time.isoformat() if vlog.exit_time else None,
             "guard": guard_name
