@@ -998,129 +998,123 @@ export default function StudentVerification() {
                                 className="w-[1011px] h-[638px] bg-white border border-gray-200 rounded-[48px] relative overflow-hidden select-none"
                                 style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                             >
-                                {/* Left Column */}
-                                <div className="absolute left-[45px] top-[42px] bottom-[42px] w-[430px] flex flex-col justify-between">
-                                    {/* Logo & School Name */}
-                                    <div className="flex items-center gap-4">
-                                        {companySettings.logo_url ? (
-                                            <img src={companySettings.logo_url} className="h-28 w-auto object-contain" />
-                                        ) : (
-                                            <div className="w-24 h-24 rounded-full bg-purple-50 flex items-center justify-center text-[#7A1975] font-bold text-3xl shrink-0 border border-purple-100">
-                                                RU
-                                            </div>
-                                        )}
-                                        <div className="flex flex-col leading-[1.1] overflow-hidden">
-                                            <span className="text-[28px] font-bold text-[#7A1975] uppercase tracking-wide leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>
-                                                {companySettings.company_name || "Riara University"}
-                                            </span>
-                                            <span className="text-[16px] font-bold text-gray-405 uppercase tracking-widest mt-2">
-                                                {companySettings.tagline || "nurturing innovators"}
-                                            </span>
-                                        </div>
-                                    </div>
+                                 {/* Left Column */}
+                                 <div className="absolute left-[45px] top-[42px] bottom-[42px] w-[430px] flex flex-col justify-between">
+                                     {/* Logo & School Name */}
+                                     <div className="flex items-center gap-4">
+                                         {companySettings.logo_url ? (
+                                             <img src={companySettings.logo_url} className="h-28 w-auto max-w-[400px] object-contain" />
+                                         ) : (
+                                             <>
+                                                 <div className="w-24 h-24 rounded-full bg-purple-50 flex items-center justify-center text-[#7A1975] font-bold text-3xl shrink-0 border border-purple-100">
+                                                     RU
+                                                 </div>
+                                                 <div className="flex flex-col leading-[1.1] overflow-hidden">
+                                                     <span className="text-[28px] font-bold text-[#7A1975] uppercase tracking-wide leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                                         {companySettings.company_name || "Riara University"}
+                                                     </span>
+                                                     <span className="text-[16px] font-bold text-gray-405 uppercase tracking-widest mt-2">
+                                                         {companySettings.tagline || "nurturing innovators"}
+                                                     </span>
+                                                 </div>
+                                             </>
+                                         )}
+                                     </div>
 
-                                    {/* Student Name */}
-                                    <div className="flex flex-col mt-4 space-y-1">
-                                        <span className="text-[54px] font-bold text-[#7A1975] leading-[1.1] uppercase break-words" style={{ fontFamily: "'Museo', sans-serif" }}>
-                                            {firstName}
-                                        </span>
-                                        <span className="text-[54px] font-bold text-[#7A1975] leading-[1.1] uppercase break-words" style={{ fontFamily: "'Museo', sans-serif" }}>
-                                            {lastName}
-                                        </span>
-                                    </div>
+                                     {/* Student Name */}
+                                     <div className="flex flex-col mt-4 space-y-1">
+                                         <span className="text-[54px] font-bold text-[#7A1975] leading-[1.1] uppercase break-words" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                             {firstName}
+                                         </span>
+                                         <span className="text-[54px] font-bold text-[#7A1975] leading-[1.1] uppercase break-words" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                             {lastName}
+                                         </span>
+                                     </div>
 
-                                    {/* ID Number */}
-                                    <div className="text-[30px] font-bold text-[#7A1975] uppercase mt-2 leading-none tracking-wide" style={{ fontFamily: "'Museo Sans', sans-serif" }}>
-                                        ID NO: {result.admission_number}
-                                    </div>
+                                     {/* ID Number */}
+                                     <div className="text-[30px] font-bold text-[#7A1975] uppercase mt-2 leading-none tracking-wide" style={{ fontFamily: "'Museo Sans', sans-serif" }}>
+                                         ID NO: {result.admission_number}
+                                     </div>
 
-                                    {/* QR Code & Status Pill */}
-                                    <div className="mt-3 flex items-end gap-5">
-                                        <div className="p-1.5 bg-white border border-gray-200 rounded-[20px] shadow-sm shrink-0">
-                                            <QRCodeSVG 
-                                                value={result.admission_number} 
-                                                size={130} 
-                                                level="H"
-                                            />
-                                        </div>
-                                        <div className="pb-2">
-                                            <div className={`px-5 py-2.5 text-[18px] font-bold uppercase tracking-wider rounded-full flex items-center gap-1.5 shadow-sm select-none text-white ${
-                                                isActive ? 'bg-[#22C55E]' : 'bg-[#EF4444]'
-                                            }`}>
-                                                <span className="w-2.5 h-2.5 bg-white rounded-full animate-pulse shrink-0"></span>
-                                                {statusText}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                     {/* QR Code */}
+                                     <div className="mt-3 flex items-end">
+                                         <div className="p-1.5 bg-white border border-gray-200 rounded-[20px] shadow-sm shrink-0">
+                                             <QRCodeSVG 
+                                                 value={result.admission_number} 
+                                                 size={130} 
+                                                 level="H"
+                                             />
+                                         </div>
+                                     </div>
+                                 </div>
 
-                                {/* Center-Right Column */}
-                                <div className="absolute left-[490px] top-0 bottom-0 w-[385px] flex flex-col border-l border-gray-100">
-                                    {/* Student Photo */}
-                                    <div className="w-full h-[438px] bg-slate-50 overflow-hidden border-b border-gray-150 relative">
-                                        {result.profile_image ? (
-                                            <img src={result.profile_image} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-gray-400 bg-slate-100">
-                                                <User size={120} />
-                                            </div>
-                                        )}
-                                    </div>
+                                 {/* Center-Right Column */}
+                                 <div className="absolute left-[490px] top-0 bottom-0 w-[385px] flex flex-col border-l border-gray-100">
+                                     {/* Student Photo */}
+                                     <div className="w-full h-[438px] bg-slate-50 overflow-hidden border-b border-gray-150 relative">
+                                         {result.profile_image ? (
+                                             <img src={result.profile_image} className="w-full h-full object-cover" />
+                                         ) : (
+                                             <div className="w-full h-full flex items-center justify-center text-gray-400 bg-slate-100">
+                                                 <User size={120} />
+                                             </div>
+                                         )}
+                                     </div>
 
-                                    {/* Details Section */}
-                                    <div className="flex-1 bg-white px-3 py-4 flex flex-col justify-center text-[25px] leading-[1.3] text-slate-800 font-sans">
-                                        <div className="flex gap-3 items-baseline">
-                                            <span className="text-[#7A1975] font-bold text-[19px] tracking-wider min-w-[155px] uppercase shrink-0">FACULTY:</span>
-                                            <span className="font-extrabold text-slate-800 break-words text-[22px]">{result.school || "School of Business"}</span>
-                                        </div>
-                                        <div className="flex gap-3 mt-2 items-baseline">
-                                            <span className="text-[#7A1975] font-bold text-[19px] tracking-wider min-w-[155px] uppercase shrink-0">COURSE:</span>
-                                            <span className="font-extrabold text-slate-800 break-words text-[22px]">{result.program || "DBM/May 2026"}</span>
-                                        </div>
-                                        <div className="flex gap-3 mt-2 items-baseline">
-                                            <span className="text-[#7A1975] font-bold text-[19px] tracking-wider min-w-[155px] uppercase shrink-0">VALIDITY:</span>
-                                            <span className="font-extrabold text-slate-800 break-words text-[22px]">
-                                                {result.expiry_date ? new Date(result.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                                     {/* Details Section */}
+                                     <div className="flex-1 bg-white px-3 py-4 flex flex-col justify-center text-[25px] leading-[1.3] text-slate-800 font-sans">
+                                         <div className="flex gap-3 items-baseline">
+                                             <span className="text-[#7A1975] font-bold text-[19px] tracking-wider min-w-[155px] uppercase shrink-0">FACULTY:</span>
+                                             <span className="font-extrabold text-slate-800 break-words text-[22px]">{result.school || "School of Business"}</span>
+                                         </div>
+                                         <div className="flex gap-3 mt-2 items-baseline">
+                                             <span className="text-[#7A1975] font-bold text-[19px] tracking-wider min-w-[155px] uppercase shrink-0">COURSE:</span>
+                                             <span className="font-extrabold text-slate-800 break-words text-[22px]">{result.program || "DBM/May 2026"}</span>
+                                         </div>
+                                         <div className="flex gap-3 mt-2 items-baseline">
+                                             <span className="text-[#7A1975] font-bold text-[19px] tracking-wider min-w-[155px] uppercase shrink-0">VALIDITY:</span>
+                                             <span className="font-extrabold text-slate-800 break-words text-[22px]">
+                                                 {result.expiry_date ? new Date(result.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
+                                             </span>
+                                         </div>
+                                     </div>
+                                 </div>
 
-                                {/* Right-most Column */}
-                                <div className="absolute right-0 top-0 bottom-0 w-[135px] bg-[#7A1975] flex items-center justify-center select-none">
-                                    <span className="text-white text-[54px] font-bold uppercase absolute transform -rotate-90 whitespace-nowrap tracking-[0.25em]" style={{ fontFamily: "'Museo', sans-serif" }}>
-                                        STUDENT
-                                    </span>
-                                </div>
+                                 {/* Right-most Column */}
+                                 <div className="absolute right-0 top-0 bottom-0 w-[135px] bg-[#7A1975] flex items-center justify-center select-none">
+                                     <span className="text-white text-[54px] font-bold uppercase absolute transform -rotate-90 whitespace-nowrap tracking-[0.25em]" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                         STUDENT
+                                     </span>
+                                 </div>
                             </div>
 
                             {/* Printable Back Side */}
                             <div 
                                 id={`printable-back-${result.id}`} 
-                                className="w-[1011px] h-[638px] bg-white border border-gray-200 rounded-[48px] relative overflow-hidden flex flex-col items-center justify-between py-16"
+                                className="w-[1011px] h-[638px] bg-white border border-gray-200 rounded-[48px] relative overflow-hidden flex flex-col items-center justify-between py-10"
                                 style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                             >
-                                <div className="absolute top-0 left-0 w-full h-[18px] bg-[#7A1975]"></div>
-                                
-                                <div className="text-center px-12 mt-4">
-                                    <h4 className="text-[36px] font-bold text-gray-800 uppercase mb-1.5 tracking-wider" style={{ fontFamily: "'Museo', sans-serif" }}>Security & Access Control</h4>
-                                    <p className="text-[22px] text-gray-400 font-bold uppercase tracking-wide">Verification Required for Campus Entry</p>
-                                </div>
+                                 <div className="absolute top-0 left-0 w-full h-[18px] bg-[#7A1975]"></div>
+                                 
+                                 <div className="text-center px-12 mt-2">
+                                     <h4 className="text-[36px] font-bold text-gray-800 uppercase tracking-wider leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>Security & Access Control</h4>
+                                     <p className="text-[20px] text-gray-400 font-bold uppercase tracking-wide mt-2 leading-none">Verification Required for Campus Entry</p>
+                                 </div>
 
-                                <div className="p-3 bg-white border border-gray-150 shadow-sm rounded-[24px]">
-                                    <QRCodeSVG 
-                                        value={result.admission_number} 
-                                        size={228} 
-                                        level="H"
-                                    />
-                                </div>
+                                 <div className="p-2.5 bg-white border border-gray-150 shadow-sm rounded-[24px] flex items-center justify-center my-2">
+                                     <QRCodeSVG 
+                                         value={result.admission_number} 
+                                         size={200} 
+                                         level="H"
+                                     />
+                                 </div>
 
-                                <div className="text-center px-16 mb-6">
-                                    <p className="text-[36px] font-bold text-[#7A1975] tracking-wide" style={{ fontFamily: "'Museo Sans', sans-serif" }}>{result.admission_number}</p>
-                                    <p className="text-[19px] text-gray-400 mt-4 font-bold uppercase leading-relaxed px-6">
-                                        This card is the property of {companySettings.company_name || "the university"}. If found, please return it to the University Security Office.
-                                    </p>
-                                </div>
+                                 <div className="text-center px-16 mb-2">
+                                     <p className="text-[34px] font-bold text-[#7A1975] tracking-wide leading-none" style={{ fontFamily: "'Museo Sans', sans-serif" }}>{result.admission_number}</p>
+                                     <p className="text-[18px] text-gray-400 mt-3.5 font-bold uppercase leading-relaxed px-6">
+                                         This card is the property of {companySettings.company_name || "the university"}. If found, please return it to the University Security Office.
+                                     </p>
+                                 </div>
 
                                 <div className="absolute bottom-[35px] right-[45px] opacity-5 pointer-events-none">
                                     {companySettings.logo_url && (

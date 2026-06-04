@@ -404,8 +404,6 @@ function IDCardFront({ student, companySettings }: any) {
     const nameParts = student.full_name ? student.full_name.trim().split(/\s+/) : [];
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || "";
-    const statusText = student.status || 'ACTIVE';
-    const isActive = statusText.toUpperCase() === 'ACTIVE';
 
     return (
         <div 
@@ -418,20 +416,22 @@ function IDCardFront({ student, companySettings }: any) {
                 {/* Logo & School Name */}
                 <div className="flex items-center gap-2">
                     {companySettings.logo_url ? (
-                        <img src={companySettings.logo_url} className="h-9 w-auto object-contain" />
+                        <img src={companySettings.logo_url} className="h-9 w-auto max-w-[135px] object-contain" />
                     ) : (
-                        <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-[#7A1975] font-black text-xs shrink-0 border border-purple-100">
-                            RU
-                        </div>
+                        <>
+                            <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center text-[#7A1975] font-black text-xs shrink-0 border border-purple-100">
+                                RU
+                            </div>
+                            <div className="flex flex-col leading-[1.1]">
+                                <div className="text-[10px] font-bold text-[#7A1975] uppercase tracking-wide leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                    {companySettings.company_name || "Riara University"}
+                                </div>
+                                <div className="text-[5.5px] font-bold text-gray-400 uppercase tracking-widest mt-1 leading-none">
+                                    {companySettings.tagline || "nurturing innovators"}
+                                </div>
+                            </div>
+                        </>
                     )}
-                    <div className="flex flex-col leading-[1.1]">
-                        <div className="text-[10px] font-bold text-[#7A1975] uppercase tracking-wide leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>
-                            {companySettings.company_name || "Riara University"}
-                        </div>
-                        <div className="text-[5.5px] font-bold text-gray-400 uppercase tracking-widest mt-1 leading-none">
-                            {companySettings.tagline || "nurturing innovators"}
-                        </div>
-                    </div>
                 </div>
 
                 {/* Student Name */}
@@ -449,22 +449,14 @@ function IDCardFront({ student, companySettings }: any) {
                     ID NO: {student.admission_number}
                 </div>
 
-                {/* QR Code & Status Pill */}
-                <div className="mt-1 flex items-end gap-2.5">
+                {/* QR Code */}
+                <div className="mt-1 flex items-end">
                     <div className="p-0.5 bg-white border border-gray-200 rounded-lg shadow-sm shrink-0">
                         <QRCodeSVG 
                             value={student.admission_number} 
                             size={44} 
                             level="H"
                         />
-                    </div>
-                    <div className="pb-0.5">
-                        <div className={`px-2 py-0.5 text-[6.5px] font-extrabold uppercase tracking-wider rounded-full flex items-center gap-1 shadow-sm select-none text-white ${
-                            isActive ? 'bg-[#22C55E]' : 'bg-[#EF4444]'
-                        }`}>
-                            <span className="w-1 h-1 bg-white rounded-full animate-pulse shrink-0"></span>
-                            {statusText}
-                        </div>
                     </div>
                 </div>
             </div>
@@ -515,27 +507,27 @@ function IDCardBack({ student, companySettings }: any) {
     return (
         <div 
             id={`id-card-back-${student.id}`}
-            className="w-[340px] h-[216px] bg-white border border-gray-200 rounded-[16px] shadow-sm relative overflow-hidden flex flex-col items-center justify-between py-5"
+            className="w-[340px] h-[216px] bg-white border border-gray-200 rounded-[16px] shadow-sm relative overflow-hidden flex flex-col items-center justify-between py-3"
             style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
         >
             <div className="absolute top-0 left-0 w-full h-1.5 bg-[#7A1975]"></div>
             
-            <div className="text-center px-4 mt-2">
-                <h4 className="text-[12px] font-bold text-gray-800 uppercase mb-0.5 tracking-wider" style={{ fontFamily: "'Museo', sans-serif" }}>Security & Access Control</h4>
-                <p className="text-[7.5px] text-gray-400 font-bold uppercase tracking-wide">Verification Required for Campus Entry</p>
+            <div className="text-center px-4 mt-1">
+                <h4 className="text-[12px] font-bold text-gray-800 uppercase tracking-wider leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>Security & Access Control</h4>
+                <p className="text-[7px] text-gray-400 font-bold uppercase tracking-wide mt-1 leading-none">Verification Required for Campus Entry</p>
             </div>
 
-            <div className="p-1 bg-white border border-gray-150 shadow-sm rounded-lg">
+            <div className="p-1 bg-white border border-gray-150 shadow-sm rounded-lg flex items-center justify-center">
                 <QRCodeSVG 
                     value={student.admission_number} 
-                    size={76} 
+                    size={70} 
                     level="H"
                 />
             </div>
 
-            <div className="text-center px-6 mb-2">
-                <p className="text-[12px] font-bold text-[#7A1975] tracking-wide" style={{ fontFamily: "'Museo Sans', sans-serif" }}>{student.admission_number}</p>
-                <p className="text-[6.5px] text-gray-400 mt-1.5 font-bold uppercase leading-tight px-2">
+            <div className="text-center px-6 mb-1">
+                <p className="text-[11px] font-bold text-[#7A1975] tracking-wide leading-none" style={{ fontFamily: "'Museo Sans', sans-serif" }}>{student.admission_number}</p>
+                <p className="text-[6.2px] text-gray-400 mt-1.5 font-bold uppercase leading-tight px-2">
                     This card is the property of {companySettings.company_name || "the university"}. If found, please return it to the University Security Office.
                 </p>
             </div>
