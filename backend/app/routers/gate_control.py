@@ -1399,7 +1399,20 @@ async def public_access_request(
             gate = await session.get(Gate, uuid.UUID(str(gate_id)))
         except Exception:
             pass
-    if not gate: raise HTTPException(404, "Invalid Gate ID")
+    if not gate:
+        # Fallback to "Main Gate"
+        from sqlmodel import select
+        gate = (await session.exec(select(Gate).where(Gate.name.ilike("%main%")))).first()
+        if not gate:
+            gate = (await session.exec(select(Gate))).first()
+        if not gate:
+            gate = Gate(
+                name="Main Gate",
+                description="Default Main Gate"
+            )
+            session.add(gate)
+            await session.commit()
+            await session.refresh(gate)
 
     # Handle Logic based on Role
     if role in ["taxi", "cab", "delivery", "visitor"]:

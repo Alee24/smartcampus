@@ -328,31 +328,7 @@ export default function StudentVerification() {
                             playSuccessSound()
                         }, 300)
 
-                        if (isScanned) {
-                            try {
-                                const token = localStorage.getItem('token')
-                                const action = data.gate_status === 'In' ? 'check-out' : 'check-in'
-                                const gateRes = await fetch(`/api/gate/${action}/${encodeURIComponent(data.admission_number)}?gate_id=${selectedGateId || ''}`, {
-                                    method: 'POST',
-                                    headers: { 'Authorization': `Bearer ${token}` }
-                                })
-                                if (gateRes.ok) {
-                                    playSuccessSound()
-                                    showNotification(`Auto ${action === 'check-in' ? 'Checked In' : 'Checked Out'}: ${data.full_name}`, 'success')
-                                    
-                                    // Reset immediately so the guard can scan the next person easily
-                                    setQuery('')
-                                    setResult(null)
-                                    setShowCard(false)
-                                    setSuggestions([])
-                                } else {
-                                    const errData = await gateRes.json()
-                                    showNotification(errData.detail || `Auto ${action} failed`, 'error')
-                                }
-                            } catch (err) {
-                                showNotification('Auto gate-log failed', 'error')
-                            }
-                        }
+
                     }
                     setLoading(false)
                     return;
@@ -388,35 +364,7 @@ export default function StudentVerification() {
                 playSuccessSound()
             }, 300)
 
-            if (isScanned) {
-                // Auto offline gate action
-                const action = data.gate_status === 'In' ? 'check-out' : 'check-in'
-                const queue = JSON.parse(localStorage.getItem('offline_scans') || '[]')
-                queue.push({
-                    admission_number: data.admission_number,
-                    action,
-                    gate_id: selectedGateId,
-                    timestamp: new Date().toISOString()
-                })
-                localStorage.setItem('offline_scans', JSON.stringify(queue))
-                setOfflineQueue(queue)
 
-                const updatedCached = cached.map((s: any) => {
-                    if (s.admission_number === data.admission_number) {
-                        return { ...s, gate_status: action === 'check-in' ? 'In' : 'Out' }
-                    }
-                    return s
-                })
-                localStorage.setItem('cached_students', JSON.stringify(updatedCached))
-                
-                showNotification(`Offline Auto ${action === 'check-in' ? 'Checked In' : 'Checked Out'}: ${data.full_name}`, 'warning')
-                
-                // Clear immediately for next scan
-                setQuery('')
-                setResult(null)
-                setShowCard(false)
-                setSuggestions([])
-            }
         } else {
             setResult({ error: 'Student not found in local offline database.' })
         }
