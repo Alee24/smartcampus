@@ -193,14 +193,14 @@ async def get_analytics(session: AsyncSession = Depends(get_session), current_us
     
     # Check-ins
     q_in = select(Gate.name, func.count(EntryLog.id))\
-        .join(Gate)\
+        .join(Gate, EntryLog.gate_id == Gate.id)\
         .where(EntryLog.entry_time >= thirty_days_ago)\
         .group_by(Gate.name)
     res_in = (await session.exec(q_in)).all()
 
     # Check-outs
     q_out = select(Gate.name, func.count(EntryLog.id))\
-        .join(Gate)\
+        .join(Gate, EntryLog.exit_gate_id == Gate.id)\
         .where(EntryLog.exit_time >= thirty_days_ago)\
         .group_by(Gate.name)
     res_out = (await session.exec(q_out)).all()

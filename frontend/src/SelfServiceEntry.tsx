@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Car, User, Truck, CheckCircle, ArrowRight, UserCheck } from 'lucide-react'
+import { Car, User, Truck, CheckCircle, ArrowRight, UserCheck, Shield, Camera, AlertCircle, RefreshCcw } from 'lucide-react'
 
 export default function SelfServiceEntry() {
     const [step, setStep] = useState(1) // 1: Role, 2: Form, 3: Success
@@ -8,6 +8,7 @@ export default function SelfServiceEntry() {
     const [formData, setFormData] = useState<any>({})
     const [submitting, setSubmitting] = useState(false)
     const [result, setResult] = useState<any>(null)
+    const [error, setError] = useState<string | null>(null)
 
     const [userData, setUserData] = useState<any>(null)
 
@@ -18,12 +19,13 @@ export default function SelfServiceEntry() {
     const [cameraActive, setCameraActive] = useState(false)
 
     const startCamera = async () => {
+        setError(null)
         if (!window.isSecureContext) {
             const el = document.getElementById("self-pass-photo-file-input")
             if (el) {
                 el.click()
             } else {
-                alert("Camera access requires a secure (HTTPS) connection.")
+                setError("Camera access requires a secure (HTTPS) connection. Please upload a photo instead.")
             }
             return
         }
@@ -40,7 +42,7 @@ export default function SelfServiceEntry() {
         } catch (err: any) {
             console.error("Camera start error:", err)
             const errorMsg = err?.message || err || "Unknown error"
-            alert(`Could not access camera: ${errorMsg}. Please ensure you have given permission.`)
+            setError(`Could not access camera: ${errorMsg}. Please ensure permissions are granted or upload a file.`)
         }
     }
 
@@ -78,6 +80,7 @@ export default function SelfServiceEntry() {
     const handleStudentSubmit = async () => {
         if (!userData?.id) return
         setSubmitting(true)
+        setError(null)
         try {
             const res = await fetch('/api/gate/public/access-request', {
                 method: 'POST',
@@ -96,10 +99,10 @@ export default function SelfServiceEntry() {
                 setResult(data)
                 setStep(3)
             } else {
-                alert(data.detail || "Request failed")
+                setError(data.detail || "Request failed. Please verify the QR scanner device is active.")
             }
         } catch (err) {
-            alert("Connection failed")
+            setError("Connection failed. Please ensure the campus server network is online.")
         } finally {
             setSubmitting(false)
         }
@@ -108,6 +111,7 @@ export default function SelfServiceEntry() {
     const handleSubmit = async (e: any) => {
         e.preventDefault()
         setSubmitting(true)
+        setError(null)
         try {
             const res = await fetch('/api/gate/public/access-request', {
                 method: 'POST',
@@ -123,10 +127,10 @@ export default function SelfServiceEntry() {
                 setResult(data)
                 setStep(3)
             } else {
-                alert(data.detail || "Request failed")
+                setError(data.detail || "Verification failed. Check credentials and retry.")
             }
         } catch (err) {
-            alert("Connection failed")
+            setError("Connection failed. Please ensure the campus server network is online.")
         } finally {
             setSubmitting(false)
         }
@@ -134,16 +138,27 @@ export default function SelfServiceEntry() {
 
     if (step === 3) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-                <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center animate-scale-in">
-                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <CheckCircle className="text-green-600" size={40} />
+            <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-slate-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/20 flex items-center justify-center p-4">
+                <div className="max-w-md w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 text-center animate-scale-in">
+                    <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-950/30 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                        <CheckCircle className="text-emerald-600 dark:text-emerald-400 animate-pulse" size={40} />
                     </div>
-                    <h2 className="text-2xl font-bold mb-2 text-gray-900">{result?.status === 'success' ? 'Access Granted' : 'Request Sent'}</h2>
-                    <p className="text-gray-600 mb-8">{result?.message}</p>
-                    <button onClick={() => window.location.reload()} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold">New Request</button>
+                    <h2 className="text-2xl font-black mb-2 text-slate-900 dark:text-white">
+                        {result?.status === 'success' ? 'Access Granted' : 'Request Sent'}
+                    </h2>
+                    <p className="text-slate-600 dark:text-slate-400 text-sm mb-8 leading-relaxed font-bold">
+                        {result?.message}
+                    </p>
+                    <button 
+                        onClick={() => window.location.reload()} 
+                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 active:scale-95 transition-all"
+                    >
+                        New Request
+                    </button>
                     {result?.status === 'success' && (
-                        <div className="mt-4 text-sm text-gray-400">Gate opened automatically</div>
+                        <div className="mt-4 text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider">
+                            Gate opened automatically
+                        </div>
                     )}
                 </div>
             </div>
@@ -151,7 +166,7 @@ export default function SelfServiceEntry() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 p-4">
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50/50 via-slate-100 to-purple-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/20 p-4 font-sans">
             <input 
                 type="file" 
                 id="self-pass-photo-file-input" 
@@ -163,6 +178,7 @@ export default function SelfServiceEntry() {
                         const reader = new FileReader()
                         reader.onloadend = () => {
                             setImage(reader.result as string)
+                            setError(null)
                         }
                         reader.readAsDataURL(file)
                     }
@@ -171,74 +187,107 @@ export default function SelfServiceEntry() {
             />
             <div className="max-w-md mx-auto">
                 <header className="mb-8 text-center pt-8">
-                    <h1 className="text-2xl font-bold text-gray-900">Gate Pass Entry</h1>
-                    <p className="text-gray-500 text-sm">Self-Service Check-in</p>
+                    <div className="inline-flex p-3 bg-indigo-600/10 rounded-2xl mb-3">
+                        <Shield className="text-indigo-600" size={28} />
+                    </div>
+                    <h1 className="text-3xl font-black text-slate-900 dark:text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+                        Smart Gate Pass
+                    </h1>
+                    <p className="text-slate-500 text-xs uppercase tracking-widest font-black mt-1">
+                        Self-Service Portal
+                    </p>
                 </header>
+
+                {error && (
+                    <div className="mb-5 p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/30 rounded-2xl text-rose-700 dark:text-rose-400 text-xs font-bold flex items-start gap-2.5 shadow-sm">
+                        <AlertCircle className="shrink-0 text-rose-500 mt-0.5" size={16} />
+                        <div>{error}</div>
+                    </div>
+                )}
 
                 {step === 1 && (
                     <div className="space-y-4 animate-fade-in">
-                        <p className="text-sm font-semibold text-gray-700 pl-1">Select your category:</p>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-wider pl-1 mb-2">
+                            Select your category:
+                        </p>
 
-                        <RoleCard icon={User} label="Visitor" desc="Personal visit, inquiry" onClick={() => { setRole('visitor'); setStep(2) }} />
-                        <RoleCard icon={Car} label="Taxi / Cab" desc="Drop-off or Pick-up" onClick={() => { setRole('taxi'); setStep(2) }} />
-                        <RoleCard icon={Truck} label="Delivery" desc="Goods, parcels, food" onClick={() => { setRole('delivery'); setStep(2) }} />
-                        <RoleCard icon={UserCheck} label="Student / Staff" desc="Login with credentials" onClick={() => { setRole('student'); setStep(2) }} color="indigo" />
+                        <RoleCard icon={User} label="Visitor" desc="Personal visits, enquiries, or guests" onClick={() => { setRole('visitor'); setStep(2); setError(null) }} />
+                        <RoleCard icon={Car} label="Taxi / Cab" desc="Drop-offs, pick-ups, or taxi services" onClick={() => { setRole('taxi'); setStep(2); setError(null) }} />
+                        <RoleCard icon={Truck} label="Delivery" desc="Goods, parcels, couriers, or food deliveries" onClick={() => { setRole('delivery'); setStep(2); setError(null) }} />
+                        <RoleCard icon={UserCheck} label="Student / Staff" desc="Campus verification check-in/out" onClick={() => { setRole('student'); setStep(2); setError(null) }} color="indigo" />
                     </div>
                 )}
 
                 {step === 2 && (
-                    <div className="bg-white rounded-2xl shadow-lg p-6 animate-slide-in">
-                        <h2 className="text-xl font-bold mb-6 capitalize flex items-center gap-2">
-                            {role === 'student' ? 'Login' : `${role} Details`}
-                        </h2>
+                    <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 p-6 animate-slide-in">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white capitalize">
+                                {role === 'student' ? 'Student / Staff Verify' : `${role} Registration`}
+                            </h2>
+                            <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-black uppercase tracking-wider px-3 py-1 rounded-full border border-indigo-100 dark:border-indigo-900">
+                                Step 2 of 2
+                            </span>
+                        </div>
 
                         {role === 'student' ? (
                             userData ? (
-                                <div className="space-y-6 text-center">
-                                    <div className="p-4 bg-indigo-50 text-indigo-900 rounded-xl mb-4">
-                                        <div className="font-bold text-lg">{userData.full_name}</div>
-                                        <div className="text-sm opacity-70">{userData.admission_number}</div>
-                                        <div className="mt-2 text-xs bg-indigo-200 text-indigo-800 px-2 py-1 rounded inline-block">Authenticated</div>
+                                <div className="space-y-5 text-center">
+                                    <div className="p-5 bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 dark:from-indigo-950/20 dark:to-slate-900 border border-indigo-500/20 rounded-2xl text-left">
+                                        <div className="font-black text-slate-800 dark:text-white text-lg">{userData.full_name}</div>
+                                        <div className="text-xs text-indigo-600 dark:text-indigo-400 font-bold font-mono uppercase mt-0.5">{userData.admission_number}</div>
+                                        <div className="mt-3 text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 px-2.5 py-1 rounded-lg inline-block font-black uppercase tracking-wider">
+                                            Authenticated
+                                        </div>
                                     </div>
 
-                                    <p className="text-gray-600 text-sm mb-4">
-                                        <strong>Verification Required:</strong><br />
-                                        Please take a photo of the classroom/location to confirm your presence.
+                                    <p className="text-slate-500 dark:text-slate-400 text-xs font-bold leading-relaxed">
+                                        Please take a photo of the entrance to verify your physical presence.
                                     </p>
 
                                     {/* Camera UI */}
-                                    <div className="mb-6">
+                                    <div className="mb-4">
                                         {!image ? (
                                             <div className="rounded-2xl overflow-hidden bg-black aspect-video relative shadow-inner">
                                                 <video ref={videoRef} playsInline autoPlay muted className="w-full h-full object-cover" />
                                                 {!cameraActive && (
-                                                    <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 text-white z-10">
-                                                        <button onClick={startCamera} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 rounded-xl font-bold shadow-lg transition-all">
-                                                            Open Camera
+                                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-white z-10 p-4">
+                                                        <button 
+                                                            onClick={startCamera} 
+                                                            className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2 active:scale-95 text-xs"
+                                                        >
+                                                            <Camera size={16} /> Open Device Camera
                                                         </button>
                                                     </div>
                                                 )}
                                                 <canvas ref={canvasRef} className="hidden" />
                                             </div>
                                         ) : (
-                                            <div className="rounded-2xl overflow-hidden aspect-video relative shadow-lg ring-4 ring-indigo-50">
+                                            <div className="rounded-2xl overflow-hidden aspect-video relative shadow-lg ring-4 ring-indigo-50 dark:ring-indigo-950/30">
                                                 <img src={image} className="w-full h-full object-cover" />
                                                 <button
                                                     onClick={() => { setImage(null); startCamera() }}
-                                                    className="absolute bottom-4 right-4 bg-white/90 text-black px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-white"
+                                                    className="absolute bottom-4 right-4 bg-white/95 text-slate-900 px-4 py-2 rounded-xl text-xs font-black shadow hover:bg-white flex items-center gap-1.5 transition-all"
                                                 >
-                                                    Retake
+                                                    <RefreshCcw size={12} /> Retake
                                                 </button>
                                             </div>
                                         )}
                                     </div>
 
-                                    <div className="flex gap-3">
-                                        <button onClick={() => setStep(1)} className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold">Back</button>
+                                    <div className="flex gap-3 pt-2">
+                                        <button 
+                                            onClick={() => { setStep(1); setError(null); }} 
+                                            className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs active:scale-95 transition-all"
+                                        >
+                                            Back
+                                        </button>
 
                                         {cameraActive && !image && (
-                                            <button onClick={takePhoto} className="flex-[2] py-3 bg-black text-white rounded-xl font-bold hover:bg-gray-800">
-                                                Take Photo
+                                            <button 
+                                                onClick={takePhoto} 
+                                                className="flex-[2] py-3.5 bg-slate-900 hover:bg-black text-white rounded-2xl font-black text-xs shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                                            >
+                                                <Camera size={14} /> Capture Photo
                                             </button>
                                         )}
 
@@ -246,14 +295,17 @@ export default function SelfServiceEntry() {
                                             <button
                                                 onClick={handleStudentSubmit}
                                                 disabled={submitting}
-                                                className="flex-[2] py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg shadow-green-200"
+                                                className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-750 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 hover:opacity-95 shadow-lg shadow-indigo-600/20 transition-all active:scale-95"
                                             >
                                                 {submitting ? 'Verifying...' : 'Submit Verification'}
                                             </button>
                                         )}
 
                                         {!cameraActive && !image && (
-                                            <button disabled className="flex-[2] py-3 bg-gray-200 text-gray-400 rounded-xl font-bold cursor-not-allowed">
+                                            <button 
+                                                disabled 
+                                                className="flex-[2] py-3.5 bg-slate-100 text-slate-400 dark:bg-slate-800/50 dark:text-slate-600 rounded-2xl font-black text-xs cursor-not-allowed"
+                                            >
                                                 Capture Photo First
                                             </button>
                                         )}
@@ -262,72 +314,122 @@ export default function SelfServiceEntry() {
                             ) : (
                                 <form className="space-y-4" onSubmit={(e) => {
                                     e.preventDefault()
-                                    alert("Please use the main app to login and generate a QR code for entry.")
                                 }}>
-                                    <div className="p-4 bg-indigo-50 text-indigo-700 rounded-xl text-sm leading-relaxed">
-                                        Start by logging into your Student/Staff account on this device.
+                                    <div className="p-4 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-150 dark:border-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-2xl text-xs font-bold leading-relaxed">
+                                        You are currently logged out. Start by logging into your account to perform gate pass checks.
                                     </div>
-                                    <button type="button" onClick={() => window.location.href = '/'} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => window.location.href = '/'} 
+                                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 text-xs active:scale-95 transition-all"
+                                    >
                                         Go to Login Page
                                     </button>
-                                    <button type="button" onClick={() => setStep(1)} className="w-full py-3 text-gray-500 font-semibold">Back</button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => { setStep(1); setError(null); }} 
+                                        className="w-full py-3.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-350 text-xs font-black"
+                                    >
+                                        Back to Categories
+                                    </button>
                                 </form>
                             )
                         ) : (
                             <form className="space-y-4" onSubmit={handleSubmit}>
                                 {/* Common Fields */}
                                 <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Full Name</label>
-                                    <input required className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200"
-                                        onChange={e => setFormData({ ...formData, name: e.target.value })} />
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Full Name</label>
+                                    <input 
+                                        required 
+                                        placeholder="e.g. John Doe"
+                                        className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                        onChange={e => setFormData({ ...formData, name: e.target.value })} 
+                                    />
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Phone Number</label>
-                                    <input required className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200" type="tel"
-                                        onChange={e => setFormData({ ...formData, mobile: e.target.value })} />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">ID / Passport No</label>
-                                    <input required className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200"
-                                        onChange={e => setFormData({ ...formData, id_number: e.target.value })} />
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Phone Number</label>
+                                        <input 
+                                            required 
+                                            type="tel"
+                                            placeholder="e.g. 0712345678"
+                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                            onChange={e => setFormData({ ...formData, mobile: e.target.value })} 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">ID / Passport No</label>
+                                        <input 
+                                            required 
+                                            placeholder="ID Number"
+                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                            onChange={e => setFormData({ ...formData, id_number: e.target.value })} 
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Vehicle Fields */}
                                 {(role === 'taxi' || role === 'visitor') && (
-                                    <>
+                                    <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-4">
                                         <div>
-                                            <label className="text-xs font-bold text-gray-500 uppercase">Vehicle Plate (Optional)</label>
-                                            <input className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 font-mono uppercase"
-                                                onChange={e => setFormData({ ...formData, plate_number: e.target.value })} />
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Vehicle Plate (Optional)</label>
+                                            <input 
+                                                placeholder="KCA 123A"
+                                                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white font-mono uppercase"
+                                                onChange={e => setFormData({ ...formData, plate_number: e.target.value })} 
+                                            />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-gray-500 uppercase">Passengers</label>
-                                            <input type="number" min="1" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200"
-                                                onChange={e => setFormData({ ...formData, passengers: e.target.value })} />
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Passengers</label>
+                                            <input 
+                                                type="number" 
+                                                min="1" 
+                                                placeholder="1"
+                                                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                                onChange={e => setFormData({ ...formData, passengers: e.target.value })} 
+                                            />
                                         </div>
-                                    </>
+                                    </div>
                                 )}
 
                                 {/* Specifics */}
                                 {role === 'delivery' && (
-                                    <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase">Delivery Details</label>
-                                        <input required placeholder="e.g. Amazon Package for Admin" className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200"
-                                            onChange={e => setFormData({ ...formData, delivery_details: e.target.value })} />
+                                    <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Delivery Details</label>
+                                        <input 
+                                            required 
+                                            placeholder="e.g. DHL Package for Admin Office" 
+                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                            onChange={e => setFormData({ ...formData, delivery_details: e.target.value })} 
+                                        />
                                     </div>
                                 )}
                                 {role !== 'delivery' && (
-                                    <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase">Purpose of Visit</label>
-                                        <input required className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200"
-                                            onChange={e => setFormData({ ...formData, purpose: e.target.value })} />
+                                    <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Purpose of Visit</label>
+                                        <input 
+                                            required 
+                                            placeholder="e.g. Meeting with Registrar, General Inquiry"
+                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                            onChange={e => setFormData({ ...formData, purpose: e.target.value })} 
+                                        />
                                     </div>
                                 )}
 
                                 <div className="pt-4 flex gap-3">
-                                    <button type="button" onClick={() => setStep(1)} className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold">Back</button>
-                                    <button disabled={submitting} className="flex-[2] py-3 bg-black text-white rounded-xl font-bold flex items-center justify-center gap-2">
-                                        {submitting ? 'Processing...' : <>Submit <ArrowRight size={18} /></>}
+                                    <button 
+                                        type="button" 
+                                        onClick={() => { setStep(1); setError(null); }} 
+                                        className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs transition-all active:scale-95"
+                                    >
+                                        Back
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        disabled={submitting} 
+                                        className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-95"
+                                    >
+                                        {submitting ? 'Processing...' : <>Submit Request <ArrowRight size={14} /></>}
                                     </button>
                                 </div>
                             </form>
@@ -340,17 +442,32 @@ export default function SelfServiceEntry() {
 }
 
 function RoleCard({ icon: Icon, label, desc, onClick, color = "blue" }: any) {
+    const colorClasses: any = {
+        blue: {
+            bg: 'bg-blue-50 dark:bg-blue-950/20',
+            text: 'text-blue-600 dark:text-blue-400',
+        },
+        indigo: {
+            bg: 'bg-indigo-50 dark:bg-indigo-950/20',
+            text: 'text-indigo-600 dark:text-indigo-400',
+        }
+    };
+    const activeColor = colorClasses[color] || colorClasses.blue;
+
     return (
-        <button onClick={onClick} className="w-full bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition-all text-left">
-            <div className={`w-12 h-12 rounded-full bg-${color}-50 text-${color}-600 flex items-center justify-center`}>
-                <Icon size={24} />
+        <button 
+            onClick={onClick} 
+            className="w-full bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-4.5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center gap-4 hover:shadow-md hover:border-indigo-500/30 transition-all text-left group active:scale-[0.99]"
+        >
+            <div className={`w-12 h-12 rounded-2xl ${activeColor.bg} ${activeColor.text} flex items-center justify-center shadow-inner`}>
+                <Icon size={22} />
             </div>
-            <div>
-                <h3 className="font-bold text-gray-900">{label}</h3>
-                <p className="text-xs text-gray-500 font-medium">{desc}</p>
+            <div className="flex-1 min-w-0">
+                <h3 className="font-black text-slate-900 dark:text-white text-sm">{label}</h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold truncate mt-0.5">{desc}</p>
             </div>
-            <div className="ml-auto text-gray-300">
-                <ArrowRight size={20} />
+            <div className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all">
+                <ArrowRight size={18} />
             </div>
         </button>
     )

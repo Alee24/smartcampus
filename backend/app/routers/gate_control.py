@@ -1304,7 +1304,7 @@ async def fetch_recent_activity(session: AsyncSession, gate_id: Optional[uuid.UU
     q_users = (
         select(EntryLog, User, Gate)
         .join(User)
-        .join(Gate)
+        .join(Gate, EntryLog.gate_id == Gate.id)
         .order_by(desc(EntryLog.entry_time))
         .limit(5)
     )
@@ -1329,7 +1329,7 @@ async def fetch_recent_activity(session: AsyncSession, gate_id: Optional[uuid.UU
     q_vehicles = (
         select(VehicleLog, Vehicle, Gate)
         .join(Vehicle)
-        .join(Gate)
+        .join(Gate, VehicleLog.gate_id == Gate.id)
         .order_by(desc(VehicleLog.entry_time))
         .limit(5)
     )
@@ -1392,7 +1392,13 @@ async def public_access_request(
     data = payload.get("data", {})
     
     # Verify Gate
-    gate = await session.get(Gate, gate_id)
+    gate = None
+    if gate_id:
+        try:
+            import uuid
+            gate = await session.get(Gate, uuid.UUID(str(gate_id)))
+        except Exception:
+            pass
     if not gate: raise HTTPException(404, "Invalid Gate ID")
 
     # Handle Logic based on Role
