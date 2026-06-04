@@ -322,7 +322,7 @@ export default function InstallPWA() {
                                 className="py-3 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
                             >
                                 <Download size={15} />
-                                {deferredPrompt ? 'Install Now' : 'Install Guide'}
+                                {deferredPrompt ? 'Install Now' : 'Install App'}
                             </button>
                         </div>
                     </div>
