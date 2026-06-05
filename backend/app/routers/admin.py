@@ -1583,7 +1583,7 @@ async def sync_dynamics_records(
             session.add(user)
         else:
             user = User(
-                id=uuid.uuid4().hex.upper(),
+                id=uuid.uuid4(),
                 admission_number=emp_no,
                 full_name=emp_name,
                 email=email,
@@ -1620,7 +1620,7 @@ async def sync_dynamics_records(
             updated_students_count += 1
         else:
             user = User(
-                id=uuid.uuid4().hex.upper(),
+                id=uuid.uuid4(),
                 admission_number=adm,
                 full_name=name,
                 email=email,
@@ -1648,7 +1648,7 @@ async def sync_dynamics_records(
         course = (await session.exec(select(Course).where(Course.course_code == c_code))).first()
         if not course:
             course = Course(
-                id=uuid.uuid4().hex.upper(),
+                id=uuid.uuid4(),
                 course_code=c_code,
                 course_name=c_name,
                 credits=3,
@@ -1679,7 +1679,7 @@ async def sync_dynamics_records(
             course = (await session.exec(select(Course).where(Course.course_code == c_code))).first()
             if not course:
                 course = Course(
-                    id=uuid.uuid4().hex.upper(),
+                    id=uuid.uuid4(),
                     course_code=c_code,
                     course_name=f"Course {c_code}",
                     credits=3,
@@ -1695,7 +1695,7 @@ async def sync_dynamics_records(
         classroom = (await session.exec(select(Classroom).where(Classroom.room_code == r_code))).first()
         if not classroom:
             classroom = Classroom(
-                id=uuid.uuid4().hex.upper(),
+                id=uuid.uuid4(),
                 room_code=r_code,
                 room_name=r_code,
                 capacity=60,
@@ -1735,7 +1735,7 @@ async def sync_dynamics_records(
 
         if not slot:
             slot = TimetableSlot(
-                id=uuid.uuid4().hex.upper(),
+                id=uuid.uuid4(),
                 course_id=course_id,
                 classroom_id=classroom.id,
                 lecturer_id=lec_id,
@@ -1768,7 +1768,7 @@ async def sync_dynamics_records(
 
             if not existing:
                 new_reg = StudentCourseRegistration(
-                    id=uuid.uuid4().hex.upper(),
+                    id=uuid.uuid4(),
                     student_id=stud_id,
                     course_id=crs_id
                 )
