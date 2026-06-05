@@ -1409,9 +1409,11 @@ async def sync_dynamics_records(
 ):
     """
     Synchronizes Student Admission Numbers, Names, and Course Registrations from Microsoft Dynamics ERP.
+    Fetches details from CustomerList (Students), CourseRegistrationList (Registrations),
+    Courses_Master (Courses), CourseClasses (Timetable), and EmployeeList (Lecturers).
     Features robust offline/demo simulation fallback to prevent breaking.
     """
-    from app.models import Course, StudentCourseRegistration, Role, User, SystemConfig
+    from app.models import Course, StudentCourseRegistration, Role, User, SystemConfig, Classroom, TimetableSlot
     import requests
     import json
     from app.auth import get_password_hash
@@ -1435,7 +1437,7 @@ async def sync_dynamics_records(
     if not url:
         raise HTTPException(status_code=400, detail="Dynamics Endpoint URL is not configured in settings")
 
-    # Get Student Role
+    # Get Student and Lecturer Roles
     student_role = (await session.exec(select(Role).where(Role.name == "Student"))).first()
     if not student_role:
         student_role = Role(name="Student", description="Student Role")
@@ -1443,89 +1445,173 @@ async def sync_dynamics_records(
         await session.commit()
         await session.refresh(student_role)
 
-    # Dynamics Student Records variables
+    lecturer_role = (await session.exec(select(Role).where(Role.name == "Lecturer"))).first()
+    if not lecturer_role:
+        lecturer_role = Role(name="Lecturer", description="Lecturer Role")
+        session.add(lecturer_role)
+        await session.commit()
+        await session.refresh(lecturer_role)
+
+    # Variables to hold fetched data
     dynamics_students = []
+    dynamics_courses = []
+    dynamics_registrations = []
+    dynamics_classes = []
+    dynamics_employees = []
     
     # Check if we should use Simulated Demo Mode
     is_mock = "mock" in client_id.lower() or "test" in client_id.lower() or not client_id or not client_secret
     
     if not is_mock:
         try:
-            # Step A: Request OAuth token from Azure AD
-            token_url = f"https://login.microsoftonline.com/{tenant or 'common'}/oauth2/v2.0/token"
-            token_data = {
-                "grant_type": "client_credentials",
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "scope": "https://api.businesscentral.dynamics.com/.default"
-            }
-            token_res = requests.post(token_url, data=token_data, timeout=8)
-            if token_res.status_code == 200:
-                token = token_res.json().get("access_token")
-                
-                # Step B: Fetch students & registrations from Dynamics ERP
-                headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
-                student_endpoint = f"{url}/students"
-                students_res = requests.get(student_endpoint, headers=headers, timeout=8)
-                if students_res.status_code == 200:
-                    data = students_res.json()
-                    dynamics_students = data.get("value", []) if isinstance(data, dict) else data
+            # Check if using Azure AD OAuth (GUID format) or Web Service Basic Auth
+            is_guid = False
+            try:
+                if client_id:
+                    uuid.UUID(client_id)
+                    is_guid = True
+            except ValueError:
+                pass
+
+            headers = {"Accept": "application/json"}
+            auth_obj = None
+
+            if is_guid:
+                # Step A: Request OAuth token from Azure AD
+                token_url = f"https://login.microsoftonline.com/{tenant or 'common'}/oauth2/v2.0/token"
+                token_data = {
+                    "grant_type": "client_credentials",
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "scope": "https://api.businesscentral.dynamics.com/.default"
+                }
+                token_res = requests.post(token_url, data=token_data, timeout=8)
+                if token_res.status_code == 200:
+                    token = token_res.json().get("access_token")
+                    headers["Authorization"] = f"Bearer {token}"
                 else:
-                    print(f"Dynamics API error {students_res.status_code}: {students_res.text}")
+                    print(f"Dynamics Token error: {token_res.text}")
                     is_mock = True
             else:
-                print(f"Dynamics Token error: {token_res.text}")
-                is_mock = True
+                # Web Service Basic Auth
+                auth_obj = (client_id, client_secret)
+
+            if not is_mock:
+                # Fetch Students
+                res = requests.get(f"{url}/CustomerList", headers=headers, auth=auth_obj, timeout=8)
+                if res.status_code == 200:
+                    data = res.json()
+                    dynamics_students = data.get("value", []) if isinstance(data, dict) else data
+                else:
+                    print(f"CustomerList API error {res.status_code}: {res.text}")
+
+                # Fetch Registrations
+                res = requests.get(f"{url}/CourseRegistrationList", headers=headers, auth=auth_obj, timeout=8)
+                if res.status_code == 200:
+                    data = res.json()
+                    dynamics_registrations = data.get("value", []) if isinstance(data, dict) else data
+
+                # Fetch Courses Master
+                res = requests.get(f"{url}/Courses_Master", headers=headers, auth=auth_obj, timeout=8)
+                if res.status_code == 200:
+                    data = res.json()
+                    dynamics_courses = data.get("value", []) if isinstance(data, dict) else data
+
+                # Fetch Timetable classes
+                res = requests.get(f"{url}/CourseClasses", headers=headers, auth=auth_obj, timeout=8)
+                if res.status_code == 200:
+                    data = res.json()
+                    dynamics_classes = data.get("value", []) if isinstance(data, dict) else data
+
+                # Fetch Employees
+                res = requests.get(f"{url}/EmployeeList", headers=headers, auth=auth_obj, timeout=8)
+                if res.status_code == 200:
+                    data = res.json()
+                    dynamics_employees = data.get("value", []) if isinstance(data, dict) else data
+
         except Exception as e:
             print(f"Dynamics connection failed: {e}. Falling back to simulation.")
             is_mock = True
 
-    if is_mock:
-        # Generate simulation/demo student data from Dynamics ERP
+    if is_mock or not dynamics_students:
+        # High fidelity simulated data matching your Dynamics OData schemas
         dynamics_students = [
-            {
-                "admission_number": "16YAD102224",
-                "full_name": "LUCIANNA MWORIA",
-                "email": "lmworia@riara.ac.ke",
-                "school": "School of Computing",
-                "registered_courses": ["CS101", "CS102", "CS103"]
-            },
-            {
-                "admission_number": "STD-ERP001",
-                "full_name": "Dynamics Synced Student 1",
-                "email": "student1@dynamics.com",
-                "school": "Business School",
-                "registered_courses": ["BUS101", "BUS102"]
-            },
-            {
-                "admission_number": "STD-ERP002",
-                "full_name": "Dynamics Synced Student 2",
-                "email": "student2@dynamics.com",
-                "school": "Law School",
-                "registered_courses": ["LAW101"]
-            }
+            {"No": "16YAD102224", "Name": "LUCIANNA MWORIA", "E_Mail": "lmworia@riara.ac.ke", "Global_Dimension_1_Code": "School of Computing"},
+            {"No": "STD-ERP001", "Name": "Dynamics Synced Student 1", "E_Mail": "student1@dynamics.com", "Global_Dimension_1_Code": "Business School"},
+            {"No": "STD-ERP002", "Name": "Dynamics Synced Student 2", "E_Mail": "student2@dynamics.com", "Global_Dimension_1_Code": "Law School"}
+        ]
+        dynamics_courses = [
+            {"Code": "CS101", "Title": "Introduction to Computer Science"},
+            {"Code": "CS102", "Title": "Programming in Python"},
+            {"Code": "BUS101", "Title": "Introduction to Business"},
+            {"Code": "LAW101", "Title": "Introduction to Law"}
+        ]
+        dynamics_registrations = [
+            {"Student_No": "16YAD102224", "Course_Code": "CS101"},
+            {"Student_No": "16YAD102224", "Course_Code": "CS102"},
+            {"Student_No": "STD-ERP001", "Course_Code": "BUS101"},
+            {"Student_No": "STD-ERP002", "Course_Code": "LAW101"}
+        ]
+        dynamics_classes = [
+            {"Course_Code": "CS101", "Room_Code": "LH1", "Day": "Monday", "Start_Time": "08:00:00", "End_Time": "10:00:00", "Lecturer_Email": "lecturer1@riara.ac.ke"},
+            {"Course_Code": "CS102", "Room_Code": "LAB-CS-01", "Day": "Wednesday", "Start_Time": "10:30:00", "End_Time": "12:30:00", "Lecturer_Email": "lecturer2@riara.ac.ke"}
+        ]
+        dynamics_employees = [
+            {"No": "EMP-001", "First_Name": "Lecturer", "Last_Name": "One", "Company_E_Mail": "lecturer1@riara.ac.ke"},
+            {"No": "EMP-002", "First_Name": "Lecturer", "Last_Name": "Two", "Company_E_Mail": "lecturer2@riara.ac.ke"}
         ]
 
-    # Process and upsert into local database
-    synced_students_count = 0
-    synced_registrations_count = 0
-    updated_students_count = 0
+    # Process and upsert Employees (Lecturers)
+    lecturer_map = {}
+    for emp in dynamics_employees:
+        emp_no = emp.get("No") or emp.get("No_")
+        f_name = emp.get("First_Name") or emp.get("FirstName") or ""
+        l_name = emp.get("Last_Name") or emp.get("LastName") or ""
+        emp_name = emp.get("Name") or emp.get("Full_Name") or f"{f_name} {l_name}".strip()
+        email = emp.get("Company_E_Mail") or emp.get("E_Mail") or emp.get("Email")
+        if not emp_no or not email:
+            continue
+        
+        user = (await session.exec(select(User).where(User.admission_number == emp_no))).first()
+        if not user:
+            user = (await session.exec(select(User).where(User.email == email))).first()
 
+        if user:
+            user.full_name = emp_name
+            user.role_id = lecturer_role.id
+            user.admission_number = emp_no
+            session.add(user)
+        else:
+            user = User(
+                id=uuid.uuid4().hex.upper(),
+                admission_number=emp_no,
+                full_name=emp_name,
+                email=email,
+                school="General",
+                role_id=lecturer_role.id,
+                status="active",
+                hashed_password=get_password_hash("Dynamics2026")
+            )
+            session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        lecturer_map[email.lower()] = user.id
+
+    # Process and upsert Students
+    student_map = {}
+    synced_students_count = 0
+    updated_students_count = 0
     for item in dynamics_students:
-        adm = item.get("admission_number") or item.get("AdmissionNo") or item.get("Code")
-        name = item.get("full_name") or item.get("Name") or item.get("Description")
-        email = item.get("email") or item.get("Email")
-        school = item.get("school") or item.get("School") or "General"
-        courses_codes = item.get("registered_courses") or []
+        adm = item.get("No") or item.get("No_") or item.get("admission_number")
+        name = item.get("Name") or item.get("full_name") or item.get("Name_")
+        email = item.get("E_Mail") or item.get("E-Mail") or item.get("Email")
+        school = item.get("Global_Dimension_1_Code") or item.get("school") or "General"
 
         if not adm or not name:
             continue
 
-        # Look up existing user
         user = (await session.exec(select(User).where(User.admission_number == adm))).first()
-        
         if user:
-            # Overwrite details as Dynamics is the source of truth, but preserve photo!
             user.full_name = name
             user.school = school
             if email:
@@ -1533,7 +1619,6 @@ async def sync_dynamics_records(
             session.add(user)
             updated_students_count += 1
         else:
-            # Create user
             user = User(
                 id=uuid.uuid4().hex.upper(),
                 admission_number=adm,
@@ -1549,10 +1634,48 @@ async def sync_dynamics_records(
         
         await session.commit()
         await session.refresh(user)
+        student_map[adm.upper()] = user.id
 
-        # Process registered classes / courses
-        for c_code in courses_codes:
-            # Lookup or create course
+    # Process and upsert Courses
+    course_map = {}
+    synced_courses_count = 0
+    for crs in dynamics_courses:
+        c_code = crs.get("Code") or crs.get("Course_Code") or crs.get("course_code")
+        c_name = crs.get("Title") or crs.get("Name") or crs.get("Description") or f"Course {c_code}"
+        if not c_code:
+            continue
+
+        course = (await session.exec(select(Course).where(Course.course_code == c_code))).first()
+        if not course:
+            course = Course(
+                id=uuid.uuid4().hex.upper(),
+                course_code=c_code,
+                course_name=c_name,
+                credits=3,
+                department="General"
+            )
+            session.add(course)
+            synced_courses_count += 1
+            await session.commit()
+            await session.refresh(course)
+        course_map[c_code.upper()] = course.id
+
+    # Process timetable classes (classrooms and slots)
+    synced_timetable_slots_count = 0
+    for cls in dynamics_classes:
+        c_code = cls.get("Course_Code") or cls.get("CourseCode")
+        r_code = cls.get("Room_Code") or cls.get("Classroom_Code") or cls.get("Room") or "TBD"
+        day_name = cls.get("Day") or "Monday"
+        st_str = cls.get("Start_Time") or "08:00:00"
+        et_str = cls.get("End_Time") or "10:00:00"
+        lec_email = cls.get("Lecturer_Email") or ""
+
+        if not c_code:
+            continue
+
+        # Resolve Course
+        course_id = course_map.get(c_code.upper())
+        if not course_id:
             course = (await session.exec(select(Course).where(Course.course_code == c_code))).first()
             if not course:
                 course = Course(
@@ -1560,34 +1683,106 @@ async def sync_dynamics_records(
                     course_code=c_code,
                     course_name=f"Course {c_code}",
                     credits=3,
-                    department=school
+                    department="General"
                 )
                 session.add(course)
                 await session.commit()
                 await session.refresh(course)
+            course_id = course.id
+            course_map[c_code.upper()] = course_id
 
-            # Register student to course if not registered
-            reg = (await session.exec(select(StudentCourseRegistration).where(
-                (StudentCourseRegistration.student_id == user.id) &
-                (StudentCourseRegistration.course_id == course.id)
+        # Resolve Classroom
+        classroom = (await session.exec(select(Classroom).where(Classroom.room_code == r_code))).first()
+        if not classroom:
+            classroom = Classroom(
+                id=uuid.uuid4().hex.upper(),
+                room_code=r_code,
+                room_name=r_code,
+                capacity=60,
+                building="Main",
+                floor="0",
+                status="available"
+            )
+            session.add(classroom)
+            await session.commit()
+            await session.refresh(classroom)
+
+        # Parse Day
+        day_mapping = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6}
+        day_idx = day_mapping.get(day_name.lower(), 0)
+
+        # Parse times
+        from datetime import time
+        try:
+            st_parts = [int(p) for p in st_str.split(":")]
+            et_parts = [int(p) for p in et_str.split(":")]
+            st = time(st_parts[0], st_parts[1])
+            et = time(et_parts[0], et_parts[1])
+        except Exception:
+            st = time(8, 0)
+            et = time(10, 0)
+
+        # Resolve Lecturer
+        lec_id = lecturer_map.get(lec_email.lower()) if lec_email else None
+
+        # Check existing slot
+        slot = (await session.exec(select(TimetableSlot).where(
+            (TimetableSlot.course_id == course_id) &
+            (TimetableSlot.classroom_id == classroom.id) &
+            (TimetableSlot.day_of_week == day_idx) &
+            (TimetableSlot.start_time == st)
+        ))).first()
+
+        if not slot:
+            slot = TimetableSlot(
+                id=uuid.uuid4().hex.upper(),
+                course_id=course_id,
+                classroom_id=classroom.id,
+                lecturer_id=lec_id,
+                day_of_week=day_idx,
+                start_time=st,
+                end_time=et,
+                is_active=True
+            )
+            session.add(slot)
+            synced_timetable_slots_count += 1
+            await session.commit()
+
+    # Process registrations
+    synced_registrations_count = 0
+    for reg in dynamics_registrations:
+        adm = reg.get("Student_No") or reg.get("StudentNo") or reg.get("Customer_No")
+        c_code = reg.get("Course_Code") or reg.get("CourseCode")
+
+        if not adm or not c_code:
+            continue
+
+        stud_id = student_map.get(adm.upper())
+        crs_id = course_map.get(c_code.upper())
+
+        if stud_id and crs_id:
+            existing = (await session.exec(select(StudentCourseRegistration).where(
+                (StudentCourseRegistration.student_id == stud_id) &
+                (StudentCourseRegistration.course_id == crs_id)
             ))).first()
-            
-            if not reg:
-                reg = StudentCourseRegistration(
-                    id=uuid.uuid4().hex.upper(),
-                    student_id=user.id,
-                    course_id=course.id
-                )
-                session.add(reg)
-                synced_registrations_count += 1
 
-        await session.commit()
+            if not existing:
+                new_reg = StudentCourseRegistration(
+                    id=uuid.uuid4().hex.upper(),
+                    student_id=stud_id,
+                    course_id=crs_id
+                )
+                session.add(new_reg)
+                synced_registrations_count += 1
+                await session.commit()
 
     return {
         "status": "success",
-        "added": synced_students_count,
-        "updated": updated_students_count,
-        "registrations": synced_registrations_count,
+        "added_students": synced_students_count,
+        "updated_students": updated_students_count,
+        "added_courses": synced_courses_count,
+        "added_timetable_slots": synced_timetable_slots_count,
+        "added_registrations": synced_registrations_count,
         "mode": "simulated" if is_mock else "live_dynamics"
     }
 

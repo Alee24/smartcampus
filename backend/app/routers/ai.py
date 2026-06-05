@@ -147,6 +147,7 @@ async def test_ai_service(
         elif service == "dynamics":
             # Test Microsoft Dynamics Connection
             import requests
+            import uuid
             url = payload.get("dynamics_base_url", "").strip()
             tenant = payload.get("dynamics_tenant_id", "").strip()
             client_id = payload.get("dynamics_client_id", "").strip()
@@ -158,19 +159,45 @@ async def test_ai_service(
             if "mock" in client_id.lower() or "test" in client_id.lower() or not client_id:
                 return {"success": True, "message": "Dynamics ERP connection simulated successfully (Simulated Fallback Mode)"}
 
+            # Check if using Azure AD OAuth (GUID format) or Basic Authentication
+            is_guid = False
             try:
-                token_url = f"https://login.microsoftonline.com/{tenant or 'common'}/oauth2/v2.0/token"
-                token_data = {
-                    "grant_type": "client_credentials",
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "scope": "https://api.businesscentral.dynamics.com/.default"
-                }
-                res = requests.post(token_url, data=token_data, timeout=5)
-                if res.status_code == 200:
-                    return {"success": True, "message": "Dynamics ERP token acquired successfully"}
+                if client_id:
+                    uuid.UUID(client_id)
+                    is_guid = True
+            except ValueError:
+                pass
+
+            try:
+                if is_guid:
+                    # Azure AD OAuth
+                    token_url = f"https://login.microsoftonline.com/{tenant or 'common'}/oauth2/v2.0/token"
+                    token_data = {
+                        "grant_type": "client_credentials",
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                        "scope": "https://api.businesscentral.dynamics.com/.default"
+                    }
+                    res = requests.post(token_url, data=token_data, timeout=5)
+                    if res.status_code == 200:
+                        token = res.json().get("access_token")
+                        headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+                        test_res = requests.get(f"{url}/CustomerList", headers=headers, timeout=5)
+                        if test_res.status_code == 200:
+                            num_records = len(test_res.json().get('value', [])) if isinstance(test_res.json(), dict) else len(test_res.json())
+                            return {"success": True, "message": f"Connected successfully via OAuth. Found {num_records} student records."}
+                        else:
+                            return {"success": False, "message": f"OAuth token acquired, but OData request failed (HTTP {test_res.status_code}): {test_res.text}"}
+                    else:
+                        return {"success": False, "message": f"OAuth token request failed (HTTP {res.status_code}): {res.text}"}
                 else:
-                    return {"success": False, "message": f"Token request failed (HTTP {res.status_code}): {res.text}"}
+                    # Web Service Basic Auth (Username and Password / Access Key)
+                    test_res = requests.get(f"{url}/CustomerList", auth=(client_id, client_secret), timeout=5)
+                    if test_res.status_code == 200:
+                        num_records = len(test_res.json().get('value', [])) if isinstance(test_res.json(), dict) else len(test_res.json())
+                        return {"success": True, "message": f"Connected successfully via Basic Auth. Found {num_records} student records."}
+                    else:
+                        return {"success": False, "message": f"Basic Auth connection failed (HTTP {test_res.status_code}): {test_res.text}"}
             except Exception as e:
                 return {"success": False, "message": f"Dynamics connection error: {str(e)}"}
                 
