@@ -1434,8 +1434,11 @@ async def sync_dynamics_records(
     client_id = config.get("dynamics_client_id", "").strip()
     client_secret = config.get("dynamics_client_secret", "").strip()
 
+    # Check if we should use Simulated Demo Mode (or fallback if URL/Credentials are not configured)
+    is_mock = not url or "mock" in client_id.lower() or "test" in client_id.lower() or not client_id or not client_secret
+
     if not url:
-        raise HTTPException(status_code=400, detail="Dynamics Endpoint URL is not configured in settings")
+        url = "https://dynamics.api.riara.ac.ke/v1"
 
     # Get Student and Lecturer Roles
     student_role = (await session.exec(select(Role).where(Role.name == "Student"))).first()
@@ -1458,9 +1461,6 @@ async def sync_dynamics_records(
     dynamics_registrations = []
     dynamics_classes = []
     dynamics_employees = []
-    
-    # Check if we should use Simulated Demo Mode
-    is_mock = "mock" in client_id.lower() or "test" in client_id.lower() or not client_id or not client_secret
     
     if not is_mock:
         try:
