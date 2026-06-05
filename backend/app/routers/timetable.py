@@ -65,26 +65,8 @@ async def create_classroom(
     
     return classroom
 
-@router.put("/classrooms/{classroom_id}")
-async def update_classroom(
-    classroom_id: str,
-    classroom_data: dict,
-    session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_admin)
-):
-    """Update classroom details"""
-    classroom = await session.get(Classroom, uuid.UUID(classroom_id))
-    if not classroom:
-        raise HTTPException(status_code=404, detail="Classroom not found")
-    
-    for key, value in classroom_data.items():
-        if hasattr(classroom, key):
-            setattr(classroom, key, value)
-    
-    await session.commit()
-    await session.refresh(classroom)
-    
-    return classroom
+# Duplicate endpoint removed, single updated endpoint is defined lower in the file
+
 
 
 
@@ -273,7 +255,10 @@ async def get_classrooms_detailed(
                 "total_scans_today": scans,
                 "is_active": is_active,
                 "last_student_adm": None,
-                "current_class": None
+                "current_class": None,
+                "room_type": room.room_type,
+                "status": room.status,
+                "amenities": room.amenities
             }
             
             if is_active:
@@ -345,20 +330,33 @@ async def update_classroom(
 ):
     """Update classroom details"""
     try:
+        try:
+            cid = uuid.UUID(classroom_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid UUID format")
+            
         # Get the classroom
-        classroom = await session.get(Classroom, classroom_id)
+        classroom = await session.get(Classroom, cid)
         if not classroom:
             raise HTTPException(status_code=404, detail="Classroom not found")
         
         # Update fields if provided
-        if "room_name" in update_data and update_data["room_name"]:
+        if "room_code" in update_data:
+            classroom.room_code = update_data["room_code"]
+        if "room_name" in update_data:
             classroom.room_name = update_data["room_name"]
-        if "building" in update_data and update_data["building"]:
+        if "building" in update_data:
             classroom.building = update_data["building"]
-        if "floor" in update_data and update_data["floor"]:
-            classroom.floor = update_data["floor"]
-        if "capacity" in update_data and update_data["capacity"]:
+        if "floor" in update_data:
+            classroom.floor = str(update_data["floor"]) if update_data["floor"] is not None else None
+        if "capacity" in update_data:
             classroom.capacity = int(update_data["capacity"])
+        if "room_type" in update_data:
+            classroom.room_type = update_data["room_type"]
+        if "status" in update_data:
+            classroom.status = update_data["status"]
+        if "amenities" in update_data:
+            classroom.amenities = update_data["amenities"]
         
         session.add(classroom)
         await session.commit()
@@ -372,7 +370,10 @@ async def update_classroom(
                 "room_name": classroom.room_name,
                 "building": classroom.building,
                 "floor": classroom.floor,
-                "capacity": classroom.capacity
+                "capacity": classroom.capacity,
+                "room_type": classroom.room_type,
+                "status": classroom.status,
+                "amenities": classroom.amenities
             }
         }
     except HTTPException:

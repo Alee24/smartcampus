@@ -23,6 +23,8 @@ export default function Timetable() {
     const [selectedSlot, setSelectedSlot] = useState<any>(null)
     const [editingSlot, setEditingSlot] = useState<any>(null)
     const [searchQuery, setSearchQuery] = useState('')
+    const [editingClassroom, setEditingClassroom] = useState<any | null>(null)
+    const [classroomPage, setClassroomPage] = useState(1)
 
     const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     const ROOM_TYPES = ['lecture_hall', 'lab', 'seminar_room', 'auditorium']
@@ -154,6 +156,51 @@ export default function Timetable() {
             }
         } catch (err) {
             console.error(err)
+        }
+    }
+
+    const handleUpdateClassroom = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!editingClassroom) return
+        const formData = new FormData(e.target as HTMLFormElement)
+
+        const amenities: any = {}
+        amenityOptions.forEach(opt => {
+            amenities[opt.id] = formData.get(`amenity_${opt.id}`) === 'on'
+        })
+
+        const data = {
+            room_code: formData.get('room_code'),
+            room_name: formData.get('room_name'),
+            building: formData.get('building'),
+            floor: formData.get('floor'),
+            capacity: parseInt(formData.get('capacity') as string) || 0,
+            room_type: formData.get('room_type'),
+            status: formData.get('status') || 'available',
+            amenities
+        }
+
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/timetable/classrooms/${editingClassroom.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(data)
+            })
+
+            if (res.ok) {
+                setEditingClassroom(null)
+                fetchClassrooms()
+                showNotification('Classroom updated successfully!', 'success')
+            } else {
+                showNotification('Failed to update classroom', 'error')
+            }
+        } catch (err) {
+            console.error(err)
+            showNotification('Error updating classroom', 'error')
         }
     }
 
@@ -704,51 +751,102 @@ export default function Timetable() {
                     </div>
 
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {classrooms.map(room => (
-                            <div key={room.id} className="glass-card p-6">
-                                <div className="flex justify-between items-start mb-4">
+                        {(() => {
+                            const itemsPerPage = 9;
+                            const startIndex = (classroomPage - 1) * itemsPerPage;
+                            const paginated = classrooms.slice(startIndex, startIndex + itemsPerPage);
+                            return paginated.map(room => (
+                                <div key={room.id} className="glass-card p-6 flex flex-col justify-between">
                                     <div>
-                                        <h4 className="text-lg font-bold text-[var(--text-primary)]">{room.room_code}</h4>
-                                        <p className="text-sm text-[var(--text-secondary)]">{room.room_name}</p>
-                                    </div>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${room.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                        }`}>
-                                        {room.status}
-                                    </span>
-                                </div>
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h4 className="text-lg font-bold text-[var(--text-primary)]">{room.room_code}</h4>
+                                                <p className="text-sm text-[var(--text-secondary)]">{room.room_name}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {userRole?.toLowerCase() !== 'student' && (
+                                                    <button
+                                                        onClick={() => setEditingClassroom(room)}
+                                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg transition-colors border border-[var(--border-color)]"
+                                                        title="Edit Classroom"
+                                                    >
+                                                        <Edit size={14} />
+                                                    </button>
+                                                )}
+                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${room.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                    }`}>
+                                                    {room.status}
+                                                </span>
+                                            </div>
+                                        </div>
 
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-                                        <MapPin size={14} />
-                                        {room.building || 'N/A'} - Floor {room.floor || 'N/A'}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-                                        <Users size={14} />
-                                        Capacity: {room.capacity}
-                                    </div>
-                                    <div className="text-xs text-[var(--text-secondary)] capitalize">
-                                        Type: {room.room_type.replace('_', ' ')}
-                                    </div>
-                                </div>
-
-                                {room.amenities && Object.keys(room.amenities).length > 0 && (
-                                    <div className="mt-4 pt-4 border-t border-[var(--border-color)]">
-                                        <p className="text-xs font-bold text-[var(--text-secondary)] mb-2">Amenities:</p>
-                                        <div className="flex flex-wrap gap-1">
-                                            {Object.entries(room.amenities).map(([key, value]) =>
-                                                value && (
-                                                    <span key={key} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs flex items-center gap-1">
-                                                        <CheckCircle size={10} />
-                                                        {key.replace('_', ' ')}
-                                                    </span>
-                                                )
-                                            )}
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                                                <MapPin size={14} />
+                                                {room.building || 'N/A'} - Floor {room.floor || 'N/A'}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                                                <Users size={14} />
+                                                Capacity: {room.capacity}
+                                            </div>
+                                            <div className="text-xs text-[var(--text-secondary)] capitalize">
+                                                Type: {room.room_type?.replace('_', ' ') || 'lecture hall'}
+                                            </div>
                                         </div>
                                     </div>
-                                )}
-                            </div>
-                        ))}
+
+                                    {room.amenities && Object.keys(room.amenities).length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-[var(--border-color)]">
+                                            <p className="text-xs font-bold text-[var(--text-secondary)] mb-2">Amenities:</p>
+                                            <div className="flex flex-wrap gap-1">
+                                                {Object.entries(room.amenities).map(([key, value]) =>
+                                                    value && (
+                                                        <span key={key} className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs flex items-center gap-1">
+                                                            <CheckCircle size={10} />
+                                                            {key.replace('_', ' ')}
+                                                        </span>
+                                                    )
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ));
+                        })()}
                     </div>
+
+                    {/* Pagination Controls */}
+                    {Math.ceil(classrooms.length / 9) > 1 && (
+                        <div className="flex justify-center items-center gap-2 mt-8">
+                            <button
+                                onClick={() => setClassroomPage(prev => Math.max(prev - 1, 1))}
+                                disabled={classroomPage === 1}
+                                className="px-4 py-2 rounded-xl border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-50 disabled:cursor-not-allowed font-bold transition-all"
+                            >
+                                Previous
+                            </button>
+                            {Array.from({ length: Math.ceil(classrooms.length / 9) }, (_, i) => i + 1).map(page => (
+                                <button
+                                    key={page}
+                                    onClick={() => setClassroomPage(page)}
+                                    className={`w-10 h-10 rounded-xl font-bold transition-all ${
+                                        classroomPage === page
+                                            ? 'bg-[image:var(--gradient-primary)] text-white shadow-md'
+                                            : 'border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]'
+                                    }`}
+                                >
+                                    {page}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => setClassroomPage(prev => Math.min(prev + 1, Math.ceil(classrooms.length / 9)))}
+                                disabled={classroomPage === Math.ceil(classrooms.length / 9)}
+                                className="px-4 py-2 rounded-xl border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-50 disabled:cursor-not-allowed font-bold transition-all"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -786,6 +884,77 @@ export default function Timetable() {
                             <div className="flex justify-end gap-3 mt-6">
                                 <button type="button" onClick={() => setShowClassroomModal(false)} className="px-6 py-3 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Cancel</button>
                                 <button type="submit" className="px-6 py-3 rounded-xl bg-[image:var(--gradient-primary)] text-white font-bold">Create Classroom</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Classroom Modal */}
+            {editingClassroom && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] p-8 rounded-2xl w-full max-w-2xl shadow-2xl animate-fade-in max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-2xl font-bold mb-6 text-[var(--text-primary)]">Edit Classroom</h3>
+                        <form onSubmit={handleUpdateClassroom} className="space-y-4">
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">Room Code</label>
+                                    <input name="room_code" defaultValue={editingClassroom.room_code} required className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)]" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">Room Name</label>
+                                    <input name="room_name" defaultValue={editingClassroom.room_name} required className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)]" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">Building</label>
+                                    <input name="building" defaultValue={editingClassroom.building} className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)]" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">Floor</label>
+                                    <input name="floor" defaultValue={editingClassroom.floor} className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)]" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">Capacity</label>
+                                    <input name="capacity" type="number" defaultValue={editingClassroom.capacity} required className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)]" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">Room Type</label>
+                                    <select name="room_type" defaultValue={editingClassroom.room_type || 'lecture_hall'} className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)]">
+                                        {ROOM_TYPES.map(type => (
+                                            <option key={type} value={type}>{type.replace('_', ' ')}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">Status</label>
+                                    <select name="status" defaultValue={editingClassroom.status || 'available'} className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)]">
+                                        <option value="available">Available</option>
+                                        <option value="maintenance">Maintenance</option>
+                                        <option value="reserved">Reserved</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <p className="font-bold text-[var(--text-primary)] mb-2">Amenities:</p>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    {amenityOptions.map(amenity => (
+                                        <label key={amenity.id} className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                                            <input
+                                                type="checkbox"
+                                                name={`amenity_${amenity.id}`}
+                                                defaultChecked={editingClassroom.amenities && editingClassroom.amenities[amenity.id] === true}
+                                                className="rounded"
+                                            />
+                                            {amenity.name}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button type="button" onClick={() => setEditingClassroom(null)} className="px-6 py-3 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Cancel</button>
+                                <button type="submit" className="px-6 py-3 rounded-xl bg-[image:var(--gradient-primary)] text-white font-bold">Update Classroom</button>
                             </div>
                         </form>
                     </div>

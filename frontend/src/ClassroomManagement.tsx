@@ -47,6 +47,7 @@ export default function ClassroomManagement() {
     const [amenityOptions, setAmenityOptions] = useState<string[]>([])
     // Mode switched to inline, so showEditModal is deprecated/removed logic
     const [showEditModal, setShowEditModal] = useState(false)
+    const [currentPage, setCurrentPage] = useState(1)
 
     // Stats
     const [stats, setStats] = useState({
@@ -389,11 +390,21 @@ export default function ClassroomManagement() {
             const token = localStorage.getItem('token')
             const formData = new FormData(e.target as HTMLFormElement)
 
+            const amenities: any = {}
+            amenityOptions.forEach((opt: any) => {
+                const optId = typeof opt === 'string' ? opt : opt.id
+                amenities[optId] = formData.get(`amenity_${optId}`) === 'on'
+            })
+
             const updateData = {
+                room_code: formData.get('room_code'),
                 room_name: formData.get('room_name'),
                 building: formData.get('building'),
                 floor: formData.get('floor'),
-                capacity: parseInt(formData.get('capacity') as string)
+                capacity: parseInt(formData.get('capacity') as string),
+                room_type: formData.get('room_type'),
+                status: formData.get('status'),
+                amenities: amenities
             }
 
             const res = await fetch(`/api/timetable/classrooms/${editingRoom.id}`, {
@@ -569,8 +580,8 @@ export default function ClassroomManagement() {
 
             {/* Classrooms Grid (Sorted by Usage) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative">
-                {[...classrooms]
-                    .sort((a, b) => {
+                {(() => {
+                    const sorted = [...classrooms].sort((a, b) => {
                         // Priority: Most scans -> Active -> Recent -> Alphabetical
                         const scansA = a.total_scans_today || 0
                         const scansB = b.total_scans_today || 0
@@ -584,8 +595,10 @@ export default function ClassroomManagement() {
                         if (timeA !== timeB) return timeB - timeA
 
                         return a.room_code.localeCompare(b.room_code)
-                    })
-                    .map((room) => {
+                    });
+                    const itemsPerPage = 9;
+                    const paginated = sorted.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+                    return paginated.map((room) => {
                         const isEditing = editingRoom?.id === room.id
 
                         return (
@@ -783,7 +796,7 @@ export default function ClassroomManagement() {
                                                 />
                                             </div>
 
-                                            <div className="md:col-span-2">
+                                            <div>
                                                 <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Capacity</label>
                                                 <input
                                                     name="capacity"
@@ -796,22 +809,53 @@ export default function ClassroomManagement() {
                                                 />
                                             </div>
 
+                                            <div>
+                                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Room Type</label>
+                                                <select
+                                                    name="room_type"
+                                                    defaultValue={room.room_type || 'lecture_hall'}
+                                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary-500 outline-none"
+                                                >
+                                                    <option value="lecture_hall">Lecture Hall</option>
+                                                    <option value="lab">Computer Lab / Science Lab</option>
+                                                    <option value="seminar_room">Seminar Room</option>
+                                                    <option value="auditorium">Auditorium</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Status</label>
+                                                <select
+                                                    name="status"
+                                                    defaultValue={room.status || 'available'}
+                                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] focus:ring-2 focus:ring-primary-500 outline-none"
+                                                >
+                                                    <option value="available">Available</option>
+                                                    <option value="maintenance">Maintenance</option>
+                                                    <option value="reserved">Reserved</option>
+                                                </select>
+                                            </div>
+
                                             {/* Amenities */}
                                             <div className="md:col-span-2">
                                                 <label className="block text-sm font-bold text-[var(--text-primary)] mb-3">Amenities</label>
                                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                                    {amenityOptions.map((amenity) => (
-                                                        <label key={amenity} className="flex items-center gap-2 p-2 rounded-lg hover:bg-[var(--bg-surface)] cursor-pointer transition-colors">
-                                                            <input
-                                                                type="checkbox"
-                                                                name="amenities"
-                                                                value={amenity}
-                                                                defaultChecked={room.amenities?.includes(amenity)}
-                                                                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                                                            />
-                                                            <span className="text-sm text-[var(--text-primary)]">{amenity}</span>
-                                                        </label>
-                                                    ))}
+                                                    {amenityOptions.map((amenity: any) => {
+                                                        const optId = typeof amenity === 'string' ? amenity : amenity.id;
+                                                        const optName = typeof amenity === 'string' ? amenity : amenity.name;
+                                                        const isChecked = room.amenities && room.amenities[optId] === true;
+                                                        return (
+                                                            <label key={optId} className="flex items-center gap-2 p-2 rounded-lg hover:bg-[var(--bg-surface)] cursor-pointer transition-colors">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name={`amenity_${optId}`}
+                                                                    defaultChecked={isChecked}
+                                                                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                                                />
+                                                                <span className="text-sm text-[var(--text-primary)]">{optName}</span>
+                                                            </label>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
 
@@ -846,8 +890,42 @@ export default function ClassroomManagement() {
                                 )}
                             </div>
                         )
-                    })}
+                    });
+                })()}
             </div>
+
+            {/* Pagination Controls */}
+            {Math.ceil(classrooms.length / 9) > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-8">
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 rounded-xl border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-50 disabled:cursor-not-allowed font-bold transition-all"
+                    >
+                        Previous
+                    </button>
+                    {Array.from({ length: Math.ceil(classrooms.length / 9) }, (_, i) => i + 1).map(page => (
+                        <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-10 h-10 rounded-xl font-bold transition-all ${
+                                currentPage === page
+                                    ? 'bg-[image:var(--gradient-primary)] text-white shadow-md'
+                                    : 'border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-surface)]'
+                            }`}
+                        >
+                            {page}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(classrooms.length / 9)))}
+                        disabled={currentPage === Math.ceil(classrooms.length / 9)}
+                        className="px-4 py-2 rounded-xl border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-surface)] disabled:opacity-50 disabled:cursor-not-allowed font-bold transition-all"
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
 
             {/* Empty State */}
             {classrooms.length === 0 && (
