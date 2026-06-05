@@ -368,7 +368,7 @@ function LecturerView() {
                 if (res.ok) setAttendees((await res.json()).attendees || [])
             }
             poll()
-            interval = setInterval(poll, 3000)
+            interval = setInterval(poll, 15000)
         }
         return () => clearInterval(interval)
     }, [activeSession])

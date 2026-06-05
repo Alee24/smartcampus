@@ -106,7 +106,7 @@ function FleetManagementContent({ initialTab = 'dashboard' }: FleetManagementPro
 
     useEffect(() => {
         fetchData();
-        const interval = setInterval(fetchLocations, 10000);
+        const interval = setInterval(fetchLocations, 15000);
         return () => clearInterval(interval);
     }, []);
 

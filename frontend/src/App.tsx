@@ -397,8 +397,8 @@ function App() {
 
         if (isAuthenticated && activeTab === 'dashboard' && role) {
             fetchDashboardData()
-            // Poll every 3 seconds for live 'System Activity' updates
-            interval = setInterval(fetchDashboardData, 3000)
+            // Poll every 15 seconds for live 'System Activity' updates
+            interval = setInterval(fetchDashboardData, 15000)
         }
 
         return () => {

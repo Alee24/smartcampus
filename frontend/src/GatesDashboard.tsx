@@ -48,7 +48,7 @@ export default function GatesDashboard() {
     useEffect(() => {
         fetchGates()
         fetchRecentActivity()
-        const interval = setInterval(fetchRecentActivity, 5000)
+        const interval = setInterval(fetchRecentActivity, 15000)
         return () => clearInterval(interval)
     }, [])
 

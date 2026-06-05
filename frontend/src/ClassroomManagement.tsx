@@ -62,8 +62,8 @@ export default function ClassroomManagement() {
         fetchAmenityOptions()
         fetchPrintableData() // Fetch rich data for PDFs
 
-        // Auto-refresh every 2 seconds for near real-time updates
-        const interval = setInterval(fetchClassrooms, 2000)
+        // Auto-refresh every 15 seconds for near real-time updates
+        const interval = setInterval(fetchClassrooms, 15000)
         return () => clearInterval(interval)
     }, [])
 

@@ -41,7 +41,7 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
 
     useEffect(() => {
         fetchDashboardData();
-        const interval = setInterval(fetchDashboardData, 5000);
+        const interval = setInterval(fetchDashboardData, 15000);
         return () => clearInterval(interval);
     }, []);
 

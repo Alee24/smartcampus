@@ -349,7 +349,7 @@ export default function LiveClasses({ fullScreen = false }: { fullScreen?: boole
 
     useEffect(() => {
         fetchLive();
-        const interval = setInterval(fetchLive, 3000);
+        const interval = setInterval(fetchLive, 15000);
         return () => clearInterval(interval);
     }, []);
 
