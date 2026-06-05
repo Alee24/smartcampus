@@ -1536,9 +1536,10 @@ async def sync_dynamics_records(
     if is_mock or not dynamics_students:
         # High fidelity simulated data matching your Dynamics OData schemas
         dynamics_students = [
-            {"No": "16YAD102224", "Name": "LUCIANNA MWORIA", "E_Mail": "lmworia@riara.ac.ke", "Global_Dimension_1_Code": "School of Computing"},
-            {"No": "STD-ERP001", "Name": "Dynamics Synced Student 1", "E_Mail": "student1@dynamics.com", "Global_Dimension_1_Code": "Business School"},
-            {"No": "STD-ERP002", "Name": "Dynamics Synced Student 2", "E_Mail": "student2@dynamics.com", "Global_Dimension_1_Code": "Law School"}
+            {"No": "16YAD102224", "Name": "LUCIANNA MWORIA", "E_Mail": "lmworia@riara.ac.ke", "Global_Dimension_1_Code": "School of Computing", "Phone_No": "+254711223344", "Gender": "Female", "Program_Code": "BSc. Computer Science"},
+            {"No": "STD-ERP001", "Name": "Dynamics Synced Student 1", "E_Mail": "student1@dynamics.com", "Global_Dimension_1_Code": "Business School", "Phone_No": "+254722334455", "Gender": "Male", "Program_Code": "Bachelor of Business Administration"},
+            {"No": "STD-ERP002", "Name": "Dynamics Synced Student 2", "E_Mail": "student2@dynamics.com", "Global_Dimension_1_Code": "Law School", "Phone_No": "+254733445566", "Gender": "Female", "Program_Code": "Bachelor of Laws"},
+            {"No": "STD-ERP003", "Name": "Newly Imported Student 3", "E_Mail": "student3@dynamics.com", "Global_Dimension_1_Code": "School of Computing", "Phone_No": "+254744556677", "Gender": "Male", "Program_Code": "BSc. Information Technology"}
         ]
         dynamics_courses = [
             {"Code": "CS101", "Title": "Introduction to Computer Science"},
@@ -1550,7 +1551,8 @@ async def sync_dynamics_records(
             {"Student_No": "16YAD102224", "Course_Code": "CS101"},
             {"Student_No": "16YAD102224", "Course_Code": "CS102"},
             {"Student_No": "STD-ERP001", "Course_Code": "BUS101"},
-            {"Student_No": "STD-ERP002", "Course_Code": "LAW101"}
+            {"Student_No": "STD-ERP002", "Course_Code": "LAW101"},
+            {"Student_No": "STD-ERP003", "Course_Code": "CS101"}
         ]
         dynamics_classes = [
             {"Course_Code": "CS101", "Room_Code": "LH1", "Day": "Monday", "Start_Time": "08:00:00", "End_Time": "10:00:00", "Lecturer_Email": "lecturer1@riara.ac.ke"},
@@ -1580,6 +1582,12 @@ async def sync_dynamics_records(
             user.full_name = emp_name
             user.role_id = lecturer_role.id
             user.admission_number = emp_no
+            if email:
+                user.email = email
+            if f_name:
+                user.first_name = f_name
+            if l_name:
+                user.last_name = l_name
             session.add(user)
         else:
             user = User(
@@ -1590,7 +1598,9 @@ async def sync_dynamics_records(
                 school="General",
                 role_id=lecturer_role.id,
                 status="active",
-                hashed_password=get_password_hash("Dynamics2026")
+                hashed_password=get_password_hash("Dynamics2026"),
+                first_name=f_name,
+                last_name=l_name
             )
             session.add(user)
         await session.commit()
@@ -1606,9 +1616,20 @@ async def sync_dynamics_records(
         name = item.get("Name") or item.get("full_name") or item.get("Name_")
         email = item.get("E_Mail") or item.get("E-Mail") or item.get("Email")
         school = item.get("Global_Dimension_1_Code") or item.get("school") or "General"
+        phone = item.get("Phone_No") or item.get("Phone") or item.get("phone_number") or item.get("Mobile_Phone_No")
+        program = item.get("Program_Code") or item.get("program") or item.get("Course_Code") or item.get("Program")
+        gender = item.get("Gender") or item.get("gender")
+        status = item.get("Status") or item.get("status") or "active"
 
         if not adm or not name:
             continue
+
+        f_name, l_name = "", ""
+        if name:
+            parts = name.split(" ")
+            f_name = parts[0]
+            if len(parts) > 1:
+                l_name = " ".join(parts[1:])
 
         user = (await session.exec(select(User).where(User.admission_number == adm))).first()
         if user:
@@ -1616,6 +1637,18 @@ async def sync_dynamics_records(
             user.school = school
             if email:
                 user.email = email
+            if phone:
+                user.phone_number = phone
+            if program:
+                user.program = program
+            if gender:
+                user.gender = gender
+            if status:
+                user.status = status
+            if f_name and not user.first_name:
+                user.first_name = f_name
+            if l_name and not user.last_name:
+                user.last_name = l_name
             session.add(user)
             updated_students_count += 1
         else:
@@ -1626,8 +1659,13 @@ async def sync_dynamics_records(
                 email=email,
                 school=school,
                 role_id=student_role.id,
-                status="active",
-                hashed_password=get_password_hash("Dynamics2026")
+                status=status,
+                hashed_password=get_password_hash("Dynamics2026"),
+                phone_number=phone,
+                program=program,
+                gender=gender,
+                first_name=f_name,
+                last_name=l_name
             )
             session.add(user)
             synced_students_count += 1
