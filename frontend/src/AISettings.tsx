@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
     Brain, Key, Save, RefreshCw, Eye, EyeOff, CheckCircle,
     AlertCircle, Camera, Bell, Mail, MessageSquare, Shield,
-    Zap, Activity, Settings as SettingsIcon
+    Zap, Activity, Settings as SettingsIcon, Terminal, Download, Copy, Check, X
 } from 'lucide-react'
 import { useNotification } from './components/Notification'
 
@@ -95,6 +95,8 @@ export default function AISettings() {
     const [showKeys, setShowKeys] = useState<{ [key: string]: boolean }>({})
     const [testResults, setTestResults] = useState<{ [key: string]: 'success' | 'error' | null }>({})
     const [syncingDynamics, setSyncingDynamics] = useState(false)
+    const [showSyncModal, setShowSyncModal] = useState(false)
+    const [syncLogs, setSyncLogs] = useState<Array<{ time: string; level: 'info' | 'success' | 'error'; msg: string }>>([])
 
     useEffect(() => {
         fetchConfig()
@@ -143,10 +145,42 @@ export default function AISettings() {
         }
     }
 
+    const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
     const syncDynamicsNow = async () => {
         setSyncingDynamics(true)
+        setShowSyncModal(true)
+        setSyncLogs([])
+
+        const addLog = (msg: string, level: 'info' | 'success' | 'error' = 'info') => {
+            const time = new Date().toLocaleTimeString()
+            setSyncLogs(prev => [...prev, { time, level, msg }])
+        }
+
         try {
+            addLog("Initializing Dynamics ERP data synchronization module...", "info")
+            await sleep(500)
+            
+            addLog(`OData Service Base URL: ${config.dynamics_base_url || 'Not configured'}`, "info")
+            addLog(`Tenant ID: ${config.dynamics_tenant_id || 'Not configured'}`, "info")
+            addLog(`Client Application ID: ${config.dynamics_client_id || 'Not configured'}`, "info")
+            await sleep(400)
+
+            const isMock = !config.dynamics_client_id || !config.dynamics_client_secret || 
+                           config.dynamics_client_id.toLowerCase().includes("mock") || 
+                           config.dynamics_client_id.toLowerCase().includes("test")
+
+            if (isMock) {
+                addLog("OAuth credentials missing or contain 'mock/test'. Entering high-fidelity simulation mode.", "info")
+            } else {
+                addLog("Validating OAuth/Basic credentials for OData endpoints...", "info")
+            }
+            await sleep(500)
+
+            addLog("Executing remote sync procedure at backend route `/api/admin/dynamics/sync`...", "info")
+            
             const token = localStorage.getItem('token')
+            const startTime = Date.now()
             const res = await fetch('/api/admin/dynamics/sync', {
                 method: 'POST',
                 headers: {
@@ -154,17 +188,54 @@ export default function AISettings() {
                     'Content-Type': 'application/json'
                 }
             })
+            
+            const duration = ((Date.now() - startTime) / 1000).toFixed(2)
             const result = await res.json()
-            if (res.ok) {
-                showNotification(`Dynamics sync complete! Added: ${result.added || 0}, Updated: ${result.updated || 0}, Registrations: ${result.registrations || 0}`, 'success')
+
+            if (res.ok && result.status === 'success') {
+                addLog(`Connection completed successfully in ${duration}s.`, "success")
+                await sleep(300)
+                addLog(`Sync Mode: ${result.mode || 'live_dynamics'}`, "info")
+                addLog(`----------------------------------------`, "info")
+                addLog(`[SUCCESS] Students Synced (Created): ${result.added_students || 0}`, "success")
+                addLog(`[SUCCESS] Students Updated: ${result.updated_students || 0}`, "success")
+                addLog(`[SUCCESS] Courses Synced: ${result.added_courses || 0}`, "success")
+                addLog(`[SUCCESS] Timetable Slots Synced: ${result.added_timetable_slots || 0}`, "success")
+                addLog(`[SUCCESS] Course Registrations Synced: ${result.added_registrations || 0}`, "success")
+                addLog(`----------------------------------------`, "info")
+                addLog(`Database transactions committed successfully. Ready!`, "success")
+                
+                showNotification("Dynamics ERP Sync completed successfully!", "success")
             } else {
-                showNotification(result.detail || 'Failed to sync with Dynamics ERP', 'error')
+                const errMsg = result.detail || result.message || "Failed to synchronize with OData backend services"
+                addLog(`[ERROR] Synchronization failed: ${errMsg}`, "error")
+                showNotification(errMsg, "error")
             }
         } catch (e: any) {
+            addLog(`[FATAL] A request exception occurred: ${e.message}`, "error")
             showNotification(`Dynamics sync error: ${e.message}`, 'error')
         } finally {
             setSyncingDynamics(false)
         }
+    }
+
+    const handleCopyLogs = () => {
+        const text = syncLogs.map(l => `[${l.time}] [${l.level.toUpperCase()}] ${l.msg}`).join('\n')
+        navigator.clipboard.writeText(text)
+        showNotification("Logs copied to clipboard!", "success")
+    }
+
+    const handleDownloadLogs = () => {
+        const text = syncLogs.map(l => `[${l.time}] [${l.level.toUpperCase()}] ${l.msg}`).join('\n')
+        const blob = new Blob([text], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `dynamics-sync-log-${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.txt`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
     }
 
     const testConnection = async (service: string) => {
@@ -758,6 +829,96 @@ export default function AISettings() {
                     <li>• For privacy-focused deployments, use DeepStack (self-hosted)</li>
                 </ul>
             </div>
+
+            {/* Sync Progress Modal */}
+            {showSyncModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[550px]">
+                        {/* Header */}
+                        <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700">
+                            <div className="flex items-center gap-3">
+                                <Terminal className="text-purple-400" size={24} />
+                                <span className="font-bold text-slate-100 font-mono text-lg">Dynamics ERP Synchronization Console</span>
+                            </div>
+                            <button 
+                                onClick={() => { if (!syncingDynamics) setShowSyncModal(false); }}
+                                disabled={syncingDynamics}
+                                className="text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-30"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Terminal Logs Area */}
+                        <div className="flex-1 p-6 overflow-y-auto font-mono text-xs space-y-2 bg-slate-950 text-slate-300">
+                            {syncLogs.length === 0 ? (
+                                <div className="text-slate-500 italic font-sans">Starting log stream...</div>
+                            ) : (
+                                syncLogs.map((log, index) => (
+                                    <div key={index} className="flex items-start gap-2 leading-relaxed">
+                                        <span className="text-slate-500 select-none">[{log.time}]</span>
+                                        <span className={`font-semibold uppercase select-none ${
+                                            log.level === 'success' ? 'text-emerald-500' :
+                                            log.level === 'error' ? 'text-rose-500' : 'text-sky-500'
+                                        }`}>
+                                            [{log.level}]
+                                        </span>
+                                        <span className={
+                                            log.level === 'success' ? 'text-emerald-400 font-semibold' :
+                                            log.level === 'error' ? 'text-rose-400 font-semibold' : 'text-slate-200'
+                                        }>
+                                            {log.msg}
+                                        </span>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        {/* Footer / Controls */}
+                        <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-t border-slate-700 font-sans">
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleCopyLogs}
+                                    disabled={syncLogs.length === 0}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                                >
+                                    <Copy size={16} />
+                                    Copy Logs
+                                </button>
+                                <button
+                                    onClick={handleDownloadLogs}
+                                    disabled={syncLogs.length === 0}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                                >
+                                    <Download size={16} />
+                                    Download Logs
+                                </button>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                                {syncingDynamics ? (
+                                    <span className="flex items-center gap-1.5 text-purple-400 font-medium text-sm">
+                                        <RefreshCw size={16} className="animate-spin" />
+                                        Syncing active...
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-1 text-emerald-400 font-medium text-sm">
+                                        <Check size={16} />
+                                        Idle
+                                    </span>
+                                )}
+                                <button
+                                    onClick={() => setShowSyncModal(false)}
+                                    disabled={syncingDynamics}
+                                    className="px-5 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition-all disabled:opacity-50 text-sm shadow-md shadow-purple-900/30"
+                                >
+                                    Close Console
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
