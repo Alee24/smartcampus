@@ -1402,8 +1402,11 @@ async def sync_ad(
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+from typing import Optional
+
 @router.post("/dynamics/sync")
 async def sync_dynamics_records(
+    payload: Optional[dict] = None,
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(ensure_admin)
 ):
@@ -1428,6 +1431,9 @@ async def sync_dynamics_records(
             config = json.loads(config_record.value)
         except Exception:
             pass
+
+    if payload:
+        config.update(payload)
 
     url = config.get("dynamics_base_url", "").strip()
     tenant = config.get("dynamics_tenant_id", "").strip()
@@ -1462,6 +1468,7 @@ async def sync_dynamics_records(
     dynamics_classes = []
     dynamics_employees = []
     
+    connection_error = None
     if not is_mock:
         try:
             # Check if using Azure AD OAuth (GUID format) or Web Service Basic Auth
@@ -1530,6 +1537,7 @@ async def sync_dynamics_records(
                     dynamics_employees = data.get("value", []) if isinstance(data, dict) else data
 
         except Exception as e:
+            connection_error = str(e)
             print(f"Dynamics connection failed: {e}. Falling back to simulation.")
             is_mock = True
 
@@ -1821,6 +1829,7 @@ async def sync_dynamics_records(
         "added_courses": synced_courses_count,
         "added_timetable_slots": synced_timetable_slots_count,
         "added_registrations": synced_registrations_count,
-        "mode": "simulated" if is_mock else "live_dynamics"
+        "mode": "simulated" if is_mock else "live_dynamics",
+        "warning": f"Live connection failed ({connection_error}). Fell back to simulation mode." if connection_error else None
     }
 

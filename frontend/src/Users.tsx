@@ -98,6 +98,9 @@ export default function Users() {
                 addLog(`Connection completed successfully in ${duration}s.`, "success")
                 await sleep(300)
                 addLog(`Sync Mode: ${result.mode || 'live_dynamics'}`, "info")
+                if (result.warning) {
+                    addLog(`[WARNING] ${result.warning}`, "error")
+                }
                 addLog(`----------------------------------------`, "info")
                 addLog(`[SUCCESS] Students Synced (Created): ${result.added_students || 0}`, "success")
                 addLog(`[SUCCESS] Students Updated: ${result.updated_students || 0}`, "success")
