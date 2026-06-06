@@ -76,7 +76,17 @@ async def upload_visitors_csv(
         raise HTTPException(status_code=400, detail="File must be a CSV")
         
     content = await file.read()
-    decoded = content.decode('utf-8')
+    # Resilient decoding: try utf-8-sig, cp1252 (windows smart quotes), latin-1, fallback to utf-8 errors replace
+    decoded = None
+    for enc in ["utf-8-sig", "cp1252", "latin-1"]:
+        try:
+            decoded = content.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if decoded is None:
+        decoded = content.decode("utf-8", errors="replace")
+        
     reader = csv.DictReader(io.StringIO(decoded))
     
     count = 0

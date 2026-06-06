@@ -733,7 +733,18 @@ async def upload_assets_csv(
         from datetime import datetime
         
         contents = await file.read()
-        csv_file = io.StringIO(contents.decode("utf-8"))
+        # Resilient decoding: try utf-8-sig, cp1252 (windows smart quotes), latin-1, fallback to utf-8 errors replace
+        decoded_content = None
+        for enc in ["utf-8-sig", "cp1252", "latin-1"]:
+            try:
+                decoded_content = contents.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if decoded_content is None:
+            decoded_content = contents.decode("utf-8", errors="replace")
+            
+        csv_file = io.StringIO(decoded_content)
         reader = csv.DictReader(csv_file)
         
         success_count = 0

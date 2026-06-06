@@ -667,10 +667,15 @@ async def upload_passenger_manifest(
             raise HTTPException(status_code=404, detail="Trip not found")
             
         content = await file.read()
-        try:
-            decoded = content.decode("utf-8")
-        except UnicodeDecodeError:
-            decoded = content.decode("latin-1")
+        decoded = None
+        for enc in ["utf-8-sig", "cp1252", "latin-1"]:
+            try:
+                decoded = content.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if decoded is None:
+            decoded = content.decode("utf-8", errors="replace")
             
         csv_file = io.StringIO(decoded)
         reader = csv.DictReader(csv_file)

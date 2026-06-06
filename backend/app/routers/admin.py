@@ -299,11 +299,18 @@ async def bulk_upload_lecturers(
     """
     try:
         content = await file.read()
-        try:
-            decoded = content.decode('utf-8-sig').splitlines()
-        except UnicodeDecodeError:
-            decoded = content.decode('latin-1').splitlines()
-
+        # Resilient decoding: try utf-8-sig, cp1252 (windows smart quotes), latin-1, fallback to utf-8 errors replace
+        decoded_str = None
+        for enc in ["utf-8-sig", "cp1252", "latin-1"]:
+            try:
+                decoded_str = content.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if decoded_str is None:
+            decoded_str = content.decode("utf-8", errors="replace")
+            
+        decoded = decoded_str.splitlines()
         reader = csv.DictReader(decoded)
         
         lecturer_role = (await session.exec(select(Role).where(Role.name == "Lecturer"))).first()
@@ -400,11 +407,18 @@ async def bulk_upload_students(
     """
     try:
         content = await file.read()
-        try:
-            decoded = content.decode('utf-8-sig').splitlines()
-        except UnicodeDecodeError:
-            decoded = content.decode('latin-1').splitlines()
-
+        # Resilient decoding: try utf-8-sig, cp1252 (windows smart quotes), latin-1, fallback to utf-8 errors replace
+        decoded_str = None
+        for enc in ["utf-8-sig", "cp1252", "latin-1"]:
+            try:
+                decoded_str = content.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if decoded_str is None:
+            decoded_str = content.decode("utf-8", errors="replace")
+            
+        decoded = decoded_str.splitlines()
         reader = csv.DictReader(decoded)
         
         student_role = (await session.exec(select(Role).where(Role.name == "Student"))).first()
@@ -533,11 +547,18 @@ async def bulk_upload_courses(
     """
     try:
         content = await file.read()
-        try:
-            decoded = content.decode('utf-8-sig').splitlines()
-        except UnicodeDecodeError:
-            decoded = content.decode('latin-1').splitlines()
-        
+        # Resilient decoding: try utf-8-sig, cp1252 (windows smart quotes), latin-1, fallback to utf-8 errors replace
+        decoded_str = None
+        for enc in ["utf-8-sig", "cp1252", "latin-1"]:
+            try:
+                decoded_str = content.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if decoded_str is None:
+            decoded_str = content.decode("utf-8", errors="replace")
+            
+        decoded = decoded_str.splitlines()
         reader = csv.DictReader(decoded)
         
         def safe_int(val, default=0):
@@ -627,11 +648,18 @@ async def bulk_upload_classrooms(
     """
     try:
         content = await file.read()
-        try:
-            decoded = content.decode('utf-8-sig').splitlines()
-        except UnicodeDecodeError:
-            decoded = content.decode('latin-1').splitlines()
-        
+        # Resilient decoding: try utf-8-sig, cp1252 (windows smart quotes), latin-1, fallback to utf-8 errors replace
+        decoded_str = None
+        for enc in ["utf-8-sig", "cp1252", "latin-1"]:
+            try:
+                decoded_str = content.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if decoded_str is None:
+            decoded_str = content.decode("utf-8", errors="replace")
+            
+        decoded = decoded_str.splitlines()
         reader = csv.DictReader(decoded)
         
         # Helper for safe integer parsing
@@ -729,11 +757,18 @@ async def bulk_upload_timetable_slots(
     """
     try:
         content = await file.read()
-        try:
-            decoded = content.decode('utf-8-sig').splitlines()
-        except UnicodeDecodeError:
-            decoded = content.decode('latin-1').splitlines()
-        
+        # Resilient decoding: try utf-8-sig, cp1252 (windows smart quotes), latin-1, fallback to utf-8 errors replace
+        decoded_str = None
+        for enc in ["utf-8-sig", "cp1252", "latin-1"]:
+            try:
+                decoded_str = content.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        if decoded_str is None:
+            decoded_str = content.decode("utf-8", errors="replace")
+            
+        decoded = decoded_str.splitlines()
         reader = csv.DictReader(decoded)
         
         count = 0
