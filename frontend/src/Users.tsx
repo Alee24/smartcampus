@@ -3,7 +3,7 @@ import {
     UserPlus, Search, Filter, X, Edit, Trash2, Mail, Phone,
     Building, GraduationCap, Shield, ChevronLeft, ChevronRight,
     MoreVertical, CheckCircle, XCircle, AlertCircle, Camera, Key, LayoutGrid, Users as UsersIcon,
-    Ban, Power, Lock, RefreshCw, Calendar, Terminal, Download, Copy, Check
+    Ban, Power, Lock, RefreshCw, Calendar, Terminal, Download, Copy, Check, RotateCw, Zap
 } from 'lucide-react'
 import { useNotification } from './components/Notification'
 
@@ -22,6 +22,7 @@ export default function Users() {
     const [syncingDynamics, setSyncingDynamics] = useState(false)
     const [showSyncModal, setShowSyncModal] = useState(false)
     const [syncLogs, setSyncLogs] = useState<Array<{ time: string; level: 'info' | 'success' | 'error'; msg: string }>>([])
+    const [compressing, setCompressing] = useState(false)
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1)
@@ -166,6 +167,44 @@ export default function Users() {
         }
     }
 
+    const handleCompressImages = async () => {
+        const confirmed = await showConfirm({
+            title: "Compress Profile Photos",
+            message: "Are you sure you want to optimize all uploaded profile photos? This resizes large images to 512px max dimensions and converts them to highly optimized WebP format, boosting system performance and loading speeds significantly.",
+            confirmText: "Yes, Compress All",
+            cancelText: "Cancel"
+        })
+        if (!confirmed) return
+
+        setCompressing(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/users/compress-all-images', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+
+            if (res.ok) {
+                const data = await res.json()
+                showNotification(
+                    `Successfully optimized profile photos! Scanned: ${data.total_scanned}, Compressed: ${data.total_compressed}. Saved: ${data.saved_size_mb} MB (${data.reduction_percentage}% space saved).`,
+                    'success'
+                )
+                fetchUsers()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                showNotification(`Compression failed: ${data.detail || 'Unknown error'}`, 'error')
+            }
+        } catch (err) {
+            console.error(err)
+            showNotification('Network error occurred.', 'error')
+        } finally {
+            setCompressing(false)
+        }
+    }
+
     const filterUsers = () => {
         let filtered = users
 
@@ -277,6 +316,37 @@ export default function Users() {
         }
     }
 
+    const handleRotateImage = async (e: React.MouseEvent, user: any) => {
+        e.stopPropagation();
+        try {
+            const token = localStorage.getItem('token')
+            const formData = new FormData()
+            formData.append('direction', 'clockwise')
+            
+            const res = await fetch(`/api/users/${user.id}/rotate-profile-image`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            })
+            
+            if (res.ok) {
+                const data = await res.json()
+                showNotification('Image rotated successfully!', 'success')
+                setUsers(prev => prev.map(u => u.id === user.id ? { ...u, profile_image: data.image_url } : u))
+                return data.image_url;
+            } else {
+                const data = await res.json().catch(() => ({}))
+                showNotification(`Rotation failed: ${data.detail || 'Unknown error'}`, 'error')
+            }
+        } catch (err) {
+            console.error(err)
+            showNotification('Network error occurred.', 'error')
+        }
+        return null;
+    }
+
     // Calculate Stats
     const stats = {
         total: users.length,
@@ -326,6 +396,16 @@ export default function Users() {
                             <LayoutGrid size={20} />
                         </button>
                     </div>
+
+                    <button
+                        onClick={handleCompressImages}
+                        disabled={compressing}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all disabled:opacity-50 active:scale-95"
+                        title="Optimize and compress all profile pictures to WebP format"
+                    >
+                        <Zap size={18} className={compressing ? "animate-bounce text-purple-500" : "text-purple-500"} />
+                        {compressing ? "Compressing..." : "Compress Photos"}
+                    </button>
 
                     <button
                         onClick={syncDynamicsUsersNow}
@@ -490,11 +570,21 @@ export default function Users() {
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
                                                     {user.profile_image ? (
-                                                        <img
-                                                            src={user.profile_image}
-                                                            alt={user.full_name}
-                                                            className="w-10 h-10 rounded-full object-cover"
-                                                        />
+                                                        <div className="relative group/img shrink-0">
+                                                            <img
+                                                                src={user.profile_image}
+                                                                alt={user.full_name}
+                                                                className="w-10 h-10 rounded-full object-cover"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => handleRotateImage(e, user)}
+                                                                className="absolute -top-1 -right-1 p-1 bg-white/95 dark:bg-gray-800/95 text-gray-700 dark:text-gray-200 rounded-full shadow border border-gray-200 dark:border-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900/50 hover:text-purple-600 dark:hover:text-purple-400 transition-all active:scale-90 opacity-0 group-hover/img:opacity-100"
+                                                                title="Rotate Image Clockwise"
+                                                            >
+                                                                <RotateCw size={10} />
+                                                            </button>
+                                                        </div>
                                                     ) : (
                                                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold text-sm">
                                                             {user.full_name?.charAt(0) || '?'}
@@ -608,13 +698,23 @@ export default function Users() {
                                     }`}></div>
 
                                 {/* Profile Image */}
-                                <div className="mb-4 relative">
+                                <div className="mb-4 relative group/img">
                                     {user.profile_image ? (
-                                        <img
-                                            src={user.profile_image.startsWith('http') ? user.profile_image : user.profile_image}
-                                            alt={user.full_name}
-                                            className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md group-hover:scale-105 transition-transform duration-300"
-                                        />
+                                        <>
+                                            <img
+                                                src={user.profile_image.startsWith('http') ? user.profile_image : user.profile_image}
+                                                alt={user.full_name}
+                                                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md group-hover:scale-105 transition-transform duration-300"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={(e) => handleRotateImage(e, user)}
+                                                className="absolute top-0 right-0 p-1.5 bg-white/95 dark:bg-gray-800/95 text-gray-750 dark:text-gray-200 rounded-full shadow border border-gray-200 dark:border-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900/50 hover:text-purple-600 dark:hover:text-purple-400 transition-all active:scale-90 opacity-0 group-hover/img:opacity-100"
+                                                title="Rotate Image Clockwise"
+                                            >
+                                                <RotateCw size={12} />
+                                            </button>
+                                        </>
                                     ) : (
                                         <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-3xl font-bold border-4 border-white shadow-md group-hover:scale-105 transition-transform duration-300">
                                             {user.full_name?.charAt(0) || '?'}
@@ -833,6 +933,36 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
     useEffect(() => {
         setEditForm(user)
     }, [user])
+
+    const handleRotatePhoto = async () => {
+        if (!editForm.profile_image) return
+        try {
+            const token = localStorage.getItem('token')
+            const formData = new FormData()
+            formData.append('direction', 'clockwise')
+            
+            const res = await fetch(`/api/users/${user.id}/rotate-profile-image`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            })
+            
+            if (res.ok) {
+                const data = await res.json()
+                showNotification('Image rotated successfully!', 'success')
+                setEditForm((prev: any) => ({ ...prev, profile_image: data.image_url }))
+                onRefresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                showNotification(`Rotation failed: ${data.detail || 'Unknown error'}`, 'error')
+            }
+        } catch (err) {
+            console.error(err)
+            showNotification('Network error occurred.', 'error')
+        }
+    }
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -1073,13 +1203,25 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                 <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
                     {/* Identity Banner */}
                     <div className="flex flex-col sm:flex-row items-center gap-6 bg-gray-50 dark:bg-gray-800/30 p-6 rounded-2xl border border-gray-100 dark:border-gray-800/50">
-                        <div className="relative group shrink-0">
+                        <div className="relative group group/img shrink-0">
                             {editForm.profile_image ? (
-                                <img
-                                    src={editForm.profile_image}
-                                    alt={editForm.full_name || user.full_name}
-                                    className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-md transition-transform duration-200 group-hover:scale-105"
-                                />
+                                <>
+                                    <img
+                                        src={editForm.profile_image}
+                                        alt={editForm.full_name || user.full_name}
+                                        className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-md transition-transform duration-200 group-hover/img:scale-105"
+                                    />
+                                    {!isEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={handleRotatePhoto}
+                                            className="absolute top-0 right-0 p-1.5 bg-white/95 dark:bg-gray-800/95 text-gray-750 dark:text-gray-200 rounded-full shadow border border-gray-200 dark:border-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900/50 hover:text-purple-600 dark:hover:text-purple-400 transition-all active:scale-90 opacity-0 group-hover/img:opacity-100"
+                                            title="Rotate Image Clockwise"
+                                        >
+                                            <RotateCw size={14} />
+                                        </button>
+                                    )}
+                                </>
                             ) : (
                                 <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-3xl font-bold shadow-md">
                                     {(editForm.full_name || user.full_name)?.charAt(0) || '?'}
@@ -1125,13 +1267,22 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                                     <Camera size={14} /> Upload Photo
                                 </button>
                                 {editForm.profile_image && (
-                                    <button
-                                        type="button"
-                                        onClick={handleRemovePhoto}
-                                        className="px-3 py-2 text-xs bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-xl font-bold transition-all flex items-center gap-1.5 border border-red-200 dark:border-red-900"
-                                    >
-                                        <Trash2 size={14} /> Remove Photo
-                                    </button>
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={handleRotatePhoto}
+                                            className="px-3 py-2 text-xs bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-xl font-bold transition-all flex items-center gap-1.5 border border-purple-200 dark:border-purple-800"
+                                        >
+                                            <RotateCw size={14} /> Rotate Photo
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleRemovePhoto}
+                                            className="px-3 py-2 text-xs bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-xl font-bold transition-all flex items-center gap-1.5 border border-red-200 dark:border-red-900"
+                                        >
+                                            <Trash2 size={14} /> Remove Photo
+                                        </button>
+                                    </>
                                 )}
                             </div>
                         )}

@@ -1096,28 +1096,40 @@ async def upload_profile_image(
     os.makedirs("static/profiles", exist_ok=True)
 
     # Determine file extension
-    import shutil
-    import os
-    
     file_ext = file.filename.split('.')[-1].lower()
     if file_ext not in ['jpg', 'jpeg', 'png', 'webp', 'gif']:
          raise HTTPException(status_code=400, detail="Invalid image format")
     
     import uuid
-    # Use unique filename to prevent browser caching issues
-    filename = f"{target_user.id}_{uuid.uuid4().hex[:8]}.{file_ext}"
+    from PIL import Image
+    # Use unique WebP filename to prevent browser caching issues and optimize size
+    filename = f"{target_user.id}_{uuid.uuid4().hex[:8]}.webp"
     file_path = f"static/profiles/{filename}"
     
-    # Save file
+    # Save/Compress using Pillow to WebP with max 512px dimensions
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Load image and process
+        with Image.open(file.file) as img:
+            # Resize if either dimension exceeds 512px
+            max_size = 512
+            if img.width > max_size or img.height > max_size:
+                img.thumbnail((max_size, max_size), Image.LANCZOS)
+            
+            # Save as optimized WebP
+            img.save(file_path, "WEBP", quality=75, method=6)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save image: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process and compress image: {str(e)}")
     
+    # Clean up the old profile image file physically if it existed
+    if target_user.profile_image and target_user.profile_image.startswith("/static/profiles/"):
+        old_file_path = target_user.profile_image.lstrip("/")
+        if os.path.exists(old_file_path):
+            try:
+                os.remove(old_file_path)
+            except Exception as e:
+                print(f"Error removing old image file {old_file_path}: {e}")
+
     # Update User Record with URL
-    # Assuming server is running on same host, we store relative path or absolute URL
-    # Storing relative path is flexible
     image_url = f"/static/profiles/{filename}"
     
     target_user.profile_image = image_url
@@ -1177,8 +1189,74 @@ async def remove_profile_image(
         await session.refresh(target_user)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database commit failed: {str(e)}")
-        
     return {"status": "success", "message": "Profile image removed successfully"}
+
+
+
+
+@router.post("/{user_id}/rotate-profile-image")
+async def rotate_profile_image(
+    user_id: str,
+    direction: str = Form("clockwise"),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    from PIL import Image
+    import os
+    import uuid
+    from uuid import UUID
+
+    # 1. Get user
+    try:
+        user_uuid = UUID(user_id)
+        target_user = await session.get(User, user_uuid)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 2. Check if user has local profile image
+    if not target_user.profile_image or not target_user.profile_image.startswith("/static/profiles/"):
+        raise HTTPException(status_code=400, detail="User does not have a local profile image to rotate")
+
+    file_path = target_user.profile_image.lstrip("/")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Profile image file not found on server")
+
+    # 3. Rotate image and save to new filename as WebP to prevent caching and optimize size
+    try:
+        new_filename = f"{target_user.id}_{uuid.uuid4().hex[:8]}.webp"
+        new_file_path = f"static/profiles/{new_filename}"
+
+        with Image.open(file_path) as img:
+            if direction == "counter-clockwise":
+                rotated_img = img.transpose(Image.ROTATE_90)
+            else:
+                rotated_img = img.transpose(Image.ROTATE_270)
+            
+            # Save as WebP
+            rotated_img.save(new_file_path, "WEBP", quality=75, method=6)
+
+        # 4. Remove old file
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            print(f"Error removing old file {file_path}: {e}")
+
+        # 5. Update DB
+        image_url = f"/static/profiles/{new_filename}"
+        target_user.profile_image = image_url
+        session.add(target_user)
+        await session.commit()
+        await session.refresh(target_user)
+
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to rotate image: {str(e)}")
+
+    return {"status": "success", "image_url": image_url}
+
 
 
 
@@ -1396,3 +1474,101 @@ async def delete_user(
     await session.delete(target)
     await session.commit()
     return {"status": "deleted", "user": target.full_name}
+
+
+@router.post("/compress-all-images")
+async def compress_all_images(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_admin_user)
+):
+    from PIL import Image
+    import os
+    import uuid
+    from pathlib import Path
+
+    # 1. Fetch all users from the database
+    query = select(User).where(User.profile_image != None)
+    results = await session.exec(query)
+    users = results.all()
+
+    total_scanned = 0
+    total_compressed = 0
+    original_total_size = 0
+    new_total_size = 0
+    errors = []
+
+    os.makedirs("static/profiles", exist_ok=True)
+
+    for user in users:
+        # Check if local profile picture
+        if not user.profile_image or not user.profile_image.startswith("/static/profiles/"):
+            continue
+        
+        total_scanned += 1
+        file_path = user.profile_image.lstrip("/")
+        
+        if not os.path.exists(file_path):
+            errors.append(f"File not found on disk for {user.full_name}: {file_path}")
+            continue
+
+        try:
+            # Check original size
+            orig_size = os.path.getsize(file_path)
+            original_total_size += orig_size
+
+            # Open image
+            with Image.open(file_path) as img:
+                # 2. Resize if necessary. Max dimension 512px.
+                max_size = 512
+                if img.width > max_size or img.height > max_size:
+                    img.thumbnail((max_size, max_size), Image.LANCZOS)
+
+                # Generate new unique WebP filename to bypass cache
+                new_filename = f"{user.id}_{uuid.uuid4().hex[:8]}.webp"
+                new_file_path = f"static/profiles/{new_filename}"
+
+                # Save as optimized WebP
+                img.save(new_file_path, "WEBP", quality=75, method=6)
+            
+            # Check new size
+            new_size = os.path.getsize(new_file_path)
+            new_total_size += new_size
+
+            # 3. Clean up the old file
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print(f"Error removing old image file {file_path}: {e}")
+
+            # 4. Update user profile image URL in DB
+            user.profile_image = f"/static/profiles/{new_filename}"
+            session.add(user)
+            total_compressed += 1
+
+        except Exception as e:
+            errors.append(f"Failed to compress image for {user.full_name}: {str(e)}")
+
+    if total_compressed > 0:
+        try:
+            await session.commit()
+        except Exception as e:
+            await session.rollback()
+            raise HTTPException(status_code=500, detail=f"Database update failed during compression: {str(e)}")
+
+    # Calculate statistics
+    saved_bytes = original_total_size - new_total_size
+    saved_mb = round(saved_bytes / (1024 * 1024), 2)
+    original_mb = round(original_total_size / (1024 * 1024), 2)
+    new_mb = round(new_total_size / (1024 * 1024), 2)
+    reduction_pct = round((saved_bytes / original_total_size * 100), 1) if original_total_size > 0 else 0
+
+    return {
+        "status": "success",
+        "total_scanned": total_scanned,
+        "total_compressed": total_compressed,
+        "original_size_mb": original_mb,
+        "new_size_mb": new_mb,
+        "saved_size_mb": saved_mb,
+        "reduction_percentage": reduction_pct,
+        "errors": errors
+    }

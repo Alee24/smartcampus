@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { 
     User, Lock, Bell, CheckCircle, Shield, Cog, 
     Mail, Phone, UserCheck, Camera, AlertTriangle, 
-    Info, Sliders, Eye, Activity, Moon, Sun, ToggleLeft, ToggleRight
+    Info, Sliders, Eye, Activity, Moon, Sun, ToggleLeft, ToggleRight, RotateCw
 } from 'lucide-react'
 
 export default function Settings() {
@@ -208,6 +208,44 @@ export default function Settings() {
         }
     }
 
+    const handleRotateOwnImage = async () => {
+        if (!profile.profile_image) return
+        setLoading(true)
+        setStatus('')
+        setStatusType('')
+        try {
+            const token = localStorage.getItem('token')
+            const formData = new FormData()
+            formData.append('direction', 'clockwise')
+            
+            const res = await fetch(`/api/users/${profile.id}/rotate-profile-image`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}` 
+                },
+                body: formData
+            })
+
+            if (res.ok) {
+                const data = await res.json()
+                setProfile(prev => ({ ...prev, profile_image: data.image_url }))
+                localStorage.setItem('userImage', data.image_url)
+                window.dispatchEvent(new Event('storage'))
+                setStatusType('success')
+                setStatus('Avatar rotated successfully!')
+            } else {
+                const errData = await res.json().catch(() => ({}))
+                setStatusType('error')
+                setStatus(errData.detail || 'Failed to rotate profile image')
+            }
+        } catch (err) {
+            setStatusType('error')
+            setStatus('Error rotating profile image')
+        } finally {
+            setLoading(false)
+        }
+    }
+
     // Save profile changes
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -351,13 +389,26 @@ export default function Settings() {
                             <div>
                                 <h4 className="font-bold text-base md:text-lg">Your Profile Avatar</h4>
                                 <p className="text-xs text-[var(--text-secondary)] mb-3">JPG, PNG, or WEBP. Max size 5MB.</p>
-                                <button 
-                                    type="button" 
-                                    onClick={triggerAvatarUpload} 
-                                    className="text-xs bg-white dark:bg-gray-800 text-[var(--text-primary)] border border-[var(--border-color)] px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
-                                >
-                                    Change Avatar
-                                </button>
+                                <div className="flex flex-wrap gap-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={triggerAvatarUpload} 
+                                        className="text-xs bg-white dark:bg-gray-800 text-[var(--text-primary)] border border-[var(--border-color)] px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
+                                    >
+                                        Change Avatar
+                                    </button>
+                                    {profile.profile_image && (
+                                        <button 
+                                            type="button" 
+                                            onClick={handleRotateOwnImage} 
+                                            className="text-xs bg-white dark:bg-gray-800 text-[var(--text-primary)] border border-[var(--border-color)] px-4 py-2 rounded-xl font-bold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all flex items-center gap-1.5"
+                                            title="Rotate Image Clockwise"
+                                        >
+                                            <RotateCw size={12} />
+                                            Rotate
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
