@@ -202,7 +202,15 @@ export default function QRRegistry() {
     }, [])
 
     const getQRValue = (asset: QRAsset) => {
-        const base = window.location.origin
+        const serverIpOrDomain = localStorage.getItem('server_ip_or_domain')
+        let base = window.location.origin
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+            if (serverIpOrDomain) {
+                base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                    ? serverIpOrDomain
+                    : `${window.location.protocol}//${serverIpOrDomain}`
+            }
+        }
         switch (asset.category) {
             case 'user': return `${base}/?user=${asset.identifier}`
             case 'vehicle': return `${base}/?vehicle=${asset.identifier}`

@@ -836,7 +836,7 @@ async def health_check():
 # --- Demo Mode Endpoints ---
 
 @app.get("/api/public/config")
-async def get_public_config(session: AsyncSession = Depends(get_session)):
+async def get_public_config(request: Request, session: AsyncSession = Depends(get_session)):
     """
     Publicly accessible configuration (e.g., for Login page).
     """
@@ -846,10 +846,47 @@ async def get_public_config(session: AsyncSession = Depends(get_session)):
     is_demo = False
     if config and config.value.lower() == "true":
         is_demo = True
+
+    # Detect local LAN IP
+    import socket
+    local_ip = "localhost"
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        try:
+            local_ip = socket.gethostbyname(socket.gethostname())
+        except:
+            pass
+
+    # Get requested hostname
+    req_host = request.url.hostname or "localhost"
+    
+    # Check if there is a stored setting for system domain
+    domain_stmt = select(SystemConfig).where(SystemConfig.key == "system_domain_or_ip")
+    domain_config = (await session.exec(domain_stmt)).first()
+    
+    server_host = None
+    if domain_config and domain_config.value and domain_config.value not in ["localhost", "127.0.0.1", "::1"]:
+        server_host = domain_config.value
+    elif req_host not in ["localhost", "127.0.0.1", "::1"]:
+        server_host = req_host
+    else:
+        server_host = local_ip if local_ip not in ["localhost", "127.0.0.1", "::1"] else "smartcampus.kkdes.co.ke"
+
+    # Ensure port is preserved if accessed on a custom port
+    req_port = request.url.port
+    if req_port and req_port not in [80, 443]:
+        server_ip_or_domain = f"{server_host}:{req_port}"
+    else:
+        server_ip_or_domain = server_host
         
     return {
         "demo_mode": is_demo,
-        "system_name": "Smart Campus"
+        "system_name": "Smart Campus",
+        "server_ip_or_domain": server_ip_or_domain
     }
 
 class DemoLoginRequest(BaseModel):

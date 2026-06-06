@@ -655,7 +655,18 @@ function LecturerView() {
                             ) : (
                                 <div className="text-center space-y-4">
                                     <div className="bg-white p-4 inline-block rounded-xl shadow-inner border border-slate-100">
-                                        <QRCodeCanvas value={`${window.location.origin}/?room=${activeSession.room_code}`} size={180} />
+                                        {(() => {
+                                            const serverIpOrDomain = localStorage.getItem('server_ip_or_domain');
+                                            let base = window.location.origin;
+                                            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+                                                if (serverIpOrDomain) {
+                                                    base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                                                        ? serverIpOrDomain
+                                                        : `${window.location.protocol}//${serverIpOrDomain}`;
+                                                }
+                                            }
+                                            return <QRCodeCanvas value={`${base}/?room=${activeSession.room_code}`} size={180} />;
+                                        })()}
                                     </div>
                                     <div>
                                         <h2 className="text-2xl font-bold">{activeSession.room_unique_number}</h2>

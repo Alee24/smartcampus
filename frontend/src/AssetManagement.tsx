@@ -1248,7 +1248,18 @@ export default function AssetManagement() {
                         {/* Barcode / QR Preview */}
                         <div className="mb-6 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl flex flex-col items-center justify-center border border-slate-100 dark:border-slate-800">
                             <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-inner">
-                                <QRCodeCanvas value={`${window.location.origin}/api/assets/scan/${showDetailModal.asset.tag_number}`} size={140} />
+                                {(() => {
+                                    const serverIpOrDomain = localStorage.getItem('server_ip_or_domain');
+                                    let base = window.location.origin;
+                                    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+                                        if (serverIpOrDomain) {
+                                            base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                                                ? serverIpOrDomain
+                                                : `${window.location.protocol}//${serverIpOrDomain}`;
+                                        }
+                                    }
+                                    return <QRCodeCanvas value={`${base}/api/assets/scan/${showDetailModal.asset.tag_number}`} size={140} />;
+                                })()}
                             </div>
                             <p className="text-[10px] text-slate-400 font-mono mt-3 uppercase tracking-widest">Asset Barcode Verification Link</p>
                         </div>

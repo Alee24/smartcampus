@@ -502,7 +502,18 @@ export default function CourseReports() {
                             <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-[var(--border-color)] rounded-2xl mb-6 shadow-inner relative">
                                 <QRCodeCanvas
                                     id="course-qr-canvas"
-                                    value={selectedCourse.room_code ? `${window.location.origin}/?room=${selectedCourse.room_code}` : `${window.location.origin}/?course=${selectedCourse.course_code}`}
+                                    value={(() => {
+                                        const serverIpOrDomain = localStorage.getItem('server_ip_or_domain');
+                                        let base = window.location.origin;
+                                        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+                                            if (serverIpOrDomain) {
+                                                base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                                                    ? serverIpOrDomain
+                                                    : `${window.location.protocol}//${serverIpOrDomain}`;
+                                            }
+                                        }
+                                        return selectedCourse.room_code ? `${base}/?room=${selectedCourse.room_code}` : `${base}/?course=${selectedCourse.course_code}`;
+                                    })()}
                                     size={200}
                                     level="H"
                                     includeMargin={true}

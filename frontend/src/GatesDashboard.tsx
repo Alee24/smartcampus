@@ -100,7 +100,18 @@ export default function GatesDashboard() {
         }
     }
 
-    const getQRLink = (id: string) => `${window.location.origin}/gate-pass/${id}`
+    const getQRLink = (id: string) => {
+        const serverIpOrDomain = localStorage.getItem('server_ip_or_domain');
+        let base = window.location.origin;
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+            if (serverIpOrDomain) {
+                base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                    ? serverIpOrDomain
+                    : `${window.location.protocol}//${serverIpOrDomain}`;
+            }
+        }
+        return `${base}/gate-pass/${id}`;
+    }
 
     return (
         <div className="animate-fade-in p-4">

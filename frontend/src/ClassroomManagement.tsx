@@ -254,7 +254,16 @@ export default function ClassroomManagement() {
                 pdf.rect(0, 0, pageHeight, pageHeight, 'F');
 
                 // QR Generation
-                const content = room.qr_content ? `${window.location.origin}${room.qr_content}` : `${window.location.origin}/?room=${room.room_code}`;
+                const serverIpOrDomain = localStorage.getItem('server_ip_or_domain');
+                let base = window.location.origin;
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+                    if (serverIpOrDomain) {
+                        base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                            ? serverIpOrDomain
+                            : `${window.location.protocol}//${serverIpOrDomain}`;
+                    }
+                }
+                const content = room.qr_content ? `${base}${room.qr_content}` : `${base}/?room=${room.room_code}`;
                 const qrDataUrl = await QRCode.toDataURL(content, {
                     width: 1000,
                     margin: 1,
@@ -717,7 +726,18 @@ export default function ClassroomManagement() {
                                             <div className="mt-auto group" onClick={(e) => { e.stopPropagation(); downloadSinglePoster(room.room_code); }}>
                                                 <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm group-hover:shadow-md transition-all relative flex justify-center items-center">
                                                     <QRCodeCanvas
-                                                        value={`${window.location.origin}/?room=${room.room_code}`}
+                                                        value={(() => {
+                                                            const serverIpOrDomain = localStorage.getItem('server_ip_or_domain');
+                                                            let base = window.location.origin;
+                                                            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+                                                                if (serverIpOrDomain) {
+                                                                    base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                                                                        ? serverIpOrDomain
+                                                                        : `${window.location.protocol}//${serverIpOrDomain}`;
+                                                                }
+                                                            }
+                                                            return `${base}/?room=${room.room_code}`;
+                                                        })()}
                                                         size={120}
                                                         level="H"
                                                         includeMargin={true}

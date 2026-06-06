@@ -201,7 +201,16 @@ export default function LiveClasses({ fullScreen = false }: { fullScreen?: boole
                 pdf.rect(0, 0, pageHeight, pageHeight, 'F'); // Square on left
 
                 // QR Generation
-                const content = room.qr_content ? `${window.location.origin}${room.qr_content}` : `${window.location.origin}/?room=${room.room_code}`;
+                const serverIpOrDomain = localStorage.getItem('server_ip_or_domain');
+                let base = window.location.origin;
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+                    if (serverIpOrDomain) {
+                        base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                            ? serverIpOrDomain
+                            : `${window.location.protocol}//${serverIpOrDomain}`;
+                    }
+                }
+                const content = room.qr_content ? `${base}${room.qr_content}` : `${base}/?room=${room.room_code}`;
                 const qrDataUrl = await QRCode.toDataURL(content, {
                     width: 1000,
                     margin: 1,

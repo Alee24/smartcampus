@@ -246,6 +246,24 @@ function App() {
         fetchCompanySettings()
     }, [isAuthenticated])
 
+    // Fetch public config (demo mode, server IP or domain)
+    useEffect(() => {
+        const fetchPublicConfig = async () => {
+            try {
+                const res = await fetch('/api/public/config')
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.server_ip_or_domain) {
+                        localStorage.setItem('server_ip_or_domain', data.server_ip_or_domain)
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch public config:', e)
+            }
+        }
+        fetchPublicConfig()
+    }, [])
+
     // Default configuration if none is saved
     const getDefaultConfig = () => {
         return {

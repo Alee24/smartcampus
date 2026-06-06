@@ -21,6 +21,9 @@ export default function Login({ onLogin }: LoginProps) {
             .then(res => res.json())
             .then(data => {
                 if (data.demo_mode) setDemoMode(true)
+                if (data.server_ip_or_domain) {
+                    localStorage.setItem('server_ip_or_domain', data.server_ip_or_domain)
+                }
             })
             .catch(err => console.error("Failed to fetch config", err))
 
