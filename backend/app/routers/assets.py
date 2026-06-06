@@ -105,6 +105,7 @@ async def get_asset_stats(
         checked_out = (await session.exec(select(func.count(Asset.id)).where(Asset.status == "checked_out"))).first() or 0
         maintenance = (await session.exec(select(func.count(Asset.id)).where(Asset.status == "maintenance"))).first() or 0
         disposed = (await session.exec(select(func.count(Asset.id)).where(Asset.status == "disposed"))).first() or 0
+        damaged = (await session.exec(select(func.count(Asset.id)).where(Asset.status == "damaged"))).first() or 0
 
         # Category Breakdown
         categories = ["electronics", "furniture", "lab_equipment", "sports_equipment", "general"]
@@ -119,6 +120,7 @@ async def get_asset_stats(
             "checked_out": checked_out,
             "maintenance": maintenance,
             "disposed": disposed,
+            "damaged": damaged,
             "categories": category_stats
         }
     except Exception as e:
@@ -685,9 +687,9 @@ async def download_csv_template(
     admin: User = Depends(get_current_admin)
 ):
     # Plain CSV headers
-    csv_content = "tag_number,name,category,status,location,department,serial_number,purchase_date,cost,notes\n"
-    csv_content += "RU-01171,Dell Latitude Laptop,electronics,available,Main Library,Finance,SN-987654321,2026-05-15,75000.00,Academic staff laptop\n"
-    csv_content += "RU-01172,Lecture Hall Projector,electronics,available,LH-03,IT,PJ-776352,2026-04-10,120000.00,High definition projector\n"
+    csv_content = "tag_number,name,category,status,location,department,serial_number,purchase_date,cost,quantity,notes\n"
+    csv_content += "RU-01171,Dell Latitude Laptop,electronics,available,Main Library,Finance,SN-987654321,2026-05-15,75000.00,1,Academic staff laptop\n"
+    csv_content += "RU-01172,Lecture Hall Projector,electronics,available,LH-03,IT,PJ-776352,2026-04-10,120000.00,1,High definition projector\n"
     
     from fastapi import Response
     return Response(
@@ -734,15 +736,7 @@ async def upload_assets_csv(
             if not tag_num or not name:
                 error_rows.append(f"Row {idx}: Missing tag_number or name.")
                 continue
-                
-            # Check if tag number already exists
-            existing = (await session.exec(
-                select(Asset).where(Asset.tag_number == tag_num)
-            )).first()
-            if existing:
-                error_rows.append(f"Row {idx}: Asset with Tag Number '{tag_num}' already exists.")
-                continue
-                
+            
             # Parse purchase date
             p_date = None
             p_date_str = row.get("purchase_date", "").strip()
@@ -766,40 +760,74 @@ async def upload_assets_csv(
                     error_rows.append(f"Row {idx}: Invalid cost value '{cost_str}'.")
                     continue
             
+            # Parse quantity
+            quantity = 1
+            quantity_str = row.get("quantity", "").strip()
+            if quantity_str:
+                try:
+                    quantity = int(quantity_str)
+                    if quantity < 1:
+                        quantity = 1
+                except ValueError:
+                    pass
+
             # Default categories & status validations
             category = row.get("category", "electronics").strip().lower()
             if category not in ["electronics", "furniture", "lab_equipment", "sports_equipment", "general"]:
                 category = "general"
                 
             status_val = row.get("status", "available").strip().lower()
-            if status_val not in ["available", "checked_out", "maintenance", "disposed"]:
+            if status_val not in ["available", "checked_out", "maintenance", "disposed", "damaged"]:
                 status_val = "available"
 
-            new_asset = Asset(
-                tag_number=tag_num,
-                name=name,
-                category=category,
-                status=status_val,
-                location=row.get("location", "General").strip() or "General",
-                department=row.get("department", "").strip() or None,
-                serial_number=row.get("serial_number", "").strip() or None,
-                purchase_date=p_date,
-                cost=cost,
-                notes=row.get("notes", "").strip() or None,
-                created_at=get_eat_time()
-            )
-            session.add(new_asset)
-            
-            # Log action
-            log_entry = AssetLog(
-                asset_id=new_asset.id,
-                action="create",
-                timestamp=get_eat_time(),
-                handled_by_id=admin.id,
-                notes="Asset registered via bulk CSV upload."
-            )
-            session.add(log_entry)
-            success_count += 1
+            # Check and create series
+            created_any = False
+            for q_idx in range(1, quantity + 1):
+                current_tag = tag_num if q_idx == 1 else f"{tag_num}-{q_idx}"
+                
+                # Check if tag number already exists
+                existing = (await session.exec(
+                    select(Asset).where(Asset.tag_number == current_tag)
+                )).first()
+                if existing:
+                    if q_idx > 1:
+                        suffix_attempt = q_idx
+                        while existing:
+                            suffix_attempt += 1
+                            current_tag = f"{tag_num}-{suffix_attempt}"
+                            existing = (await session.exec(
+                                select(Asset).where(Asset.tag_number == current_tag)
+                            )).first()
+                    else:
+                        error_rows.append(f"Row {idx}: Asset with Tag Number '{current_tag}' already exists.")
+                        break
+
+                new_asset = Asset(
+                    tag_number=current_tag,
+                    name=name,
+                    category=category,
+                    status=status_val,
+                    location=row.get("location", "General").strip() or "General",
+                    department=row.get("department", "").strip() or None,
+                    serial_number=row.get("serial_number", "").strip() or None,
+                    purchase_date=p_date,
+                    cost=cost,
+                    notes=row.get("notes", "").strip() or None,
+                    created_at=get_eat_time()
+                )
+                session.add(new_asset)
+                
+                # Log action
+                log_entry = AssetLog(
+                    asset_id=new_asset.id,
+                    action="create",
+                    timestamp=get_eat_time(),
+                    handled_by_id=admin.id,
+                    notes="Asset registered via bulk CSV upload."
+                )
+                session.add(log_entry)
+                success_count += 1
+                created_any = True
 
         if success_count > 0:
             await session.commit()

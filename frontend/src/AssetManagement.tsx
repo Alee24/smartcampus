@@ -242,6 +242,27 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
         }
     }, [activeTab, assets])
 
+    const [rooms, setRooms] = useState<any[]>([])
+
+    const fetchRooms = async () => {
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/timetable/classrooms', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setRooms(data)
+            }
+        } catch (e) {
+            console.error("Failed to fetch classrooms", e)
+        }
+    }
+
+    useEffect(() => {
+        fetchRooms()
+    }, [])
+
     const generateTagNumber = () => {
         const num = Math.floor(100000 + Math.random() * 900000)
         setNewAsset(prev => ({ ...prev, tag_number: `RU-${num}` }))
@@ -428,6 +449,30 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
         }
     }
 
+    const handleDownloadTemplate = async () => {
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/assets/template/csv', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const blob = await res.blob()
+                const url = window.URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.setAttribute('download', 'asset_upload_template.csv')
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+                showNotification("Template downloaded successfully!", "success")
+            } else {
+                showNotification("Failed to download CSV template.", "error")
+            }
+        } catch (e) {
+            showNotification("Network error occurred during template download.", "error")
+        }
+    }
+
     const handleCheckin = async (e: any) => {
         e.preventDefault()
         if (!showCheckinModal) return
@@ -536,7 +581,21 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
             case 'checked_out': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
             case 'maintenance': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400 animate-pulse'
             case 'disposed': return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+            case 'damaged': return 'bg-rose-100 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400 border border-rose-200'
             default: return 'bg-slate-100 text-slate-700'
+        }
+    }
+
+    const getRowBgColor = (status: string) => {
+        switch (status) {
+            case 'maintenance':
+                return 'bg-amber-50/70 hover:bg-amber-100/90 dark:bg-amber-950/20 dark:hover:bg-amber-900/30 text-amber-900 dark:text-amber-200 border-amber-100 dark:border-amber-900/30';
+            case 'checked_out':
+                return 'bg-emerald-50/70 hover:bg-emerald-100/90 dark:bg-emerald-950/20 dark:hover:bg-emerald-900/30 text-emerald-900 dark:text-emerald-200 border-emerald-100 dark:border-emerald-900/30';
+            case 'damaged':
+                return 'bg-rose-50/70 hover:bg-rose-100/90 dark:bg-rose-950/20 dark:hover:bg-rose-900/30 text-rose-900 dark:text-rose-200 border-rose-100 dark:border-rose-900/30';
+            default:
+                return 'hover:bg-slate-50/50 dark:hover:bg-slate-800/10 text-slate-700 dark:text-slate-200';
         }
     }
 
@@ -567,8 +626,19 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                 <FileText size={18} /> Bulk Import CSV
                             </button>
                             <button
-                                onClick={() => {
+                                onClick={async () => {
+                                    if (rooms.length === 0) {
+                                        await showConfirm({
+                                            title: "Classroom Pre-requisite Required",
+                                            message: "No classrooms/rooms have been registered in the system. You must upload or create classrooms/rooms first in the Data Management/Classrooms tab before registering campus assets.",
+                                            confirmText: "Understand",
+                                            cancelText: "Cancel",
+                                            isDanger: false
+                                        });
+                                        return;
+                                    }
                                     generateTagNumber()
+                                    setNewAsset(prev => ({ ...prev, location: rooms[0]?.room_code || 'General' }))
                                     setShowAddModal(true)
                                 }}
                                 className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/10 flex items-center gap-2"
@@ -661,6 +731,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                         <option value="checked_out">Checked Out</option>
                                         <option value="maintenance">Maintenance</option>
                                         <option value="disposed">Disposed</option>
+                                        <option value="damaged">Damaged</option>
                                     </select>
                                 </div>
                             </div>
@@ -687,7 +758,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                                                 {assets.map((a) => (
-                                                    <tr key={a.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 cursor-pointer" onClick={() => handleViewDetails(a)}>
+                                                    <tr key={a.id} className={`${getRowBgColor(a.status)} cursor-pointer transition-all border-b border-slate-100 dark:border-slate-700`} onClick={() => handleViewDetails(a)}>
                                                         <td className="p-4 font-mono font-bold text-blue-600 dark:text-blue-400 text-sm">
                                                             <div className="flex items-center gap-1">
                                                                 <Tag size={14} />
@@ -1191,11 +1262,13 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                         .filter(a => !reportLocation || a.location === reportLocation)
                                         .filter(a => !reportStatus || a.status === reportStatus);
                                     
-                                    let csv = "Barcode Tag,Asset Name,Category,Location,Cost,Status,Custodian/Borrower,Date Handed Over\n";
-                                    filtered.forEach(a => {
-                                        csv += `"${a.tag_number}","${a.name}","${a.category}","${a.location}",${a.cost},"${a.status}","${a.handover_name || a.assigned_to_name || 'Central Inventory'}","${a.handover_date || ''}"\n`;
+                                    let csv = "S.No.,Barcode Tag,Asset Name,Category,Location,Department,Serial Number,Purchase Date,Cost,Status,Custodian/Borrower,Date Handed Over,Quantity,Notes\n";
+                                    filtered.forEach((a, idx) => {
+                                        const custodian = a.handover_name || a.assigned_to_name || 'Central Inventory';
+                                        const cleanNotes = (a.notes || '').replace(/"/g, '""');
+                                        csv += `"${idx + 1}","${a.tag_number}","${a.name}","${a.category}","${a.location}","${a.department || ''}","${a.serial_number || ''}","${a.purchase_date || ''}",${a.cost},"${a.status}","${custodian}","${a.handover_date || ''}",1,"${cleanNotes}"\n`;
                                     });
-                                    const blob = new Blob([csv], { type: 'text/csv' });
+                                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                                     const url = window.URL.createObjectURL(blob);
                                     const link = document.createElement('a');
                                     link.href = url;
@@ -1346,6 +1419,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                 <option value="checked_out">Checked Out</option>
                                 <option value="maintenance">Maintenance</option>
                                 <option value="disposed">Disposed</option>
+                                <option value="damaged">Damaged</option>
                             </select>
                         </div>
                     </div>
@@ -1549,12 +1623,15 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Location / Room</label>
-                                    <input
+                                    <select
                                         className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
-                                        placeholder="e.g. LAB1 or LH2"
                                         value={newAsset.location}
                                         onChange={e => setNewAsset({ ...newAsset, location: e.target.value })}
-                                    />
+                                    >
+                                        {rooms.map(r => (
+                                            <option key={r.id} value={r.room_code}>{r.room_code} - {r.room_name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 
@@ -1653,11 +1730,18 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Location / Room</label>
-                                    <input
+                                    <select
                                         className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
                                         value={showEditModal.location}
                                         onChange={e => setShowEditModal({ ...showEditModal, location: e.target.value })}
-                                    />
+                                    >
+                                        {rooms.map(r => (
+                                            <option key={r.id} value={r.room_code}>{r.room_code} - {r.room_name}</option>
+                                        ))}
+                                        {!rooms.some(r => r.room_code === showEditModal.location) && (
+                                            <option value={showEditModal.location}>{showEditModal.location} (Not in list)</option>
+                                        )}
+                                    </select>
                                 </div>
                             </div>
 
@@ -1691,6 +1775,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                         <option value="checked_out">Checked Out</option>
                                         <option value="maintenance">Maintenance</option>
                                         <option value="disposed">Disposed</option>
+                                        <option value="damaged">Damaged</option>
                                     </select>
                                 </div>
                             </div>
@@ -2020,13 +2105,13 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                         <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-800/40 text-xs mb-6 space-y-2">
                             <p className="font-bold text-blue-600 dark:text-blue-400">Step 1: Download CSV Template</p>
                             <p className="text-[var(--text-secondary)]">Populate the template using any spreadsheet editor (Excel, Google Sheets). Use the correct column formats. Barcode tags (e.g. <b>RU01171</b>) must be unique.</p>
-                            <a 
-                                href="/api/assets/template/csv" 
-                                download 
+                            <button 
+                                type="button"
+                                onClick={handleDownloadTemplate} 
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors mt-2"
                             >
                                 <FileText size={14} /> Download Template
-                            </a>
+                            </button>
                         </div>
 
                         <form onSubmit={handleCsvUpload} className="space-y-4">
