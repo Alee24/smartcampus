@@ -22,7 +22,6 @@ L.Icon.Default.mergeOptions({
     iconUrl: markerIcon,
     shadowUrl: markerShadow,
 });
-
 const vehicleIcon = new L.Icon({
     iconUrl: 'https://cdn-icons-png.flaticon.com/512/3202/3202926.png',
     iconSize: [32, 32],
@@ -30,6 +29,27 @@ const vehicleIcon = new L.Icon({
     popupAnchor: [0, -32]
 });
 
+const busIcon = new L.Icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/3448/3448339.png',
+    iconSize: [38, 38],
+    iconAnchor: [19, 38],
+    popupAnchor: [0, -38]
+});
+
+const vanIcon = new L.Icon({
+    iconUrl: 'https://cdn-icons-png.flaticon.com/512/744/744465.png',
+    iconSize: [38, 38],
+    iconAnchor: [19, 38],
+    popupAnchor: [0, -38]
+});
+
+const getVehicleIcon = (type?: string) => {
+    if (!type) return vehicleIcon;
+    const t = type.toLowerCase();
+    if (t.includes('bus') || t === 'shuttle') return busIcon;
+    if (t.includes('van') || t === 'matatu' || t === 'hiace') return vanIcon;
+    return vehicleIcon;
+};
 interface FleetManagementProps {
     initialTab?: string;
 }
@@ -466,16 +486,15 @@ function FleetManagementContent({ initialTab = 'dashboard' }: FleetManagementPro
                     })}
                 </div>
             </div>
-
             {/* Live Map */}
             <div className="flex-1 relative">
-                <MapContainer center={[-1.286389, 36.817223]} zoom={13} style={{ height: '100%', width: '100%' }}>
+                <MapContainer center={[-2.6, 38.0]} zoom={7} style={{ height: '100%', width: '100%' }}>
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                     {locations.map((loc, i) => (
                         <Marker 
                             key={i} 
                             position={[loc.latitude, loc.longitude]} 
-                            icon={vehicleIcon}
+                            icon={getVehicleIcon(loc.vehicle_type)}
                         >
                             <Popup>
                                 <div className="p-2">

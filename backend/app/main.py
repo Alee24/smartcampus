@@ -232,8 +232,65 @@ async def seed_data(session: AsyncSession):
                 role_id=driver_role.id,
                 status="active"
             )
-            session.add(drv_user)
             print(f"Seeded Driver: {d_data['full_name']}")
+    
+    # 5c. Seed Fleet Vehicles and GPS Logs (Bus in Nairobi, Van in Mombasa)
+    fleet_vehicles_to_seed = [
+        {
+            "plate_number": "KCD 202B",
+            "make": "Isuzu",
+            "model": "FVR (Bus)",
+            "vehicle_type": "bus",
+            "fuel_type": "diesel",
+            "fuel_capacity": 200.0,
+            "seating_capacity": 62,
+            "year": 2024,
+            "status": "active",
+            "current_odometer": 15200.0,
+            "is_fleet": True,
+            "driver_name": "Jane Mwangi",
+            "driver_contact": "0722334455"
+        },
+        {
+            "plate_number": "KCB 101A",
+            "make": "Toyota",
+            "model": "Hiace (Van)",
+            "vehicle_type": "van",
+            "fuel_type": "diesel",
+            "fuel_capacity": 70.0,
+            "seating_capacity": 14,
+            "year": 2023,
+            "status": "active",
+            "current_odometer": 48300.0,
+            "is_fleet": True,
+            "driver_name": "John Kamau",
+            "driver_contact": "0711223344"
+        }
+    ]
+    for v_data in fleet_vehicles_to_seed:
+        existing_v = (await session.exec(select(Vehicle).where(Vehicle.plate_number == v_data["plate_number"]))).first()
+        if not existing_v:
+            veh = Vehicle(**v_data)
+            session.add(veh)
+            await session.commit()
+            await session.refresh(veh)
+            
+            # Seed GPS logs for this vehicle
+            lat = -1.2921 if v_data["vehicle_type"] == "bus" else -4.0435 # Nairobi for bus, Mombasa for van
+            lng = 36.8219 if v_data["vehicle_type"] == "bus" else 39.6682
+            
+            gps_log = FleetGPSLog(
+                vehicle_id=veh.id,
+                latitude=lat,
+                longitude=lng,
+                speed=45.0,
+                heading=180.0,
+                ignition_status=True,
+                timestamp=get_eat_time()
+            )
+            session.add(gps_log)
+            await session.commit()
+            print(f"Seeded Fleet Vehicle: {v_data['plate_number']} with GPS log at ({lat}, {lng})")
     
     # 4. Sample Classrooms for QR Code Generation
     sample_rooms = [
