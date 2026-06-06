@@ -72,6 +72,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
     const [categoryFilter, setCategoryFilter] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
+    const [currentPage, setCurrentPage] = useState(1)
     
     // Handovers and Reports states
     const [handoverSearch, setHandoverSearch] = useState('')
@@ -233,6 +234,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
     }
 
     useEffect(() => {
+        setCurrentPage(1)
         fetchAssets()
     }, [categoryFilter, statusFilter, searchQuery])
 
@@ -241,6 +243,31 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
             fetchAllLogs()
         }
     }, [activeTab, assets])
+
+    const itemsPerPage = 10
+    const totalPages = Math.max(1, Math.ceil(assets.length / itemsPerPage))
+    const safeCurrentPage = Math.min(currentPage, totalPages)
+    const indexOfLastItem = safeCurrentPage * itemsPerPage
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage
+    const currentItems = assets.slice(indexOfFirstItem, indexOfLastItem)
+
+    const getPageNumbers = () => {
+        const pages: (number | string)[] = []
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) {
+                pages.push(i)
+            }
+        } else {
+            if (safeCurrentPage <= 4) {
+                pages.push(1, 2, 3, 4, 5, '...', totalPages)
+            } else if (safeCurrentPage >= totalPages - 3) {
+                pages.push(1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages)
+            } else {
+                pages.push(1, '...', safeCurrentPage - 1, safeCurrentPage, safeCurrentPage + 1, '...', totalPages)
+            }
+        }
+        return pages
+    }
 
     const [rooms, setRooms] = useState<any[]>([])
 
@@ -740,7 +767,8 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                 ) : assets.length === 0 ? (
                                     <div className="text-center py-20 text-slate-400 font-bold">No assets registered matching criteria.</div>
                                 ) : (
-                                    <div className="overflow-x-auto">
+                                    <>
+                                        <div className="overflow-x-auto">
                                         <table className="w-full text-left border-collapse">
                                             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 font-black text-xs uppercase tracking-wider">
                                                 <tr>
@@ -754,7 +782,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                                {assets.map((a) => (
+                                                {currentItems.map((a) => (
                                                     <tr key={a.id} className={`${getRowBgColor(a.status)} cursor-pointer transition-all border-b border-slate-100 dark:border-slate-700`} onClick={() => handleViewDetails(a)}>
                                                         <td className="p-4 font-mono font-bold text-blue-600 dark:text-blue-400 text-sm">
                                                             <div className="flex items-center gap-1">
@@ -851,7 +879,74 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                             </tbody>
                                         </table>
                                     </div>
-                                )}
+
+                                    {/* Pagination Footer */}
+                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/20">
+                                        <div className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+                                            Showing <span className="font-bold text-slate-700 dark:text-slate-200">{Math.min(indexOfFirstItem + 1, assets.length)}</span> to{' '}
+                                            <span className="font-bold text-slate-700 dark:text-slate-200">{Math.min(indexOfLastItem, assets.length)}</span> of{' '}
+                                            <span className="font-bold text-slate-700 dark:text-slate-200">{assets.length}</span> assets
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                disabled={safeCurrentPage === 1}
+                                                className={`px-3 py-2 text-sm font-semibold rounded-xl transition-all border ${
+                                                    safeCurrentPage === 1
+                                                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                                                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95'
+                                                }`}
+                                            >
+                                                Previous
+                                            </button>
+                                            
+                                            <div className="hidden md:flex items-center gap-1">
+                                                {getPageNumbers().map((p, idx) => {
+                                                    if (p === '...') {
+                                                        return (
+                                                            <span key={`dots-${idx}`} className="px-3 py-2 text-slate-400 dark:text-slate-500 font-bold select-none">
+                                                                ...
+                                                            </span>
+                                                        )
+                                                    }
+                                                    const isPageActive = safeCurrentPage === p
+                                                    return (
+                                                        <button
+                                                            key={`page-${p}`}
+                                                            onClick={() => setCurrentPage(Number(p))}
+                                                            className={`w-9 h-9 flex items-center justify-center text-sm font-bold rounded-xl transition-all border ${
+                                                                isPageActive
+                                                                    ? 'bg-blue-600 border-blue-600 text-white shadow shadow-blue-500/20'
+                                                                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95'
+                                                            }`}
+                                                        >
+                                                            {p}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                            
+                                            {/* Mobile current/total text */}
+                                            <span className="md:hidden text-sm font-semibold text-slate-500 dark:text-slate-400 px-2">
+                                                Page {safeCurrentPage} of {totalPages}
+                                            </span>
+
+                                            <button
+                                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                                disabled={safeCurrentPage === totalPages}
+                                                className={`px-3 py-2 text-sm font-semibold rounded-xl transition-all border ${
+                                                    safeCurrentPage === totalPages
+                                                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-300 dark:text-slate-600 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                                                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95'
+                                                }`}
+                                            >
+                                                Next
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                             </div>
                         </div>
                     )}
