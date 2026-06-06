@@ -813,6 +813,18 @@ function App() {
                             active={activeTab === 'assets'}
                             onClick={() => { setActiveTab('assets'); setSidebarOpen(false); }}
                         />
+                        <NavItem
+                            icon={<ClipboardList size={18} />}
+                            label="Asset Handovers"
+                            active={activeTab === 'asset-handovers'}
+                            onClick={() => { setActiveTab('asset-handovers'); setSidebarOpen(false); }}
+                        />
+                        <NavItem
+                            icon={<FileText size={18} />}
+                            label="Asset Reports"
+                            active={activeTab === 'asset-reports'}
+                            onClick={() => { setActiveTab('asset-reports'); setSidebarOpen(false); }}
+                        />
                     </SidebarGroup>
                 )}
             </>
@@ -1192,7 +1204,9 @@ function App() {
                     {activeTab === 'geofencing' && <Geofencing />}
                     {activeTab === 'id-printing' && <IDPrinting />}
                     {activeTab === 'qr-registry' && <QRRegistry />}
-                    {activeTab === 'assets' && <AssetManagement />}
+                    {activeTab === 'assets' && <AssetManagement initialView="assets" />}
+                    {activeTab === 'asset-handovers' && <AssetManagement initialView="handovers" />}
+                    {activeTab === 'asset-reports' && <AssetManagement initialView="reports" />}
                     <footer className="mt-10 pt-6 border-t border-[var(--border-color)] text-center text-sm text-[var(--text-secondary)]">
                         <p>&copy; {new Date().getFullYear()} Smart Campus System.</p>
                     </footer>

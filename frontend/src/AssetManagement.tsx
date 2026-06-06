@@ -3,10 +3,14 @@ import {
     Package, CheckCircle, AlertTriangle, ShieldAlert,
     Search, Plus, Trash2, Edit, Check, X, QrCode,
     RefreshCw, User, MapPin, Tag, DollarSign, Calendar,
-    FileText, ArrowUpRight, ArrowDownLeft, Wrench, Loader2
+    FileText, ArrowUpRight, ArrowDownLeft, Wrench, Loader2,
+    ClipboardList, UserCheck, Activity, BarChart3, FileSpreadsheet, Download, Printer
 } from 'lucide-react'
 import { useNotification } from './components/Notification'
 import { QRCodeCanvas } from 'qrcode.react'
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
+} from 'recharts'
 
 interface Asset {
     id: string
@@ -47,9 +51,14 @@ interface AssetLog {
     handover_date?: string
 }
 
-export default function AssetManagement() {
+export default function AssetManagement({ initialView = 'assets' }: { initialView?: 'assets' | 'handovers' | 'reports' }) {
     const { showConfirm, showNotification } = useNotification()
     const [assets, setAssets] = useState<Asset[]>([])
+    const [currentView, setCurrentView] = useState<'assets' | 'handovers' | 'reports'>(initialView)
+
+    useEffect(() => {
+        setCurrentView(initialView)
+    }, [initialView])
     const [stats, setStats] = useState({
         total: 0,
         available: 0,
@@ -63,6 +72,76 @@ export default function AssetManagement() {
     const [categoryFilter, setCategoryFilter] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
+    
+    // Handovers and Reports states
+    const [handoverSearch, setHandoverSearch] = useState('')
+    const [handoverDept, setHandoverDept] = useState('')
+    const [handoverNewSearch, setHandoverNewSearch] = useState('')
+    const [reportCategory, setReportCategory] = useState('')
+    const [reportLocation, setReportLocation] = useState('')
+    const [reportStatus, setReportStatus] = useState('')
+    const [selectedAssetId, setSelectedAssetId] = useState('')
+    const [handoverForm, setHandoverForm] = useState({
+        name: '',
+        email: '',
+        phone: '',
+        no: '',
+        department: '',
+        date: new Date().toISOString().split('T')[0],
+        notes: ''
+    })
+
+    const handleDedicatedHandoverSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!selectedAssetId) {
+            showNotification("Please select an asset to handover.", "error")
+            return
+        }
+        if (!handoverForm.name) {
+            showNotification("Recipient name is required.", "error")
+            return
+        }
+        try {
+            const token = localStorage.getItem('token')
+            const payload = {
+                borrower_identifier: null,
+                handover_name: handoverForm.name,
+                handover_email: handoverForm.email || null,
+                handover_phone: handoverForm.phone || null,
+                handover_no: handoverForm.no || null,
+                handover_department: handoverForm.department || null,
+                handover_date: handoverForm.date || null,
+                notes: handoverForm.notes
+            }
+            const res = await fetch(`/api/assets/${selectedAssetId}/checkout`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            })
+            if (res.ok) {
+                setHandoverForm({
+                    name: '',
+                    email: '',
+                    phone: '',
+                    no: '',
+                    department: '',
+                    date: new Date().toISOString().split('T')[0],
+                    notes: ''
+                })
+                setSelectedAssetId('')
+                fetchAssets()
+                showNotification("Asset handed over successfully!", "success")
+            } else {
+                const data = await res.json()
+                showNotification(data.detail || "Handover checkout failed.", "error")
+            }
+        } catch (e) {
+            showNotification("Network error occurred during handover checkout.", "error")
+        }
+    }
     
     // Modal states
     const [showAddModal, setShowAddModal] = useState(false)
@@ -461,117 +540,797 @@ export default function AssetManagement() {
 
     return (
         <div className="animate-fade-in p-2 md:p-6 space-y-6">
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 flex items-center gap-2">
-                        <Package size={32} className="text-blue-600" />
-                        Asset Barcode Tracking & Inventory
-                    </h1>
-                    <p className="text-[var(--text-secondary)] mt-1">Register, monitor, check-out, and audit physical campus assets using barcode tags</p>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={fetchAssets} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shadow-sm">
-                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                    <button
-                        onClick={() => {
-                            setUploadResults(null);
-                            setCsvFile(null);
-                            setShowUploadModal(true);
-                        }}
-                        className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm"
-                    >
-                        <FileText size={18} /> Bulk Import CSV
-                    </button>
-                    <button
-                        onClick={() => {
-                            generateTagNumber()
-                            setShowAddModal(true)
-                        }}
-                        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/10 flex items-center gap-2"
-                    >
-                        <Plus size={18} /> Register Asset
-                    </button>
-                </div>
-            </header>
-
-            {/* KPI Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="glass-card p-5 border-l-4 border-blue-500">
-                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Total Assets</p>
-                    <div className="text-3xl font-black mt-2 text-slate-800 dark:text-white">{stats.total}</div>
-                </div>
-                <div className="glass-card p-5 border-l-4 border-green-500">
-                    <p className="text-xs font-black text-green-600/70 uppercase tracking-widest">Available</p>
-                    <div className="text-3xl font-black mt-2 text-green-700 dark:text-green-400">{stats.available}</div>
-                </div>
-                <div className="glass-card p-5 border-l-4 border-indigo-500">
-                    <p className="text-xs font-black text-indigo-600/70 uppercase tracking-widest">Checked Out</p>
-                    <div className="text-3xl font-black mt-2 text-indigo-700 dark:text-indigo-400">{stats.checked_out}</div>
-                </div>
-                <div className="glass-card p-5 border-l-4 border-yellow-500">
-                    <p className="text-xs font-black text-yellow-600/70 uppercase tracking-widest">Maintenance</p>
-                    <div className="text-3xl font-black mt-2 text-yellow-700 dark:text-yellow-400">{stats.maintenance}</div>
-                </div>
-            </div>
-
-            {/* Navigation Switcher */}
-            <div className="flex bg-white dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 w-fit">
-                <button
-                    onClick={() => setActiveTab('list')}
-                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'list' ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
-                >
-                    Asset Inventory
-                </button>
-                <button
-                    onClick={() => setActiveTab('scanner')}
-                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'scanner' ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
-                >
-                    Barcode Desk Scanner
-                </button>
-                <button
-                    onClick={() => setActiveTab('logs')}
-                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'logs' ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
-                >
-                    Transaction Log History
-                </button>
-            </div>
-
-            {/* Tab: Inventory List */}
-            {activeTab === 'list' && (
-                <div className="space-y-6">
-                    {/* Filters Bar */}
-                    <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                        <div className="relative flex-1 max-w-md">
-                            <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
-                                <Search size={18} />
-                            </span>
-                            <input
-                                type="text"
-                                placeholder="Search by name, tag barcode, location..."
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm"
-                            />
+            {currentView === 'assets' && (
+                <>
+                    <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 flex items-center gap-2">
+                                <Package size={32} className="text-blue-600" />
+                                Asset Barcode Tracking & Inventory
+                            </h1>
+                            <p className="text-[var(--text-secondary)] mt-1">Register, monitor, check-out, and audit physical campus assets using barcode tags</p>
                         </div>
-                        
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex gap-2">
+                            <button onClick={fetchAssets} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shadow-sm">
+                                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setUploadResults(null);
+                                    setCsvFile(null);
+                                    setShowUploadModal(true);
+                                }}
+                                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm"
+                            >
+                                <FileText size={18} /> Bulk Import CSV
+                            </button>
+                            <button
+                                onClick={() => {
+                                    generateTagNumber()
+                                    setShowAddModal(true)
+                                }}
+                                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/10 flex items-center gap-2"
+                            >
+                                <Plus size={18} /> Register Asset
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* KPI Stats Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="glass-card p-5 border-l-4 border-blue-500">
+                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Total Assets</p>
+                            <div className="text-3xl font-black mt-2 text-slate-800 dark:text-white">{stats.total}</div>
+                        </div>
+                        <div className="glass-card p-5 border-l-4 border-green-500">
+                            <p className="text-xs font-black text-green-600/70 uppercase tracking-widest">Available</p>
+                            <div className="text-3xl font-black mt-2 text-green-700 dark:text-green-400">{stats.available}</div>
+                        </div>
+                        <div className="glass-card p-5 border-l-4 border-indigo-500">
+                            <p className="text-xs font-black text-indigo-600/70 uppercase tracking-widest">Checked Out</p>
+                            <div className="text-3xl font-black mt-2 text-indigo-700 dark:text-indigo-400">{stats.checked_out}</div>
+                        </div>
+                        <div className="glass-card p-5 border-l-4 border-yellow-500">
+                            <p className="text-xs font-black text-yellow-600/70 uppercase tracking-widest">Maintenance</p>
+                            <div className="text-3xl font-black mt-2 text-yellow-700 dark:text-yellow-400">{stats.maintenance}</div>
+                        </div>
+                    </div>
+
+                    {/* Navigation Switcher */}
+                    <div className="flex bg-white dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 w-fit">
+                        <button
+                            onClick={() => setActiveTab('list')}
+                            className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'list' ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                        >
+                            Asset Inventory
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('scanner')}
+                            className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'scanner' ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                        >
+                            Barcode Desk Scanner
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('logs')}
+                            className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'logs' ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
+                        >
+                            Transaction Log History
+                        </button>
+                    </div>
+
+                    {/* Tab: Inventory List */}
+                    {activeTab === 'list' && (
+                        <div className="space-y-6">
+                            {/* Filters Bar */}
+                            <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                <div className="relative flex-1 max-w-md">
+                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                                        <Search size={18} />
+                                    </span>
+                                    <input
+                                        type="text"
+                                        placeholder="Search by name, tag barcode, location..."
+                                        value={searchQuery}
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm"
+                                    />
+                                </div>
+                                
+                                <div className="flex flex-wrap gap-2">
+                                    <select
+                                        value={categoryFilter}
+                                        onChange={e => setCategoryFilter(e.target.value)}
+                                        className="p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                    >
+                                        <option value="">All Categories</option>
+                                        <option value="electronics">Electronics</option>
+                                        <option value="furniture">Furniture</option>
+                                        <option value="lab_equipment">Lab Equipment</option>
+                                        <option value="sports_equipment">Sports Equipment</option>
+                                    </select>
+
+                                    <select
+                                        value={statusFilter}
+                                        onChange={e => setStatusFilter(e.target.value)}
+                                        className="p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                    >
+                                        <option value="">All Statuses</option>
+                                        <option value="available">Available</option>
+                                        <option value="checked_out">Checked Out</option>
+                                        <option value="maintenance">Maintenance</option>
+                                        <option value="disposed">Disposed</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Table */}
+                            <div className="glass-card overflow-hidden border border-slate-200 dark:border-slate-700">
+                                {loading && assets.length === 0 ? (
+                                    <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Syncing Asset Registry...</div>
+                                ) : assets.length === 0 ? (
+                                    <div className="text-center py-20 text-slate-400 font-bold">No assets registered matching criteria.</div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 font-black text-xs uppercase tracking-wider">
+                                                <tr>
+                                                    <th className="p-4 border-b border-slate-100 dark:border-slate-700">Barcode Tag</th>
+                                                    <th className="p-4 border-b border-slate-100 dark:border-slate-700">Asset Name</th>
+                                                    <th className="p-4 border-b border-slate-100 dark:border-slate-700">Category</th>
+                                                    <th className="p-4 border-b border-slate-100 dark:border-slate-700">Location</th>
+                                                    <th className="p-4 border-b border-slate-100 dark:border-slate-700">Custodian / Borrower</th>
+                                                    <th className="p-4 border-b border-slate-100 dark:border-slate-700">Status</th>
+                                                    <th className="p-4 border-b border-slate-100 dark:border-slate-700 text-right">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                                {assets.map((a) => (
+                                                    <tr key={a.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 cursor-pointer" onClick={() => handleViewDetails(a)}>
+                                                        <td className="p-4 font-mono font-bold text-blue-600 dark:text-blue-400 text-sm">
+                                                            <div className="flex items-center gap-1">
+                                                                <Tag size={14} />
+                                                                {a.tag_number}
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-4 font-bold text-slate-800 dark:text-white">{a.name}</td>
+                                                        <td className="p-4">
+                                                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold capitalize border ${getCategoryBadgeColor(a.category)}`}>
+                                                                {a.category.replace('_', ' ')}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-4 text-xs font-bold text-slate-600 dark:text-slate-300">
+                                                            <div className="flex items-center gap-1">
+                                                                <MapPin size={12} className="text-slate-400" />
+                                                                {a.location}
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-4 text-sm font-semibold">
+                                                            {a.handover_name ? (
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-slate-800 dark:text-slate-100 font-bold">{a.handover_name}</span>
+                                                                    <span className="text-[10px] font-mono text-slate-400">
+                                                                        {a.handover_no || a.handover_email || 'Manual Recipient'}
+                                                                    </span>
+                                                                </div>
+                                                            ) : a.assigned_to_name ? (
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-slate-800 dark:text-slate-100 font-bold">{a.assigned_to_name}</span>
+                                                                    <span className="text-[10px] font-mono text-slate-400">{a.assigned_to_identifier}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-slate-400 italic">Central Inventory</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-4">
+                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${getStatusBadgeColor(a.status)}`}>
+                                                                {a.status.replace('_', ' ')}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-4 text-right flex justify-end gap-2" onClick={e => e.stopPropagation()}>
+                                                            {a.status === 'available' && (
+                                                                <button
+                                                                    onClick={() => setShowCheckoutModal(a)}
+                                                                    className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
+                                                                    title="Check Out"
+                                                                >
+                                                                    <ArrowUpRight size={16} />
+                                                                </button>
+                                                            )}
+                                                            {a.status === 'checked_out' && (
+                                                                <button
+                                                                    onClick={() => setShowCheckinModal(a)}
+                                                                    className="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors"
+                                                                    title="Check In / Return"
+                                                                >
+                                                                    <ArrowDownLeft size={16} />
+                                                                </button>
+                                                            )}
+                                                            {a.status === 'available' && (
+                                                                <button
+                                                                    onClick={() => setShowMaintenanceModal(a)}
+                                                                    className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100 transition-colors"
+                                                                    title="Send to Maintenance"
+                                                                >
+                                                                    <Wrench size={16} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => setShowEditModal(a)}
+                                                                className="p-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-700/50 rounded transition-colors text-slate-600 dark:text-slate-300"
+                                                                title="Modify"
+                                                            >
+                                                                <Edit size={16} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteAsset(a.id, a.name)}
+                                                                className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Tab: Barcode Desk Scanner */}
+                    {activeTab === 'scanner' && (
+                        <div className="max-w-3xl mx-auto space-y-6">
+                            <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-md text-center">
+                                <div className="w-16 h-16 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <QrCode size={32} />
+                                </div>
+                                <h2 className="text-xl font-bold mb-2 text-slate-800 dark:text-white">Desk Barcode Reader Desk</h2>
+                                <p className="text-[var(--text-secondary)] text-sm mb-6 max-w-md mx-auto">Scan or enter the unique Asset barcode tag to quickly view details, check-out, check-in, or flag assets.</p>
+                                
+                                <form onSubmit={handleBarcodeScan} className="flex gap-2 max-w-lg mx-auto">
+                                    <input
+                                        type="text"
+                                        placeholder="Scan Barcode / Enter tag (e.g. AST-000123)"
+                                        className="flex-1 p-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        value={scanBarcode}
+                                        onChange={e => setScanBarcode(e.target.value)}
+                                        required
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={scanning}
+                                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold flex items-center gap-2"
+                                    >
+                                        {scanning ? <Loader2 className="animate-spin" size={16} /> : "Query Tag"}
+                                    </button>
+                                </form>
+
+                                <div className="mt-4 flex justify-center gap-2">
+                                    <button 
+                                        type="button"
+                                        onClick={() => { setScanBarcode('AST-100201'); setTimeout(() => handleBarcodeScan(), 100); }}
+                                        className="px-3 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 rounded-full text-xs font-bold text-slate-600 dark:text-slate-300"
+                                    >
+                                        Simulated Scan: AST-100201
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Scanned Asset Panel */}
+                            {scannedAsset && (
+                                <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-lg animate-scale-in">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div>
+                                            <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 rounded text-xs font-mono font-bold tracking-wider">
+                                                {scannedAsset.tag_number}
+                                            </span>
+                                            <h3 className="text-xl font-bold text-slate-800 dark:text-white mt-1">{scannedAsset.name}</h3>
+                                        </div>
+                                        <span className={`px-2.5 py-0.5 rounded text-xs font-black uppercase tracking-wider ${getStatusBadgeColor(scannedAsset.status)}`}>
+                                            {scannedAsset.status}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100 dark:border-slate-700">
+                                        <div>
+                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Category</p>
+                                            <p className="text-sm font-semibold capitalize mt-1 text-slate-700 dark:text-slate-300">{scannedAsset.category}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Location</p>
+                                            <p className="text-sm font-semibold mt-1 text-slate-700 dark:text-slate-300">{scannedAsset.location}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Custodian</p>
+                                            <p className="text-sm font-semibold mt-1 text-slate-700 dark:text-slate-300">{scannedAsset.assigned_to_name || "Central Inventory"}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-8 flex gap-3">
+                                        {scannedAsset.status === 'available' && (
+                                            <button
+                                                onClick={() => setShowCheckoutModal(scannedAsset)}
+                                                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2"
+                                            >
+                                                <ArrowUpRight size={18} /> Check Out Asset
+                                            </button>
+                                        )}
+                                        {scannedAsset.status === 'checked_out' && (
+                                            <button
+                                                onClick={() => setShowCheckinModal(scannedAsset)}
+                                                className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2"
+                                            >
+                                                <ArrowDownLeft size={18} /> Check In / Return
+                                            </button>
+                                        )}
+                                        {scannedAsset.status === 'available' && (
+                                            <button
+                                                onClick={() => setShowMaintenanceModal(scannedAsset)}
+                                                className="flex-1 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-bold flex items-center justify-center gap-2"
+                                            >
+                                                <Wrench size={18} /> Send to repairs
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Tab: General Logs */}
+                    {activeTab === 'logs' && (
+                        <div className="space-y-6">
+                            <div className="glass-card p-6">
+                                <h3 className="font-bold text-lg mb-4">Central Assets Transaction Log</h3>
+                                <div className="space-y-4">
+                                    {allLogs.length === 0 ? (
+                                        <p className="text-slate-400 text-center py-12">No transactions recorded yet.</p>
+                                    ) : (
+                                        allLogs.map((l) => (
+                                            <div key={l.id} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                                                <div className="flex items-center gap-4">
+                                                    <span className={`w-3 h-3 rounded-full ${
+                                                        l.action === 'check_out' ? 'bg-indigo-500' :
+                                                        l.action === 'check_in' ? 'bg-green-500' : 'bg-yellow-500'
+                                                    }`} />
+                                                    <div>
+                                                        <p className="text-sm font-bold capitalize text-slate-800 dark:text-white">
+                                                            {l.action.replace('_', ' ')}
+                                                        </p>
+                                                        {l.borrower_name && (
+                                                            <p className="text-xs text-slate-500">Borrower: {l.borrower_name}</p>
+                                                        )}
+                                                        <p className="text-[10px] text-slate-400 font-semibold">{l.notes}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] text-slate-400 font-mono">{new Date(l.timestamp).toLocaleString()}</p>
+                                                    <p className="text-[9px] text-slate-400 uppercase font-black tracking-wider mt-1">By: {l.handled_by_name}</p>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* View: Handovers */}
+            {currentView === 'handovers' && (
+                <div className="space-y-6">
+                    <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 flex items-center gap-2">
+                                <ClipboardList size={32} className="text-blue-600" />
+                                Asset Handovers & Allocations
+                            </h1>
+                            <p className="text-[var(--text-secondary)] mt-1">Assign university equipment to students or staff, and monitor active allocations</p>
+                        </div>
+                        <button onClick={fetchAssets} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shadow-sm">
+                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                        </button>
+                    </header>
+
+                    {/* Handover KPIs */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="glass-card p-5 border-l-4 border-indigo-500">
+                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Active Handovers</p>
+                            <div className="text-3xl font-black mt-2 text-slate-800 dark:text-white">
+                                {assets.filter(a => a.status === 'checked_out').length}
+                            </div>
+                        </div>
+                        <div className="glass-card p-5 border-l-4 border-blue-500">
+                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Unique Custodians</p>
+                            <div className="text-3xl font-black mt-2 text-slate-800 dark:text-white">
+                                {new Set(assets.filter(a => a.status === 'checked_out').map(a => a.handover_name)).size}
+                            </div>
+                        </div>
+                        <div className="glass-card p-5 border-l-4 border-teal-500">
+                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Available Items</p>
+                            <div className="text-3xl font-black mt-2 text-teal-700 dark:text-teal-400">
+                                {assets.filter(a => a.status === 'available').length}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Allocation Form */}
+                        <div className="lg:col-span-1 bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm h-fit">
+                            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-white">
+                                <UserCheck size={20} className="text-blue-500" />
+                                Handover New Asset
+                            </h2>
+                            <form onSubmit={handleDedicatedHandoverSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Select Available Asset *</label>
+                                    <select
+                                        required
+                                        value={selectedAssetId}
+                                        onChange={e => setSelectedAssetId(e.target.value)}
+                                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                    >
+                                        <option value="">-- Choose available asset --</option>
+                                        {assets.filter(a => a.status === 'available').map(a => (
+                                            <option key={a.id} value={a.id}>
+                                                {a.tag_number} - {a.name} ({a.location})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Recipient Name *</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="Full Name"
+                                        value={handoverForm.name}
+                                        onChange={e => setHandoverForm({ ...handoverForm, name: e.target.value })}
+                                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Email Address</label>
+                                    <input
+                                        type="email"
+                                        placeholder="email@example.com"
+                                        value={handoverForm.email}
+                                        onChange={e => setHandoverForm({ ...handoverForm, email: e.target.value })}
+                                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Phone</label>
+                                        <input
+                                            type="text"
+                                            placeholder="+2547..."
+                                            value={handoverForm.phone}
+                                            onChange={e => setHandoverForm({ ...handoverForm, phone: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Staff / Student No</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. RU01171"
+                                            value={handoverForm.no}
+                                            onChange={e => setHandoverForm({ ...handoverForm, no: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Department</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. IT"
+                                            value={handoverForm.department}
+                                            onChange={e => setHandoverForm({ ...handoverForm, department: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Date</label>
+                                        <input
+                                            type="date"
+                                            value={handoverForm.date}
+                                            onChange={e => setHandoverForm({ ...handoverForm, date: e.target.value })}
+                                            className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Notes</label>
+                                    <textarea
+                                        placeholder="Reason for checkout..."
+                                        value={handoverForm.notes}
+                                        onChange={e => setHandoverForm({ ...handoverForm, notes: e.target.value })}
+                                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs h-20"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-md flex items-center justify-center gap-2"
+                                >
+                                    <UserCheck size={18} /> Approve Handover Allocation
+                                </button>
+                            </form>
+                        </div>
+
+                        {/* Handover List */}
+                        <div className="lg:col-span-2 space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-3 bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                <div className="relative flex-1">
+                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 pointer-events-none">
+                                        <Search size={16} />
+                                    </span>
+                                    <input
+                                        type="text"
+                                        placeholder="Search allocations..."
+                                        value={handoverSearch}
+                                        onChange={e => setHandoverSearch(e.target.value)}
+                                        className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                    />
+                                </div>
+                                <select
+                                    value={handoverDept}
+                                    onChange={e => setHandoverDept(e.target.value)}
+                                    className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                >
+                                    <option value="">All Departments</option>
+                                    {Array.from(new Set(assets.filter(a => a.handover_department).map(a => a.handover_department))).map(dept => (
+                                        <option key={dept} value={dept}>{dept}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="glass-card overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 font-black text-xs uppercase tracking-wider">
+                                            <tr>
+                                                <th className="p-4 border-b border-slate-100 dark:border-slate-700">Barcode</th>
+                                                <th className="p-4 border-b border-slate-100 dark:border-slate-700">Asset</th>
+                                                <th className="p-4 border-b border-slate-100 dark:border-slate-700">Recipient</th>
+                                                <th className="p-4 border-b border-slate-100 dark:border-slate-700">Department</th>
+                                                <th className="p-4 border-b border-slate-100 dark:border-slate-700">Handover Date</th>
+                                                <th className="p-4 border-b border-slate-100 dark:border-slate-700 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                            {assets
+                                                .filter(a => a.status === 'checked_out')
+                                                .filter(a => {
+                                                    if (!handoverSearch) return true;
+                                                    const s = handoverSearch.toLowerCase();
+                                                    return (
+                                                        a.tag_number.toLowerCase().includes(s) ||
+                                                        a.name.toLowerCase().includes(s) ||
+                                                        (a.handover_name && a.handover_name.toLowerCase().includes(s)) ||
+                                                        (a.handover_no && a.handover_no.toLowerCase().includes(s))
+                                                    );
+                                                })
+                                                .filter(a => !handoverDept || a.handover_department === handoverDept)
+                                                .map(a => (
+                                                    <tr key={a.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 cursor-pointer" onClick={() => handleViewDetails(a)}>
+                                                        <td className="p-4 font-mono font-bold text-blue-600 dark:text-blue-400 text-sm">
+                                                            {a.tag_number}
+                                                        </td>
+                                                        <td className="p-4 font-bold text-slate-800 dark:text-white">{a.name}</td>
+                                                        <td className="p-4">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold text-slate-800 dark:text-white">{a.handover_name}</span>
+                                                                <span className="text-[10px] text-slate-400 font-mono">{a.handover_no || 'N/A'}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                                            {a.handover_department || 'General'}
+                                                        </td>
+                                                        <td className="p-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                                            {a.handover_date || 'N/A'}
+                                                        </td>
+                                                        <td className="p-4 text-right flex justify-end gap-2" onClick={e => e.stopPropagation()}>
+                                                            <button
+                                                                onClick={() => setShowCheckinModal(a)}
+                                                                className="px-3 py-1 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800/40 rounded-lg text-xs font-bold hover:bg-green-100 transition-all flex items-center gap-1"
+                                                                title="Return / Check In"
+                                                            >
+                                                                <ArrowDownLeft size={14} /> Return
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            {assets.filter(a => a.status === 'checked_out').length === 0 && (
+                                                <tr>
+                                                    <td colSpan={6} className="text-center py-12 text-slate-400 font-medium">
+                                                        No active checkout allocations found.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* View: Reports */}
+            {currentView === 'reports' && (
+                <div className="space-y-6">
+                    <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 flex items-center gap-2">
+                                <BarChart3 size={32} className="text-blue-600" />
+                                Asset Analytics & Reports
+                            </h1>
+                            <p className="text-[var(--text-secondary)] mt-1">Audit status, evaluate value distribution, and print/export inventory details</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => {
+                                    // Generate and download CSV Client-Side
+                                    const filtered = assets
+                                        .filter(a => !reportCategory || a.category === reportCategory)
+                                        .filter(a => !reportLocation || a.location === reportLocation)
+                                        .filter(a => !reportStatus || a.status === reportStatus);
+                                    
+                                    let csv = "Barcode Tag,Asset Name,Category,Location,Cost,Status,Custodian/Borrower,Date Handed Over\n";
+                                    filtered.forEach(a => {
+                                        csv += `"${a.tag_number}","${a.name}","${a.category}","${a.location}",${a.cost},"${a.status}","${a.handover_name || a.assigned_to_name || 'Central Inventory'}","${a.handover_date || ''}"\n`;
+                                    });
+                                    const blob = new Blob([csv], { type: 'text/csv' });
+                                    const url = window.URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.setAttribute('download', `campus_assets_report_${new Date().toISOString().split('T')[0]}.csv`);
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    showNotification("CSV report generated and downloaded!", "success");
+                                }}
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold flex items-center gap-2 shadow-sm text-sm"
+                            >
+                                <FileSpreadsheet size={16} /> Export CSV
+                            </button>
+                            <button
+                                onClick={() => {
+                                    // Compile high-fidelity print window layout
+                                    const filtered = assets
+                                        .filter(a => !reportCategory || a.category === reportCategory)
+                                        .filter(a => !reportLocation || a.location === reportLocation)
+                                        .filter(a => !reportStatus || a.status === reportStatus);
+                                    
+                                    const printWin = window.open("", "_blank");
+                                    if (!printWin) return;
+                                    
+                                    const rowsHtml = filtered.map(a => `
+                                        <tr>
+                                            <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-weight: bold;">${a.tag_number}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">${a.name}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd; text-transform: capitalize;">${a.category.replace('_', ' ')}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd;">${a.location}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">KES ${a.cost.toLocaleString()}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: 500;">${a.handover_name || 'Central Inventory'}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center; color: ${
+                                                a.status === 'available' ? '#16a34a' : a.status === 'checked_out' ? '#2563eb' : '#d97706'
+                                            }">${a.status}</td>
+                                        </tr>
+                                    `).join("");
+
+                                    const summaryTotalCost = filtered.reduce((acc, curr) => acc + curr.cost, 0);
+
+                                    printWin.document.write(`
+                                        <html>
+                                        <head>
+                                            <title>Campus Asset Report</title>
+                                            <style>
+                                                body { font-family: system-ui, -apple-system, sans-serif; color: #333; padding: 20px; }
+                                                .header { border-bottom: 3px double #000; padding-bottom: 20px; margin-bottom: 25px; text-align: center; }
+                                                .title { font-size: 26px; font-weight: 900; letter-spacing: -0.5px; text-transform: uppercase; }
+                                                .date { font-size: 12px; color: #666; margin-top: 5px; font-weight: 600; }
+                                                .metrics { display: flex; gap: 15px; margin-bottom: 25px; }
+                                                .card { flex: 1; border: 1px solid #ddd; border-radius: 8px; padding: 12px; text-align: center; background: #fafafa; }
+                                                .card p { margin: 0; font-size: 10px; font-weight: bold; text-transform: uppercase; color: #777; }
+                                                .card h2 { margin: 5px 0 0 0; font-size: 20px; font-weight: 900; color: #111; }
+                                                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                                                th { background: #f3f4f6; padding: 10px; border: 1px solid #ddd; text-align: left; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+                                            </style>
+                                        </head>
+                                        <body onload="window.print()">
+                                            <div class="header">
+                                                <div class="title">Smart Campus Asset Verification Audit</div>
+                                                <div class="date">Generated on: ${new Date().toLocaleString()}</div>
+                                            </div>
+                                            <div class="metrics">
+                                                <div class="card">
+                                                    <p>Total Items Matching</p>
+                                                    <h2>${filtered.length}</h2>
+                                                </div>
+                                                <div class="card">
+                                                    <p>Estimated Asset Cost</p>
+                                                    <h2>KES ${summaryTotalCost.toLocaleString()}</h2>
+                                                </div>
+                                                <div class="card">
+                                                    <p>Checked Out</p>
+                                                    <h2>${filtered.filter(a => a.status === 'checked_out').length}</h2>
+                                                </div>
+                                                <div class="card">
+                                                    <p>Under Maintenance</p>
+                                                    <h2>${filtered.filter(a => a.status === 'maintenance').length}</h2>
+                                                </div>
+                                            </div>
+                                            <table>
+                                                <thead>
+                                                    <tr>
+                                                        <th>Tag Barcode</th>
+                                                        <th>Name</th>
+                                                        <th>Category</th>
+                                                        <th>Location</th>
+                                                        <th>Purchase Cost</th>
+                                                        <th>Borrower / Custodian</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    ${rowsHtml}
+                                                </tbody>
+                                            </table>
+                                        </body>
+                                        </html>
+                                    `);
+                                    printWin.document.close();
+                                }}
+                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl font-bold flex items-center gap-2 shadow-sm text-sm"
+                            >
+                                <Printer size={16} /> Print Report
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Report Filters */}
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row gap-4">
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Filter Category</label>
                             <select
-                                value={categoryFilter}
-                                onChange={e => setCategoryFilter(e.target.value)}
-                                className="p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                value={reportCategory}
+                                onChange={e => setReportCategory(e.target.value)}
+                                className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
                             >
                                 <option value="">All Categories</option>
                                 <option value="electronics">Electronics</option>
                                 <option value="furniture">Furniture</option>
                                 <option value="lab_equipment">Lab Equipment</option>
                                 <option value="sports_equipment">Sports Equipment</option>
+                                <option value="general">General</option>
                             </select>
-
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Filter Location</label>
                             <select
-                                value={statusFilter}
-                                onChange={e => setStatusFilter(e.target.value)}
-                                className="p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                value={reportLocation}
+                                onChange={e => setReportLocation(e.target.value)}
+                                className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                            >
+                                <option value="">All Locations</option>
+                                {Array.from(new Set(assets.map(a => a.location))).map(loc => (
+                                    <option key={loc} value={loc}>{loc}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Filter Status</label>
+                            <select
+                                value={reportStatus}
+                                onChange={e => setReportStatus(e.target.value)}
+                                className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
                             >
                                 <option value="">All Statuses</option>
                                 <option value="available">Available</option>
@@ -582,257 +1341,146 @@ export default function AssetManagement() {
                         </div>
                     </div>
 
-                    {/* Table */}
-                    <div className="glass-card overflow-hidden border border-slate-200 dark:border-slate-700">
-                        {loading && assets.length === 0 ? (
-                            <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Syncing Asset Registry...</div>
-                        ) : assets.length === 0 ? (
-                            <div className="text-center py-20 text-slate-400 font-bold">No assets registered matching criteria.</div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 font-black text-xs uppercase tracking-wider">
-                                        <tr>
-                                            <th className="p-4 border-b border-slate-100 dark:border-slate-700">Barcode Tag</th>
-                                            <th className="p-4 border-b border-slate-100 dark:border-slate-700">Asset Name</th>
-                                            <th className="p-4 border-b border-slate-100 dark:border-slate-700">Category</th>
-                                            <th className="p-4 border-b border-slate-100 dark:border-slate-700">Location</th>
-                                            <th className="p-4 border-b border-slate-100 dark:border-slate-700">Custodian / Borrower</th>
-                                            <th className="p-4 border-b border-slate-100 dark:border-slate-700">Status</th>
-                                            <th className="p-4 border-b border-slate-100 dark:border-slate-700 text-right">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                        {assets.map((a) => (
-                                            <tr key={a.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 cursor-pointer" onClick={() => handleViewDetails(a)}>
-                                                <td className="p-4 font-mono font-bold text-blue-600 dark:text-blue-400 text-sm">
-                                                    <div className="flex items-center gap-1">
-                                                        <Tag size={14} />
-                                                        {a.tag_number}
-                                                    </div>
-                                                </td>
-                                                <td className="p-4 font-bold text-slate-800 dark:text-white">{a.name}</td>
-                                                <td className="p-4">
-                                                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold capitalize border ${getCategoryBadgeColor(a.category)}`}>
-                                                        {a.category.replace('_', ' ')}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4 text-xs font-bold text-slate-600 dark:text-slate-300">
-                                                    <div className="flex items-center gap-1">
-                                                        <MapPin size={12} className="text-slate-400" />
-                                                        {a.location}
-                                                    </div>
-                                                </td>
-                                                <td className="p-4 text-sm font-semibold">
-                                                                                    {a.handover_name ? (
-                                                        <div className="flex flex-col">
-                                                            <span className="text-slate-800 dark:text-slate-100 font-bold">{a.handover_name}</span>
-                                                            <span className="text-[10px] font-mono text-slate-400">
-                                                                {a.handover_no || a.handover_email || 'Manual Recipient'}
-                                                            </span>
-                                                        </div>
-                                                    ) : a.assigned_to_name ? (
-                                                        <div className="flex flex-col">
-                                                            <span className="text-slate-800 dark:text-slate-100 font-bold">{a.assigned_to_name}</span>
-                                                            <span className="text-[10px] font-mono text-slate-400">{a.assigned_to_identifier}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-xs text-slate-400 italic">Central Inventory</span>
-                                                    )}
-                                                </td>
-                                                <td className="p-4">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${getStatusBadgeColor(a.status)}`}>
-                                                        {a.status.replace('_', ' ')}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4 text-right flex justify-end gap-2" onClick={e => e.stopPropagation()}>
-                                                    {a.status === 'available' && (
-                                                        <button
-                                                            onClick={() => setShowCheckoutModal(a)}
-                                                            className="p-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
-                                                            title="Check Out"
-                                                        >
-                                                            <ArrowUpRight size={16} />
-                                                        </button>
-                                                    )}
-                                                    {a.status === 'checked_out' && (
-                                                        <button
-                                                            onClick={() => setShowCheckinModal(a)}
-                                                            className="p-1.5 bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors"
-                                                            title="Check In / Return"
-                                                        >
-                                                            <ArrowDownLeft size={16} />
-                                                        </button>
-                                                    )}
-                                                    {a.status === 'available' && (
-                                                        <button
-                                                            onClick={() => setShowMaintenanceModal(a)}
-                                                            className="p-1.5 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100 transition-colors"
-                                                            title="Send to Maintenance"
-                                                        >
-                                                            <Wrench size={16} />
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => setShowEditModal(a)}
-                                                        className="p-1.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-700/50 rounded transition-colors text-slate-600 dark:text-slate-300"
-                                                        title="Modify"
-                                                    >
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteAsset(a.id, a.name)}
-                                                        className="p-1.5 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Tab: Barcode Desk Scanner */}
-            {activeTab === 'scanner' && (
-                <div className="max-w-3xl mx-auto space-y-6">
-                    <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-md text-center">
-                        <div className="w-16 h-16 bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <QrCode size={32} />
-                        </div>
-                        <h2 className="text-xl font-bold mb-2 text-slate-800 dark:text-white">Desk Barcode Reader Desk</h2>
-                        <p className="text-[var(--text-secondary)] text-sm mb-6 max-w-md mx-auto">Scan or enter the unique Asset barcode tag to quickly view details, check-out, check-in, or flag assets.</p>
+                    {/* Filtered Summary KPIs */}
+                    {(() => {
+                        const filtered = assets
+                            .filter(a => !reportCategory || a.category === reportCategory)
+                            .filter(a => !reportLocation || a.location === reportLocation)
+                            .filter(a => !reportStatus || a.status === reportStatus);
                         
-                        <form onSubmit={handleBarcodeScan} className="flex gap-2 max-w-lg mx-auto">
-                            <input
-                                type="text"
-                                placeholder="Scan Barcode / Enter tag (e.g. AST-000123)"
-                                className="flex-1 p-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                value={scanBarcode}
-                                onChange={e => setScanBarcode(e.target.value)}
-                                required
-                            />
-                            <button
-                                type="submit"
-                                disabled={scanning}
-                                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold flex items-center gap-2"
-                            >
-                                {scanning ? <Loader2 className="animate-spin" size={16} /> : "Query Tag"}
-                            </button>
-                        </form>
+                        const totalCostVal = filtered.reduce((acc, curr) => acc + curr.cost, 0);
 
-                        <div className="mt-4 flex justify-center gap-2">
-                            <button 
-                                type="button"
-                                onClick={() => { setScanBarcode('AST-100201'); setTimeout(() => handleBarcodeScan(), 100); }}
-                                className="px-3 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 rounded-full text-xs font-bold text-slate-600 dark:text-slate-300"
-                            >
-                                Simulated Scan: AST-100201
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Scanned Asset Panel */}
-                    {scannedAsset && (
-                        <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-lg animate-scale-in">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 rounded text-xs font-mono font-bold tracking-wider">
-                                        {scannedAsset.tag_number}
-                                    </span>
-                                    <h3 className="text-xl font-bold text-slate-800 dark:text-white mt-1">{scannedAsset.name}</h3>
-                                </div>
-                                <span className={`px-2.5 py-0.5 rounded text-xs font-black uppercase tracking-wider ${getStatusBadgeColor(scannedAsset.status)}`}>
-                                    {scannedAsset.status}
-                                </span>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-slate-100 dark:border-slate-700">
-                                <div>
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Category</p>
-                                    <p className="text-sm font-semibold capitalize mt-1 text-slate-700 dark:text-slate-300">{scannedAsset.category}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Location</p>
-                                    <p className="text-sm font-semibold mt-1 text-slate-700 dark:text-slate-300">{scannedAsset.location}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Custodian</p>
-                                    <p className="text-sm font-semibold mt-1 text-slate-700 dark:text-slate-300">{scannedAsset.assigned_to_name || "Central Inventory"}</p>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 flex gap-3">
-                                {scannedAsset.status === 'available' && (
-                                    <button
-                                        onClick={() => setShowCheckoutModal(scannedAsset)}
-                                        className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2"
-                                    >
-                                        <ArrowUpRight size={18} /> Check Out Asset
-                                    </button>
-                                )}
-                                {scannedAsset.status === 'checked_out' && (
-                                    <button
-                                        onClick={() => setShowCheckinModal(scannedAsset)}
-                                        className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold flex items-center justify-center gap-2"
-                                    >
-                                        <ArrowDownLeft size={18} /> Check In / Return
-                                    </button>
-                                )}
-                                {scannedAsset.status === 'available' && (
-                                    <button
-                                        onClick={() => setShowMaintenanceModal(scannedAsset)}
-                                        className="flex-1 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-bold flex items-center justify-center gap-2"
-                                    >
-                                        <Wrench size={18} /> Send to repairs
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Tab: General Logs */}
-            {activeTab === 'logs' && (
-                <div className="space-y-6">
-                    <div className="glass-card p-6">
-                        <h3 className="font-bold text-lg mb-4">Central Assets Transaction Log</h3>
-                        <div className="space-y-4">
-                            {allLogs.length === 0 ? (
-                                <p className="text-slate-400 text-center py-12">No transactions recorded yet.</p>
-                            ) : (
-                                allLogs.map((l) => (
-                                    <div key={l.id} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                                        <div className="flex items-center gap-4">
-                                            <span className={`w-3 h-3 rounded-full ${
-                                                l.action === 'check_out' ? 'bg-indigo-500' :
-                                                l.action === 'check_in' ? 'bg-green-500' : 'bg-yellow-500'
-                                            }`} />
-                                            <div>
-                                                <p className="text-sm font-bold capitalize text-slate-800 dark:text-white">
-                                                    {l.action.replace('_', ' ')}
-                                                </p>
-                                                {l.borrower_name && (
-                                                    <p className="text-xs text-slate-500">Borrower: {l.borrower_name}</p>
-                                                )}
-                                                <p className="text-[10px] text-slate-400 font-semibold">{l.notes}</p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[10px] text-slate-400 font-mono">{new Date(l.timestamp).toLocaleString()}</p>
-                                            <p className="text-[9px] text-slate-400 uppercase font-black tracking-wider mt-1">By: {l.handled_by_name}</p>
+                        return (
+                            <>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="glass-card p-4 border-l-4 border-blue-500">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Matching Items</p>
+                                        <div className="text-2xl font-black mt-1 text-slate-800 dark:text-white">{filtered.length}</div>
+                                    </div>
+                                    <div className="glass-card p-4 border-l-4 border-emerald-500">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Valuation</p>
+                                        <div className="text-2xl font-black mt-1 text-emerald-600">KES {totalCostVal.toLocaleString()}</div>
+                                    </div>
+                                    <div className="glass-card p-4 border-l-4 border-indigo-500">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Allocated (Out)</p>
+                                        <div className="text-2xl font-black mt-1 text-slate-800 dark:text-white">
+                                            {filtered.filter(a => a.status === 'checked_out').length}
                                         </div>
                                     </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
+                                    <div className="glass-card p-4 border-l-4 border-yellow-500">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">In Repairs</p>
+                                        <div className="text-2xl font-black mt-1 text-yellow-600">
+                                            {filtered.filter(a => a.status === 'maintenance').length}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Recharts Visualizations */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700">
+                                        <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4">Category Distribution</h3>
+                                        <div className="h-64">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={[
+                                                    { name: 'Electronics', count: filtered.filter(a => a.category === 'electronics').length },
+                                                    { name: 'Furniture', count: filtered.filter(a => a.category === 'furniture').length },
+                                                    { name: 'Lab Equip', count: filtered.filter(a => a.category === 'lab_equipment').length },
+                                                    { name: 'Sports', count: filtered.filter(a => a.category === 'sports_equipment').length },
+                                                    { name: 'General', count: filtered.filter(a => a.category === 'general').length }
+                                                ]}>
+                                                    <CartesianGrid strokeDasharray="3 3" />
+                                                    <XAxis dataKey="name" stroke="#888888" fontSize={11} tickLine={false} axisLine={false} />
+                                                    <YAxis stroke="#888888" fontSize={11} tickLine={false} axisLine={false} />
+                                                    <RechartsTooltip />
+                                                    <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                                </BarChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl border border-slate-200 dark:border-slate-700">
+                                        <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4">Status Allocation Breakdown</h3>
+                                        <div className="h-64">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie
+                                                        data={[
+                                                            { name: 'Available', value: filtered.filter(a => a.status === 'available').length },
+                                                            { name: 'Checked Out', value: filtered.filter(a => a.status === 'checked_out').length },
+                                                            { name: 'Maintenance', value: filtered.filter(a => a.status === 'maintenance').length },
+                                                            { name: 'Disposed', value: filtered.filter(a => a.status === 'disposed').length }
+                                                        ].filter(d => d.value > 0)}
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        innerRadius={60}
+                                                        outerRadius={80}
+                                                        paddingAngle={4}
+                                                        dataKey="value"
+                                                    >
+                                                        <Cell fill="#10b981" />
+                                                        <Cell fill="#3b82f6" />
+                                                        <Cell fill="#f59e0b" />
+                                                        <Cell fill="#ef4444" />
+                                                    </Pie>
+                                                    <RechartsTooltip />
+                                                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Preview Data Table */}
+                                <div className="glass-card overflow-hidden">
+                                    <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30 flex justify-between items-center">
+                                        <span className="text-xs font-bold text-slate-500">Live Audit Data Preview</span>
+                                        <span className="text-xs bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full font-bold">
+                                            {filtered.length} Items
+                                        </span>
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse text-xs">
+                                            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 font-black uppercase tracking-wider">
+                                                <tr>
+                                                    <th className="p-3">Barcode</th>
+                                                    <th className="p-3">Name</th>
+                                                    <th className="p-3">Category</th>
+                                                    <th className="p-3">Location</th>
+                                                    <th className="p-3">Valuation</th>
+                                                    <th className="p-3">Custodian</th>
+                                                    <th className="p-3">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                                {filtered.map(a => (
+                                                    <tr key={a.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 cursor-pointer" onClick={() => handleViewDetails(a)}>
+                                                        <td className="p-3 font-mono font-bold text-blue-600">{a.tag_number}</td>
+                                                        <td className="p-3 font-bold text-slate-800 dark:text-white">{a.name}</td>
+                                                        <td className="p-3 capitalize">{a.category.replace('_', ' ')}</td>
+                                                        <td className="p-3 font-medium">{a.location}</td>
+                                                        <td className="p-3 font-mono font-bold">KES {a.cost.toLocaleString()}</td>
+                                                        <td className="p-3 font-semibold">{a.handover_name || 'Central Inventory'}</td>
+                                                        <td className="p-3">
+                                                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${getStatusBadgeColor(a.status)}`}>
+                                                                {a.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {filtered.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={7} className="text-center py-8 text-slate-400 font-medium">
+                                                            No matching assets found. Try adjusting filters.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </>
+                        );
+                    })()}
                 </div>
             )}
 
