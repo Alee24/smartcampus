@@ -46,6 +46,7 @@ async def main():
         "migrate_cameras.py",
         "migrate_fleet.py",
         "migrate_asset_department.py",
+        "migrate_security_features.py",
         "seed_db.py",
         "diagnose_500.py"
     ]

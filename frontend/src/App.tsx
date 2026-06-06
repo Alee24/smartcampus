@@ -13,6 +13,10 @@ import { useNotification } from './components/Notification'
 // 1. Critical Components (Load immediately for FCP)
 import Login from './Login'
 import LandingPage from './LandingPage'
+import StaffDashboard from './StaffDashboard'
+import GuestDashboard from './GuestDashboard'
+import ManagementDashboard from './ManagementDashboard'
+import StoresDashboard from './StoresDashboard'
 
 // 2. Lazy Loaded Components (Split chunks)
 const UsersComp = lazy(() => import('./Users'))
@@ -54,6 +58,8 @@ const LecturerDashboard = lazy(() => import('./LecturerDashboard'))
 const QRRegistry = lazy(() => import('./QRRegistry'))
 const NoticeBoard = lazy(() => import('./NoticeBoard'))
 const AssetManagement = lazy(() => import('./AssetManagement'))
+const IncidentReporting = lazy(() => import('./IncidentReporting'))
+const LostAndFound = lazy(() => import('./LostAndFound'))
 
 // 3. Non-lazy components (small/critical)
 import InstallPWA, { InstallPWATrigger } from './components/InstallPWA'
@@ -132,6 +138,7 @@ function App() {
         people: false,
         gate_ops: false,
         security_monitor: false,
+        security_ops: false,
         academics: false,
         settings: false,
         analytics: false,
@@ -281,7 +288,109 @@ function App() {
                 'projects': false,
                 'bulk': false,
                 'settings': false,
-                'integrations': false
+                'integrations': false,
+                'notice-board': true
+            },
+            'Staff': {
+                'dashboard': true,
+                'student-dashboard': false,
+                'users': false,
+                'verification': false,
+                'attendance': true,
+                'live': false,
+                'gate': false,
+                'vehicles': false,
+                'timetable': true,
+                'cameras': false,
+                'settings': true,
+                'notice-board': true,
+                'assets': true
+            },
+            'Guest': {
+                'dashboard': true,
+                'student-dashboard': false,
+                'users': false,
+                'verification': false,
+                'attendance': false,
+                'live': false,
+                'gate': false,
+                'vehicles': false,
+                'timetable': false,
+                'cameras': false,
+                'settings': true,
+                'notice-board': true
+            },
+            'Management': {
+                'dashboard': true,
+                'users': true,
+                'verification': true,
+                'attendance': true,
+                'live': true,
+                'gate': true,
+                'vehicles': true,
+                'timetable': true,
+                'cameras': true,
+                'settings': true,
+                'notice-board': true,
+                'fleet': true,
+                'fleet-tracking': true,
+                'fleet-trips': true,
+                'incidents': true,
+                'lost-found': true,
+                'reports': true,
+                'gates-dashboard': true
+            },
+            'Stores': {
+                'dashboard': true,
+                'users': false,
+                'verification': false,
+                'attendance': false,
+                'live': false,
+                'gate': false,
+                'vehicles': false,
+                'timetable': false,
+                'cameras': false,
+                'settings': true,
+                'notice-board': true,
+                'assets': true,
+                'asset-handovers': true,
+                'asset-reports': true
+            },
+            'Security Lead': {
+                'dashboard': true,
+                'users': false,
+                'verification': true,
+                'attendance': false,
+                'live': true,
+                'gate': true,
+                'vehicles': true,
+                'timetable': false,
+                'cameras': true,
+                'settings': true,
+                'notice-board': true,
+                'fleet': true,
+                'fleet-tracking': true,
+                'fleet-trips': true,
+                'incidents': true,
+                'lost-found': true
+            },
+            'Guard': {
+                'dashboard': true,
+                'users': false,
+                'verification': true,
+                'attendance': false,
+                'live': true,
+                'gate': true,
+                'vehicles': true,
+                'timetable': false,
+                'cameras': true,
+                'settings': true,
+                'notice-board': true,
+                'fleet': true,
+                'fleet-tracking': true,
+                'fleet-trips': true,
+                'incidents': true,
+                'lost-found': true
             },
             'Lecturer': {
                 'dashboard': true,
@@ -329,7 +438,31 @@ function App() {
                 'projects': false,
                 'bulk': false,
                 'settings': false,
-                'integrations': false
+                'integrations': false,
+                'incidents': true,
+                'lost-found': true
+            },
+            'Admin': {
+                'dashboard': true,
+                'users': true,
+                'verification': true,
+                'attendance': true,
+                'live': true,
+                'gate': true,
+                'vehicles': true,
+                'timetable': true,
+                'cameras': true,
+                'projects': true,
+                'bulk': true,
+                'settings': true,
+                'integrations': true,
+                'fleet': true,
+                'geofencing': true,
+                'assets': true,
+                'asset-handovers': true,
+                'asset-reports': true,
+                'incidents': true,
+                'lost-found': true
             },
             'SuperAdmin': {
                 'dashboard': true,
@@ -346,7 +479,12 @@ function App() {
                 'settings': true,
                 'integrations': true,
                 'fleet': true,
-                'geofencing': true
+                'geofencing': true,
+                'assets': true,
+                'asset-handovers': true,
+                'asset-reports': true,
+                'incidents': true,
+                'lost-found': true
             }
         }
     }
@@ -358,7 +496,8 @@ function App() {
 
         // Get config for current role (use saved config or defaults)
         const defaults: any = getDefaultConfig()
-        const roleConfig = menuConfig[role] || defaults[role] || {}
+        const matchedKey = Object.keys(defaults).find(k => k.toLowerCase() === role?.toLowerCase())
+        const roleConfig = (matchedKey ? defaults[matchedKey] : null) || menuConfig[role] || {}
 
         // Return enabled status (default to false if not specified)
         return roleConfig[menuId] === true
@@ -677,6 +816,28 @@ function App() {
                                 label="Surveillance"
                                 active={activeTab === 'cameras'}
                                 onClick={() => { setActiveTab('cameras'); setSidebarOpen(false); }}
+                            />
+                        )}
+                    </SidebarGroup>
+                )}
+
+                {/* Security Operations */}
+                {(isMenuEnabled('incidents') || isMenuEnabled('lost-found')) && (
+                    <SidebarGroup title="Security Ops" isOpen={openGroups.security_ops} onToggle={() => toggleGroup('security_ops')} isSidebarCollapsed={isSidebarCollapsed}>
+                        {isMenuEnabled('incidents') && (
+                            <NavItem
+                                icon={<AlertTriangle size={18} />}
+                                label="Incident Reports"
+                                active={activeTab === 'incidents'}
+                                onClick={() => { setActiveTab('incidents'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('lost-found') && (
+                            <NavItem
+                                icon={<Inbox size={18} />}
+                                label="Lost & Found"
+                                active={activeTab === 'lost-found'}
+                                onClick={() => { setActiveTab('lost-found'); setSidebarOpen(false); }}
                             />
                         )}
                     </SidebarGroup>
@@ -1162,12 +1323,16 @@ function App() {
                     })()}
 
                     {activeTab === 'dashboard' && role === 'Guardian' && <GuardianDashboard />}
-                    {activeTab === 'dashboard' && role === 'Security' && <SecurityDashboard onNavigate={setActiveTab} />}
+                    {activeTab === 'dashboard' && (role === 'Security' || role === 'Security Lead' || role === 'Guard') && <SecurityDashboard onNavigate={setActiveTab} />}
                     {activeTab === 'dashboard' && role === 'Student' && <StudentDashboard />}
                     {activeTab === 'dashboard' && role === 'Lecturer' && <LecturerDashboard />}
+                    {activeTab === 'dashboard' && role === 'Staff' && <StaffDashboard currentUser={currentUser} onNavigate={setActiveTab} />}
+                    {activeTab === 'dashboard' && role === 'Guest' && <GuestDashboard currentUser={currentUser} />}
+                    {activeTab === 'dashboard' && role === 'Management' && <ManagementDashboard currentUser={currentUser} onNavigate={setActiveTab} />}
+                    {activeTab === 'dashboard' && role === 'Stores' && <StoresDashboard currentUser={currentUser} onNavigate={setActiveTab} />}
                     {activeTab === 'visitors' && <VisitorManagement />}
                     {activeTab === 'calendar' && <CampusCalendar />}
-                    {activeTab === 'dashboard' && role !== 'Guardian' && role !== 'Security' && role !== 'Student' && role !== 'Lecturer' && (
+                    {activeTab === 'dashboard' && role !== 'Guardian' && role !== 'Security' && role !== 'Security Lead' && role !== 'Guard' && role !== 'Student' && role !== 'Lecturer' && role !== 'Staff' && role !== 'Guest' && role !== 'Management' && role !== 'Stores' && (
                         <AdminDashboard onNavigate={setActiveTab} />
                     )}
 
@@ -1191,6 +1356,8 @@ function App() {
                     {activeTab === 'company-settings' && <CompanySettings />}
                     {activeTab === 'reports' && <Reports />}
                     {activeTab === 'verification' && <StudentVerification />}
+                    {activeTab === 'incidents' && <IncidentReporting />}
+                    {activeTab === 'lost-found' && <LostAndFound />}
                     {activeTab === 'privacy' && <PrivacyPolicy />}
                     {activeTab === 'cookies' && <CookiePolicy />}
                     {activeTab === 'rights' && <UserDataRights />}

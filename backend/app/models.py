@@ -687,3 +687,56 @@ class AssetLog(UUIDModel, table=True):
     asset: Asset = Relationship(back_populates="logs")
     user: Optional["User"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[AssetLog.user_id]"})
     handled_by: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[AssetLog.handled_by_id]"})
+
+# --- Incident Reporting & Lost & Found Models ---
+class IncidentReport(UUIDModel, table=True):
+    __tablename__ = "incident_reports"
+    
+    title: str = Field(index=True)
+    description: str = Field(sa_column=Column(Text))
+    reporter_id: UUID = Field(foreign_key="users.id")
+    status: str = Field(default="reported", index=True) # reported, under_investigation, police_reported, disciplinary, resolved
+    incident_date: datetime = Field(default_factory=get_eat_time)
+    location: str = Field(index=True)
+    severity: str = Field(default="low", index=True) # low, medium, high
+    target_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", nullable=True)
+    target_name_external: Optional[str] = None
+    evidence_image: Optional[str] = None
+    notes: Optional[str] = Field(default=None, sa_column=Column(Text))
+    created_at: datetime = Field(default_factory=get_eat_time)
+
+    reporter: User = Relationship(sa_relationship_kwargs={"foreign_keys": "[IncidentReport.reporter_id]"})
+    target_user: Optional[User] = Relationship(sa_relationship_kwargs={"foreign_keys": "[IncidentReport.target_user_id]"})
+    followups: List["IncidentFollowup"] = Relationship(back_populates="incident", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+
+class IncidentFollowup(UUIDModel, table=True):
+    __tablename__ = "incident_followups"
+    
+    incident_id: UUID = Field(foreign_key="incident_reports.id")
+    followup_type: str = Field(index=True) # police_report, disciplinary, resolved, update
+    description: str = Field(sa_column=Column(Text))
+    officer_id: UUID = Field(foreign_key="users.id")
+    timestamp: datetime = Field(default_factory=get_eat_time)
+    
+    incident: IncidentReport = Relationship(back_populates="followups")
+    officer: User = Relationship()
+
+class LostAndFoundItem(UUIDModel, table=True):
+    __tablename__ = "lost_and_found_items"
+    
+    item_name: str = Field(index=True)
+    description: str = Field(sa_column=Column(Text))
+    location_found: str = Field(index=True)
+    date_found: date = Field(default_factory=lambda: get_eat_time().date())
+    status: str = Field(default="found", index=True) # found, claimed, disposed
+    finder_name: Optional[str] = None
+    claimant_name: Optional[str] = None
+    claimant_id: Optional[UUID] = Field(default=None, foreign_key="users.id", nullable=True)
+    date_claimed: Optional[date] = None
+    image_path: Optional[str] = None
+    notes: Optional[str] = Field(default=None, sa_column=Column(Text))
+    handler_id: UUID = Field(foreign_key="users.id")
+    created_at: datetime = Field(default_factory=get_eat_time)
+    
+    claimant: Optional[User] = Relationship(sa_relationship_kwargs={"foreign_keys": "[LostAndFoundItem.claimant_id]"})
+    handler: User = Relationship(sa_relationship_kwargs={"foreign_keys": "[LostAndFoundItem.handler_id]"})

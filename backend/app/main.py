@@ -87,8 +87,26 @@ async def seed_data(session: AsyncSession):
         await session.commit()
         print("Seeded Main Gate.")
 
-    # --- Seed Sample Users for Testing ---
-    # 1. Lecturer
+    # --- Seed All Requested User Roles ---
+    roles_to_seed = [
+        {"name": "Admin", "description": "System Administrator"},
+        {"name": "Security Lead", "description": "Security Lead Officer"},
+        {"name": "Guard", "description": "Security Guard"},
+        {"name": "Student", "description": "Regular Student"},
+        {"name": "Staff", "description": "University Staff Member"},
+        {"name": "Guest", "description": "Temporary Visitor / Guest"},
+        {"name": "Management", "description": "University Management Team"},
+        {"name": "Stores", "description": "Stores & Asset Officer"}
+    ]
+    for r_data in roles_to_seed:
+        existing = (await session.exec(select(Role).where(Role.name == r_data["name"]))).first()
+        if not existing:
+            new_role = Role(name=r_data["name"], description=r_data["description"])
+            session.add(new_role)
+            await session.commit()
+            print(f"Seeded role: {r_data['name']}")
+
+    # Get Lecturer Role
     lecturer_role = (await session.exec(select(Role).where(Role.name == "Lecturer"))).first()
     if not lecturer_role:
         lecturer_role = Role(name="Lecturer", description="Academic Staff")
@@ -110,13 +128,18 @@ async def seed_data(session: AsyncSession):
         session.add(lec_user)
         print("Seeded Lecturer: lecturer@test.com / Pass123!")
 
+    # Guard and Security Lead Role Setup
+    guard_role = (await session.exec(select(Role).where(Role.name == "Guard"))).first()
+    sec_lead_role = (await session.exec(select(Role).where(Role.name == "Security Lead"))).first()
+    admin_role_obj = (await session.exec(select(Role).where(Role.name == "Admin"))).first()
+    
     # 2. Security Guard
-    guard_role = (await session.exec(select(Role).where(Role.name == "Security"))).first()
-    if not guard_role:
-        guard_role = Role(name="Security", description="Gate & Patrol")
-        session.add(guard_role)
+    old_security_role = (await session.exec(select(Role).where(Role.name == "Security"))).first()
+    if not old_security_role:
+        old_security_role = Role(name="Security", description="Gate & Patrol")
+        session.add(old_security_role)
         await session.commit()
-        await session.refresh(guard_role)
+        await session.refresh(old_security_role)
 
     guard_user = (await session.exec(select(User).where((User.email == "guard@test.com") | (User.admission_number == "SEC001")))).first()
     if not guard_user:
@@ -125,7 +148,7 @@ async def seed_data(session: AsyncSession):
             full_name="Officer Bob Jones",
             email="guard@test.com",
             hashed_password=get_password_hash("Pass123!"),
-            role_id=guard_role.id,
+            role_id=guard_role.id if guard_role else old_security_role.id,
             school="Security Dept",
             status="active"
         )
@@ -212,6 +235,33 @@ async def seed_data(session: AsyncSession):
         )
         session.add(stud_user)
         print("Seeded Student: STD001 / Pass123!")
+    
+    # 3b. Seed Test Users for New Roles
+    test_users_to_seed = [
+        {"admission_number": "ADM001", "full_name": "System Administrator", "email": "admin@test.com", "role_name": "Admin", "school": "IT Operations"},
+        {"admission_number": "SEC-LEAD-01", "full_name": "Chief Security Officer", "email": "seclead@test.com", "role_name": "Security Lead", "school": "Security Department"},
+        {"admission_number": "STF001", "full_name": "Prof. Charles Xavier", "email": "staff@test.com", "role_name": "Staff", "school": "Humanities"},
+        {"admission_number": "GST001", "full_name": "John Visitor Doe", "email": "guest@test.com", "role_name": "Guest", "school": "Visitor Center"},
+        {"admission_number": "MGT001", "full_name": "Vice Chancellor Office", "email": "management@test.com", "role_name": "Management", "school": "Administration Office"},
+        {"admission_number": "STR001", "full_name": "Inventory Stores Head", "email": "stores@test.com", "role_name": "Stores", "school": "Procurement & Stores"}
+    ]
+    for tu in test_users_to_seed:
+        existing_tu = (await session.exec(select(User).where((User.admission_number == tu["admission_number"]) | (User.email == tu["email"])))).first()
+        if not existing_tu:
+            tu_role = (await session.exec(select(Role).where(Role.name == tu["role_name"]))).first()
+            if tu_role:
+                new_tu = User(
+                    admission_number=tu["admission_number"],
+                    full_name=tu["full_name"],
+                    email=tu["email"],
+                    hashed_password=get_password_hash("Pass123!"),
+                    role_id=tu_role.id,
+                    school=tu["school"],
+                    status="active"
+                )
+                session.add(new_tu)
+                print(f"Seeded user: {tu['full_name']} ({tu['role_name']})")
+    await session.commit()
     
     # 5b. Seed Drivers
     drivers_to_seed = [
@@ -797,6 +847,10 @@ app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
 # Import and include notifications router
 from app.routers import notifications
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
+
+# Import and include security router
+from app.routers import security
+app.include_router(security.router, prefix="/api/security", tags=["security"])
 
 # Import and include notice board router
 from app.routers import notice_board
