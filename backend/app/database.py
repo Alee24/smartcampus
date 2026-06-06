@@ -308,7 +308,7 @@ async def migrate_assets():
     print("Checking assets and asset_logs tables...")
     try:
         async with engine.begin() as conn:
-            # Create assets table
+            # Create assets table with handover columns
             await conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS assets (
                     id VARCHAR(36) NOT NULL,
@@ -323,6 +323,12 @@ async def migrate_assets():
                     assigned_to_id VARCHAR(36) DEFAULT NULL,
                     notes TEXT DEFAULT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    handover_name VARCHAR(255) DEFAULT NULL,
+                    handover_email VARCHAR(255) DEFAULT NULL,
+                    handover_phone VARCHAR(255) DEFAULT NULL,
+                    handover_no VARCHAR(255) DEFAULT NULL,
+                    handover_department VARCHAR(255) DEFAULT NULL,
+                    handover_date DATE DEFAULT NULL,
                     PRIMARY KEY (id),
                     UNIQUE KEY (tag_number),
                     KEY (category),
@@ -330,7 +336,7 @@ async def migrate_assets():
                     KEY (location)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """))
-            # Create asset_logs table
+            # Create asset_logs table with handover columns
             await conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS asset_logs (
                     id VARCHAR(36) NOT NULL,
@@ -340,12 +346,47 @@ async def migrate_assets():
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                     handled_by_id VARCHAR(36) NOT NULL,
                     notes TEXT DEFAULT NULL,
+                    handover_name VARCHAR(255) DEFAULT NULL,
+                    handover_email VARCHAR(255) DEFAULT NULL,
+                    handover_phone VARCHAR(255) DEFAULT NULL,
+                    handover_no VARCHAR(255) DEFAULT NULL,
+                    handover_department VARCHAR(255) DEFAULT NULL,
+                    handover_date DATE DEFAULT NULL,
                     PRIMARY KEY (id),
                     KEY (asset_id),
                     KEY (user_id),
                     KEY (action)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """))
+            
+            # Run column inspections and perform ALTER TABLE updates if tables exist but lack columns
+            def get_cols(connection, table_name):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                return [c['name'] for c in inspector.get_columns(table_name)]
+
+            # Check assets table
+            asset_cols = await conn.run_sync(lambda c: get_cols(c, 'assets'))
+            new_handover_cols = {
+                "handover_name": "VARCHAR(255) DEFAULT NULL",
+                "handover_email": "VARCHAR(255) DEFAULT NULL",
+                "handover_phone": "VARCHAR(255) DEFAULT NULL",
+                "handover_no": "VARCHAR(255) DEFAULT NULL",
+                "handover_department": "VARCHAR(255) DEFAULT NULL",
+                "handover_date": "DATE DEFAULT NULL"
+            }
+            for col, type_ in new_handover_cols.items():
+                if col not in asset_cols:
+                    print(f"Adding column {col} to assets table...")
+                    await conn.execute(text(f"ALTER TABLE assets ADD COLUMN {col} {type_}"))
+
+            # Check asset_logs table
+            log_cols = await conn.run_sync(lambda c: get_cols(c, 'asset_logs'))
+            for col, type_ in new_handover_cols.items():
+                if col not in log_cols:
+                    print(f"Adding column {col} to asset_logs table...")
+                    await conn.execute(text(f"ALTER TABLE asset_logs ADD COLUMN {col} {type_}"))
+
             print("Assets and asset_logs tables checked/created successfully.")
     except Exception as e:
         print(f"Assets table migration skipped/failed: {e}")

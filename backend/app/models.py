@@ -652,6 +652,14 @@ class Asset(UUIDModel, table=True):
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=get_eat_time)
 
+    # Handover details (manual or copied from user)
+    handover_name: Optional[str] = Field(default=None, nullable=True)
+    handover_email: Optional[str] = Field(default=None, nullable=True)
+    handover_phone: Optional[str] = Field(default=None, nullable=True)
+    handover_no: Optional[str] = Field(default=None, nullable=True)
+    handover_department: Optional[str] = Field(default=None, nullable=True)
+    handover_date: Optional[date] = Field(default=None, nullable=True)
+
     # Relationships
     assigned_to: Optional["User"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[Asset.assigned_to_id]"})
     logs: List["AssetLog"] = Relationship(back_populates="asset", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -665,6 +673,14 @@ class AssetLog(UUIDModel, table=True):
     timestamp: datetime = Field(default_factory=get_eat_time, index=True)
     handled_by_id: UUID = Field(foreign_key="users.id")
     notes: Optional[str] = None
+
+    # Handover historical details
+    handover_name: Optional[str] = Field(default=None, nullable=True)
+    handover_email: Optional[str] = Field(default=None, nullable=True)
+    handover_phone: Optional[str] = Field(default=None, nullable=True)
+    handover_no: Optional[str] = Field(default=None, nullable=True)
+    handover_department: Optional[str] = Field(default=None, nullable=True)
+    handover_date: Optional[date] = Field(default=None, nullable=True)
 
     # Relationships
     asset: Asset = Relationship(back_populates="logs")

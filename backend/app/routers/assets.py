@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File, Response
 from sqlmodel import select, func
 from sqlmodel.ext.asyncio.session import AsyncSession
 from pydantic import BaseModel
@@ -40,7 +40,13 @@ class AssetUpdate(BaseModel):
     notes: Optional[str] = None
 
 class CheckoutRequest(BaseModel):
-    borrower_identifier: str  # Can be admission_number, email, or barcode
+    borrower_identifier: Optional[str] = None  # Can be admission_number, email, etc.
+    handover_name: Optional[str] = None
+    handover_email: Optional[str] = None
+    handover_phone: Optional[str] = None
+    handover_no: Optional[str] = None
+    handover_department: Optional[str] = None
+    handover_date: Optional[date_type] = None
     notes: Optional[str] = None
 
 class CheckinRequest(BaseModel):
@@ -54,6 +60,12 @@ class AssetLogResponse(BaseModel):
     handled_by_name: str
     borrower_name: Optional[str] = None
     notes: Optional[str] = None
+    handover_name: Optional[str] = None
+    handover_email: Optional[str] = None
+    handover_phone: Optional[str] = None
+    handover_no: Optional[str] = None
+    handover_department: Optional[str] = None
+    handover_date: Optional[str] = None
 
 class AssetResponse(BaseModel):
     id: UUID
@@ -70,6 +82,12 @@ class AssetResponse(BaseModel):
     assigned_to_identifier: Optional[str] = None
     notes: Optional[str] = None
     created_at: str
+    handover_name: Optional[str] = None
+    handover_email: Optional[str] = None
+    handover_phone: Optional[str] = None
+    handover_no: Optional[str] = None
+    handover_department: Optional[str] = None
+    handover_date: Optional[str] = None
 
 # ---- API Endpoints ----
 
@@ -154,7 +172,13 @@ async def get_assets(
                     assigned_to_name=assigned_name,
                     assigned_to_identifier=assigned_identifier,
                     notes=a.notes,
-                    created_at=a.created_at.isoformat()
+                    created_at=a.created_at.isoformat(),
+                    handover_name=a.handover_name,
+                    handover_email=a.handover_email,
+                    handover_phone=a.handover_phone,
+                    handover_no=a.handover_no,
+                    handover_department=a.handover_department,
+                    handover_date=a.handover_date.isoformat() if a.handover_date else None
                 )
             )
         return response_list
@@ -223,7 +247,13 @@ async def create_asset(
             purchase_date=new_asset.purchase_date.isoformat() if new_asset.purchase_date else None,
             cost=new_asset.cost,
             notes=new_asset.notes,
-            created_at=new_asset.created_at.isoformat()
+            created_at=new_asset.created_at.isoformat(),
+            handover_name=None,
+            handover_email=None,
+            handover_phone=None,
+            handover_no=None,
+            handover_department=None,
+            handover_date=None
         )
     except HTTPException:
         raise
@@ -260,7 +290,13 @@ async def scan_asset_by_barcode(
             "serial_number": asset.serial_number,
             "assigned_to_name": assigned_name,
             "assigned_to_identifier": assigned_identifier,
-            "notes": asset.notes
+            "notes": asset.notes,
+            "handover_name": asset.handover_name,
+            "handover_email": asset.handover_email,
+            "handover_phone": asset.handover_phone,
+            "handover_no": asset.handover_no,
+            "handover_department": asset.handover_department,
+            "handover_date": asset.handover_date.isoformat() if asset.handover_date else None
         }
     except HTTPException:
         raise
@@ -303,7 +339,13 @@ async def get_asset_details(
                     timestamp=l.timestamp.isoformat(),
                     handled_by_name=handled.full_name if handled else "Unknown Admin",
                     borrower_name=borrower.full_name if borrower else None,
-                    notes=l.notes
+                    notes=l.notes,
+                    handover_name=l.handover_name,
+                    handover_email=l.handover_email,
+                    handover_phone=l.handover_phone,
+                    handover_no=l.handover_no,
+                    handover_department=l.handover_department,
+                    handover_date=l.handover_date.isoformat() if l.handover_date else None
                 )
             )
 
@@ -322,7 +364,13 @@ async def get_asset_details(
                 assigned_to_name=assigned_name,
                 assigned_to_identifier=assigned_identifier,
                 notes=asset.notes,
-                created_at=asset.created_at.isoformat()
+                created_at=asset.created_at.isoformat(),
+                handover_name=asset.handover_name,
+                handover_email=asset.handover_email,
+                handover_phone=asset.handover_phone,
+                handover_no=asset.handover_no,
+                handover_department=asset.handover_department,
+                handover_date=asset.handover_date.isoformat() if asset.handover_date else None
             ),
             "logs": formatted_logs
         }
@@ -429,30 +477,62 @@ async def checkout_asset(
         if asset.status != "available":
             raise HTTPException(status_code=400, detail=f"Asset is not available for check-out. Status: '{asset.status}'")
 
-        # Find user
-        borrower = (await session.exec(
-            select(User).where(
-                (User.admission_number == payload.borrower_identifier) |
-                (User.email == payload.borrower_identifier)
-            )
-        )).first()
+        # Handover target details
+        borrower_id = None
+        h_name = payload.handover_name
+        h_email = payload.handover_email
+        h_phone = payload.handover_phone
+        h_no = payload.handover_no
+        h_dept = payload.handover_department
+        h_date = payload.handover_date or get_eat_time().date()
 
-        if not borrower:
-            raise HTTPException(status_code=404, detail=f"Borrower with ID/Admission/Email '{payload.borrower_identifier}' not found.")
+        # If a system user identifier is provided, look them up and pull details
+        if payload.borrower_identifier:
+            borrower = (await session.exec(
+                select(User).where(
+                    (User.admission_number == payload.borrower_identifier) |
+                    (User.email == payload.borrower_identifier)
+                )
+            )).first()
+            if borrower:
+                borrower_id = borrower.id
+                h_name = borrower.full_name
+                h_email = borrower.email
+                h_phone = borrower.phone_number
+                h_no = borrower.admission_number
+                h_dept = borrower.school or "General"
+            else:
+                raise HTTPException(status_code=404, detail=f"System user '{payload.borrower_identifier}' not found in database.")
+
+        # Fallback validation
+        if not h_name:
+            raise HTTPException(status_code=400, detail="Handover recipient name is required.")
 
         # Perform checkout
         asset.status = "checked_out"
-        asset.assigned_to_id = borrower.id
+        asset.assigned_to_id = borrower_id
+        asset.handover_name = h_name
+        asset.handover_email = h_email
+        asset.handover_phone = h_phone
+        asset.handover_no = h_no
+        asset.handover_department = h_dept
+        asset.handover_date = h_date
         session.add(asset)
 
         # Log action
         log_entry = AssetLog(
             asset_id=asset.id,
-            user_id=borrower.id,
+            user_id=borrower_id,
             action="check_out",
             timestamp=get_eat_time(),
             handled_by_id=admin.id,
-            notes=payload.notes or f"Checked out to {borrower.full_name}"
+            notes=payload.notes or f"Checked out to {h_name}",
+            handover_name=h_name,
+            handover_email=h_email,
+            handover_phone=h_phone,
+            handover_no=h_no,
+            handover_department=h_dept,
+            handover_date=h_date
         )
         session.add(log_entry)
         await session.commit()
@@ -463,12 +543,20 @@ async def checkout_asset(
             user=admin,
             table_name="assets",
             record_id=str(asset_id),
-            description=f"Checked out asset {asset.name} ({asset.tag_number}) to {borrower.full_name} ({borrower.admission_number})",
-            new_values={"borrower": borrower.full_name, "notes": payload.notes},
+            description=f"Checked out asset {asset.name} ({asset.tag_number}) to {h_name}",
+            new_values={
+                "borrower": h_name,
+                "email": h_email,
+                "phone": h_phone,
+                "staff_no": h_no,
+                "department": h_dept,
+                "handover_date": h_date.isoformat() if h_date else None,
+                "notes": payload.notes
+            },
             request=request
         )
 
-        return {"status": "success", "message": f"Asset checked out to {borrower.full_name} successfully."}
+        return {"status": "success", "message": f"Asset checked out to {h_name} successfully."}
     except HTTPException:
         raise
     except Exception as e:
@@ -492,10 +580,17 @@ async def checkin_asset(
             raise HTTPException(status_code=400, detail="Asset is not checked out.")
 
         borrower_id = asset.assigned_to_id
+        h_name = asset.handover_name
 
         # Perform checkin
         asset.status = "available"
         asset.assigned_to_id = None
+        asset.handover_name = None
+        asset.handover_email = None
+        asset.handover_phone = None
+        asset.handover_no = None
+        asset.handover_department = None
+        asset.handover_date = None
         session.add(asset)
 
         # Log action
@@ -505,7 +600,7 @@ async def checkin_asset(
             action="check_in",
             timestamp=get_eat_time(),
             handled_by_id=admin.id,
-            notes=payload.notes or "Returned to inventory."
+            notes=payload.notes or f"Returned from {h_name or 'borrower'}."
         )
         session.add(log_entry)
         await session.commit()
@@ -543,6 +638,12 @@ async def send_to_maintenance(
 
         asset.status = "maintenance"
         asset.assigned_to_id = None
+        asset.handover_name = None
+        asset.handover_email = None
+        asset.handover_phone = None
+        asset.handover_no = None
+        asset.handover_department = None
+        asset.handover_date = None
         session.add(asset)
 
         log_entry = AssetLog(
@@ -572,3 +673,146 @@ async def send_to_maintenance(
     except Exception as e:
         await session.rollback()
         raise HTTPException(status_code=500, detail=f"Maintenance status update failed: {str(e)}")
+
+@router.get("/template/csv")
+async def download_csv_template(
+    admin: User = Depends(get_current_admin)
+):
+    # Plain CSV headers
+    csv_content = "tag_number,name,category,status,location,serial_number,purchase_date,cost,notes\n"
+    csv_content += "RU01171,Dell Latitude Laptop,electronics,available,Main Library,SN-987654321,2026-05-15,75000.00,Academic staff laptop\n"
+    csv_content += "RU01172,Lecture Hall Projector,electronics,available,LH-03,PJ-776352,2026-04-10,120000.00,High definition projector\n"
+    
+    from fastapi import Response
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=asset_upload_template.csv"}
+    )
+
+@router.post("/upload/csv")
+async def upload_assets_csv(
+    request: Request,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(get_current_admin)
+):
+    try:
+        import csv
+        import io
+        from datetime import datetime
+        
+        contents = await file.read()
+        csv_file = io.StringIO(contents.decode("utf-8"))
+        reader = csv.DictReader(csv_file)
+        
+        success_count = 0
+        error_rows = []
+        
+        # Check required columns
+        if not reader.fieldnames:
+            raise HTTPException(status_code=400, detail="Invalid CSV format. Header is empty.")
+            
+        required_fields = ["tag_number", "name"]
+        for field in required_fields:
+            if field not in reader.fieldnames:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid CSV format. Missing required column '{field}'"
+                )
+        
+        for idx, row in enumerate(reader, start=2):
+            tag_num = row.get("tag_number", "").strip()
+            name = row.get("name", "").strip()
+            
+            if not tag_num or not name:
+                error_rows.append(f"Row {idx}: Missing tag_number or name.")
+                continue
+                
+            # Check if tag number already exists
+            existing = (await session.exec(
+                select(Asset).where(Asset.tag_number == tag_num)
+            )).first()
+            if existing:
+                error_rows.append(f"Row {idx}: Asset with Tag Number '{tag_num}' already exists.")
+                continue
+                
+            # Parse purchase date
+            p_date = None
+            p_date_str = row.get("purchase_date", "").strip()
+            if p_date_str:
+                try:
+                    p_date = datetime.strptime(p_date_str, "%Y-%m-%d").date()
+                except Exception:
+                    try:
+                        p_date = datetime.strptime(p_date_str, "%m/%d/%Y").date()
+                    except Exception:
+                        error_rows.append(f"Row {idx}: Invalid date format for '{p_date_str}'. Use YYYY-MM-DD.")
+                        continue
+            
+            # Parse cost
+            cost = 0.0
+            cost_str = row.get("cost", "").strip()
+            if cost_str:
+                try:
+                    cost = float(cost_str)
+                except ValueError:
+                    error_rows.append(f"Row {idx}: Invalid cost value '{cost_str}'.")
+                    continue
+            
+            # Default categories & status validations
+            category = row.get("category", "electronics").strip().lower()
+            if category not in ["electronics", "furniture", "lab_equipment", "sports_equipment", "general"]:
+                category = "general"
+                
+            status_val = row.get("status", "available").strip().lower()
+            if status_val not in ["available", "checked_out", "maintenance", "disposed"]:
+                status_val = "available"
+
+            new_asset = Asset(
+                tag_number=tag_num,
+                name=name,
+                category=category,
+                status=status_val,
+                location=row.get("location", "General").strip() or "General",
+                serial_number=row.get("serial_number", "").strip() or None,
+                purchase_date=p_date,
+                cost=cost,
+                notes=row.get("notes", "").strip() or None,
+                created_at=get_eat_time()
+            )
+            session.add(new_asset)
+            
+            # Log action
+            log_entry = AssetLog(
+                asset_id=new_asset.id,
+                action="create",
+                timestamp=get_eat_time(),
+                handled_by_id=admin.id,
+                notes="Asset registered via bulk CSV upload."
+            )
+            session.add(log_entry)
+            success_count += 1
+
+        if success_count > 0:
+            await session.commit()
+            await log_action(
+                session=session,
+                action_type="bulk_upload_assets",
+                user=admin,
+                table_name="assets",
+                record_id="bulk",
+                description=f"Bulk uploaded {success_count} assets via CSV",
+                request=request
+            )
+        
+        return {
+            "status": "success",
+            "message": f"Successfully imported {success_count} assets.",
+            "errors": error_rows
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        await session.rollback()
+        raise HTTPException(status_code=500, detail=f"CSV Import failed: {str(e)}")

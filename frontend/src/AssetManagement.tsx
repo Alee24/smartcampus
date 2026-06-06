@@ -10,11 +10,11 @@ import { QRCodeCanvas } from 'qrcode.react'
 
 interface Asset {
     id: string
-    tag_number: str
-    name: str
-    category: str
-    status: str
-    location: str
+    tag_number: string
+    name: string
+    category: string
+    status: string
+    location: string
     serial_number?: string
     purchase_date?: string
     cost: number
@@ -23,6 +23,12 @@ interface Asset {
     assigned_to_identifier?: string
     notes?: string
     created_at: string
+    handover_name?: string
+    handover_email?: string
+    handover_phone?: string
+    handover_no?: string
+    handover_department?: string
+    handover_date?: string
 }
 
 interface AssetLog {
@@ -33,6 +39,12 @@ interface AssetLog {
     handled_by_name: string
     borrower_name?: string
     notes?: string
+    handover_name?: string
+    handover_email?: string
+    handover_phone?: string
+    handover_no?: string
+    handover_department?: string
+    handover_date?: string
 }
 
 export default function AssetManagement() {
@@ -74,8 +86,19 @@ export default function AssetManagement() {
     })
     const [checkoutData, setCheckoutData] = useState({
         borrower_identifier: '',
+        handover_name: '',
+        handover_email: '',
+        handover_phone: '',
+        handover_no: '',
+        handover_department: '',
+        handover_date: new Date().toISOString().split('T')[0],
         notes: ''
     })
+    const [isManualHandover, setIsManualHandover] = useState(false)
+    const [showUploadModal, setShowUploadModal] = useState(false)
+    const [csvFile, setCsvFile] = useState<File | null>(null)
+    const [uploadingCsv, setUploadingCsv] = useState(false)
+    const [uploadResults, setUploadResults] = useState<{ message: string; errors: string[] } | null>(null)
     const [checkinNotes, setCheckinNotes] = useState('')
     const [maintenanceNotes, setMaintenanceNotes] = useState('')
     const [scanBarcode, setScanBarcode] = useState('')
@@ -238,23 +261,49 @@ export default function AssetManagement() {
     const handleCheckout = async (e: any) => {
         e.preventDefault()
         if (!showCheckoutModal) return
-        if (!checkoutData.borrower_identifier) {
+        
+        if (!isManualHandover && !checkoutData.borrower_identifier) {
             showNotification("Please specify the borrower's Admission Number, Email or ID.", "error")
             return
         }
+        if (isManualHandover && !checkoutData.handover_name) {
+            showNotification("Please enter the recipient's name.", "error")
+            return
+        }
+
         try {
             const token = localStorage.getItem('token')
+            const payload = {
+                borrower_identifier: isManualHandover ? null : checkoutData.borrower_identifier,
+                handover_name: isManualHandover ? checkoutData.handover_name : null,
+                handover_email: isManualHandover ? checkoutData.handover_email : null,
+                handover_phone: isManualHandover ? checkoutData.handover_phone : null,
+                handover_no: isManualHandover ? checkoutData.handover_no : null,
+                handover_department: isManualHandover ? checkoutData.handover_department : null,
+                handover_date: isManualHandover ? checkoutData.handover_date : null,
+                notes: checkoutData.notes
+            }
+
             const res = await fetch(`/api/assets/${showCheckoutModal.id}/checkout`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(checkoutData)
+                body: JSON.stringify(payload)
             })
             if (res.ok) {
                 setShowCheckoutModal(null)
-                setCheckoutData({ borrower_identifier: '', notes: '' })
+                setCheckoutData({
+                    borrower_identifier: '',
+                    handover_name: '',
+                    handover_email: '',
+                    handover_phone: '',
+                    handover_no: '',
+                    handover_department: '',
+                    handover_date: new Date().toISOString().split('T')[0],
+                    notes: ''
+                })
                 fetchAssets()
                 showNotification("Asset checked out successfully!", "success")
             } else {
@@ -263,6 +312,38 @@ export default function AssetManagement() {
             }
         } catch (e) {
             showNotification("Network error occurred.", "error")
+        }
+    }
+
+    const handleCsvUpload = async (e: any) => {
+        e.preventDefault()
+        if (!csvFile) return
+        setUploadingCsv(true)
+        setUploadResults(null)
+        try {
+            const token = localStorage.getItem('token')
+            const formData = new FormData()
+            formData.append('file', csvFile)
+            const res = await fetch('/api/assets/upload/csv', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            })
+            const data = await res.json()
+            if (res.ok) {
+                setUploadResults(data)
+                showNotification(data.message || "CSV upload processed successfully.", "success")
+                fetchAssets()
+                setCsvFile(null)
+            } else {
+                showNotification(data.detail || "Failed to process CSV file.", "error")
+            }
+        } catch (e) {
+            showNotification("Network error occurred during CSV upload.", "error")
+        } finally {
+            setUploadingCsv(false)
         }
     }
 
@@ -391,6 +472,16 @@ export default function AssetManagement() {
                 <div className="flex gap-2">
                     <button onClick={fetchAssets} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shadow-sm">
                         <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                    </button>
+                    <button
+                        onClick={() => {
+                            setUploadResults(null);
+                            setCsvFile(null);
+                            setShowUploadModal(true);
+                        }}
+                        className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-xl font-bold transition-all flex items-center gap-2 shadow-sm"
+                    >
+                        <FileText size={18} /> Bulk Import CSV
                     </button>
                     <button
                         onClick={() => {
@@ -533,9 +624,16 @@ export default function AssetManagement() {
                                                     </div>
                                                 </td>
                                                 <td className="p-4 text-sm font-semibold">
-                                                    {a.assigned_to_name ? (
+                                                                                    {a.handover_name ? (
                                                         <div className="flex flex-col">
-                                                            <span className="text-slate-800 dark:text-slate-100">{a.assigned_to_name}</span>
+                                                            <span className="text-slate-800 dark:text-slate-100 font-bold">{a.handover_name}</span>
+                                                            <span className="text-[10px] font-mono text-slate-400">
+                                                                {a.handover_no || a.handover_email || 'Manual Recipient'}
+                                                            </span>
+                                                        </div>
+                                                    ) : a.assigned_to_name ? (
+                                                        <div className="flex flex-col">
+                                                            <span className="text-slate-800 dark:text-slate-100 font-bold">{a.assigned_to_name}</span>
                                                             <span className="text-[10px] font-mono text-slate-400">{a.assigned_to_identifier}</span>
                                                         </div>
                                                     ) : (
@@ -940,36 +1038,118 @@ export default function AssetManagement() {
             {/* Check-out Modal */}
             {showCheckoutModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-scale-in text-center">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl animate-scale-in text-center overflow-y-auto max-h-[95vh]">
                         <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
                             <ArrowUpRight size={24} />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-white">Check-Out Asset</h3>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-white">Check-Out / Handover Asset</h3>
                         <p className="text-xs text-slate-400 mb-6">{showCheckoutModal.name} ({showCheckoutModal.tag_number})</p>
 
-                        <form onSubmit={handleCheckout} className="space-y-4">
-                            <div>
-                                <label className="block text-left text-xs font-bold text-slate-400 uppercase mb-1">Borrower Email / Admission No.</label>
-                                <input
-                                    required
-                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm"
-                                    placeholder="e.g. STD001 or student@test.com"
-                                    value={checkoutData.borrower_identifier}
-                                    onChange={e => setCheckoutData({ ...checkoutData, borrower_identifier: e.target.value })}
-                                />
-                            </div>
+                        <div className="flex items-center justify-center gap-4 mb-4 bg-slate-50 dark:bg-slate-800 p-2 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                            <button
+                                type="button"
+                                onClick={() => setIsManualHandover(false)}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${!isManualHandover ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-500'}`}
+                            >
+                                Registered User
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsManualHandover(true)}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${isManualHandover ? 'bg-white dark:bg-slate-700 text-blue-600 shadow-sm' : 'text-slate-500'}`}
+                            >
+                                Manual Handover
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleCheckout} className="space-y-4 text-left">
+                            {!isManualHandover ? (
+                                <div>
+                                    <label className="block text-left text-xs font-bold text-slate-400 uppercase mb-1">Borrower Email / Admission No.</label>
+                                    <input
+                                        required
+                                        className="w-full p-3 bg-slate-50 dark:bg-slate-800 border rounded-xl text-sm"
+                                        placeholder="e.g. STD001 or student@test.com"
+                                        value={checkoutData.borrower_identifier}
+                                        onChange={e => setCheckoutData({ ...checkoutData, borrower_identifier: e.target.value })}
+                                    />
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Recipient Full Name *</label>
+                                        <input
+                                            required
+                                            className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
+                                            placeholder="e.g. Jane Doe"
+                                            value={checkoutData.handover_name}
+                                            onChange={e => setCheckoutData({ ...checkoutData, handover_name: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Email Address</label>
+                                        <input
+                                            type="email"
+                                            className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
+                                            placeholder="e.g. jane.doe@example.com"
+                                            value={checkoutData.handover_email}
+                                            onChange={e => setCheckoutData({ ...checkoutData, handover_email: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Phone Number</label>
+                                            <input
+                                                className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
+                                                placeholder="e.g. +254700..."
+                                                value={checkoutData.handover_phone}
+                                                onChange={e => setCheckoutData({ ...checkoutData, handover_phone: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Staff / Student No. (e.g. RU01171)</label>
+                                            <input
+                                                className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
+                                                placeholder="e.g. RU01171"
+                                                value={checkoutData.handover_no}
+                                                onChange={e => setCheckoutData({ ...checkoutData, handover_no: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Department</label>
+                                            <input
+                                                className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
+                                                placeholder="e.g. Finance"
+                                                value={checkoutData.handover_department}
+                                                onChange={e => setCheckoutData({ ...checkoutData, handover_department: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Handover Date</label>
+                                            <input
+                                                type="date"
+                                                className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
+                                                value={checkoutData.handover_date}
+                                                onChange={e => setCheckoutData({ ...checkoutData, handover_date: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <div>
-                                <label className="block text-left text-xs font-bold text-slate-400 uppercase mb-1">Conditions / Notes</label>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-1 font-semibold text-slate-400 uppercase tracking-wider">Additional Notes</label>
                                 <textarea
                                     className="w-full p-3 bg-slate-50 dark:bg-slate-800 border rounded-xl text-xs"
-                                    placeholder="e.g. Borrowed for science lab demo..."
+                                    placeholder="e.g. Handover for teaching research activities..."
                                     value={checkoutData.notes}
                                     onChange={e => setCheckoutData({ ...checkoutData, notes: e.target.value })}
                                 />
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 pt-2">
                                 <button type="submit" className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm">
                                     Approve Check-Out
                                 </button>
@@ -1083,13 +1263,29 @@ export default function AssetManagement() {
                                 <span className="font-semibold text-slate-700 dark:text-slate-300">{showDetailModal.asset.location}</span>
                             </div>
                             <div>
-                                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Custodian</span>
-                                <span className="font-semibold text-slate-700 dark:text-slate-300">{showDetailModal.asset.assigned_to_name || "Central Inventory"}</span>
+                                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Custodian / Borrower</span>
+                                <span className="font-semibold text-slate-700 dark:text-slate-300 font-bold">
+                                    {showDetailModal.asset.handover_name || showDetailModal.asset.assigned_to_name || "Central Inventory"}
+                                </span>
                             </div>
                             <div>
                                 <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Onetime Cost</span>
-                                <span className="font-mono font-bold text-emerald-600">KES {showDetailModal.asset.cost.toLocaleString()}</span>
+                                <span className="font-mono font-bold text-emerald-600 font-mono">KES {showDetailModal.asset.cost.toLocaleString()}</span>
                             </div>
+
+                            {showDetailModal.asset.handover_name && (
+                                <div className="col-span-2 bg-blue-50/50 dark:bg-blue-900/10 p-3.5 rounded-xl border border-blue-100 dark:border-blue-800/40 text-xs space-y-1">
+                                    <p className="font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2">Handover / Allocation Details</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <p><span className="text-slate-400">Recipient Name:</span> <span className="font-bold text-slate-800 dark:text-slate-200 block mt-0.5">{showDetailModal.asset.handover_name}</span></p>
+                                        <p><span className="text-slate-400">Email:</span> <span className="font-bold text-slate-800 dark:text-slate-200 block mt-0.5">{showDetailModal.asset.handover_email || 'N/A'}</span></p>
+                                        <p><span className="text-slate-400">Phone:</span> <span className="font-bold text-slate-800 dark:text-slate-200 block mt-0.5">{showDetailModal.asset.handover_phone || 'N/A'}</span></p>
+                                        <p><span className="text-slate-400">Staff / Student No:</span> <span className="font-bold text-slate-800 dark:text-slate-200 font-mono block mt-0.5">{showDetailModal.asset.handover_no || 'N/A'}</span></p>
+                                        <p><span className="text-slate-400">Department:</span> <span className="font-bold text-slate-800 dark:text-slate-200 block mt-0.5">{showDetailModal.asset.handover_department || 'N/A'}</span></p>
+                                        <p><span className="text-slate-400">Date Handed Over:</span> <span className="font-bold text-slate-800 dark:text-slate-200 block mt-0.5">{showDetailModal.asset.handover_date || 'N/A'}</span></p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
@@ -1113,6 +1309,90 @@ export default function AssetManagement() {
                                 )}
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* CSV Bulk Upload Modal */}
+            {showUploadModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl animate-scale-in relative max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-2">
+                                <FileText className="text-blue-600" size={24} />
+                                Bulk Import Assets via CSV
+                            </h3>
+                            <button 
+                                onClick={() => { setShowUploadModal(false); setUploadResults(null); }} 
+                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-800/40 text-xs mb-6 space-y-2">
+                            <p className="font-bold text-blue-600 dark:text-blue-400">Step 1: Download CSV Template</p>
+                            <p className="text-[var(--text-secondary)]">Populate the template using any spreadsheet editor (Excel, Google Sheets). Use the correct column formats. Barcode tags (e.g. <b>RU01171</b>) must be unique.</p>
+                            <a 
+                                href="/api/assets/template/csv" 
+                                download 
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors mt-2"
+                            >
+                                <FileText size={14} /> Download Template
+                            </a>
+                        </div>
+
+                        <form onSubmit={handleCsvUpload} className="space-y-4">
+                            <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-blue-500 rounded-2xl p-6 text-center transition-colors relative cursor-pointer">
+                                <input 
+                                    type="file" 
+                                    accept=".csv"
+                                    required
+                                    onChange={e => setCsvFile(e.target.files?.[0] || null)}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                />
+                                <div className="space-y-2">
+                                    <FileText className="mx-auto text-slate-400" size={36} />
+                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                                        {csvFile ? csvFile.name : "Select CSV File"}
+                                    </p>
+                                    <p className="text-xs text-slate-400">
+                                        {csvFile ? `${(csvFile.size / 1024).toFixed(2)} KB` : "Click or drag & drop asset CSV here"}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button 
+                                type="submit" 
+                                disabled={uploadingCsv || !csvFile}
+                                className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
+                            >
+                                {uploadingCsv ? (
+                                    <>
+                                        <Loader2 className="animate-spin" size={18} />
+                                        Uploading assets...
+                                    </>
+                                ) : "Upload & Parse CSV"}
+                            </button>
+                        </form>
+
+                        {/* Import Results Logs */}
+                        {uploadResults && (
+                            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4">
+                                <div className="p-4 rounded-xl bg-green-50 dark:bg-green-950/20 text-xs font-bold text-green-700 dark:text-green-400">
+                                    {uploadResults.message}
+                                </div>
+                                {uploadResults.errors && uploadResults.errors.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-black text-red-500 uppercase tracking-wider">Failed Rows ({uploadResults.errors.length})</p>
+                                        <div className="bg-red-50/50 dark:bg-red-950/10 p-3 rounded-xl border border-red-100 dark:border-red-800/40 text-[10px] text-red-600 dark:text-red-400 font-mono space-y-1 max-h-36 overflow-y-auto">
+                                            {uploadResults.errors.map((err, i) => (
+                                                <p key={i}>• {err}</p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
