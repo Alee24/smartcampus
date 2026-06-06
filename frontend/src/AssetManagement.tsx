@@ -158,6 +158,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
         category: 'electronics',
         status: 'available',
         location: 'General',
+        department: '',
         serial_number: '',
         purchase_date: new Date().toISOString().split('T')[0],
         cost: 0.0,
@@ -243,7 +244,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
 
     const generateTagNumber = () => {
         const num = Math.floor(100000 + Math.random() * 900000)
-        setNewAsset(prev => ({ ...prev, tag_number: `AST-${num}` }))
+        setNewAsset(prev => ({ ...prev, tag_number: `RU-${num}` }))
     }
 
     const handleCreateAsset = async (e: any) => {
@@ -270,6 +271,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                     category: 'electronics',
                     status: 'available',
                     location: 'General',
+                    department: '',
                     serial_number: '',
                     purchase_date: new Date().toISOString().split('T')[0],
                     cost: 0.0,
@@ -699,9 +701,16 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                                             </span>
                                                         </td>
                                                         <td className="p-4 text-xs font-bold text-slate-600 dark:text-slate-300">
-                                                            <div className="flex items-center gap-1">
-                                                                <MapPin size={12} className="text-slate-400" />
-                                                                {a.location}
+                                                            <div className="flex flex-col">
+                                                                <span className="flex items-center gap-1">
+                                                                    <MapPin size={12} className="text-slate-400" />
+                                                                    {a.location}
+                                                                </span>
+                                                                {a.department && (
+                                                                    <span className="text-[10px] text-slate-400 font-mono mt-0.5 ml-4">
+                                                                        Dept: {a.department}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </td>
                                                         <td className="p-4 text-sm font-semibold">
@@ -1549,6 +1558,16 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                 </div>
                             </div>
 
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Department</label>
+                                <input
+                                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
+                                    placeholder="e.g. Finance, Stores"
+                                    value={newAsset.department}
+                                    onChange={e => setNewAsset({ ...newAsset, department: e.target.value })}
+                                />
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Serial Number</label>
@@ -1640,6 +1659,16 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                         onChange={e => setShowEditModal({ ...showEditModal, location: e.target.value })}
                                     />
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Department</label>
+                                <input
+                                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
+                                    placeholder="e.g. Finance, Stores"
+                                    value={showEditModal.department || ''}
+                                    onChange={e => setShowEditModal({ ...showEditModal, department: e.target.value })}
+                                />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

@@ -645,6 +645,7 @@ class Asset(UUIDModel, table=True):
     category: str = Field(default="electronics", index=True) # electronics, furniture, lab_equipment, sports_equipment, general
     status: str = Field(default="available", index=True) # available, checked_out, maintenance, disposed
     location: str = Field(default="General", index=True) # e.g., LH1, Lab 1
+    department: Optional[str] = Field(default=None, index=True)
     serial_number: Optional[str] = None
     purchase_date: Optional[date] = None
     cost: float = Field(default=0.0)

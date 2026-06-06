@@ -21,6 +21,7 @@ class AssetCreate(BaseModel):
     category: str = "electronics"
     status: str = "available"
     location: str = "General"
+    department: Optional[str] = None
     serial_number: Optional[str] = None
     purchase_date: Optional[date_type] = None
     cost: float = 0.0
@@ -33,6 +34,7 @@ class AssetUpdate(BaseModel):
     category: Optional[str] = None
     status: Optional[str] = None
     location: Optional[str] = None
+    department: Optional[str] = None
     serial_number: Optional[str] = None
     purchase_date: Optional[date_type] = None
     cost: Optional[float] = None
@@ -74,6 +76,7 @@ class AssetResponse(BaseModel):
     category: str
     status: str
     location: str
+    department: Optional[str] = None
     serial_number: Optional[str] = None
     purchase_date: Optional[str] = None
     cost: float
@@ -165,6 +168,7 @@ async def get_assets(
                     category=a.category,
                     status=a.status,
                     location=a.location,
+                    department=a.department,
                     serial_number=a.serial_number,
                     purchase_date=a.purchase_date.isoformat() if a.purchase_date else None,
                     cost=a.cost,
@@ -204,6 +208,7 @@ async def create_asset(
             category=asset_data.category,
             status=asset_data.status,
             location=asset_data.location,
+            department=asset_data.department,
             serial_number=asset_data.serial_number,
             purchase_date=asset_data.purchase_date,
             cost=asset_data.cost,
@@ -243,6 +248,7 @@ async def create_asset(
             category=new_asset.category,
             status=new_asset.status,
             location=new_asset.location,
+            department=new_asset.department,
             serial_number=new_asset.serial_number,
             purchase_date=new_asset.purchase_date.isoformat() if new_asset.purchase_date else None,
             cost=new_asset.cost,
@@ -679,9 +685,9 @@ async def download_csv_template(
     admin: User = Depends(get_current_admin)
 ):
     # Plain CSV headers
-    csv_content = "tag_number,name,category,status,location,serial_number,purchase_date,cost,notes\n"
-    csv_content += "RU01171,Dell Latitude Laptop,electronics,available,Main Library,SN-987654321,2026-05-15,75000.00,Academic staff laptop\n"
-    csv_content += "RU01172,Lecture Hall Projector,electronics,available,LH-03,PJ-776352,2026-04-10,120000.00,High definition projector\n"
+    csv_content = "tag_number,name,category,status,location,department,serial_number,purchase_date,cost,notes\n"
+    csv_content += "RU-01171,Dell Latitude Laptop,electronics,available,Main Library,Finance,SN-987654321,2026-05-15,75000.00,Academic staff laptop\n"
+    csv_content += "RU-01172,Lecture Hall Projector,electronics,available,LH-03,IT,PJ-776352,2026-04-10,120000.00,High definition projector\n"
     
     from fastapi import Response
     return Response(
@@ -775,6 +781,7 @@ async def upload_assets_csv(
                 category=category,
                 status=status_val,
                 location=row.get("location", "General").strip() or "General",
+                department=row.get("department", "").strip() or None,
                 serial_number=row.get("serial_number", "").strip() or None,
                 purchase_date=p_date,
                 cost=cost,
