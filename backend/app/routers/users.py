@@ -408,18 +408,18 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
         async_session_factory = sessionmaker(engine, class_=SAAsyncSession, expire_on_commit=False)
 
         async with async_session_factory() as session:
-             # Parse CSV (Resilient decoding: try utf-8-sig, cp1252, latin-1)
-             decoded = None
-             for enc in ["utf-8-sig", "cp1252", "latin-1"]:
-                 try:
-                     decoded = content.decode(enc)
-                     break
-                 except UnicodeDecodeError:
-                     continue
-             if decoded is None:
-                 decoded = content.decode("utf-8", errors="replace")
-                 
-             rows = list(csv.DictReader(io.StringIO(decoded)))
+            # Parse CSV (Resilient decoding: try utf-8-sig, cp1252, latin-1)
+            decoded = None
+            for enc in ["utf-8-sig", "cp1252", "latin-1"]:
+                try:
+                    decoded = content.decode(enc)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            if decoded is None:
+                decoded = content.decode("utf-8", errors="replace")
+                
+            rows = list(csv.DictReader(io.StringIO(decoded)))
 
             if not rows:
                 _upload_jobs[job_id] = {"status": "done", "added": 0, "updated": 0, "errors": 0, "error_details": ["CSV is empty"], "total_processed": 0}
