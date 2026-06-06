@@ -635,3 +635,38 @@ class NoticeBoardItem(UUIDModel, table=True):
     author_name: str
     author_role: str
     created_at: datetime = Field(default_factory=get_eat_time)
+
+# --- Asset Tracking & Management System Models ---
+class Asset(UUIDModel, table=True):
+    __tablename__ = "assets"
+
+    tag_number: str = Field(unique=True, index=True) # e.g. AST-0001
+    name: str = Field(index=True)
+    category: str = Field(default="electronics", index=True) # electronics, furniture, lab_equipment, sports_equipment, general
+    status: str = Field(default="available", index=True) # available, checked_out, maintenance, disposed
+    location: str = Field(default="General", index=True) # e.g., LH1, Lab 1
+    serial_number: Optional[str] = None
+    purchase_date: Optional[date] = None
+    cost: float = Field(default=0.0)
+    assigned_to_id: Optional[UUID] = Field(default=None, foreign_key="users.id", nullable=True)
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=get_eat_time)
+
+    # Relationships
+    assigned_to: Optional["User"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[Asset.assigned_to_id]"})
+    logs: List["AssetLog"] = Relationship(back_populates="asset", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+
+class AssetLog(UUIDModel, table=True):
+    __tablename__ = "asset_logs"
+
+    asset_id: UUID = Field(foreign_key="assets.id")
+    user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", nullable=True)
+    action: str = Field(index=True) # check_out, check_in, maintenance, dispose, create
+    timestamp: datetime = Field(default_factory=get_eat_time, index=True)
+    handled_by_id: UUID = Field(foreign_key="users.id")
+    notes: Optional[str] = None
+
+    # Relationships
+    asset: Asset = Relationship(back_populates="logs")
+    user: Optional["User"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[AssetLog.user_id]"})
+    handled_by: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[AssetLog.handled_by_id]"})

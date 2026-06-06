@@ -24,7 +24,6 @@ engine = create_async_engine(
     max_overflow=20,
     pool_timeout=30,
 )
-
 async def init_db():
     async with engine.begin() as conn:
         # await conn.run_sync(SQLModel.metadata.drop_all)
@@ -38,7 +37,7 @@ async def init_db():
     await migrate_system_configs()
     await migrate_notice_board()
     await migrate_gate_exits()
-
+    await migrate_assets()
 async def get_session() -> AsyncSession:
     async_session = sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
@@ -303,4 +302,51 @@ async def migrate_gate_exits():
             print("Gate exits schema migration checked/applied successfully.")
     except Exception as e:
         print(f"Gate exits schema migration skipped/failed: {e}")
+
+async def migrate_assets():
+    """Manual migration to create assets and asset_logs tables if they don't exist."""
+    print("Checking assets and asset_logs tables...")
+    try:
+        async with engine.begin() as conn:
+            # Create assets table
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS assets (
+                    id VARCHAR(36) NOT NULL,
+                    tag_number VARCHAR(100) NOT NULL,
+                    name VARCHAR(255) NOT NULL,
+                    category VARCHAR(100) DEFAULT 'electronics',
+                    status VARCHAR(100) DEFAULT 'available',
+                    location VARCHAR(255) DEFAULT 'General',
+                    serial_number VARCHAR(255) DEFAULT NULL,
+                    purchase_date DATE DEFAULT NULL,
+                    cost DOUBLE DEFAULT 0.0,
+                    assigned_to_id VARCHAR(36) DEFAULT NULL,
+                    notes TEXT DEFAULT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY (tag_number),
+                    KEY (category),
+                    KEY (status),
+                    KEY (location)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """))
+            # Create asset_logs table
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS asset_logs (
+                    id VARCHAR(36) NOT NULL,
+                    asset_id VARCHAR(36) NOT NULL,
+                    user_id VARCHAR(36) DEFAULT NULL,
+                    action VARCHAR(100) NOT NULL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    handled_by_id VARCHAR(36) NOT NULL,
+                    notes TEXT DEFAULT NULL,
+                    PRIMARY KEY (id),
+                    KEY (asset_id),
+                    KEY (user_id),
+                    KEY (action)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """))
+            print("Assets and asset_logs tables checked/created successfully.")
+    except Exception as e:
+        print(f"Assets table migration skipped/failed: {e}")
 

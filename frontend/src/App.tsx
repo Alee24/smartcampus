@@ -53,6 +53,7 @@ const AdminDashboard = lazy(() => import('./AdminDashboard'))
 const LecturerDashboard = lazy(() => import('./LecturerDashboard'))
 const QRRegistry = lazy(() => import('./QRRegistry'))
 const NoticeBoard = lazy(() => import('./NoticeBoard'))
+const AssetManagement = lazy(() => import('./AssetManagement'))
 
 // 3. Non-lazy components (small/critical)
 import InstallPWA, { InstallPWATrigger } from './components/InstallPWA'
@@ -137,7 +138,8 @@ function App() {
         support: false,
         legal: false,
         fleet: false,
-        admin: false
+        admin: false,
+        assets: false
     })
     const toggleGroup = (key: string) => {
         setOpenGroups((prev: any) => {
@@ -783,6 +785,18 @@ function App() {
                         />
                     </SidebarGroup>
                 )}
+
+                {/* Asset Tracking & Management */}
+                {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                    <SidebarGroup title="Asset Management" isOpen={openGroups.assets} onToggle={() => toggleGroup('assets')} isSidebarCollapsed={isSidebarCollapsed}>
+                        <NavItem
+                            icon={<Briefcase size={18} />}
+                            label="Campus Assets"
+                            active={activeTab === 'assets'}
+                            onClick={() => { setActiveTab('assets'); setSidebarOpen(false); }}
+                        />
+                    </SidebarGroup>
+                )}
             </>
         )
     }
@@ -1160,6 +1174,7 @@ function App() {
                     {activeTab === 'geofencing' && <Geofencing />}
                     {activeTab === 'id-printing' && <IDPrinting />}
                     {activeTab === 'qr-registry' && <QRRegistry />}
+                    {activeTab === 'assets' && <AssetManagement />}
                     <footer className="mt-10 pt-6 border-t border-[var(--border-color)] text-center text-sm text-[var(--text-secondary)]">
                         <p>&copy; {new Date().getFullYear()} Smart Campus System.</p>
                     </footer>

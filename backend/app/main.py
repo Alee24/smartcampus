@@ -787,11 +787,13 @@ app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(gate_control.router, prefix="/api/gate", tags=["gate"])
 app.include_router(attendance.router, prefix="/api/attendance", tags=["attendance"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
-
 # Import and include fleet router
 from app.routers import fleet
 app.include_router(fleet.router, prefix="/api/fleet", tags=["fleet"])
 
+# Import and include assets router
+from app.routers import assets
+app.include_router(assets.router, prefix="/api/assets", tags=["assets"])
 # Import and include notifications router
 from app.routers import notifications
 app.include_router(notifications.router, prefix="/api", tags=["notifications"])
