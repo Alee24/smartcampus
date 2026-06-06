@@ -671,7 +671,8 @@ async def register(
     # 0. Check Permissions
     # Fetch role name
     admin_role = await session.get(Role, current_user.role_id)
-    if not admin_role or admin_role.name != "SuperAdmin":
+    allowed_creator_roles = ["SuperAdmin", "Admin", "Management"]
+    if not admin_role or admin_role.name not in allowed_creator_roles:
         raise HTTPException(status_code=403, detail="Not authorized to create users")
 
     # 1. Validation

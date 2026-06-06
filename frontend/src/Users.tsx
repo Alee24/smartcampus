@@ -282,7 +282,7 @@ export default function Users() {
         total: users.length,
         active: users.filter(u => ['active', 'Active', 'Registered'].includes(u.status)).length,
         students: users.filter(u => u.role === 'Student').length,
-        staff: users.filter(u => u.role === 'Lecturer' || u.role === 'Admin' || u.role === 'Security' || u.role === 'Driver').length
+        staff: users.filter(u => ['Lecturer', 'Admin', 'SuperAdmin', 'Security Lead', 'Guard', 'Security', 'Staff', 'Management', 'Stores', 'Driver'].includes(u.role)).length
     }
 
     if (loading) {
@@ -402,7 +402,13 @@ export default function Users() {
                             <option value="student">Students</option>
                             <option value="lecturer">Lecturers</option>
                             <option value="admin">Admins</option>
-                            <option value="security">Security</option>
+                            <option value="security lead">Security Lead</option>
+                            <option value="guard">Guards</option>
+                            <option value="staff">Staff</option>
+                            <option value="guest">Guests</option>
+                            <option value="management">Management</option>
+                            <option value="stores">Stores</option>
+                            <option value="guardian">Guardians</option>
                             <option value="driver">Drivers</option>
                         </select>
                     </div>
@@ -1020,43 +1026,43 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
         }
     }
 
-    // Modern "Slide-over" with NO dark backdrop
+    // Professional Centered Modal Dialog
     return (
-        <>
-            {/* Invisible overlay to catch clicks outside */}
-            <div
-                className="fixed inset-0 z-40 bg-transparent"
-                onClick={onClose}
-            ></div>
-
-            {/* The Panel */}
-            <div className="fixed inset-y-0 right-0 z-50 w-full md:w-[480px] bg-white dark:bg-gray-900 shadow-2xl border-l border-gray-100 dark:border-gray-800 transform transition-transform animate-slide-in-right flex flex-col">
-
+        <div 
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in"
+            onClick={onClose}
+        >
+            {/* The Modal Container */}
+            <div 
+                className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-scale-in flex flex-col max-h-[90vh]"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header Actions */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-gray-800">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
                     <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
-                        {isEditing ? 'Edit User Profile' : 'User Profile'}
+                        {isEditing ? 'Edit User Profile' : 'User Profile Details'}
                     </h2>
                     <div className="flex items-center gap-2">
                         {isEditing ? (
                             <button
                                 onClick={() => setIsEditing(false)}
-                                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                className="px-4 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all"
                             >
                                 Cancel
                             </button>
                         ) : (
                             <button
                                 onClick={() => setIsEditing(true)}
-                                className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                                className="px-4 py-2 text-sm font-semibold text-purple-600 bg-purple-50 dark:bg-purple-950/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-xl transition-all flex items-center gap-1.5"
                                 title="Edit Profile"
                             >
-                                <Edit size={20} />
+                                <Edit size={16} />
+                                Edit Details
                             </button>
                         )}
                         <button
                             onClick={onClose}
-                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all"
                         >
                             <X size={20} />
                         </button>
@@ -1064,55 +1070,57 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                 </div>
 
                 {/* Scrollable Content */}
-                <div className="flex-1 overflow-y-auto p-6">
-                    {/* Identity Section */}
-                    <div className="flex flex-col items-center mb-8">
-                        <div className="relative group">
+                <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+                    {/* Identity Banner */}
+                    <div className="flex flex-col sm:flex-row items-center gap-6 bg-gray-50 dark:bg-gray-800/30 p-6 rounded-2xl border border-gray-100 dark:border-gray-800/50">
+                        <div className="relative group shrink-0">
                             {editForm.profile_image ? (
                                 <img
                                     src={editForm.profile_image}
                                     alt={editForm.full_name || user.full_name}
-                                    className="w-32 h-32 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-lg transition-transform duration-200 group-hover:scale-105"
+                                    className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-gray-800 shadow-md transition-transform duration-200 group-hover:scale-105"
                                 />
                             ) : (
-                                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-5xl font-bold shadow-lg">
+                                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-3xl font-bold shadow-md">
                                     {(editForm.full_name || user.full_name)?.charAt(0) || '?'}
                                 </div>
                             )}
-                            <div className={`absolute bottom-1 right-1 w-6 h-6 border-4 border-white dark:border-gray-900 rounded-full ${editForm.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                            <div className={`absolute bottom-0 right-0 w-5 h-5 border-4 border-white dark:border-gray-900 rounded-full ${editForm.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                             
                             {isEditing && (
                                 <div className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 cursor-pointer">
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="text-white hover:text-purple-300 p-1 flex items-center gap-1 text-xs font-semibold"
-                                        title="Upload New Photo"
+                                        className="text-white hover:text-purple-300 p-1 flex items-center gap-1 text-[10px] font-bold"
                                     >
-                                        <Camera size={16} />
+                                        <Camera size={12} />
                                         <span>Change</span>
                                     </button>
-                                    {editForm.profile_image && (
-                                        <button
-                                            type="button"
-                                            onClick={handleRemovePhoto}
-                                            className="text-red-400 hover:text-red-300 p-1 flex items-center gap-1 text-xs font-semibold"
-                                            title="Remove Photo"
-                                        >
-                                            <Trash2 size={16} />
-                                            <span>Remove</span>
-                                        </button>
-                                    )}
                                 </div>
                             )}
                         </div>
 
+                        <div className="text-center sm:text-left space-y-2 flex-1">
+                            <h3 className="text-2xl font-black text-gray-900 dark:text-gray-100">
+                                {editForm.first_name || editForm.last_name ? `${editForm.first_name || ''} ${editForm.last_name || ''}`.trim() : user.full_name}
+                            </h3>
+                            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                                <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-black uppercase tracking-wide border border-purple-200 dark:border-purple-800">
+                                    {editForm.role || user.role}
+                                </span>
+                                <span className="text-gray-500 dark:text-gray-400 font-mono text-sm font-semibold">
+                                    {editForm.admission_number || user.admission_number}
+                                </span>
+                            </div>
+                        </div>
+
                         {isEditing && (
-                            <div className="mt-3 flex gap-2">
+                            <div className="flex flex-col gap-2 shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="px-3 py-1 text-xs bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-lg font-medium transition-colors flex items-center gap-1"
+                                    className="px-3 py-2 text-xs bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-xl font-bold transition-all flex items-center gap-1.5 border border-purple-200 dark:border-purple-800"
                                 >
                                     <Camera size={14} /> Upload Photo
                                 </button>
@@ -1120,286 +1128,222 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                                     <button
                                         type="button"
                                         onClick={handleRemovePhoto}
-                                        className="px-3 py-1 text-xs bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg font-medium transition-colors flex items-center gap-1"
+                                        className="px-3 py-2 text-xs bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-xl font-bold transition-all flex items-center gap-1.5 border border-red-200 dark:border-red-900"
                                     >
                                         <Trash2 size={14} /> Remove Photo
                                     </button>
                                 )}
                             </div>
                         )}
-
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileChange}
-                            accept="image/*"
-                            className="hidden"
-                        />
-
-                        {!isEditing && (
-                            <div className="text-center mt-4">
-                                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{user.full_name}</h3>
-                                <div className="flex items-center justify-center gap-2 mt-2">
-                                    <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-bold uppercase tracking-wide">
-                                        {user.role}
-                                    </span>
-                                    <span className="text-gray-500 dark:text-gray-400 font-mono text-sm">
-                                        {user.admission_number}
-                                    </span>
-                                </div>
-                            </div>
-                        )}
                     </div>
 
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept="image/*"
+                        className="hidden"
+                    />
+
                     {isEditing ? (
-                        /* EDIT FORM */
-                        <div className="space-y-6 animate-fade-in">
-                            {/* Personal Information */}
-                            <div className="bg-gray-50 dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800 space-y-4">
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Personal Details</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">First Name</label>
-                                        <input
-                                            type="text"
-                                            value={editForm.first_name || ''}
-                                            onChange={e => setEditForm({ ...editForm, first_name: e.target.value })}
-                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Last Name</label>
-                                        <input
-                                            type="text"
-                                            value={editForm.last_name || ''}
-                                            onChange={e => setEditForm({ ...editForm, last_name: e.target.value })}
-                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Email Address</label>
-                                        <input
-                                            type="email"
-                                            value={editForm.email || ''}
-                                            onChange={e => setEditForm({ ...editForm, email: e.target.value })}
-                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Phone Number</label>
-                                        <input
-                                            type="text"
-                                            value={editForm.phone_number || ''}
-                                            onChange={e => setEditForm({ ...editForm, phone_number: e.target.value })}
-                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Gender</label>
-                                        <select
-                                            value={editForm.gender || ''}
-                                            onChange={e => setEditForm({ ...editForm, gender: e.target.value })}
-                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
-                                        >
-                                            <option value="">Select Gender</option>
-                                            <option value="male">Male</option>
-                                            <option value="female">Female</option>
-                                            <option value="other">Other</option>
-                                        </select>
-                                    </div>
-                                </div>
+                        /* EDIT FORM IN CENTER MODAL */
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">First Name</label>
+                                <input
+                                    type="text"
+                                    value={editForm.first_name || ''}
+                                    onChange={e => setEditForm({ ...editForm, first_name: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-purple-500 text-gray-800 dark:text-white"
+                                />
                             </div>
-
-                            {/* Institution Profile */}
-                            <div className="bg-gray-50 dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800 space-y-4">
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Institution Profile</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Admission / ID Number</label>
-                                        <input
-                                            type="text"
-                                            value={editForm.admission_number || ''}
-                                            onChange={e => setEditForm({ ...editForm, admission_number: e.target.value })}
-                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white font-mono"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">User Role</label>
-                                        <select
-                                            value={editForm.role || ''}
-                                            onChange={e => setEditForm({ ...editForm, role: e.target.value })}
-                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
-                                        >
-                                            <option value="student">Student</option>
-                                            <option value="staff">Staff</option>
-                                            <option value="gatekeeper">Gatekeeper</option>
-                                            <option value="admin">Admin</option>
-                                        </select>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Program / Course</label>
-                                        <input
-                                            type="text"
-                                            value={editForm.program || ''}
-                                            onChange={e => setEditForm({ ...editForm, program: e.target.value })}
-                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">School / Department</label>
-                                        <input
-                                            type="text"
-                                            value={editForm.school || ''}
-                                            onChange={e => setEditForm({ ...editForm, school: e.target.value })}
-                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
-                                        />
-                                    </div>
-                                </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Last Name</label>
+                                <input
+                                    type="text"
+                                    value={editForm.last_name || ''}
+                                    onChange={e => setEditForm({ ...editForm, last_name: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-purple-500 text-gray-800 dark:text-white"
+                                />
                             </div>
-
-                            {/* Account Administration */}
-                            <div className="bg-gray-50 dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800 space-y-4">
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Account Settings</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Account Status</label>
-                                        <select
-                                            value={editForm.status || 'active'}
-                                            onChange={e => setEditForm({ ...editForm, status: e.target.value })}
-                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
-                                        >
-                                            <option value="active">Active</option>
-                                            <option value="suspended">Suspended</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Expiry Date</label>
-                                        <input
-                                            type="date"
-                                            value={editForm.expiry_date ? editForm.expiry_date.split('T')[0] : ''}
-                                            onChange={e => setEditForm({ ...editForm, expiry_date: e.target.value })}
-                                            className="w-full px-4 py-2 text-sm rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all text-gray-950 dark:text-white"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="pt-2 flex justify-between gap-3 border-t border-gray-200/50 dark:border-gray-700/50">
-                                    <button
-                                        type="button"
-                                        onClick={handleResetPassword}
-                                        className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-bold transition-all"
-                                    >
-                                        <Key size={14} /> Reset Password
-                                    </button>
-                                </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Email Address</label>
+                                <input
+                                    type="email"
+                                    value={editForm.email || ''}
+                                    onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-purple-500 text-gray-800 dark:text-white"
+                                />
                             </div>
-
-                            <div className="pt-4 flex gap-3">
-                                <button
-                                    onClick={handleUpdate}
-                                    className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl hover:shadow-purple-500/10 transition-all active:scale-[0.98]"
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Phone Number</label>
+                                <input
+                                    type="text"
+                                    value={editForm.phone_number || ''}
+                                    onChange={e => setEditForm({ ...editForm, phone_number: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-purple-500 text-gray-800 dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Gender</label>
+                                <select
+                                    value={editForm.gender || ''}
+                                    onChange={e => setEditForm({ ...editForm, gender: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-purple-500 text-gray-800 dark:text-white"
                                 >
-                                    Save Changes
-                                </button>
-                                <button
-                                    onClick={() => setIsEditing(false)}
-                                    className="px-5 py-3 bg-gray-100 hover:bg-gray-250 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-xl font-bold transition-all"
+                                    <option value="">Select Gender</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">User Role</label>
+                                <select
+                                    value={editForm.role || ''}
+                                    onChange={e => setEditForm({ ...editForm, role: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-purple-500 text-gray-800 dark:text-white"
                                 >
-                                    Cancel
-                                </button>
+                                    <option value="Student">Student</option>
+                                    <option value="Staff">Staff</option>
+                                    <option value="Admin">Admin</option>
+                                    <option value="Security Lead">Security Lead</option>
+                                    <option value="Guard">Guard</option>
+                                    <option value="Guest">Guest</option>
+                                    <option value="Management">Management</option>
+                                    <option value="Stores">Stores</option>
+                                    <option value="Lecturer">Lecturer</option>
+                                    <option value="Guardian">Guardian</option>
+                                </select>
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Program / Course</label>
+                                <input
+                                    type="text"
+                                    value={editForm.program || ''}
+                                    onChange={e => setEditForm({ ...editForm, program: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-purple-500 text-gray-800 dark:text-white"
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">School / Department</label>
+                                <input
+                                    type="text"
+                                    value={editForm.school || ''}
+                                    onChange={e => setEditForm({ ...editForm, school: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-purple-500 text-gray-800 dark:text-white"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Account Status</label>
+                                <select
+                                    value={editForm.status || 'Active'}
+                                    onChange={e => setEditForm({ ...editForm, status: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-purple-500 text-gray-800 dark:text-white"
+                                >
+                                    <option value="Active">Active</option>
+                                    <option value="Suspended">Suspended</option>
+                                    <option value="Graduated">Graduated</option>
+                                    <option value="Registered">Registered</option>
+                                    <option value="Deferred">Deferred</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Expiry Date</label>
+                                <input
+                                    type="date"
+                                    value={editForm.expiry_date ? editForm.expiry_date.split('T')[0] : ''}
+                                    onChange={e => setEditForm({ ...editForm, expiry_date: e.target.value })}
+                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border-none rounded-xl text-sm outline-none focus:ring-1 focus:ring-purple-500 text-gray-800 dark:text-white"
+                                />
                             </div>
                         </div>
                     ) : (
-                        /* READ ONLY DETAILS */
-                        <div className="space-y-6">
-                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Contact Information</h4>
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center text-blue-500 shadow-sm border border-gray-100 dark:border-gray-700">
-                                            <Mail size={18} />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-500 font-medium">Email Address</p>
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{user.email || 'Not set'}</p>
-                                        </div>
+                        /* READ ONLY DETAILS IN CENTER MODAL */
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
+                            {/* Contact Details Card */}
+                            <div className="bg-gray-50 dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800/50 space-y-4">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><Mail size={12} /> Contact Information</h4>
+                                <div className="space-y-3">
+                                    <div>
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase">Email Address</p>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate mt-0.5">{user.email || 'Not registered'}</p>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center text-green-500 shadow-sm border border-gray-100 dark:border-gray-700">
-                                            <Phone size={18} />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-500 font-medium">Phone Number</p>
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{user.phone_number || 'Not set'}</p>
-                                        </div>
+                                    <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase">Phone Number</p>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-0.5">{user.phone_number || 'Not registered'}</p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Academic & Status</h4>
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center text-purple-500 shadow-sm border border-gray-100 dark:border-gray-700">
-                                            <Building size={18} />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-500 font-medium">School / Department</p>
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{user.school || 'Not set'}</p>
-                                        </div>
+                            {/* Academic & Operations Details Card */}
+                            <div className="bg-gray-50 dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800/50 space-y-4">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><Building size={12} /> Academic / Organization</h4>
+                                <div className="space-y-3">
+                                    <div>
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase">School / Department</p>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-0.5">{user.school || 'General'}</p>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center text-orange-500 shadow-sm border border-gray-100 dark:border-gray-700">
-                                            <Shield size={18} />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-500 font-medium">Account Status</p>
-                                            <div className="flex items-center gap-2">
-                                                <span className={`w-2 h-2 rounded-full ${user.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                                                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 capitalize">{user.status}</p>
-                                            </div>
-                                        </div>
+                                    <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase">Program / Course</p>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-0.5">{user.program || 'N/A'}</p>
                                     </div>
                                 </div>
                             </div>
+
                         </div>
                     )}
                 </div>
 
-                {/* Footer Actions (Only visible when not editing) */}
-                {!isEditing && (
-                    <div className="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900">
-                        <div className="grid grid-cols-2 gap-3">
+                {/* Footer Controls */}
+                <div className="px-6 py-5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/40 flex flex-col gap-3">
+                    {isEditing ? (
+                        <div className="flex justify-end gap-2 w-full">
                             <button
-                                onClick={handleStatusToggle}
-                                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold transition-all shadow-sm border ${user.status === 'active'
-                                    ? 'bg-white text-red-600 border-gray-200 hover:bg-red-50 hover:border-red-200'
-                                    : 'bg-green-600 text-white border-transparent hover:bg-green-700 shadow-green-500/20'
-                                    }`}
+                                onClick={() => setIsEditing(false)}
+                                className="px-5 py-3 bg-gray-150 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-bold rounded-xl hover:bg-gray-200 transition-all"
                             >
-                                {user.status === 'active' ? <Ban size={18} /> : <Power size={18} />}
-                                {user.status === 'active' ? 'Suspend' : 'Activate'}
+                                Cancel
                             </button>
-
                             <button
-                                onClick={handleResetPassword}
-                                className="flex items-center justify-center gap-2 px-4 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-xl font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm"
+                                onClick={handleUpdate}
+                                className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold rounded-xl shadow-lg hover:shadow-xl transition-all"
                             >
-                                <Key size={18} />
-                                Reset Pwd
+                                Save Changes
                             </button>
                         </div>
-                        <button
-                            onClick={handleDelete}
-                            className="w-full mt-3 flex items-center justify-center gap-2 text-gray-400 hover:text-red-500 text-sm font-medium transition-colors py-2"
-                        >
-                            <Trash2 size={16} />
-                            Permanently Delete User
-                        </button>
-                    </div>
-                )}
+                    ) : (
+                        <div className="w-full flex flex-col sm:flex-row justify-between items-center gap-3">
+                            <button
+                                onClick={handleDelete}
+                                className="text-red-500 hover:text-red-700 text-xs font-bold flex items-center gap-1.5 transition-all py-2 order-last sm:order-first"
+                            >
+                                <Trash2 size={16} />
+                                Delete User File
+                            </button>
+                            <div className="flex gap-2 w-full sm:w-auto">
+                                <button
+                                    onClick={handleStatusToggle}
+                                    className={`flex-1 sm:flex-initial px-5 py-3 rounded-xl text-xs font-bold transition-all shadow-sm border ${user.status === 'active'
+                                        ? 'bg-white text-red-600 border-gray-200 hover:bg-red-50 hover:border-red-200'
+                                        : 'bg-green-600 text-white border-transparent hover:bg-green-700'
+                                    }`}
+                                >
+                                    {user.status === 'active' ? 'Suspend Account' : 'Activate Account'}
+                                </button>
+                                <button
+                                    onClick={handleResetPassword}
+                                    className="flex-1 sm:flex-initial px-5 py-3 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm"
+                                >
+                                    Reset Password
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
-        </>
+        </div>
     )
 }
 

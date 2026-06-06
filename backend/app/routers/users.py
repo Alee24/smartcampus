@@ -30,8 +30,10 @@ _upload_jobs: dict = {}
 async def get_current_admin_user(current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)):
     # Fetch role name
     role = await session.get(Role, current_user.role_id)
-    if not role or role.name not in ["SuperAdmin", "Security"]:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    # Allow SuperAdmin, Admin, and Management to manage users
+    allowed_roles = ["SuperAdmin", "Admin", "Security Lead", "Management"]
+    if not role or role.name not in allowed_roles:
+        raise HTTPException(status_code=403, detail="Not authorized - Admin or SuperAdmin role required")
     return current_user
 
 @router.get("")
@@ -205,7 +207,8 @@ async def get_current_user_info(
         "profile_image": current_user.profile_image,
         "pin_setup_required": current_user.pin_setup_required,
         "role": role.name if role else "Unknown",
-        "role_id": current_user.role_id
+        "role_id": current_user.role_id,
+        "status": current_user.status
     }
 
 class UserUpdateMe(BaseModel):
