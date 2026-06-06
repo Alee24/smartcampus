@@ -449,27 +449,24 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
         }
     }
 
-    const handleDownloadTemplate = async () => {
+    const handleDownloadTemplate = () => {
         try {
-            const token = localStorage.getItem('token')
-            const res = await fetch('/api/assets/template/csv', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            if (res.ok) {
-                const blob = await res.blob()
-                const url = window.URL.createObjectURL(blob)
-                const link = document.createElement('a')
-                link.href = url
-                link.setAttribute('download', 'asset_upload_template.csv')
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-                showNotification("Template downloaded successfully!", "success")
-            } else {
-                showNotification("Failed to download CSV template.", "error")
-            }
+            const headers = "tag_number,name,category,status,location,department,serial_number,purchase_date,cost,quantity,notes\n";
+            const row1 = "RU-01171,Dell Latitude Laptop,electronics,available,Main Library,Finance,SN-987654321,2026-05-15,75000.00,1,Academic staff laptop\n";
+            const row2 = "RU-01172,Lecture Hall Projector,electronics,available,LH-03,IT,PJ-776352,2026-04-10,120000.00,1,High definition projector\n";
+            const csvContent = headers + row1 + row2;
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.setAttribute('download', 'asset_upload_template.csv')
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            showNotification("Template downloaded successfully!", "success")
         } catch (e) {
-            showNotification("Network error occurred during template download.", "error")
+            showNotification("Failed to generate template download.", "error")
         }
     }
 
