@@ -19,6 +19,7 @@ interface Asset {
     category: string
     status: string
     location: string
+    department?: string
     serial_number?: string
     purchase_date?: string
     cost: number
@@ -33,6 +34,8 @@ interface Asset {
     handover_no?: string
     handover_department?: string
     handover_date?: string
+    item_condition?: string
+    accessories?: string
 }
 
 interface AssetLog {
@@ -49,6 +52,8 @@ interface AssetLog {
     handover_no?: string
     handover_department?: string
     handover_date?: string
+    item_condition?: string
+    accessories?: string
 }
 
 export default function AssetManagement({ initialView = 'assets' }: { initialView?: 'assets' | 'handovers' | 'reports' }) {
@@ -89,7 +94,9 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
         no: '',
         department: '',
         date: new Date().toISOString().split('T')[0],
-        notes: ''
+        notes: '',
+        item_condition: 'new',
+        accessories: ''
     })
 
     const handleDedicatedHandoverSubmit = async (e: React.FormEvent) => {
@@ -112,7 +119,9 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                 handover_no: handoverForm.no || null,
                 handover_department: handoverForm.department || null,
                 handover_date: handoverForm.date || null,
-                notes: handoverForm.notes
+                notes: handoverForm.notes,
+                item_condition: handoverForm.item_condition,
+                accessories: handoverForm.accessories
             }
             const res = await fetch(`/api/assets/${selectedAssetId}/checkout`, {
                 method: 'POST',
@@ -130,7 +139,9 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                     no: '',
                     department: '',
                     date: new Date().toISOString().split('T')[0],
-                    notes: ''
+                    notes: '',
+                    item_condition: 'new',
+                    accessories: ''
                 })
                 setSelectedAssetId('')
                 fetchAssets()
@@ -151,6 +162,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
     const [showCheckinModal, setShowCheckinModal] = useState<Asset | null>(null)
     const [showMaintenanceModal, setShowMaintenanceModal] = useState<Asset | null>(null)
     const [showDetailModal, setShowDetailModal] = useState<{ asset: Asset; logs: AssetLog[] } | null>(null)
+    const [showReportModal, setShowReportModal] = useState(false)
 
     // Form states
     const [newAsset, setNewAsset] = useState({
@@ -173,7 +185,9 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
         handover_no: '',
         handover_department: '',
         handover_date: new Date().toISOString().split('T')[0],
-        notes: ''
+        notes: '',
+        item_condition: 'new',
+        accessories: ''
     })
     const [isManualHandover, setIsManualHandover] = useState(false)
     const [showUploadModal, setShowUploadModal] = useState(false)
@@ -410,7 +424,9 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                 handover_no: isManualHandover ? checkoutData.handover_no : null,
                 handover_department: isManualHandover ? checkoutData.handover_department : null,
                 handover_date: isManualHandover ? checkoutData.handover_date : null,
-                notes: checkoutData.notes
+                notes: checkoutData.notes,
+                item_condition: checkoutData.item_condition,
+                accessories: checkoutData.accessories
             }
 
             const res = await fetch(`/api/assets/${showCheckoutModal.id}/checkout`, {
@@ -431,7 +447,9 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                     handover_no: '',
                     handover_department: '',
                     handover_date: new Date().toISOString().split('T')[0],
-                    notes: ''
+                    notes: '',
+                    item_condition: 'new',
+                    accessories: ''
                 })
                 fetchAssets()
                 showNotification("Asset checked out successfully!", "success")
@@ -496,6 +514,193 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
             showNotification("Failed to generate template download.", "error")
         }
     }
+
+    const handleGenerateCategorizedReport = (groupType: 'department' | 'category') => {
+        const printWin = window.open("", "_blank");
+        if (!printWin) {
+            showNotification("Please allow popups to view the report.", "error");
+            return;
+        }
+
+        // Group assets
+        const grouped: Record<string, Asset[]> = {};
+        assets.forEach(a => {
+            const key = groupType === 'department'
+                ? (a.handover_department || a.department || 'Unassigned / Central')
+                : (a.category.replace('_', ' ').toUpperCase());
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(a);
+        });
+
+        const sortedKeys = Object.keys(grouped).sort();
+
+        let contentHtml = "";
+        let grandTotalCost = 0;
+        let grandTotalCount = 0;
+
+        sortedKeys.forEach(key => {
+            const items = grouped[key];
+            const subtotalCost = items.reduce((acc, curr) => acc + curr.cost, 0);
+            grandTotalCost += subtotalCost;
+            grandTotalCount += items.length;
+
+            const rowsHtml = items.map(a => `
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-weight: bold;">${a.tag_number}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">
+                        ${a.name}
+                        ${a.item_condition ? `
+                            <span style="font-size: 8px; padding: 2px 6px; border-radius: 9999px; text-transform: uppercase; font-weight: 900; margin-left: 5px; border: 1px solid #ddd;
+                                background-color: ${a.item_condition === 'new' ? '#e0e7ff' : a.item_condition === 'refurbished' ? '#fef3c7' : '#f3e8ff'};
+                                color: ${a.item_condition === 'new' ? '#4338ca' : a.item_condition === 'refurbished' ? '#b45309' : '#6b21a8'};
+                            ">${a.item_condition}</span>
+                        ` : ''}
+                    </td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-transform: capitalize;">${a.category.replace('_', ' ')}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${a.location}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${a.handover_name || 'Central Inventory'}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; font-size: 11px;">${a.accessories || '-'}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; font-size: 11px; text-transform: uppercase; font-weight: bold; text-align: center; color: ${
+                        a.status === 'available' ? '#16a34a' : a.status === 'checked_out' ? '#2563eb' : a.status === 'maintenance' ? '#d97706' : '#dc2626'
+                    }">${a.status}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">KES ${a.cost.toLocaleString()}</td>
+                </tr>
+            `).join("");
+
+            contentHtml += `
+                <div style="margin-bottom: 30px; page-break-inside: avoid;">
+                    <h3 style="background-color: #f3f4f6; padding: 8px 12px; margin: 10px 0; border-left: 4px solid #4f46e5; text-transform: uppercase; font-size: 14px; font-weight: 800; display: flex; justify-content: space-between;">
+                        <span>${key}</span>
+                        <span style="font-size: 11px; color: #555;">Items Count: ${items.length}</span>
+                    </h3>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="background: #fafafa; padding: 8px; border: 1px solid #ddd; text-align: left; font-size: 10px;">Barcode</th>
+                                <th style="background: #fafafa; padding: 8px; border: 1px solid #ddd; text-align: left; font-size: 10px;">Name / Condition</th>
+                                <th style="background: #fafafa; padding: 8px; border: 1px solid #ddd; text-align: left; font-size: 10px;">Category</th>
+                                <th style="background: #fafafa; padding: 8px; border: 1px solid #ddd; text-align: left; font-size: 10px;">Location</th>
+                                <th style="background: #fafafa; padding: 8px; border: 1px solid #ddd; text-align: left; font-size: 10px;">Custodian</th>
+                                <th style="background: #fafafa; padding: 8px; border: 1px solid #ddd; text-align: left; font-size: 10px;">Accessories</th>
+                                <th style="background: #fafafa; padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 10px;">Status</th>
+                                <th style="background: #fafafa; padding: 8px; border: 1px solid #ddd; text-align: right; font-size: 10px;">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                            <tr style="background: #fafafa; font-weight: bold;">
+                                <td colspan="7" style="padding: 10px; border: 1px solid #ddd; text-align: right; text-transform: uppercase; font-size: 11px;">Subtotal for ${key}:</td>
+                                <td style="padding: 10px; border: 1px solid #ddd; text-align: right; color: #4f46e5;">KES ${subtotalCost.toLocaleString()}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        });
+
+        printWin.document.write(`
+            <html>
+            <head>
+                <title>Categorized Asset Report - Grouped by ${groupType === 'department' ? 'Department' : 'Asset Type'}</title>
+                <style>
+                    body { font-family: system-ui, -apple-system, sans-serif; color: #333; padding: 25px; margin: 0; }
+                    .header { border-bottom: 3px double #333; padding-bottom: 15px; margin-bottom: 25px; text-align: center; }
+                    .title { font-size: 24px; font-weight: 950; letter-spacing: -0.5px; text-transform: uppercase; color: #111; }
+                    .subtitle { font-size: 12px; color: #666; margin-top: 5px; font-weight: 600; text-transform: uppercase; }
+                    .date { font-size: 11px; color: #888; margin-top: 3px; font-family: monospace; }
+                    .metrics { display: flex; gap: 15px; margin-bottom: 25px; }
+                    .card { flex: 1; border: 1px solid #ddd; border-radius: 12px; padding: 12px; text-align: center; background: #fbfbfb; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+                    .card p { margin: 0; font-size: 9px; font-weight: bold; text-transform: uppercase; color: #777; letter-spacing: 0.5px; }
+                    .card h2 { margin: 5px 0 0 0; font-size: 22px; font-weight: 900; color: #111; }
+                    table { font-size: 11px; }
+                    th { font-weight: bold; text-transform: uppercase; }
+                    @media print {
+                        body { padding: 0; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="no-print" style="margin-bottom: 20px; display: flex; justify-content: space-between; background: #f3f4f6; padding: 10px; border-radius: 8px;">
+                    <span style="font-size: 12px; font-weight: bold; display: flex; align-items: center; color: #4b5563;">Report Preview</span>
+                    <button onclick="window.print()" style="padding: 6px 16px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Print Report</button>
+                </div>
+                <div class="header">
+                    <div class="title">Campus Asset Inventory Report</div>
+                    <div class="subtitle">Grouped by ${groupType === 'department' ? 'Department' : 'Asset Category / Type'}</div>
+                    <div class="date">Generated: ${new Date().toLocaleString()}</div>
+                </div>
+
+                <div class="metrics">
+                    <div class="card">
+                        <p>Total Grouped Items</p>
+                        <h2>${grandTotalCount}</h2>
+                    </div>
+                    <div class="card">
+                        <p>Total Valuation</p>
+                        <h2>KES ${grandTotalCost.toLocaleString()}</h2>
+                    </div>
+                    <div class="card">
+                        <p>Grouping Key</p>
+                        <h2 style="text-transform: capitalize;">${groupType}</h2>
+                    </div>
+                </div>
+
+                ${contentHtml}
+
+                <div style="margin-top: 40px; border-top: 2px solid #333; padding-top: 15px; text-align: right; page-break-inside: avoid;">
+                    <span style="font-size: 13px; font-weight: bold; text-transform: uppercase; margin-right: 15px;">Grand Total Valuation:</span>
+                    <span style="font-size: 20px; font-weight: 900; color: #4f46e5;">KES ${grandTotalCost.toLocaleString()}</span>
+                </div>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+        showNotification("Categorized report preview generated successfully!", "success");
+    };
+
+    const handleDownloadCategorizedCSV = (groupType: 'department' | 'category') => {
+        const grouped: Record<string, Asset[]> = {};
+        assets.forEach(a => {
+            const key = groupType === 'department'
+                ? (a.handover_department || a.department || 'Unassigned_Central')
+                : (a.category.replace('_', ' ').toUpperCase());
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(a);
+        });
+
+        const sortedKeys = Object.keys(grouped).sort();
+        let csv = `Campus Asset Inventory Report - Grouped by ${groupType.toUpperCase()}\n`;
+        csv += `Generated: ${new Date().toLocaleString()}\n\n`;
+
+        sortedKeys.forEach(key => {
+            const items = grouped[key];
+            const subtotal = items.reduce((acc, curr) => acc + curr.cost, 0);
+            
+            csv += `GROUP: ${key.replace(/,/g, ' ')} (Items Count: ${items.length})\n`;
+            csv += "S.No.,Barcode Tag,Asset Name,Category,Location,Custodian,Condition,Accessories,Status,Value (KES)\n";
+            
+            items.forEach((a, idx) => {
+                const custodian = a.handover_name || a.assigned_to_name || 'Central Inventory';
+                csv += `"${idx + 1}","${a.tag_number}","${a.name}","${a.category}","${a.location}","${custodian}","${a.item_condition || ''}","${a.accessories || ''}","${a.status}",${a.cost}\n`;
+            });
+            
+            csv += `,,,,,,,SUBTOTAL,,"KES ${subtotal}"\n\n`;
+        });
+
+        const grandTotal = assets.reduce((acc, curr) => acc + curr.cost, 0);
+        csv += `,,,,,,,GRAND TOTAL,,"KES ${grandTotal}"\n`;
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `campus_assets_report_by_${groupType}_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showNotification("Categorized CSV report generated!", "success");
+    };
 
     const handleCheckin = async (e: any) => {
         e.preventDefault()
@@ -638,6 +843,12 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                         <div className="flex gap-2">
                             <button onClick={fetchAssets} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shadow-sm">
                                 <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                            </button>
+                            <button
+                                onClick={() => setShowReportModal(true)}
+                                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-500/10 flex items-center gap-2"
+                            >
+                                <BarChart3 size={18} /> Generate Report
                             </button>
                             <button
                                 onClick={() => {
@@ -790,7 +1001,27 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                                                 {a.tag_number}
                                                             </div>
                                                         </td>
-                                                        <td className="p-4 font-bold text-slate-800 dark:text-white">{a.name}</td>
+                                                        <td className="p-4 font-bold text-slate-800 dark:text-white">
+                                                            <div className="flex flex-col">
+                                                                <span className="font-bold">{a.name}</span>
+                                                                <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                                                    {a.item_condition && (
+                                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                                                            a.item_condition === 'new' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-200' :
+                                                                            a.item_condition === 'refurbished' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200' :
+                                                                            'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border border-purple-200'
+                                                                        }`}>
+                                                                            {a.item_condition}
+                                                                        </span>
+                                                                    )}
+                                                                    {a.accessories && (
+                                                                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                                                            + {a.accessories}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </td>
                                                         <td className="p-4">
                                                             <span className={`px-2.5 py-1 rounded-full text-xs font-bold capitalize border ${getCategoryBadgeColor(a.category)}`}>
                                                                 {a.category.replace('_', ' ')}
@@ -1102,9 +1333,17 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                             </h1>
                             <p className="text-[var(--text-secondary)] mt-1">Assign university equipment to students or staff, and monitor active allocations</p>
                         </div>
-                        <button onClick={fetchAssets} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shadow-sm">
-                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                        </button>
+                        <div className="flex gap-2">
+                            <button onClick={fetchAssets} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shadow-sm">
+                                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                            </button>
+                            <button
+                                onClick={() => setShowReportModal(true)}
+                                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-indigo-500/10 flex items-center gap-2 text-sm"
+                            >
+                                <BarChart3 size={18} /> Generate Report
+                            </button>
+                        </div>
                     </header>
 
                     {/* Handover KPIs */}
@@ -1218,7 +1457,64 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Notes</label>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Item Condition *</label>
+                                    <select
+                                        required
+                                        value={handoverForm.item_condition || 'new'}
+                                        onChange={e => setHandoverForm({ ...handoverForm, item_condition: e.target.value })}
+                                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                    >
+                                        <option value="new">New</option>
+                                        <option value="refurbished">Refurbished</option>
+                                        <option value="reclaimed">Reclaimed</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Accompanying Accessories</label>
+                                    <div className="grid grid-cols-2 gap-2 mb-2">
+                                        {['charger', 'bag', 'mouse', 'keyboard'].map(item => {
+                                            const label = item === 'bag' ? 'Carrying Bag' : item.charAt(0).toUpperCase() + item.slice(1);
+                                            const currentAccessories = handoverForm.accessories ? handoverForm.accessories.split(',').map(x => x.trim()) : [];
+                                            const checked = currentAccessories.includes(item);
+                                            return (
+                                                <label key={item} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-750 text-xs font-semibold select-none">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={checked}
+                                                        onChange={e => {
+                                                            let list = [...currentAccessories];
+                                                            if (e.target.checked) {
+                                                                list.push(item);
+                                                            } else {
+                                                                list = list.filter(x => x !== item);
+                                                            }
+                                                            setHandoverForm({ ...handoverForm, accessories: list.join(', ') });
+                                                        }}
+                                                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                                    />
+                                                    {label}
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Enter other items (comma-separated)..."
+                                        value={handoverForm.accessories ? handoverForm.accessories.split(',').map(x => x.trim()).filter(x => !['charger', 'bag', 'mouse', 'keyboard'].includes(x)).join(', ') : ''}
+                                        onChange={e => {
+                                            const currentAccessories = handoverForm.accessories ? handoverForm.accessories.split(',').map(x => x.trim()) : [];
+                                            const presets = currentAccessories.filter(x => ['charger', 'bag', 'mouse', 'keyboard'].includes(x));
+                                            const customVal = e.target.value.trim();
+                                            const combined = customVal ? [...presets, ...customVal.split(',').map(x => x.trim())].join(', ') : presets.join(', ');
+                                            setHandoverForm({ ...handoverForm, accessories: combined });
+                                        }}
+                                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1 font-semibold text-slate-400 uppercase tracking-wider">Notes</label>
                                     <textarea
                                         placeholder="Reason for checkout..."
                                         value={handoverForm.notes}
@@ -1294,7 +1590,27 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                                         <td className="p-4 font-mono font-bold text-blue-600 dark:text-blue-400 text-sm">
                                                             {a.tag_number}
                                                         </td>
-                                                        <td className="p-4 font-bold text-slate-800 dark:text-white">{a.name}</td>
+                                                        <td className="p-4 font-bold text-slate-800 dark:text-white">
+                                                             <div className="flex flex-col">
+                                                                 <span className="font-bold">{a.name}</span>
+                                                                 <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                                                     {a.item_condition && (
+                                                                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                                                             a.item_condition === 'new' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-200' :
+                                                                             a.item_condition === 'refurbished' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200' :
+                                                                             'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border border-purple-200'
+                                                                         }`}>
+                                                                             {a.item_condition}
+                                                                         </span>
+                                                                     )}
+                                                                     {a.accessories && (
+                                                                         <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                                                                             + {a.accessories}
+                                                                         </span>
+                                                                     )}
+                                                                 </div>
+                                                             </div>
+                                                         </td>
                                                         <td className="p-4">
                                                             <div className="flex flex-col">
                                                                 <span className="font-bold text-slate-800 dark:text-white">{a.handover_name}</span>
@@ -1872,6 +2188,31 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                 </div>
                             </div>
 
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Item Condition</label>
+                                    <select
+                                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
+                                        value={showEditModal.item_condition || ''}
+                                        onChange={e => setShowEditModal({ ...showEditModal, item_condition: e.target.value })}
+                                    >
+                                        <option value="">-- No Condition --</option>
+                                        <option value="new">New</option>
+                                        <option value="refurbished">Refurbished</option>
+                                        <option value="reclaimed">Reclaimed</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Accessories</label>
+                                    <input
+                                        className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
+                                        placeholder="e.g. charger, mouse, bag"
+                                        value={showEditModal.accessories || ''}
+                                        onChange={e => setShowEditModal({ ...showEditModal, accessories: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Additional Notes</label>
                                 <textarea
@@ -1992,6 +2333,63 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                     </div>
                                 </div>
                             )}
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Item Condition *</label>
+                                <select
+                                    required
+                                    value={checkoutData.item_condition || 'new'}
+                                    onChange={e => setCheckoutData({ ...checkoutData, item_condition: e.target.value })}
+                                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm"
+                                >
+                                    <option value="new">New</option>
+                                    <option value="refurbished">Refurbished</option>
+                                    <option value="reclaimed">Reclaimed</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Accompanying Accessories</label>
+                                <div className="grid grid-cols-2 gap-2 mb-2">
+                                    {['charger', 'bag', 'mouse', 'keyboard'].map(item => {
+                                        const label = item === 'bag' ? 'Carrying Bag' : item.charAt(0).toUpperCase() + item.slice(1);
+                                        const currentAccessories = checkoutData.accessories ? checkoutData.accessories.split(',').map(x => x.trim()) : [];
+                                        const checked = currentAccessories.includes(item);
+                                        return (
+                                            <label key={item} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-750 text-xs font-semibold select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={e => {
+                                                        let list = [...currentAccessories];
+                                                        if (e.target.checked) {
+                                                            list.push(item);
+                                                        } else {
+                                                            list = list.filter(x => x !== item);
+                                                        }
+                                                        setCheckoutData({ ...checkoutData, accessories: list.join(', ') });
+                                                    }}
+                                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                                />
+                                                {label}
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="Enter other items (comma-separated)..."
+                                    value={checkoutData.accessories ? checkoutData.accessories.split(',').map(x => x.trim()).filter(x => !['charger', 'bag', 'mouse', 'keyboard'].includes(x)).join(', ') : ''}
+                                    onChange={e => {
+                                        const currentAccessories = checkoutData.accessories ? checkoutData.accessories.split(',').map(x => x.trim()) : [];
+                                        const presets = currentAccessories.filter(x => ['charger', 'bag', 'mouse', 'keyboard'].includes(x));
+                                        const customVal = e.target.value.trim();
+                                        const combined = customVal ? [...presets, ...customVal.split(',').map(x => x.trim())].join(', ') : presets.join(', ');
+                                        setCheckoutData({ ...checkoutData, accessories: combined });
+                                    }}
+                                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border rounded-lg text-xs"
+                                />
+                            </div>
 
                             <div>
                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1 font-semibold text-slate-400 uppercase tracking-wider">Additional Notes</label>
@@ -2137,6 +2535,24 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                 <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Onetime Cost</span>
                                 <span className="font-mono font-bold text-emerald-600 font-mono">KES {showDetailModal.asset.cost.toLocaleString()}</span>
                             </div>
+                            <div>
+                                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Condition</span>
+                                {showDetailModal.asset.item_condition ? (
+                                    <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                        showDetailModal.asset.item_condition === 'new' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 border border-indigo-200' :
+                                        showDetailModal.asset.item_condition === 'refurbished' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200' :
+                                        'bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border border-purple-200'
+                                    }`}>
+                                        {showDetailModal.asset.item_condition}
+                                    </span>
+                                ) : (
+                                    <span className="text-slate-500 text-xs italic">-</span>
+                                )}
+                            </div>
+                            <div>
+                                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">Accompanying Assets</span>
+                                <span className="font-semibold text-slate-700 dark:text-slate-300 text-xs block mt-1">{showDetailModal.asset.accessories || '-'}</span>
+                            </div>
 
                             {showDetailModal.asset.handover_name && (
                                 <div className="col-span-2 bg-blue-50/50 dark:bg-blue-900/10 p-3.5 rounded-xl border border-blue-100 dark:border-blue-800/40 text-xs space-y-1">
@@ -2258,6 +2674,76 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
                                 )}
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {showReportModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl animate-scale-in text-center">
+                        <div className="w-12 h-12 bg-indigo-50 text-indigo-600 dark:bg-indigo-950/20 dark:text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <BarChart3 size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-white">Generate Asset Report</h3>
+                        <p className="text-sm text-slate-400 mb-6">Select a categorization method and export type to generate your asset report.</p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 text-left">
+                            <div className="border border-slate-200 dark:border-slate-700 rounded-2xl p-4 hover:border-blue-500 dark:hover:border-blue-400 transition-all">
+                                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-3">Group by Department</h4>
+                                <div className="space-y-2">
+                                    <button
+                                        onClick={() => {
+                                            handleGenerateCategorizedReport('department');
+                                            setShowReportModal(false);
+                                        }}
+                                        className="w-full py-2 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-lg transition-all"
+                                    >
+                                        Print / PDF Report
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            handleDownloadCategorizedCSV('department');
+                                            setShowReportModal(false);
+                                        }}
+                                        className="w-full py-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg transition-all"
+                                    >
+                                        Download CSV
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="border border-slate-200 dark:border-slate-700 rounded-2xl p-4 hover:border-blue-500 dark:hover:border-blue-400 transition-all">
+                                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-3">Group by Asset Type</h4>
+                                <div className="space-y-2">
+                                    <button
+                                        onClick={() => {
+                                            handleGenerateCategorizedReport('category');
+                                            setShowReportModal(false);
+                                        }}
+                                        className="w-full py-2 bg-indigo-50 dark:bg-indigo-950/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-bold rounded-lg transition-all"
+                                    >
+                                        Print / PDF Report
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            handleDownloadCategorizedCSV('category');
+                                            setShowReportModal(false);
+                                        }}
+                                        className="w-full py-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/50 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg transition-all"
+                                    >
+                                        Download CSV
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setShowReportModal(false)}
+                            className="w-full py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm transition-all"
+                        >
+                            Close
+                        </button>
                     </div>
                 </div>
             )}

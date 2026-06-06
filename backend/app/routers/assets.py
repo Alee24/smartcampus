@@ -40,6 +40,8 @@ class AssetUpdate(BaseModel):
     cost: Optional[float] = None
     assigned_to_id: Optional[UUID] = None
     notes: Optional[str] = None
+    item_condition: Optional[str] = None
+    accessories: Optional[str] = None
 
 class CheckoutRequest(BaseModel):
     borrower_identifier: Optional[str] = None  # Can be admission_number, email, etc.
@@ -50,6 +52,8 @@ class CheckoutRequest(BaseModel):
     handover_department: Optional[str] = None
     handover_date: Optional[date_type] = None
     notes: Optional[str] = None
+    item_condition: Optional[str] = None
+    accessories: Optional[str] = None
 
 class CheckinRequest(BaseModel):
     notes: Optional[str] = None
@@ -68,6 +72,8 @@ class AssetLogResponse(BaseModel):
     handover_no: Optional[str] = None
     handover_department: Optional[str] = None
     handover_date: Optional[str] = None
+    item_condition: Optional[str] = None
+    accessories: Optional[str] = None
 
 class AssetResponse(BaseModel):
     id: UUID
@@ -91,6 +97,8 @@ class AssetResponse(BaseModel):
     handover_no: Optional[str] = None
     handover_department: Optional[str] = None
     handover_date: Optional[str] = None
+    item_condition: Optional[str] = None
+    accessories: Optional[str] = None
 
 # ---- API Endpoints ----
 
@@ -184,7 +192,9 @@ async def get_assets(
                     handover_phone=a.handover_phone,
                     handover_no=a.handover_no,
                     handover_department=a.handover_department,
-                    handover_date=a.handover_date.isoformat() if a.handover_date else None
+                    handover_date=a.handover_date.isoformat() if a.handover_date else None,
+                    item_condition=a.item_condition,
+                    accessories=a.accessories
                 )
             )
         return response_list
@@ -261,7 +271,9 @@ async def create_asset(
             handover_phone=None,
             handover_no=None,
             handover_department=None,
-            handover_date=None
+            handover_date=None,
+            item_condition=None,
+            accessories=None
         )
     except HTTPException:
         raise
@@ -353,7 +365,9 @@ async def get_asset_details(
                     handover_phone=l.handover_phone,
                     handover_no=l.handover_no,
                     handover_department=l.handover_department,
-                    handover_date=l.handover_date.isoformat() if l.handover_date else None
+                    handover_date=l.handover_date.isoformat() if l.handover_date else None,
+                    item_condition=l.item_condition,
+                    accessories=l.accessories
                 )
             )
 
@@ -378,7 +392,9 @@ async def get_asset_details(
                 handover_phone=asset.handover_phone,
                 handover_no=asset.handover_no,
                 handover_department=asset.handover_department,
-                handover_date=asset.handover_date.isoformat() if asset.handover_date else None
+                handover_date=asset.handover_date.isoformat() if asset.handover_date else None,
+                item_condition=asset.item_condition,
+                accessories=asset.accessories
             ),
             "logs": formatted_logs
         }
@@ -525,6 +541,8 @@ async def checkout_asset(
         asset.handover_no = h_no
         asset.handover_department = h_dept
         asset.handover_date = h_date
+        asset.item_condition = payload.item_condition
+        asset.accessories = payload.accessories
         session.add(asset)
 
         # Log action
@@ -540,7 +558,9 @@ async def checkout_asset(
             handover_phone=h_phone,
             handover_no=h_no,
             handover_department=h_dept,
-            handover_date=h_date
+            handover_date=h_date,
+            item_condition=payload.item_condition,
+            accessories=payload.accessories
         )
         session.add(log_entry)
         await session.commit()
@@ -559,7 +579,9 @@ async def checkout_asset(
                 "staff_no": h_no,
                 "department": h_dept,
                 "handover_date": h_date.isoformat() if h_date else None,
-                "notes": payload.notes
+                "notes": payload.notes,
+                "item_condition": payload.item_condition,
+                "accessories": payload.accessories
             },
             request=request
         )

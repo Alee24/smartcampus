@@ -661,6 +661,10 @@ class Asset(UUIDModel, table=True):
     handover_department: Optional[str] = Field(default=None, nullable=True)
     handover_date: Optional[date] = Field(default=None, nullable=True)
 
+    # Condition & Accessories tracking
+    item_condition: Optional[str] = Field(default=None, index=True, nullable=True)
+    accessories: Optional[str] = Field(default=None, nullable=True)
+
     # Relationships
     assigned_to: Optional["User"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[Asset.assigned_to_id]"})
     logs: List["AssetLog"] = Relationship(back_populates="asset", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -682,6 +686,10 @@ class AssetLog(UUIDModel, table=True):
     handover_no: Optional[str] = Field(default=None, nullable=True)
     handover_department: Optional[str] = Field(default=None, nullable=True)
     handover_date: Optional[date] = Field(default=None, nullable=True)
+
+    # Condition & Accessories tracking
+    item_condition: Optional[str] = Field(default=None, nullable=True)
+    accessories: Optional[str] = Field(default=None, nullable=True)
 
     # Relationships
     asset: Asset = Relationship(back_populates="logs")

@@ -373,7 +373,9 @@ async def migrate_assets():
                 "handover_phone": "VARCHAR(255) DEFAULT NULL",
                 "handover_no": "VARCHAR(255) DEFAULT NULL",
                 "handover_department": "VARCHAR(255) DEFAULT NULL",
-                "handover_date": "DATE DEFAULT NULL"
+                "handover_date": "DATE DEFAULT NULL",
+                "item_condition": "VARCHAR(255) DEFAULT NULL",
+                "accessories": "VARCHAR(255) DEFAULT NULL"
             }
             for col, type_ in new_handover_cols.items():
                 if col not in asset_cols:
