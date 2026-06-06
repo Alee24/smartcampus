@@ -78,10 +78,10 @@ export default function IncidentReporting() {
                 const data = await res.json();
                 setIncidents(data);
             } else {
-                showNotification('error', 'Failed to retrieve incidents');
+                showNotification('Failed to retrieve incidents', 'error');
             }
         } catch (e) {
-            showNotification('error', 'Error connecting to incidents server');
+            showNotification('Error connecting to incidents server', 'error');
         } finally {
             setLoading(false);
         }
@@ -97,7 +97,7 @@ export default function IncidentReporting() {
                 setActiveIncident(data);
             }
         } catch (e) {
-            showNotification('error', 'Could not load incident details');
+            showNotification('Could not load incident details', 'error');
         }
     };
 
@@ -142,7 +142,7 @@ export default function IncidentReporting() {
     const handleCreateIncident = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!title || !description || !location) {
-            showNotification('warning', 'Please fill all required fields');
+            showNotification('Please fill all required fields: Title, Location and Description', 'warning');
             return;
         }
 
@@ -176,7 +176,7 @@ export default function IncidentReporting() {
             });
 
             if (res.ok) {
-                showNotification('success', 'Incident reported successfully');
+                showNotification('Incident reported successfully!', 'success');
                 setShowCreateModal(false);
                 // Reset form
                 setTitle('');
@@ -194,10 +194,10 @@ export default function IncidentReporting() {
                 fetchIncidents();
             } else {
                 const err = await res.json();
-                showNotification('error', err.detail || 'Failed to report incident');
+                showNotification(err.detail || 'Failed to report incident', 'error');
             }
         } catch (e) {
-            showNotification('error', 'Server error reporting incident');
+            showNotification('Server error reporting incident', 'error');
         } finally {
             setSubmittingIncident(false);
         }
@@ -206,7 +206,7 @@ export default function IncidentReporting() {
     const handleAddFollowup = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!followupDesc) {
-            showNotification('warning', 'Please enter a description for the followup');
+            showNotification('Please enter a description for the followup', 'warning');
             return;
         }
 
@@ -223,16 +223,16 @@ export default function IncidentReporting() {
             });
 
             if (res.ok) {
-                showNotification('success', 'Followup timeline logged successfully');
+                showNotification('Followup timeline logged successfully!', 'success');
                 setFollowupDesc('');
                 fetchIncidentDetails(activeIncident.id);
                 fetchIncidents(); // Refresh general list too for status change
             } else {
                 const err = await res.json();
-                showNotification('error', err.detail || 'Failed to log followup');
+                showNotification(err.detail || 'Failed to log followup', 'error');
             }
         } catch (e) {
-            showNotification('error', 'Server error logging followup');
+            showNotification('Server error logging followup', 'error');
         } finally {
             setSubmittingFollowup(false);
         }

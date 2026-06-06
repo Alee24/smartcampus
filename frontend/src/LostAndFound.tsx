@@ -73,10 +73,10 @@ export default function LostAndFound() {
                 const data = await res.json();
                 setItems(data);
             } else {
-                showNotification('error', 'Failed to retrieve items registry');
+                showNotification('Failed to retrieve items registry', 'error');
             }
         } catch (e) {
-            showNotification('error', 'Error connecting to lost & found registry');
+            showNotification('Error connecting to lost & found registry', 'error');
         } finally {
             setLoading(false);
         }
@@ -123,7 +123,7 @@ export default function LostAndFound() {
     const handleLogItem = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!itemName || !description || !locationFound) {
-            showNotification('warning', 'Please fill all required fields');
+            showNotification('Please fill all required fields: Item name, Description, and Location', 'warning');
             return;
         }
 
@@ -153,7 +153,7 @@ export default function LostAndFound() {
             });
 
             if (res.ok) {
-                showNotification('success', 'Found item registry log saved');
+                showNotification('Found item registry log saved successfully!', 'success');
                 setShowLogModal(false);
                 // Reset states
                 setItemName('');
@@ -168,10 +168,10 @@ export default function LostAndFound() {
                 fetchItems();
             } else {
                 const err = await res.json();
-                showNotification('error', err.detail || 'Failed to log found item');
+                showNotification(err.detail || 'Failed to log found item', 'error');
             }
         } catch (e) {
-            showNotification('error', 'Server error logging found item');
+            showNotification('Server error logging found item', 'error');
         } finally {
             setSubmittingItem(false);
         }
@@ -181,7 +181,7 @@ export default function LostAndFound() {
         e.preventDefault();
         if (!activeItem) return;
         if (!selectedClaimant && !externalClaimantName) {
-            showNotification('warning', 'Please specify a claimant from system or external');
+            showNotification('Please specify a claimant from system or enter external name', 'warning');
             return;
         }
 
@@ -202,7 +202,7 @@ export default function LostAndFound() {
             });
 
             if (res.ok) {
-                showNotification('success', 'Item marked successfully as Claimed');
+                showNotification('Item marked successfully as Claimed!', 'success');
                 setShowClaimModal(false);
                 setSelectedClaimant(null);
                 setExternalClaimantName('');
@@ -213,10 +213,10 @@ export default function LostAndFound() {
                 setActiveItem(null);
             } else {
                 const err = await res.json();
-                showNotification('error', err.detail || 'Failed to mark as claimed');
+                showNotification(err.detail || 'Failed to mark as claimed', 'error');
             }
         } catch (e) {
-            showNotification('error', 'Server error claiming item');
+            showNotification('Server error claiming item', 'error');
         } finally {
             setSubmittingClaim(false);
         }
