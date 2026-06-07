@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 from app.database import get_session
-from app.models import SystemConfig, User, Role, Course, Classroom, TimetableSlot, ScanLog
+from app.models import SystemConfig, User, Role, Course, Classroom, TimetableSlot, ScanLog, IncidentReport
 from app.auth import get_current_user, get_password_hash
 from app.utils.audit import log_action
 import csv
@@ -1233,6 +1233,17 @@ async def get_scan_logs(limit: int = 100, session: AsyncSession = Depends(get_se
     )
     results = (await session.exec(query)).all()
     
+    # Collect all user IDs to batch-check flagged status
+    user_ids = [user.id for log, user, classroom in results]
+    flagged_user_ids = set()
+    if user_ids:
+        incident_stmt = select(IncidentReport.target_user_id).where(
+            (IncidentReport.target_user_id.in_(user_ids)) &
+            (IncidentReport.status.notin_(["resolved"]))
+        )
+        flagged_results = (await session.exec(incident_stmt)).all()
+        flagged_user_ids = {str(uid) for uid in flagged_results if uid is not None}
+
     data = []
     for log, user, classroom in results:
         # Construct pleasant location string
@@ -1242,7 +1253,8 @@ async def get_scan_logs(limit: int = 100, session: AsyncSession = Depends(get_se
             if classroom.room_name: parts.append(classroom.room_name)
             if classroom.building: parts.append(classroom.building)
             if parts: loc_str = ", ".join(parts)
-            
+
+        is_flagged = str(user.id) in flagged_user_ids
         data.append({
             "id": str(log.id),
             "timestamp": log.timestamp,
@@ -1250,6 +1262,9 @@ async def get_scan_logs(limit: int = 100, session: AsyncSession = Depends(get_se
             "admission_number": user.admission_number,
             "room_code": log.room_code,
             "is_successful": log.is_successful,
+            "detected_location": loc_str,
+            "status_message": log.status_message if hasattr(log, 'status_message') else None,
+            "is_flagged": is_flagged,
         })
     return data
 

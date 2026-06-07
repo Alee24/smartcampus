@@ -78,14 +78,29 @@ export default function ScanLogs() {
                                 </tr>
                             ) : (
                                 paginatedLogs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-[var(--bg-primary)] transition-colors">
+                                    <tr key={log.id} className={`transition-colors ${
+                                        log.is_flagged 
+                                            ? 'bg-red-50 dark:bg-red-950/30 border-l-4 border-red-500' 
+                                            : 'hover:bg-[var(--bg-primary)]'
+                                    }`}>
                                         <td className="p-4 whitespace-nowrap text-sm font-mono text-[var(--text-secondary)]">
                                             {new Date(log.timestamp).toLocaleTimeString()}
                                             <div className="text-xs opacity-60">{new Date(log.timestamp).toLocaleDateString()}</div>
                                         </td>
                                         <td className="p-4">
-                                            <div className="font-bold text-sm">{log.student_name}</div>
-                                            <div className="text-xs font-mono text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-1 rounded w-fit mt-0.5">
+                                            <div className={`font-bold text-sm flex items-center gap-1.5 ${log.is_flagged ? 'text-red-700 dark:text-red-400' : ''}`}>
+                                                {log.student_name}
+                                                {log.is_flagged && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-red-600 text-white animate-pulse">
+                                                        ⚠ FLAGGED
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className={`text-xs font-mono px-1 rounded w-fit mt-0.5 ${
+                                                log.is_flagged 
+                                                    ? 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30' 
+                                                    : 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20'
+                                            }`}>
                                                 {log.admission_number}
                                             </div>
                                         </td>

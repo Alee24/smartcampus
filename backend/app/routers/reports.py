@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import select, func, col, case
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.database import get_session
-from app.models import User, EntryLog, VehicleLog, AttendanceRecord, Role, Gate, ClassSession
+from app.models import User, EntryLog, VehicleLog, AttendanceRecord, Role, Gate, ClassSession, IncidentReport
 from app.auth import get_current_user
 from datetime import datetime, timedelta
 from app.utils.timezone import get_eat_time
@@ -166,6 +166,20 @@ async def get_detailed_report(
     entries = (await session.exec(query_entries)).all()
     
     entry_list = []
+    # Batch-fetch flagged users for this date's entries
+    entry_user_ids = [e.user_id for e in entries if e.user_id]
+    flagged_user_ids = set()
+    if entry_user_ids:
+        try:
+            flagged_stmt = select(IncidentReport.target_user_id).where(
+                (IncidentReport.target_user_id.in_(entry_user_ids)) &
+                (IncidentReport.status.notin_(["resolved"]))
+            )
+            flagged_results = (await session.exec(flagged_stmt)).all()
+            flagged_user_ids = {str(uid) for uid in flagged_results if uid is not None}
+        except Exception as e:
+            print(f"Error fetching flagged users: {e}")
+
     for entry in entries:
         user_obj = None
         role_name = "User"
@@ -214,6 +228,7 @@ async def get_detailed_report(
         except Exception as e:
             print(f"Error loading guard for entry: {e}")
             
+        is_flagged = str(entry.user_id) in flagged_user_ids if entry.user_id else False
         entry_list.append({
             "id": str(entry.id),
             "name": user_obj.full_name if user_obj else "Unknown User",
@@ -225,7 +240,8 @@ async def get_detailed_report(
             "exit_time": entry.exit_time.isoformat() if entry.exit_time else None,
             "method": entry.method,
             "guard": guard_name,
-            "status": entry.status
+            "status": entry.status,
+            "is_flagged": is_flagged,
         })
 
     # 2. Fetch Vehicle Scan Logs for the given day

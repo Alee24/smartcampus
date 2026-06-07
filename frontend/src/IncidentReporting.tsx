@@ -61,6 +61,7 @@ export default function IncidentReporting() {
     // Followup Form States
     const [followupType, setFollowupType] = useState('update');
     const [followupDesc, setFollowupDesc] = useState('');
+    const [reactivateUser, setReactivateUser] = useState(true);
     const [submittingFollowup, setSubmittingFollowup] = useState(false);
     const [submittingIncident, setSubmittingIncident] = useState(false);
 
@@ -215,6 +216,9 @@ export default function IncidentReporting() {
             const formData = new FormData();
             formData.append('followup_type', followupType);
             formData.append('description', followupDesc);
+            if (followupType === 'resolved') {
+                formData.append('reactivate_user', reactivateUser ? 'true' : 'false');
+            }
 
             const res = await fetch(`/api/security/incidents/${activeIncident.id}/followup`, {
                 method: 'POST',
@@ -492,6 +496,25 @@ export default function IncidentReporting() {
                                                     <option value="disciplinary">Refer to Disciplinary Committee</option>
                                                     <option value="resolved">Mark Case as Resolved</option>
                                                 </select>
+                                                {/* Verdict Option - only shown when resolving */}
+                                                {followupType === 'resolved' && activeIncident?.target_user && (
+                                                    <div className="mt-3 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/30 rounded-xl">
+                                                        <label className="flex items-start gap-2.5 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={reactivateUser}
+                                                                onChange={(e) => setReactivateUser(e.target.checked)}
+                                                                className="mt-0.5 w-4 h-4 rounded text-green-600 border-green-300 cursor-pointer"
+                                                            />
+                                                            <div>
+                                                                <p className="text-xs font-bold text-green-800 dark:text-green-300">Verdict: Reactivate Student</p>
+                                                                <p className="text-[10px] text-green-600 dark:text-green-400 mt-0.5">
+                                                                    Restore <strong>{activeIncident.target_user.full_name}</strong>'s status to Active upon resolution
+                                                                </p>
+                                                            </div>
+                                                        </label>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="md:col-span-2">
                                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Description / Notes</label>

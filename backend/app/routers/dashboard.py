@@ -4,7 +4,7 @@ from datetime import datetime
 from app.utils.timezone import get_eat_time
 from sqlmodel import select, func
 from app.database import get_session
-from app.models import User, AttendanceRecord, Gate, EntryLog, Vehicle, VehicleLog, SystemActivity, Role, FleetTrip, Event
+from app.models import User, AttendanceRecord, Gate, EntryLog, Vehicle, VehicleLog, SystemActivity, Role, FleetTrip, Event, IncidentReport, NoticeBoardItem
 
 from app.auth import get_current_user
 
@@ -299,6 +299,32 @@ async def get_live_monitor_stats(session: AsyncSession = Depends(get_session)):
     from sqlalchemy import extract
     events_this_month = (await session.exec(select(func.count(Event.id)).where((extract('year', Event.event_date) == today.year) & (extract('month', Event.event_date) == today.month)))).one()
 
+    # 6. Security Incidents - active (unresolved)
+    active_incidents = 0
+    high_severity_incidents = 0
+    try:
+        active_incidents = (await session.exec(
+            select(func.count(IncidentReport.id)).where(IncidentReport.status.notin_(["resolved"]))
+        )).one()
+        high_severity_incidents = (await session.exec(
+            select(func.count(IncidentReport.id)).where(
+                (IncidentReport.severity == "high") & (IncidentReport.status.notin_(["resolved"]))
+            )
+        )).one()
+    except Exception as e:
+        print(f"Error fetching incident stats: {e}")
+
+    # 7. Notice Board - count recent notices (last 30 days)
+    active_notices = 0
+    try:
+        from datetime import timedelta
+        thirty_days_ago = get_eat_time() - timedelta(days=30)
+        active_notices = (await session.exec(
+            select(func.count(NoticeBoardItem.id)).where(NoticeBoardItem.created_at >= thirty_days_ago)
+        )).one()
+    except Exception as e:
+        print(f"Error fetching notice stats: {e}")
+
     return {
         "vehicles": {
             "inside": vehicles_inside,
@@ -321,5 +347,12 @@ async def get_live_monitor_stats(session: AsyncSession = Depends(get_session)):
         },
         "events": {
             "planned_this_month": events_this_month
+        },
+        "incidents": {
+            "total_active": active_incidents,
+            "high_severity": high_severity_incidents
+        },
+        "notices": {
+            "total_active": active_notices
         }
     }

@@ -18,6 +18,7 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
     const [liveStats, setLiveStats] = useState<any>(null);
     const [syncingAD, setSyncingAD] = useState(false);
     const [showActiveTrips, setShowActiveTrips] = useState(false);
+    const [chartType, setChartType] = useState<'area' | 'bar'>('area');
 
     const fetchDashboardData = async () => {
         try {
@@ -126,15 +127,15 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
                             <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><Car size={20} /></div>
                         </div>
                     </div>
-                    <div 
+                    <div
                         onClick={() => {
                             if (liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0) {
                                 setShowActiveTrips(true);
                             }
                         }}
                         className={`glass-card p-5 border-l-4 border-orange-500 relative transition-all ${
-                            liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0 
-                                ? 'cursor-pointer hover:shadow-xl hover:scale-[1.02] bg-gradient-to-br from-white to-orange-50/10' 
+                            liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0
+                                ? 'cursor-pointer hover:shadow-xl hover:scale-[1.02] bg-gradient-to-br from-white to-orange-50/10'
                                 : ''
                         }`}
                     >
@@ -154,13 +155,13 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
                                 )}
                             </div>
                             <div className={`p-2.5 rounded-xl transition-all ${
-                                liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0 
-                                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' 
+                                liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0
+                                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30'
                                     : 'bg-orange-50 text-orange-600'
                             }`}
                             style={
-                                liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0 
-                                    ? { animation: 'pulse-bus 2s infinite' } 
+                                liveStats.fleet.active_trips && liveStats.fleet.active_trips.length > 0
+                                    ? { animation: 'pulse-bus 2s infinite' }
                                     : {}
                             }>
                                 <Bus size={20} />
@@ -179,47 +180,136 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
                 </div>
             )}
 
+            {/* Secondary Stats Row - Incidents & Notices */}
+            {liveStats?.incidents !== undefined && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className={`glass-card p-5 border-l-4 ${
+                        liveStats.incidents.high_severity > 0 ? 'border-red-600' : 'border-yellow-500'
+                    }`}>
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Incidents</p>
+                                <p className={`text-2xl font-black mt-1 ${
+                                    liveStats.incidents.total_active > 0 ? 'text-red-600' : 'text-gray-900 dark:text-white'
+                                }`}>{liveStats.incidents.total_active}</p>
+                                {liveStats.incidents.high_severity > 0 && (
+                                    <p className="text-[10px] font-bold text-red-500 flex items-center gap-1 mt-1">
+                                        <AlertTriangle size={10} />
+                                        {liveStats.incidents.high_severity} High Severity
+                                    </p>
+                                )}
+                            </div>
+                            <div className={`p-2 rounded-lg ${
+                                liveStats.incidents.high_severity > 0 ? 'bg-red-100 text-red-600' : 'bg-yellow-50 text-yellow-600'
+                            }`}>
+                                <ShieldCheck size={20} />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="glass-card p-5 border-l-4 border-teal-500">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Gate Entries Today</p>
+                                <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{stats.gate_entries_today || 0}</p>
+                            </div>
+                            <div className="p-2 bg-teal-50 rounded-lg text-teal-600"><Activity size={20} /></div>
+                        </div>
+                    </div>
+                    <div className="glass-card p-5 border-l-4 border-sky-500">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Recent Notices (30d)</p>
+                                <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{liveStats.notices?.total_active ?? 0}</p>
+                            </div>
+                            <div className="p-2 bg-sky-50 rounded-lg text-sky-600"><FileText size={20} /></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* Left Column: Charts */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Weekly Traffic Area Chart */}
+                    {/* Weekly Traffic Chart with toggle */}
                     <div className="glass-card p-6">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                                 <TrendingUp size={18} className="text-indigo-500" /> Previous 7 Days Traffic Report
                             </h3>
-                            <span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-2 py-1 rounded">Daily Performance</span>
+                            <div className="flex items-center gap-2">
+                                <div className="flex rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
+                                    <button
+                                        onClick={() => setChartType('area')}
+                                        className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                            chartType === 'area'
+                                                ? 'bg-white dark:bg-gray-700 text-indigo-600 shadow-sm'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    >
+                                        Area
+                                    </button>
+                                    <button
+                                        onClick={() => setChartType('bar')}
+                                        className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                                            chartType === 'bar'
+                                                ? 'bg-white dark:bg-gray-700 text-indigo-600 shadow-sm'
+                                                : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    >
+                                        Bar
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                         <div className="h-[300px]">
                             {kpiData.details ? (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={kpiData.labels.map((l: any, i: any) => ({
-                                        name: l,
-                                        people: kpiData.details.people[i],
-                                        vehicles: kpiData.details.vehicles[i]
-                                    }))} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="colorPeople" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                                            </linearGradient>
-                                            <linearGradient id="colorVehicles" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
-                                                <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(150, 150, 150, 0.1)" />
-                                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                                        <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                                        <RechartsTooltip 
-                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}
-                                            labelStyle={{ fontWeight: 'bold', color: '#333' }}
-                                        />
-                                        <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} iconType="circle" />
-                                        <Area type="monotone" dataKey="people" name="People Entries" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorPeople)" />
-                                        <Area type="monotone" dataKey="vehicles" name="Vehicle Entries" stroke="#14b8a6" strokeWidth={3} fillOpacity={1} fill="url(#colorVehicles)" />
-                                    </AreaChart>
+                                    {chartType === 'area' ? (
+                                        <AreaChart data={kpiData.labels.map((l: any, i: any) => ({
+                                            name: l,
+                                            people: kpiData.details.people[i],
+                                            vehicles: kpiData.details.vehicles[i]
+                                        }))} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="colorPeople" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                                                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                                                </linearGradient>
+                                                <linearGradient id="colorVehicles" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3}/>
+                                                    <stop offset="95%" stopColor="#14b8a6" stopOpacity={0}/>
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(150, 150, 150, 0.1)" />
+                                            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                                            <RechartsTooltip
+                                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}
+                                                labelStyle={{ fontWeight: 'bold', color: '#333' }}
+                                            />
+                                            <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} iconType="circle" />
+                                            <Area type="monotone" dataKey="people" name="People Entries" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorPeople)" />
+                                            <Area type="monotone" dataKey="vehicles" name="Vehicle Entries" stroke="#14b8a6" strokeWidth={3} fillOpacity={1} fill="url(#colorVehicles)" />
+                                        </AreaChart>
+                                    ) : (
+                                        <BarChart data={kpiData.labels.map((l: any, i: any) => ({
+                                            name: l,
+                                            people: kpiData.details.people[i],
+                                            vehicles: kpiData.details.vehicles[i]
+                                        }))} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(150, 150, 150, 0.1)" />
+                                            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                                            <RechartsTooltip
+                                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
+                                                labelStyle={{ fontWeight: 'bold', color: '#333' }}
+                                            />
+                                            <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} iconType="circle" />
+                                            <Bar dataKey="people" name="People Entries" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                            <Bar dataKey="vehicles" name="Vehicle Entries" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                                        </BarChart>
+                                    )}
                                 </ResponsiveContainer>
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-gray-400">Loading chart...</div>
@@ -319,12 +409,23 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
                                 <p className="text-center text-gray-400 text-sm py-4">No recent activity</p>
                             ) : (
                                 recentLogs.map((log, i) => (
-                                    <div key={i} className="flex gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 transition-colors">
-                                        <div className={`p-2 rounded-lg shrink-0 ${log.isAlert ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-                                            {log.isAlert ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+                                    <div key={i} className={`flex gap-3 p-3 rounded-xl transition-colors ${
+                                        log.is_flagged
+                                            ? 'bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30'
+                                            : 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100'
+                                    }`}>
+                                        <div className={`p-2 rounded-lg shrink-0 ${log.isAlert || log.is_flagged ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+                                            {log.isAlert || log.is_flagged ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
                                         </div>
                                         <div>
-                                            <p className="text-xs font-bold text-gray-900 dark:text-gray-100">{log.user}</p>
+                                            <p className={`text-xs font-bold flex items-center gap-1.5 ${
+                                                log.is_flagged ? 'text-red-700 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
+                                            }`}>
+                                                {log.user}
+                                                {log.is_flagged && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-red-600 text-white">FLAGGED</span>
+                                                )}
+                                            </p>
                                             <p className="text-[10px] text-gray-500 flex items-center gap-1 mt-0.5">
                                                 <Clock size={10} /> {log.time} • {log.status}
                                             </p>

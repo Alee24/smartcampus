@@ -273,6 +273,17 @@ export default function Reports() {
                 headStyles: { fillColor: [79, 70, 229], fontSize: 9 }, // primary-600
                 bodyStyles: { fontSize: 8 },
                 margin: { left: marginX, right: marginX },
+                didParseCell: function (data: any) {
+                    if (type === 'people' && data.section === 'body') {
+                        const rowIndex = data.row.index;
+                        const logEntry = genReport.entry_logs[rowIndex];
+                        if (logEntry && logEntry.is_flagged) {
+                            data.cell.styles.fillColor = [254, 226, 226]; // light red
+                            data.cell.styles.textColor = [153, 27, 27];   // dark red
+                            data.cell.styles.fontStyle = 'bold';
+                        }
+                    }
+                },
                 didDrawPage: function () {
                     pdf.setFontSize(8);
                     pdf.setTextColor(156, 163, 175);
@@ -582,8 +593,15 @@ export default function Reports() {
                                                         log.guard.toLowerCase().includes(searchQuery.toLowerCase())
                                                     )
                                                     .map((log: any) => (
-                                                        <tr key={log.id} className="hover:bg-[var(--bg-primary)]/30 transition-colors">
-                                                            <td className="p-4 font-bold text-[var(--text-primary)]">{log.name}</td>
+                                                        <tr key={log.id} className={`transition-colors ${log.is_flagged ? 'bg-red-50 dark:bg-red-950/20 border-l-4 border-red-500' : 'hover:bg-[var(--bg-primary)]/30'}`}>
+                                                            <td className={`p-4 font-bold ${log.is_flagged ? 'text-red-700 dark:text-red-400' : 'text-[var(--text-primary)]'}`}>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    {log.name}
+                                                                    {log.is_flagged && (
+                                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-red-600 text-white animate-pulse">⚠ FLAGGED</span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
                                                             <td className="p-4 text-[var(--text-secondary)] text-xs"><span className="px-2 py-0.5 rounded bg-[var(--bg-primary)] border border-[var(--border-color)]">{log.role}</span></td>
                                                             <td className="p-4 font-semibold">{log.gate}</td>
                                                             <td className="p-4 font-semibold text-[var(--text-secondary)]">{log.exit_gate || '-'}</td>

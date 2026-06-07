@@ -232,10 +232,12 @@ async def add_followup(
     incident_id: str,
     followup_type: str = Form(...), # police_report, disciplinary, resolved, update
     description: str = Form(...),
+    reactivate_user: bool = Form(False),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
-    """Add a followup timeline event to an incident report and update its status"""
+    """Add a followup timeline event to an incident report and update its status.
+    When followup_type=='resolved' and reactivate_user=True, also restores target user's status to 'active'."""
     inc_uuid = uuid.UUID(incident_id)
     inc = await session.get(IncidentReport, inc_uuid)
     if not inc:
@@ -257,6 +259,12 @@ async def add_followup(
     # Automatically update incident status based on followup type
     if followup_type == "resolved":
         inc.status = "resolved"
+        # If reactivate_user is requested and there's a target, restore their status
+        if reactivate_user and inc.target_user_id:
+            target_user = await session.get(User, inc.target_user_id)
+            if target_user:
+                target_user.status = "active"
+                session.add(target_user)
     elif followup_type == "police_report":
         inc.status = "police_reported"
     elif followup_type == "disciplinary":
@@ -267,7 +275,8 @@ async def add_followup(
     session.add(new_followup)
     session.add(inc)
     await session.commit()
-    return {"status": "success", "incident_status": inc.status}
+    reactivated = reactivate_user and followup_type == "resolved" and inc.target_user_id is not None
+    return {"status": "success", "incident_status": inc.status, "user_reactivated": reactivated}
 
 # --- Lost & Found Endpoints ---
 
