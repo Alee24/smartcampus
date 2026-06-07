@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
     Users, Shield, AlertTriangle, ShieldAlert, BarChart3, TrendingUp,
-    FileText, ClipboardList, CheckCircle2, ChevronRight, Activity
+    FileText, ClipboardList, CheckCircle2, ChevronRight, Activity, RefreshCw
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
 

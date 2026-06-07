@@ -13,7 +13,7 @@ from app.models import (
     FleetFuelLog, FleetGPSLog, FleetMaintenanceLog,
     FleetNotification, User, Role, Gate
 )
-from app.auth import get_current_user, get_current_admin
+from app.auth import get_current_user, get_current_admin, get_current_fleet_operator
 from app.utils.audit import log_action
 
 router = APIRouter()
@@ -805,7 +805,7 @@ async def start_trip(
     trip_id: UUID,
     odometer: float,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_fleet_operator)
 ):
     try:
         trip = await session.get(FleetTrip, trip_id)
@@ -842,7 +842,7 @@ async def board_passenger(
     trip_id: UUID,
     payload: dict,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_fleet_operator)
 ):
     try:
         scanned_data = payload.get("scanned_data")
@@ -922,7 +922,7 @@ async def end_trip(
     odometer: float,
     notes: Optional[str] = None,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_fleet_operator)
 ):
     try:
         trip = await session.get(FleetTrip, trip_id)
@@ -984,7 +984,7 @@ async def create_fuel_log(
     request: Request,
     log_data: FuelLogCreate,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_fleet_operator)
 ):
     try:
         vehicle = await session.get(Vehicle, log_data.vehicle_id)
@@ -1059,7 +1059,7 @@ async def create_maintenance_log(
     request: Request,
     log_data: MaintenanceLogCreate,
     session: AsyncSession = Depends(get_session),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_fleet_operator)
 ):
     try:
         vehicle = await session.get(Vehicle, log_data.vehicle_id)

@@ -206,12 +206,17 @@ export default function Login({ onLogin }: LoginProps) {
                                 🚀 Demo Quick Access
                             </p>
                             <div className="grid grid-cols-2 gap-2">
-                                <button type="button" onClick={() => handleDemoLogin('admin')} disabled={isLoading} className="p-2 text-xs font-semibold rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors">Admin</button>
-                                <button type="button" onClick={() => handleDemoLogin('lecturer')} disabled={isLoading} className="p-2 text-xs font-semibold rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors">Lecturer</button>
-                                <button type="button" onClick={() => handleDemoLogin('security')} disabled={isLoading} className="p-2 text-xs font-semibold rounded bg-green-100 text-green-700 hover:bg-green-200 transition-colors">Security</button>
-                                <button type="button" onClick={() => handleDemoLogin('student')} disabled={isLoading} className="p-2 text-xs font-semibold rounded bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors">Student</button>
+                                <button type="button" onClick={() => handleDemoLogin('admin')} disabled={isLoading} className="p-2.5 text-xs font-semibold rounded bg-red-105 text-red-700 hover:bg-red-200 transition-colors">Admin</button>
+                                <button type="button" onClick={() => handleDemoLogin('management')} disabled={isLoading} className="p-2.5 text-xs font-semibold rounded bg-cyan-105 text-cyan-700 hover:bg-cyan-200 transition-colors">Management</button>
+                                <button type="button" onClick={() => handleDemoLogin('lecturer')} disabled={isLoading} className="p-2.5 text-xs font-semibold rounded bg-blue-105 text-blue-700 hover:bg-blue-200 transition-colors">Lecturer</button>
+                                <button type="button" onClick={() => handleDemoLogin('student')} disabled={isLoading} className="p-2.5 text-xs font-semibold rounded bg-purple-105 text-purple-700 hover:bg-purple-200 transition-colors">Student</button>
+                                <button type="button" onClick={() => handleDemoLogin('security_lead')} disabled={isLoading} className="p-2.5 text-xs font-semibold rounded bg-emerald-105 text-emerald-700 hover:bg-emerald-200 transition-colors">Security Lead</button>
+                                <button type="button" onClick={() => handleDemoLogin('guard')} disabled={isLoading} className="p-2.5 text-xs font-semibold rounded bg-green-105 text-green-700 hover:bg-green-200 transition-colors">Guard (Security)</button>
+                                <button type="button" onClick={() => handleDemoLogin('guest')} disabled={isLoading} className="p-2.5 text-xs font-semibold rounded bg-rose-105 text-rose-700 hover:bg-rose-200 transition-colors">Guest / Visitor</button>
+                                <button type="button" onClick={() => handleDemoLogin('stores')} disabled={isLoading} className="p-2.5 text-xs font-semibold rounded bg-amber-105 text-amber-700 hover:bg-amber-200 transition-colors">Stores / Inventory</button>
+                                <button type="button" onClick={() => handleDemoLogin('driver')} disabled={isLoading} className="p-2.5 text-xs font-semibold rounded bg-teal-105 text-teal-700 hover:bg-teal-200 transition-colors">Driver / Transport</button>
+                                <button type="button" onClick={() => handleDemoLogin('guardian')} disabled={isLoading} className="p-2.5 text-xs font-semibold rounded bg-orange-105 text-orange-700 hover:bg-orange-200 transition-colors">Guardian / Parent</button>
                             </div>
-                            <button type="button" onClick={() => handleDemoLogin('guardian')} disabled={isLoading} className="w-full mt-2 p-2 text-xs font-semibold rounded bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors">Guardian / Parent</button>
                         </div>
                     )}
 

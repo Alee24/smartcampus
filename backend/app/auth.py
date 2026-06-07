@@ -131,3 +131,13 @@ async def get_current_admin(current_user: User = Depends(get_current_user), sess
             detail="Only administrators are authorized to perform this action"
         )
     return current_user
+
+async def get_current_fleet_operator(current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)) -> User:
+    from app.models import Role
+    role = await session.get(Role, current_user.role_id)
+    if not role or role.name not in ["SuperAdmin", "Admin", "FleetManager", "Driver"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators, fleet managers, and drivers are authorized to perform this action"
+        )
+    return current_user

@@ -966,7 +966,13 @@ async def demo_login(req: DemoLoginRequest, request: Request, session: AsyncSess
         "lecturer": "lecturer@test.com",
         "security": "guard@test.com",
         "student": "student@test.com",
-        "guardian": "parent@test.com"
+        "guardian": "parent@test.com",
+        "management": "management@test.com",
+        "security_lead": "seclead@test.com",
+        "guard": "guard@test.com",
+        "guest": "guest@test.com",
+        "stores": "stores@test.com",
+        "driver": "kamau@test.com"
     }
     
     target_email = email_map.get(req.role)

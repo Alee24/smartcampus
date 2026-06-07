@@ -55,6 +55,7 @@ const IDPrinting = lazy(() => import('./IDPrinting'))
 const Geofencing = lazy(() => import('./Geofencing'))
 const AdminDashboard = lazy(() => import('./AdminDashboard'))
 const LecturerDashboard = lazy(() => import('./LecturerDashboard'))
+const DriverDashboard = lazy(() => import('./DriverDashboard'))
 const QRRegistry = lazy(() => import('./QRRegistry'))
 const NoticeBoard = lazy(() => import('./NoticeBoard'))
 const AssetManagement = lazy(() => import('./AssetManagement'))
@@ -424,6 +425,22 @@ function App() {
                 'bulk': false,
                 'settings': false,
                 'integrations': false
+            },
+            'Driver': {
+                'dashboard': true,
+                'users': false,
+                'verification': false,
+                'attendance': false,
+                'live': false,
+                'gate': false,
+                'vehicles': true,
+                'timetable': false,
+                'cameras': false,
+                'settings': true,
+                'notice-board': true,
+                'fleet': true,
+                'fleet-tracking': false,
+                'fleet-trips': true
             },
             'Security': {
                 'dashboard': true,
@@ -1330,9 +1347,10 @@ function App() {
                     {activeTab === 'dashboard' && role === 'Guest' && <GuestDashboard currentUser={currentUser} />}
                     {activeTab === 'dashboard' && role === 'Management' && <ManagementDashboard currentUser={currentUser} onNavigate={setActiveTab} />}
                     {activeTab === 'dashboard' && role === 'Stores' && <StoresDashboard currentUser={currentUser} onNavigate={setActiveTab} />}
+                    {activeTab === 'dashboard' && role === 'Driver' && <DriverDashboard currentUser={currentUser} onNavigate={setActiveTab} />}
                     {activeTab === 'visitors' && <VisitorManagement />}
                     {activeTab === 'calendar' && <CampusCalendar />}
-                    {activeTab === 'dashboard' && role !== 'Guardian' && role !== 'Security' && role !== 'Security Lead' && role !== 'Guard' && role !== 'Student' && role !== 'Lecturer' && role !== 'Staff' && role !== 'Guest' && role !== 'Management' && role !== 'Stores' && (
+                    {activeTab === 'dashboard' && role !== 'Guardian' && role !== 'Security' && role !== 'Security Lead' && role !== 'Guard' && role !== 'Student' && role !== 'Lecturer' && role !== 'Staff' && role !== 'Guest' && role !== 'Management' && role !== 'Stores' && role !== 'Driver' && (
                         <AdminDashboard onNavigate={setActiveTab} />
                     )}
 
