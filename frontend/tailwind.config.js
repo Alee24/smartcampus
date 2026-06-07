@@ -10,8 +10,8 @@ export default {
             colors: {
                 primary: {
                     DEFAULT: 'var(--primary-color)',
-                    50: '#f0fdfa',
-                    100: '#ccfbf1',
+                    50: '#eff6ff',
+                    100: '#dbeafe',
                     500: 'var(--primary-color)', // Dynamic from CSS
                     600: 'var(--secondary-color)', // Mapping logic
                     gradient: 'var(--gradient-primary)'

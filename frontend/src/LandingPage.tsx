@@ -1,4 +1,4 @@
-import { Shield, QrCode, Clock, CheckCircle, ArrowRight, Smartphone, Lock, BarChart3, Bell, UserCheck, Activity, Database, Zap, HeartPulse, Stethoscope, Phone, ShieldAlert, Award } from 'lucide-react'
+import { Shield, QrCode, Clock, CheckCircle, ArrowRight, Smartphone, Lock, BarChart3, Bell, UserCheck, Activity, Database, Zap, Phone, ShieldAlert, Award, Sliders, Server, User } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import StudentVerification from './StudentVerification'
 
@@ -9,7 +9,7 @@ interface LandingPageProps {
 export default function LandingPage({ onGetStarted }: LandingPageProps) {
     const [showVerification, setShowVerification] = useState(false)
     const [companySettings, setCompanySettings] = useState<{ company_name: string, logo_url: string }>({
-        company_name: 'Smart Campus Health',
+        company_name: 'Smart Campus',
         logo_url: ''
     })
 
@@ -18,43 +18,43 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             .then(res => res.json())
             .then(data => {
                 setCompanySettings({
-                    company_name: data.company_name || 'Smart Campus Health',
+                    company_name: data.company_name || 'Smart Campus',
                     logo_url: data.logo_url || ''
                 })
             })
             .catch(err => console.error("Failed to fetch company settings", err))
     }, [])
 
-    const medicalServices = [
+    const campusServices = [
         {
-            icon: <HeartPulse size={24} className="text-teal-600 dark:text-teal-400" />,
-            title: "Campus Medical & Wellness Care",
-            description: "Access campus clinic resources, check-in for outpatient consultations, and request verified health clearance credentials."
+            icon: <Shield size={24} className="text-blue-600 dark:text-blue-400" />,
+            title: "Identity & Gate Governance",
+            description: "Contactless gate authorization powered by secure biometrics and high-contrast dynamic QR credentials."
         },
         {
-            icon: <Shield size={24} className="text-teal-600 dark:text-teal-400" />,
-            title: "Safe Contactless Access",
-            description: "Swipe through entry points swiftly and safely using private biometric identity features or dynamic QR codes."
-        },
-        {
-            icon: <Activity size={24} className="text-teal-600 dark:text-teal-400" />,
+            icon: <Activity size={24} className="text-blue-600 dark:text-blue-400" />,
             title: "Precision Academic Check-ins",
-            description: "Log lecture and lab session attendance with integrated class check-ins that protect safety and records."
+            description: "Automated session attendance tracking with real-time registers for students and lecturers."
         },
         {
-            icon: <Database size={24} className="text-teal-600 dark:text-teal-400" />,
-            title: "University Fleet & Shuttles",
-            description: "Track university transit schedules, check active routes, and coordinate medical shuttle services across campus."
+            icon: <Database size={24} className="text-blue-600 dark:text-blue-400" />,
+            title: "Transit & Fleet Operations",
+            description: "Full coordination of campus shuttle schedules, routes, trip manifests, and passenger counters."
+        },
+        {
+            icon: <Sliders size={24} className="text-blue-600 dark:text-blue-400" />,
+            title: "Campus Asset Management",
+            description: "Track institutional inventory, manage equipment handovers, and generate detailed condition reports."
         }
     ]
 
-    const securityHighlights = [
-        "Encrypted Health & ID Records",
-        "24/7 Campus Clinical Support",
-        "Contactless Access Points",
-        "Real-time Safety Alerting",
-        "Secure Self-Service Check-in",
-        "Verified Institutional Integrity"
+    const platformHighlights = [
+        "Biometric Identity Verification",
+        "Dynamic Encrypted Gate QR Codes",
+        "Automated Lecture Attendance Logs",
+        "Transit Fleet & Route Monitoring",
+        "Asset Handover Tracking Hub",
+        "Unified Administration Dashboard"
     ]
 
     if (showVerification) {
@@ -68,8 +68,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                                     <img src={companySettings.logo_url} alt="Logo" className="w-full h-full object-contain" />
                                 </div>
                             ) : (
-                                <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center">
-                                    <HeartPulse className="text-white" size={20} />
+                                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
+                                    <Shield className="text-white" size={20} />
                                 </div>
                             )}
                             <span className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
@@ -78,7 +78,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                         </div>
                         <button
                             onClick={() => setShowVerification(false)}
-                            className="px-6 py-2 rounded-lg border border-[var(--border-color)] text-[var(--text-primary)] font-semibold hover:bg-[var(--bg-primary)] transition-all focus:ring-2 focus:ring-teal-500 outline-none"
+                            className="px-6 py-2 rounded-lg border border-[var(--border-color)] text-[var(--text-primary)] font-semibold hover:bg-[var(--bg-primary)] transition-all focus:ring-2 focus:ring-blue-500 outline-none"
                         >
                             Return to Portal
                         </button>
@@ -92,8 +92,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
     }
 
     return (
-        <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] selection:bg-teal-500/30">
-            {/* Header / Navigation */}
+        <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] selection:bg-blue-500/30">
+            {/* Navigation Bar */}
             <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg-surface)]/95 backdrop-blur-md border-b border-[var(--border-color)] transition-colors duration-300">
                 <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -102,25 +102,25 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                                 <img src={companySettings.logo_url} alt="Logo" className="w-full h-full object-contain" />
                             </div>
                         ) : (
-                            <div className="w-9 h-9 rounded-lg bg-teal-600 flex items-center justify-center">
-                                <HeartPulse className="text-white" size={18} />
+                            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
+                                <Shield className="text-white" size={18} />
                             </div>
                         )}
-                        <span className="text-xl font-bold tracking-tight text-teal-600 dark:text-teal-400">
+                        <span className="text-xl font-bold tracking-tight text-blue-600 dark:text-blue-400">
                             {companySettings.company_name}
                         </span>
                     </div>
                     
                     <div className="hidden md:flex items-center gap-8 text-sm font-medium text-[var(--text-secondary)]">
-                        <button onClick={() => setShowVerification(true)} className="hover:text-teal-600 dark:hover:text-teal-400 transition-colors focus:outline-none">Credentials Check</button>
-                        <button onClick={() => window.location.href = '/gate-pass/entry'} className="hover:text-teal-600 dark:hover:text-teal-400 transition-colors focus:outline-none">Self Service</button>
-                        <a href="https://www.kkdes.co.ke" target="_blank" rel="noopener noreferrer" className="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Emergency Support</a>
+                        <button onClick={() => setShowVerification(true)} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none">Credentials Check</button>
+                        <button onClick={() => window.location.href = '/gate-pass/entry'} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none">Self Service</button>
+                        <a href="https://www.kkdes.co.ke" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Technical Support</a>
                     </div>
 
                     <div className="flex items-center gap-4">
                         <button
                             onClick={onGetStarted}
-                            className="px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600 text-white text-sm font-bold transition-all shadow-md shadow-teal-500/10 focus:ring-2 focus:ring-teal-500 outline-none"
+                            className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white text-sm font-bold transition-all shadow-md shadow-blue-500/10 focus:ring-2 focus:ring-blue-500 outline-none"
                         >
                             Sign In to Portal
                         </button>
@@ -130,103 +130,103 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
             {/* Hero Section */}
             <section className="relative pt-40 pb-24 px-6">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[450px] bg-teal-500/5 rounded-full blur-[100px] pointer-events-none" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl h-[450px] bg-blue-500/5 rounded-full blur-[100px] pointer-events-none" />
                 
                 <div className="max-w-7xl mx-auto relative">
                     <div className="grid lg:grid-cols-12 gap-12 items-center">
                         <div className="lg:col-span-7">
-                            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/50 text-teal-700 dark:text-teal-300 text-xs font-bold uppercase tracking-wider mb-6">
-                                <Stethoscope size={14} className="animate-pulse" /> Unified Health & Access Environment
+                            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold uppercase tracking-wider mb-6">
+                                <Zap size={14} className="text-blue-600 dark:text-blue-400" /> Unified Campus Operations Environment
                             </div>
                             <h1 className="text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] tracking-tight">
-                                Care-focused safety. <br />
-                                <span className="text-teal-600 dark:text-teal-400">Reassuringly simple</span> <br />
-                                campus access.
+                                Integrated security. <br />
+                                <span className="text-blue-600 dark:text-blue-400">Reassuringly simple</span> <br />
+                                campus operations.
                             </h1>
                             <p className="text-lg text-[var(--text-secondary)] mb-8 leading-relaxed max-w-2xl">
-                                Welcome to your modern campus care gate. Access secure health status clearances, verify academic attendance, book clinic appointments, and manage contactless entries through one unified, patient-centric ecosystem.
+                                Deploy a unified intelligence layer for institutional safety. Monitor gate access, track classroom attendance registers, coordinate transit logistics, and manage campus assets in real time on one centralized, high-performance platform.
                             </p>
                             
                             <div className="flex flex-wrap gap-4">
                                 <button
                                     onClick={onGetStarted}
-                                    className="px-8 py-4 rounded-xl bg-teal-600 hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600 text-white font-bold transition-all flex items-center gap-3 shadow-lg shadow-teal-600/20 hover:shadow-teal-600/30 transform hover:-translate-y-0.5 focus:ring-2 focus:ring-teal-500 outline-none"
+                                    className="px-8 py-4 rounded-xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-bold transition-all flex items-center gap-3 shadow-lg shadow-blue-600/20 hover:shadow-blue-600/30 transform hover:-translate-y-0.5 focus:ring-2 focus:ring-blue-500 outline-none"
                                 >
-                                    Access Medical Portal <ArrowRight size={18} />
+                                    Access Operations Center <ArrowRight size={18} />
                                 </button>
                                 <button 
                                     onClick={() => setShowVerification(true)}
-                                    className="px-8 py-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-primary)] font-bold hover:bg-[var(--bg-primary)] transition-all flex items-center gap-2 hover:border-teal-500/30 focus:ring-2 focus:ring-teal-500 outline-none"
+                                    className="px-8 py-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-primary)] font-bold hover:bg-[var(--bg-primary)] transition-all flex items-center gap-2 hover:border-blue-500/30 focus:ring-2 focus:ring-blue-500 outline-none"
                                 >
-                                    <UserCheck size={18} className="text-teal-600 dark:text-teal-400" /> Verify Credentials
+                                    <UserCheck size={18} className="text-blue-600 dark:text-blue-400" /> Verify Credentials
                                 </button>
                             </div>
 
                             <div className="mt-12 flex items-center gap-10 border-t border-[var(--border-color)] pt-8">
                                 <div>
-                                    <div className="text-2xl font-extrabold text-teal-600 dark:text-teal-400">100%</div>
-                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Privacy Compliant</div>
+                                    <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">100%</div>
+                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Audit Reliability</div>
                                 </div>
                                 <div>
-                                    <div className="text-2xl font-extrabold text-teal-600 dark:text-teal-400">24/7</div>
-                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Medical Response</div>
+                                    <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">Real-Time</div>
+                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Activity Tracking</div>
                                 </div>
                                 <div>
-                                    <div className="text-2xl font-extrabold text-teal-600 dark:text-teal-400">Contactless</div>
-                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Access Protocol</div>
+                                    <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">Contactless</div>
+                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Gate Verification</div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Interactive Campus Clinic / Alert Panel Mockup */}
+                        {/* Interactive Stats Dashboard Mockup */}
                         <div className="lg:col-span-5 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-3xl p-8 shadow-xl relative overflow-hidden transition-all duration-300 hover:shadow-2xl">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/10 rounded-bl-[100px] pointer-events-none" />
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-bl-[100px] pointer-events-none" />
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-950/30 flex items-center justify-center">
-                                        <HeartPulse className="text-teal-600 dark:text-teal-400" size={20} />
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
+                                        <Activity className="text-blue-600 dark:text-blue-400" size={20} />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-[var(--text-primary)]">Quick Health Status</h3>
-                                        <p className="text-xs text-[var(--text-secondary)]">Live clinic operational details</p>
+                                        <h3 className="font-bold text-[var(--text-primary)]">System Metrics</h3>
+                                        <p className="text-xs text-[var(--text-secondary)]">Live operational status</p>
                                     </div>
                                 </div>
                                 <span className="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Open Now
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
                                 </span>
                             </div>
 
                             <div className="space-y-4">
-                                <div className="p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between hover:border-teal-500/30 transition-all">
+                                <div className="p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between hover:border-blue-500/30 transition-all">
                                     <div className="flex items-center gap-3">
-                                        <Stethoscope className="text-teal-600 dark:text-teal-400" size={18} />
-                                        <span className="text-sm font-semibold">Active Doctor consultations</span>
+                                        <Shield className="text-blue-600 dark:text-blue-400" size={18} />
+                                        <span className="text-sm font-semibold">Security Gate Logs</span>
                                     </div>
-                                    <span className="text-xs text-[var(--text-secondary)] font-medium">Wait: ~5 mins</span>
+                                    <span className="text-xs text-[var(--text-secondary)] font-medium">Auto logging: Active</span>
                                 </div>
-                                <div className="p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between hover:border-teal-500/30 transition-all">
+                                <div className="p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between hover:border-blue-500/30 transition-all">
                                     <div className="flex items-center gap-3">
-                                        <Phone className="text-teal-600 dark:text-teal-400" size={18} />
-                                        <span className="text-sm font-semibold">24hr Wellness Hotline</span>
+                                        <Database className="text-blue-600 dark:text-blue-400" size={18} />
+                                        <span className="text-sm font-semibold">Transit Fleet Tracking</span>
                                     </div>
-                                    <span className="text-xs text-teal-600 dark:text-teal-400 font-bold">Call Enabled</span>
+                                    <span className="text-xs text-blue-600 dark:text-blue-400 font-bold">Trips Enabled</span>
                                 </div>
-                                <div className="p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between hover:border-teal-500/30 transition-all">
+                                <div className="p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between hover:border-blue-500/30 transition-all">
                                     <div className="flex items-center gap-3">
-                                        <CheckCircle className="text-teal-600 dark:text-teal-400" size={18} />
-                                        <span className="text-sm font-semibold">Digital clearance status</span>
+                                        <CheckCircle className="text-blue-600 dark:text-blue-400" size={18} />
+                                        <span className="text-sm font-semibold">User Verification State</span>
                                     </div>
-                                    <span className="text-xs px-2 py-0.5 rounded bg-teal-50 dark:bg-teal-950/50 text-teal-700 dark:text-teal-300 font-bold">100% Valid</span>
+                                    <span className="text-xs px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-bold">Secure</span>
                                 </div>
                             </div>
 
                             <div className="mt-6 pt-6 border-t border-[var(--border-color)] text-center">
-                                <p className="text-xs text-[var(--text-secondary)] mb-4">Are you experiencing a medical emergency on campus?</p>
+                                <p className="text-xs text-[var(--text-secondary)] mb-4">Need immediate security assistance on campus?</p>
                                 <a 
                                     href="tel:+254700000000"
                                     className="inline-flex items-center gap-2 text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-700 transition-colors"
                                 >
-                                    <ShieldAlert size={14} /> Call Campus Emergency Line: +254 700 000 000
+                                    <ShieldAlert size={14} /> Contact Campus Command Center: +254 700 000 000
                                 </a>
                             </div>
                         </div>
@@ -238,22 +238,22 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             <section className="py-24 px-6 bg-[var(--bg-surface)] border-y border-[var(--border-color)] transition-colors duration-300">
                 <div className="max-w-7xl mx-auto">
                     <div className="max-w-3xl mb-16">
-                        <h2 className="text-3xl md:text-4xl font-bold mb-4">Patient-Centered Campus Services</h2>
+                        <h2 className="text-3xl md:text-4xl font-bold mb-4">Integrated Campus Functionalities</h2>
                         <p className="text-[var(--text-secondary)] text-lg leading-relaxed">
-                            Discover an array of digital utilities engineered to keep our campus community healthy, protected, and moving efficiently.
+                            Discover an array of digital utilities engineered to keep our campus secure, connected, and operating with maximum efficiency.
                         </p>
                     </div>
 
                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {medicalServices.map((service, index) => (
+                        {campusServices.map((service, index) => (
                             <div
                                 key={index}
-                                className="group p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] hover:border-teal-500/30 hover:shadow-lg hover:shadow-teal-500/5 transition-all duration-300"
+                                className="group p-8 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-300"
                             >
-                                <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] flex items-center justify-center mb-6 group-hover:bg-teal-600 group-hover:text-white dark:group-hover:bg-teal-500 transition-all duration-300">
+                                <div className="w-12 h-12 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-color)] flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white dark:group-hover:bg-blue-500 transition-all duration-300">
                                     {service.icon}
                                 </div>
-                                <h3 className="text-lg font-bold mb-3 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">{service.title}</h3>
+                                <h3 className="text-lg font-bold mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{service.title}</h3>
                                 <p className="text-[var(--text-secondary)] text-sm leading-relaxed">{service.description}</p>
                             </div>
                         ))}
@@ -261,41 +261,41 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 </div>
             </section>
 
-            {/* Patient & Staff Testimonials */}
+            {/* Testimonials */}
             <section className="py-24 px-6">
                 <div className="max-w-7xl mx-auto">
                     <div className="text-center mb-16">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/50 text-teal-700 dark:text-teal-300 text-[11px] font-bold uppercase tracking-wider mb-4">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 text-[11px] font-bold uppercase tracking-wider mb-4">
                             <Award size={12} /> Testimonials
                         </div>
-                        <h2 className="text-3xl md:text-4xl font-bold">Trusted by Students & Care Providers</h2>
+                        <h2 className="text-3xl md:text-4xl font-bold">Trusted by Campus Teams & Students</h2>
                         <p className="text-[var(--text-secondary)] text-base mt-2 max-w-xl mx-auto">
-                            Hear how our health clearance and access system transforms daily wellness workflows on campus.
+                            Hear how our unified operations system transforms daily campus access and management tasks.
                         </p>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
                         <div className="p-8 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
                             <p className="text-[var(--text-secondary)] italic leading-relaxed text-sm">
-                                "The integration of our medical records and digital gate clearance has streamlined how we verify health passes on campus. It feels safe, modern, and respectful of our time."
+                                "Integrating biometric gate control and academic registers has dramatically streamlined our campus safety operations. It provides clear visibility, reduces manual logs, and keeps records secure."
                             </p>
                             <div className="mt-6 flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center text-teal-700 dark:text-teal-300 font-bold text-sm">
+                                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold text-sm">
                                     EV
                                 </div>
                                 <div>
-                                    <h4 className="font-bold text-sm">Dr. Elizabeth Vance</h4>
-                                    <p className="text-[var(--text-secondary)] text-xs">Director of Campus Clinical Services</p>
+                                    <h4 className="font-bold text-sm">Prof. Elizabeth Vance</h4>
+                                    <p className="text-[var(--text-secondary)] text-xs">Director of Campus Administration</p>
                                 </div>
                             </div>
                         </div>
 
                         <div className="p-8 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
                             <p className="text-[var(--text-secondary)] italic leading-relaxed text-sm">
-                                "As a student, being able to verify my health credentials online and walk through the gate without carrying physical paperwork is incredibly convenient. The interface is simple and extremely responsive."
+                                "Being able to check my attendance record and use contactless gate check-ins has made my daily commute completely seamless. The interface is clean, intuitive, and extremely fast."
                             </p>
                             <div className="mt-6 flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-teal-100 dark:bg-teal-900/40 flex items-center justify-center text-teal-700 dark:text-teal-300 font-bold text-sm">
+                                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold text-sm">
                                     MM
                                 </div>
                                 <div>
@@ -308,22 +308,22 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 </div>
             </section>
 
-            {/* Why Choose Section & Reassurance list */}
+            {/* Features Detail list */}
             <section className="py-24 px-6 bg-[var(--bg-surface)] border-t border-[var(--border-color)] transition-colors duration-300">
                 <div className="max-w-7xl mx-auto">
                     <div className="grid lg:grid-cols-2 gap-16 items-center">
                         <div>
                             <h2 className="text-3xl lg:text-4xl font-bold mb-6 leading-tight">
                                 Safeguarding access, <br />
-                                <span className="text-teal-600 dark:text-teal-400">protecting your wellness.</span>
+                                <span className="text-blue-600 dark:text-blue-400">streamlining operations.</span>
                             </h2>
                             <p className="text-base text-[var(--text-secondary)] mb-8 leading-relaxed">
-                                Our platform consolidates medical clearance and campus access points to eliminate queues, manual logs, and vulnerabilities. Every decision keeps patient confidentiality and user accessibility at the center.
+                                Our platform consolidates gate entry point data, attendance registers, assets, and fleets into a single command dashboard to eliminate administrative overhead, paperwork, and security vulnerabilities.
                             </p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8">
-                                {securityHighlights.map((highlight, index) => (
+                                {platformHighlights.map((highlight, index) => (
                                     <div key={index} className="flex items-center gap-3">
-                                        <CheckCircle className="text-teal-600 dark:text-teal-400 flex-shrink-0" size={18} />
+                                        <CheckCircle className="text-blue-600 dark:text-blue-400 flex-shrink-0" size={18} />
                                         <span className="text-sm font-semibold text-[var(--text-primary)]">{highlight}</span>
                                     </div>
                                 ))}
@@ -331,25 +331,25 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-teal-500/30 transition-all">
-                                <Smartphone className="text-teal-600 dark:text-teal-400 mb-4" size={24} />
-                                <h4 className="font-bold text-sm mb-1">Mobile-First Care</h4>
-                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">Check clearances and access clinics on any mobile browser instantly.</p>
+                            <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-blue-500/30 transition-all">
+                                <Smartphone className="text-blue-600 dark:text-blue-400 mb-4" size={24} />
+                                <h4 className="font-bold text-sm mb-1">Mobile-First Check-in</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">Scan QR codes and register entries on mobile devices instantly.</p>
                             </div>
-                            <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-teal-500/30 transition-all mt-6">
-                                <Lock className="text-teal-600 dark:text-teal-400 mb-4" size={24} />
-                                <h4 className="font-bold text-sm mb-1">Privacy Encrypted</h4>
-                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">All health credentials conform to modern confidentiality regulations.</p>
+                            <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-blue-500/30 transition-all mt-6">
+                                <Lock className="text-blue-600 dark:text-blue-400 mb-4" size={24} />
+                                <h4 className="font-bold text-sm mb-1">Security Standards</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">All check-in parameters are fully encrypted and log-audited.</p>
                             </div>
-                            <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-teal-500/30 transition-all">
-                                <BarChart3 className="text-teal-600 dark:text-teal-400 mb-4" size={24} />
-                                <h4 className="font-bold text-sm mb-1">Clinic Analytics</h4>
-                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">Enables medical staff to monitor visitor density and waiting lines.</p>
+                            <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-blue-500/30 transition-all">
+                                <BarChart3 className="text-blue-600 dark:text-blue-400 mb-4" size={24} />
+                                <h4 className="font-bold text-sm mb-1">Detailed Analytics</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">View traffic volumes, vehicle types, and transit loads at a glance.</p>
                             </div>
-                            <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-teal-500/30 transition-all mt-6">
-                                <Bell className="text-teal-600 dark:text-teal-400 mb-4" size={24} />
-                                <h4 className="font-bold text-sm mb-1">Dynamic Pushes</h4>
-                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">Receive instant notices for health alerts or medical updates.</p>
+                            <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-blue-500/30 transition-all mt-6">
+                                <Bell className="text-blue-600 dark:text-blue-400 mb-4" size={24} />
+                                <h4 className="font-bold text-sm mb-1">Instant Notifications</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">Broadcast announcements and system notifications in real time.</p>
                             </div>
                         </div>
                     </div>
@@ -360,21 +360,21 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             <section className="py-24 px-6 bg-slate-900 dark:bg-slate-950 text-white border-t border-[var(--border-color)] text-center">
                 <div className="max-w-4xl mx-auto">
                     <h2 className="text-3xl md:text-5xl font-bold mb-6">
-                        Access your health & <br className="hidden sm:inline" />security environment today.
+                        Access your campus portal <br className="hidden sm:inline" />and resources today.
                     </h2>
                     <p className="text-lg text-slate-400 mb-10 max-w-2xl mx-auto">
-                        Sign in to check-in at the medical center, renew gate passes, view routes, or verify check-in logs.
+                        Sign in to monitor gate entries, check class schedules, coordinate shuttle trips, or manage campus assets.
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <button
                             onClick={onGetStarted}
-                            className="w-full sm:w-auto px-8 py-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold transition-all shadow-lg shadow-teal-600/20 transform hover:-translate-y-0.5 focus:ring-2 focus:ring-teal-500 outline-none"
+                            className="w-full sm:w-auto px-8 py-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold transition-all shadow-lg shadow-blue-600/20 transform hover:-translate-y-0.5 focus:ring-2 focus:ring-blue-500 outline-none"
                         >
                             Open Access Portal
                         </button>
                         <button
                             onClick={() => setShowVerification(true)}
-                            className="w-full sm:w-auto px-8 py-4 rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-800/50 hover:bg-slate-800 text-slate-300 font-bold transition-all focus:ring-2 focus:ring-teal-500 outline-none"
+                            className="w-full sm:w-auto px-8 py-4 rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-800/50 hover:bg-slate-800 text-slate-300 font-bold transition-all focus:ring-2 focus:ring-blue-500 outline-none"
                         >
                             Verify Credential Status
                         </button>
@@ -386,14 +386,14 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             <footer className="py-12 px-6 border-t border-[var(--border-color)] bg-[var(--bg-surface)] transition-colors duration-300">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8 text-[var(--text-secondary)] text-xs font-medium">
                     <div className="flex items-center gap-2">
-                        <HeartPulse size={14} className="text-teal-600 dark:text-teal-400" />
+                        <Shield size={14} className="text-blue-600 dark:text-blue-400" />
                         <span className="uppercase">{companySettings.company_name} PORTAL &copy; {new Date().getFullYear()}</span>
                     </div>
                     
                     <div className="flex gap-8">
-                        <a href="/privacy" className="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Privacy Infrastructure</a>
-                        <a href="/terms" className="hover:text-teal-600 dark:hover:text-teal-400 transition-colors">Terms of Service</a>
-                        <a href="https://www.kkdes.co.ke" target="_blank" rel="noopener noreferrer" className="text-teal-600 dark:text-teal-400 font-bold">KKDES ENGINEERING</a>
+                        <a href="/privacy" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Privacy Infrastructure</a>
+                        <a href="/terms" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Terms of Service</a>
+                        <a href="https://www.kkdes.co.ke" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 font-bold">KKDES ENGINEERING</a>
                     </div>
                 </div>
             </footer>
