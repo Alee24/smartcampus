@@ -9,7 +9,7 @@ from sqlalchemy import text as sa_text
 from typing import List, Optional
 from pydantic import BaseModel
 from app.database import get_session, engine
-from app.models import User, Role, SystemConfig, EntryLog
+from app.models import User, Role, SystemConfig, EntryLog, IncidentReport
 from app.auth import get_current_user, get_password_hash
 from app.utils.audit import log_action
 import csv
@@ -893,6 +893,11 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
     gate_status_query = select(EntryLog).where(EntryLog.user_id == user.id).where(EntryLog.exit_time == None).order_by(EntryLog.entry_time.desc())
     open_log = (await session.exec(gate_status_query)).first()
     gate_status = "In" if open_log else "Out"
+
+    # Check if student is flagged in incident reports (any unresolved incident)
+    incident_query = select(IncidentReport).where(IncidentReport.target_user_id == user.id).where(IncidentReport.status != "resolved")
+    active_incidents = (await session.exec(incident_query)).all()
+    user_status = "Flagged" if active_incidents else user.status
     
     return {
         "id": str(user.id),
@@ -900,7 +905,7 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
         "admission_number": user.admission_number,
         "email": user.email,
         "school": user.school,
-        "status": user.status,
+        "status": user_status,
         "profile_image": user.profile_image,
         "admission_date": user.admission_date.isoformat() if user.admission_date else None,
         "expiry_date": user.expiry_date.isoformat() if user.expiry_date else None,

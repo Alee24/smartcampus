@@ -511,3 +511,20 @@ h1.text-white, h2.text-white, h3.text-white, h4.text-white, h5.text-white, h6.te
 .via-pink-600 {
   --tw-gradient-stops: var(--tw-gradient-from), var(--accent-color), var(--tw-gradient-to) !important;
 }
+
+/* Flagged Alert Flash Red animation */
+@keyframes pulseRedAlert {
+  0%, 100% {
+    border-color: #ef4444;
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4), 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    border-color: #b91c1c;
+    box-shadow: 0 0 30px rgba(220, 38, 38, 1), 0 0 15px rgba(220, 38, 38, 0.5) inset;
+    background-color: rgba(254, 226, 226, 0.15);
+  }
+}
+.animate-pulse-red {
+  animation: pulseRedAlert 1s infinite !important;
+  border-width: 4px !important;
+}

@@ -78,6 +78,7 @@ const SIDEBAR_GROUPS = [
         id: 'gate_ops',
         label: 'Gate & Security Ops',
         items: [
+            { id: 'verification', label: 'ID Verification', permissionKey: 'verification' },
             { id: 'gate', label: 'Gate Control', permissionKey: 'gate' },
             { id: 'visitors', label: 'Visitor Logs', permissionKey: 'gate' },
             { id: 'vehicles', label: 'Vehicle Intel', permissionKey: 'vehicles' },
@@ -94,7 +95,6 @@ const SIDEBAR_GROUPS = [
         label: 'People',
         items: [
             { id: 'users', label: 'Students / Staff', permissionKey: 'users' },
-            { id: 'verification', label: 'ID Verification', permissionKey: 'verification' },
             { id: 'id-printing', label: 'ID Printing', permissionKey: 'id-printing' },
             { id: 'qr-registry', label: 'QR Asset Hub', permissionKey: 'qr-registry' }
         ]
@@ -1013,8 +1013,16 @@ function App() {
                 </SidebarGroup>
 
                 {/* Gate & Security Operations - Core Functionality */}
-                {(isMenuEnabled('gate') || isMenuEnabled('vehicles') || isMenuEnabled('live') || isMenuEnabled('cameras') || isMenuEnabled('incidents') || isMenuEnabled('lost-found')) && (
+                {(isMenuEnabled('verification') || isMenuEnabled('gate') || isMenuEnabled('vehicles') || isMenuEnabled('live') || isMenuEnabled('cameras') || isMenuEnabled('incidents') || isMenuEnabled('lost-found')) && (
                     <SidebarGroup title="Gate & Security Ops" isOpen={true} onToggle={() => {}} isSidebarCollapsed={isSidebarCollapsed}>
+                        {isMenuEnabled('verification') && (
+                            <NavItem
+                                icon={<ShieldCheck size={18} />}
+                                label="ID Verification"
+                                active={activeTab === 'verification'}
+                                onClick={() => { setActiveTab('verification'); setSidebarOpen(false); }}
+                            />
+                        )}
                         {isMenuEnabled('gate') && (
                             <NavItem
                                 icon={<Shield size={18} />}
@@ -1091,7 +1099,7 @@ function App() {
                 )}
 
                 {/* People Management */}
-                {(isMenuEnabled('users') || isMenuEnabled('verification')) && (
+                {(isMenuEnabled('users') || isMenuEnabled('id-printing') || isMenuEnabled('qr-registry')) && (
                     <SidebarGroup title="People" isOpen={openGroups.people} onToggle={() => toggleGroup('people')} isSidebarCollapsed={isSidebarCollapsed}>
                         {isMenuEnabled('users') && (
                             <NavItem
@@ -1099,14 +1107,6 @@ function App() {
                                 label="Students / Staff"
                                 active={activeTab === 'users'}
                                 onClick={() => { setActiveTab('users'); setSidebarOpen(false); }}
-                            />
-                        )}
-                        {isMenuEnabled('verification') && (
-                            <NavItem
-                                icon={<ShieldCheck size={18} />}
-                                label="ID Verification"
-                                active={activeTab === 'verification'}
-                                onClick={() => { setActiveTab('verification'); setSidebarOpen(false); }}
                             />
                         )}
                         {(isMenuEnabled('id-printing') || isMenuEnabled('qr-registry')) && (
@@ -1297,19 +1297,10 @@ function App() {
                         </button>
                     </div>
 
-                    <nav className="space-y-1 overflow-y-auto max-h-[calc(100vh-250px)] scrollbar-hide">
+                    {/* Unified Navigation - Flex Scrollable Container fitting 100% height */}
+                    <nav className="space-y-4 overflow-y-auto max-h-[calc(100vh-160px)] scrollbar-hide pr-1">
                         {renderSidebarItems()}
-                    </nav>
-                </div>
 
-                <div className="mt-auto p-4 border-t border-[var(--border-color)]">
-                    <nav className="space-y-1 mb-4">
-                        {/* Settings removed from Sidebar for Admin as per request */}
-                    </nav>
-                </div>
-
-                <div className="mt-auto p-4 border-t border-[var(--border-color)]">
-                    <nav className="space-y-1 mb-4">
                         {/* Administration - Visible on Mobile for Admins since Top Bar is hidden */}
                         {role?.toLowerCase() !== 'student' && (isMenuEnabled('settings') || isMenuEnabled('bulk') || isMenuEnabled('company-settings') || isMenuEnabled('ai-settings') || isMenuEnabled('dashboard-designer') || isMenuEnabled('integrations') || isMenuEnabled('audit') || isMenuEnabled('geofencing')) && (
                             <SidebarGroup title="Administration" isOpen={openGroups.admin} onToggle={() => toggleGroup('admin')} isSidebarCollapsed={isSidebarCollapsed}>
@@ -1323,17 +1314,16 @@ function App() {
                                 {isMenuEnabled('geofencing') && <NavItem icon={<Shield size={18} />} label="IP Geofencing" active={activeTab === 'geofencing'} onClick={() => { setActiveTab('geofencing'); setSidebarOpen(false); }} />}
                             </SidebarGroup>
                         )}
+                        
                         {role?.toLowerCase() !== 'student' && (
                             <SidebarGroup title="Support" isOpen={openGroups.support} onToggle={() => toggleGroup('support')} isSidebarCollapsed={isSidebarCollapsed}>
                                 <NavItem icon={<HelpCircle size={18} />} label="Help Center" active={false} onClick={() => { }} />
                                 <InstallPWATrigger navStyle />
                             </SidebarGroup>
                         )}
-                    </nav>
 
-                    {/* Legal Section */}
-                    {role?.toLowerCase() !== 'student' && (
-                        <div className="mb-2">
+                        {/* Legal Section */}
+                        {role?.toLowerCase() !== 'student' && (
                             <SidebarGroup title="Privacy & Legal" isOpen={openGroups.legal} onToggle={() => toggleGroup('legal')} isSidebarCollapsed={isSidebarCollapsed}>
                                 <NavItem
                                     icon={<ShieldCheck size={18} />}
@@ -1354,24 +1344,24 @@ function App() {
                                     onClick={() => { setActiveTab('cookies'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
                                 />
                             </SidebarGroup>
-                        </div>
-                    )}
+                        )}
+                    </nav>
+                </div>
 
-
-                    <div className="flex items-center justify-between px-4 py-2 border-t border-[var(--border-color)] mt-2">
-                        <button
-                            onClick={() => setDarkMode(!darkMode)}
-                            className="p-2 rounded-full hover:bg-[var(--bg-primary)] text-[var(--text-secondary)] transition-colors"
-                        >
-                            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                        </button>
-                        <button
-                            onClick={handleLogout}
-                            className="p-2 rounded-full hover:bg-red-50 text-red-500 transition-colors"
-                        >
-                            <LogOut size={20} />
-                        </button>
-                    </div>
+                {/* Fixed Bottom Panel */}
+                <div className="mt-auto p-4 border-t border-[var(--border-color)] shrink-0 flex items-center justify-between bg-[var(--bg-primary)]">
+                    <button
+                        onClick={() => setDarkMode(!darkMode)}
+                        className="p-2 rounded-full hover:bg-[var(--bg-primary)] text-[var(--text-secondary)] transition-colors"
+                    >
+                        {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                    </button>
+                    <button
+                        onClick={handleLogout}
+                        className="p-2 rounded-full hover:bg-red-50 text-red-500 transition-colors"
+                    >
+                        <LogOut size={20} />
+                    </button>
                 </div>
             </aside>
 
