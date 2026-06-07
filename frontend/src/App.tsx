@@ -66,6 +66,101 @@ const LostAndFound = lazy(() => import('./LostAndFound'))
 import InstallPWA, { InstallPWATrigger } from './components/InstallPWA'
 import PermissionsModal from './components/PermissionsModal'
 
+const SIDEBAR_GROUPS = [
+    {
+        id: 'overview',
+        label: 'Overview',
+        items: [
+            { id: 'dashboard', label: 'Dashboard' }
+        ]
+    },
+    {
+        id: 'gate_ops',
+        label: 'Gate & Security Ops',
+        items: [
+            { id: 'gate', label: 'Gate Control', permissionKey: 'gate' },
+            { id: 'visitors', label: 'Visitor Logs', permissionKey: 'gate' },
+            { id: 'vehicles', label: 'Vehicle Intel', permissionKey: 'vehicles' },
+            { id: 'scan-logs', label: 'Scan Logs', permissionKey: 'scan-logs' },
+            { id: 'gates-dashboard', label: 'Gates Analytics', permissionKey: 'gates-dashboard' },
+            { id: 'live', label: 'Live Monitor', permissionKey: 'live' },
+            { id: 'cameras', label: 'Surveillance', permissionKey: 'cameras' },
+            { id: 'incidents', label: 'Incident Reports', permissionKey: 'incidents' },
+            { id: 'lost-found', label: 'Lost & Found', permissionKey: 'lost-found' }
+        ]
+    },
+    {
+        id: 'people',
+        label: 'People',
+        items: [
+            { id: 'users', label: 'Students / Staff', permissionKey: 'users' },
+            { id: 'verification', label: 'ID Verification', permissionKey: 'verification' },
+            { id: 'id-printing', label: 'ID Printing', permissionKey: 'id-printing' },
+            { id: 'qr-registry', label: 'QR Asset Hub', permissionKey: 'qr-registry' }
+        ]
+    },
+    {
+        id: 'events',
+        label: 'Events',
+        items: [
+            { id: 'events', label: 'Events & Guests' },
+            { id: 'calendar', label: 'Campus Calendar' }
+        ]
+    },
+    {
+        id: 'academics',
+        label: 'Academics',
+        items: [
+            { id: 'attendance', label: 'Class Attendance', permissionKey: 'attendance' },
+            { id: 'timetable', label: 'Timetable', permissionKey: 'timetable' },
+            { id: 'courses', label: 'Courses', permissionKey: 'timetable' },
+            { id: 'classrooms', label: 'Classrooms', permissionKey: 'timetable' },
+            { id: 'all-attendance', label: 'All Attendance', permissionKey: 'all-attendance' }
+        ]
+    },
+    {
+        id: 'fleet',
+        label: 'Fleet Management',
+        items: [
+            { id: 'fleet', label: 'Fleet Dashboard', permissionKey: 'fleet' },
+            { id: 'fleet-tracking', label: 'Live Tracking', permissionKey: 'fleet-tracking' },
+            { id: 'fleet-trips', label: 'Trips & Manifests', permissionKey: 'fleet-trips' }
+        ]
+    },
+    {
+        id: 'assets',
+        label: 'Asset Management',
+        items: [
+            { id: 'assets', label: 'Campus Assets', permissionKey: 'assets' },
+            { id: 'asset-handovers', label: 'Asset Handovers', permissionKey: 'asset-handovers' },
+            { id: 'asset-reports', label: 'Asset Reports', permissionKey: 'asset-reports' }
+        ]
+    },
+    {
+        id: 'admin',
+        label: 'Administration',
+        items: [
+            { id: 'settings', label: 'General Settings', permissionKey: 'settings' },
+            { id: 'bulk', label: 'Data Management', permissionKey: 'bulk' },
+            { id: 'company-settings', label: 'Company Profile', permissionKey: 'company-settings' },
+            { id: 'ai-settings', label: 'AI Configuration', permissionKey: 'ai-settings' },
+            { id: 'dashboard-designer', label: 'Design System', permissionKey: 'dashboard-designer' },
+            { id: 'integrations', label: 'API Integrations', permissionKey: 'integrations' },
+            { id: 'audit', label: 'Audit Trail', permissionKey: 'audit' },
+            { id: 'geofencing', label: 'IP Geofencing', permissionKey: 'geofencing' }
+        ]
+    },
+    {
+        id: 'legal',
+        label: 'Privacy & Legal',
+        items: [
+            { id: 'privacy', label: 'Privacy Policy' },
+            { id: 'rights', label: 'Data Rights' },
+            { id: 'cookies', label: 'Cookie Policy' }
+        ]
+    }
+]
+
 // Helper for Suspense Fallback
 const PageLoader = () => (
     <div className="flex items-center justify-center p-20">
@@ -167,6 +262,7 @@ function App() {
     const [menuConfig, setMenuConfig] = useState<any>({})
     const [showProfileModal, setShowProfileModal] = useState(false)
     const [syncingAD, setSyncingAD] = useState(false)
+    const [showQuickScanModal, setShowQuickScanModal] = useState(false)
     const hasValidated = useState(false)[0] // Simple mount check
 
     // URL Deep Link Handler (QR Codes)
@@ -770,9 +866,9 @@ function App() {
                     )}
                 </SidebarGroup>
 
-                {/* Gate Operations - Core Functionality */}
-                {(isMenuEnabled('gate') || isMenuEnabled('vehicles')) && (
-                    <SidebarGroup title="Gate Operations" isOpen={openGroups.gate_ops} onToggle={() => toggleGroup('gate_ops')} isSidebarCollapsed={isSidebarCollapsed}>
+                {/* Gate & Security Operations - Core Functionality */}
+                {(isMenuEnabled('gate') || isMenuEnabled('vehicles') || isMenuEnabled('live') || isMenuEnabled('cameras') || isMenuEnabled('incidents') || isMenuEnabled('lost-found')) && (
+                    <SidebarGroup title="Gate & Security Ops" isOpen={true} onToggle={() => {}} isSidebarCollapsed={isSidebarCollapsed}>
                         {isMenuEnabled('gate') && (
                             <NavItem
                                 icon={<Shield size={18} />}
@@ -813,12 +909,6 @@ function App() {
                                 onClick={() => { setActiveTab('gates-dashboard'); setSidebarOpen(false); }}
                             />
                         )}
-                    </SidebarGroup>
-                )}
-
-                {/* Security Monitor */}
-                {(isMenuEnabled('live') || isMenuEnabled('cameras')) && (
-                    <SidebarGroup title="Security Monitor" isOpen={openGroups.security_monitor} onToggle={() => toggleGroup('security_monitor')} isSidebarCollapsed={isSidebarCollapsed}>
                         {isMenuEnabled('live') && (
                             <NavItem
                                 icon={<MonitorPlay size={18} />}
@@ -835,12 +925,6 @@ function App() {
                                 onClick={() => { setActiveTab('cameras'); setSidebarOpen(false); }}
                             />
                         )}
-                    </SidebarGroup>
-                )}
-
-                {/* Security Operations */}
-                {(isMenuEnabled('incidents') || isMenuEnabled('lost-found')) && (
-                    <SidebarGroup title="Security Ops" isOpen={openGroups.security_ops} onToggle={() => toggleGroup('security_ops')} isSidebarCollapsed={isSidebarCollapsed}>
                         {isMenuEnabled('incidents') && (
                             <NavItem
                                 icon={<AlertTriangle size={18} />}
@@ -862,7 +946,7 @@ function App() {
 
                 {/* People Management */}
                 {(isMenuEnabled('users') || isMenuEnabled('verification')) && (
-                    <SidebarGroup title="People" isOpen={true} onToggle={() => {}} isSidebarCollapsed={isSidebarCollapsed}>
+                    <SidebarGroup title="People" isOpen={openGroups.people} onToggle={() => toggleGroup('people')} isSidebarCollapsed={isSidebarCollapsed}>
                         {isMenuEnabled('users') && (
                             <NavItem
                                 icon={<Users size={18} />}
@@ -1299,34 +1383,14 @@ function App() {
 
                         {/* Row 2: Context Menu (Secondary Navigation) */}
                         {(() => {
-                            const groups: any = {
-                                security: [
-                                    { id: 'live', label: 'Monitor' },
-                                    { id: 'gate', label: 'Gate' },
-                                    { id: 'visitors', label: 'Visitors' },
-                                    { id: 'vehicles', label: 'Vehicles' },
-                                    { id: 'cameras', label: 'Cameras' }
-                                ],
-                                academics: [
-                                    { id: 'timetable', label: 'Schedule' },
-                                    { id: 'attendance', label: 'Attendance' },
-                                    { id: 'courses', label: 'Courses' },
-                                    { id: 'classrooms', label: 'Rooms' },
-                                    { id: 'all-attendance', label: 'All Attendance' }
-                                ],
-                                people: [
-                                    { id: 'users', label: 'Directory' },
-                                    { id: 'verification', label: 'Verify ID' }
-                                ]
-                            }
-                            const currentGroup = Object.values(groups).find((items: any) => items.some((i: any) => i.id === activeTab)) as any[]
-
+                            const currentGroup = SIDEBAR_GROUPS.find(group => group.items.some(item => item.id === activeTab))
                             if (currentGroup) {
                                 return (
                                     <div className="w-full overflow-x-auto pb-1 animate-in slide-in-from-left-4">
                                         <div className="flex items-center gap-2 p-1">
-                                            {currentGroup.map(item => (
-                                                isMenuEnabled(item.id) && (
+                                            {currentGroup.items.map(item => {
+                                                const isEnabled = !item.permissionKey || isMenuEnabled(item.permissionKey)
+                                                return isEnabled && (
                                                     <button
                                                         key={item.id}
                                                         onClick={() => setActiveTab(item.id)}
@@ -1338,7 +1402,7 @@ function App() {
                                                         {item.label}
                                                     </button>
                                                 )
-                                            ))}
+                                            })}
                                         </div>
                                     </div>
                                 )
@@ -1500,6 +1564,43 @@ function App() {
                 </div>
             )}
 
+
+            {/* Floating Quick Scan Button for Admins & Guards */}
+            {isAuthenticated && ['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
+                <button
+                    onClick={() => setShowQuickScanModal(true)}
+                    className="fixed bottom-6 right-6 z-[90] bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white rounded-full px-5 py-3.5 shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 font-black tracking-wider text-xs border border-white/20 animate-bounce"
+                    style={{ boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.5)' }}
+                >
+                    <QrCode size={20} />
+                    <span>QUICK SCAN</span>
+                </button>
+            )}
+
+            {/* Quick Scan Modal Overlay */}
+            {showQuickScanModal && (
+                <div 
+                    className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-fade-in"
+                    onClick={() => setShowQuickScanModal(false)}
+                >
+                    <div 
+                        className="bg-white dark:bg-gray-800 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-4xl overflow-hidden animate-scale-in max-h-[90vh] sm:max-h-none overflow-y-auto relative p-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <button 
+                            onClick={() => setShowQuickScanModal(false)}
+                            className="absolute top-4 right-4 p-2 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-650 text-slate-800 dark:text-white transition-all z-50 shadow-sm"
+                        >
+                            <X size={20} />
+                        </button>
+                        <div className="pt-2">
+                            <Suspense fallback={<PageLoader />}>
+                                <StudentVerification />
+                            </Suspense>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <InstallPWA />
             <PermissionsModal />

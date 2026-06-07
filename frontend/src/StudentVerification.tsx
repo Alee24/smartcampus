@@ -102,6 +102,9 @@ export default function StudentVerification() {
     }, [])
 
     const playSuccessSound = () => {
+        if ('vibrate' in navigator) {
+            try { navigator.vibrate(200); } catch (e) {}
+        }
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
         const oscillator = audioContext.createOscillator()
         const gainNode = audioContext.createGain()
@@ -113,6 +116,23 @@ export default function StudentVerification() {
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
         oscillator.start(audioContext.currentTime)
         oscillator.stop(audioContext.currentTime + 0.5)
+    }
+
+    const playErrorSound = () => {
+        if ('vibrate' in navigator) {
+            try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+        }
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+        oscillator.frequency.setValueAtTime(300, audioContext.currentTime)
+        oscillator.frequency.exponentialRampToValueAtTime(120, audioContext.currentTime + 0.3)
+        gainNode.gain.setValueAtTime(0.4, audioContext.currentTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.6)
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.6)
     }
 
     const [offlineQueue, setOfflineQueue] = useState<any[]>([])
@@ -367,6 +387,7 @@ export default function StudentVerification() {
 
         } else {
             setResult({ error: 'Student not found in local offline database.' })
+            playErrorSound()
         }
         setLoading(false)
     }

@@ -81,6 +81,18 @@ export default function GateControl() {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const qrScannerRef = useRef<Html5Qrcode | null>(null)
 
+    const triggerHapticFeedback = (success: boolean) => {
+        if ('vibrate' in navigator) {
+            try {
+                if (success) {
+                    navigator.vibrate(200)
+                } else {
+                    navigator.vibrate([200, 100, 200])
+                }
+            } catch (e) {}
+        }
+    }
+
     // Autocomplete Lookup for Plates
     const handlePlateSearch = async (val: string) => {
         const v = val.toUpperCase().replace(/[^A-Z0-9\s]/g, '')
@@ -145,11 +157,13 @@ export default function GateControl() {
             if (result.status === 'allowed') {
                 setScanStatus('success')
                 setLastScan(result.data)
+                triggerHapticFeedback(true)
                 showNotification(`Access granted for ${result.data.name}`, 'success')
                 setAdmissionNumber('')
             } else if (result.status === 'event_pass') {
                 setEventData(result.data)
                 setShowEventModal(true)
+                triggerHapticFeedback(true)
                 setScanStatus('idle')
             } else {
                 setScanStatus('rejected')
@@ -158,11 +172,13 @@ export default function GateControl() {
                     role: 'N/A',
                     time: new Date().toLocaleTimeString()
                 })
+                triggerHapticFeedback(false)
                 showNotification('Access Denied', 'error')
             }
             refreshData()
         } catch (err) {
             setScanStatus('rejected')
+            triggerHapticFeedback(false)
             showNotification('Network communication error', 'error')
         } finally {
             setIsSubmitting(false)
@@ -518,10 +534,12 @@ export default function GateControl() {
             if (result.status === 'allowed') {
                 setScanStatus('success')
                 setLastScan(result.data)
+                triggerHapticFeedback(true)
                 showNotification(result.message || `Access granted for ${result.data.name}`, 'success')
             } else if (result.status === 'event_pass') {
                 setEventData(result.data)
                 setShowEventModal(true)
+                triggerHapticFeedback(true)
                 setScanStatus('idle')
             } else {
                 setScanStatus('rejected')
@@ -530,11 +548,13 @@ export default function GateControl() {
                     role: 'N/A',
                     time: new Date().toLocaleTimeString()
                 })
+                triggerHapticFeedback(false)
                 showNotification(result.message || 'Access Denied', 'error')
             }
             refreshData()
         } catch (err: any) {
             setScanStatus('rejected')
+            triggerHapticFeedback(false)
             showNotification(`Scanner error: ${err.message || err}`, 'error')
         }
     }

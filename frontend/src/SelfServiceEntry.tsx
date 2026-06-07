@@ -98,11 +98,20 @@ export default function SelfServiceEntry() {
             if (res.ok) {
                 setResult(data)
                 setStep(3)
+                if ('vibrate' in navigator) {
+                    try { navigator.vibrate(200); } catch (e) {}
+                }
             } else {
                 setError(data.detail || "Request failed. Please verify the QR scanner device is active.")
+                if ('vibrate' in navigator) {
+                    try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+                }
             }
         } catch (err) {
             setError("Connection failed. Please ensure the campus server network is online.")
+            if ('vibrate' in navigator) {
+                try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+            }
         } finally {
             setSubmitting(false)
         }
@@ -126,11 +135,20 @@ export default function SelfServiceEntry() {
             if (res.ok) {
                 setResult(data)
                 setStep(3)
+                if ('vibrate' in navigator) {
+                    try { navigator.vibrate(200); } catch (e) {}
+                }
             } else {
                 setError(data.detail || "Verification failed. Check credentials and retry.")
+                if ('vibrate' in navigator) {
+                    try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+                }
             }
         } catch (err) {
             setError("Connection failed. Please ensure the campus server network is online.")
+            if ('vibrate' in navigator) {
+                try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+            }
         } finally {
             setSubmitting(false)
         }
