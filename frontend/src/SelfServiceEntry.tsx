@@ -151,9 +151,15 @@ export default function SelfServiceEntry() {
                     </p>
                     <button 
                         onClick={() => window.location.reload()} 
-                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 active:scale-95 transition-all"
+                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 active:scale-95 transition-all mb-3"
                     >
                         New Request
+                    </button>
+                    <button 
+                        onClick={() => window.location.href = '/'}
+                        className="w-full py-4 border border-slate-200 dark:border-slate-850 text-slate-650 dark:text-slate-450 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-2xl font-black text-sm active:scale-95 transition-all"
+                    >
+                        Back to Homepage
                     </button>
                     {result?.status === 'success' && (
                         <div className="mt-4 text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider">
@@ -185,8 +191,17 @@ export default function SelfServiceEntry() {
                 }} 
                 className="hidden" 
             />
-            <div className="max-w-md mx-auto">
-                <header className="mb-8 text-center pt-8">
+            <div className="max-w-md mx-auto relative">
+                {/* Back to Homepage Button */}
+                <div className="flex justify-start mb-4 pt-4">
+                    <button 
+                        onClick={() => window.location.href = '/'}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl text-xs font-black shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                    >
+                        &larr; Back to Homepage
+                    </button>
+                </div>
+                <header className="mb-8 text-center">
                     <div className="inline-flex p-3 bg-indigo-600/10 rounded-2xl mb-3">
                         <Shield className="text-indigo-600" size={28} />
                     </div>

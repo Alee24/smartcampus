@@ -1,4 +1,4 @@
-import { Shield, QrCode, Clock, CheckCircle, ArrowRight, Smartphone, Lock, BarChart3, Bell, UserCheck, Activity, Database, Zap, Phone, ShieldAlert, Award, Sliders, Server, User } from 'lucide-react'
+import { Shield, QrCode, Clock, CheckCircle, ArrowRight, Smartphone, Lock, BarChart3, Bell, UserCheck, Activity, Database, Zap, Phone, ShieldAlert, Award, Sliders, Server, User, Video, Megaphone, HelpCircle } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import StudentVerification from './StudentVerification'
 
@@ -27,34 +27,44 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
     const campusServices = [
         {
-            icon: <Shield size={24} className="text-blue-600 dark:text-blue-400" />,
-            title: "Identity & Gate Governance",
-            description: "Contactless gate authorization powered by secure biometrics and high-contrast dynamic QR credentials."
+            icon: <QrCode size={24} className="text-blue-600 dark:text-blue-400" />,
+            title: "100% QR-Based Access",
+            description: "No expensive hardware scanners or physical ID card printing needed. Verify gate passes using high-contrast dynamic QR codes."
+        },
+        {
+            icon: <ShieldAlert size={24} className="text-blue-600 dark:text-blue-400" />,
+            title: "Incident Reporting",
+            description: "Allows staff, students, and guards to report safety hazards, file security logs, and report issues instantly."
+        },
+        {
+            icon: <HelpCircle size={24} className="text-blue-600 dark:text-blue-400" />,
+            title: "Lost & Found Registry",
+            description: "A centralized register to search lost belongings, log recovered items, and streamline returns."
+        },
+        {
+            icon: <Megaphone size={24} className="text-blue-600 dark:text-blue-400" />,
+            title: "University Notice Board",
+            description: "Broadcast announcements, announcements, alerts, and system notices directly to the campus notice board."
+        },
+        {
+            icon: <Video size={24} className="text-blue-600 dark:text-blue-400" />,
+            title: "Camera Integration",
+            description: "Connect and monitor CCTV/IP security cameras directly from the dashboard to verify entrance events."
         },
         {
             icon: <Activity size={24} className="text-blue-600 dark:text-blue-400" />,
-            title: "Precision Academic Check-ins",
-            description: "Automated session attendance tracking with real-time registers for students and lecturers."
-        },
-        {
-            icon: <Database size={24} className="text-blue-600 dark:text-blue-400" />,
-            title: "Transit & Fleet Operations",
-            description: "Full coordination of campus shuttle schedules, routes, trip manifests, and passenger counters."
-        },
-        {
-            icon: <Sliders size={24} className="text-blue-600 dark:text-blue-400" />,
-            title: "Campus Asset Management",
-            description: "Track institutional inventory, manage equipment handovers, and generate detailed condition reports."
+            title: "Attendance & Schedules",
+            description: "Track student classroom attendance automatically using localized mobile logs and dynamic registers."
         }
     ]
 
     const platformHighlights = [
-        "Biometric Identity Verification",
-        "Dynamic Encrypted Gate QR Codes",
-        "Automated Lecture Attendance Logs",
-        "Transit Fleet & Route Monitoring",
-        "Asset Handover Tracking Hub",
-        "Unified Administration Dashboard"
+        "100% QR-Based Identity",
+        "Zero Hardware Scanners Required",
+        "Runs on Any Connected Phone",
+        "Set Up in Minutes",
+        "Integrated Security Cameras",
+        "Incident & Asset Logs"
     ]
 
     if (showVerification) {
@@ -120,7 +130,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     <div className="flex items-center gap-4">
                         <button
                             onClick={onGetStarted}
-                            className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white text-sm font-bold transition-all shadow-md shadow-blue-500/10 focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-teal-650 text-white text-sm font-bold transition-all shadow-md shadow-blue-500/10 focus:ring-2 focus:ring-blue-500 outline-none"
                         >
                             Sign In to Portal
                         </button>
@@ -136,15 +146,15 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     <div className="grid lg:grid-cols-12 gap-12 items-center">
                         <div className="lg:col-span-7">
                             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 text-blue-700 dark:text-blue-300 text-xs font-bold uppercase tracking-wider mb-6">
-                                <Zap size={14} className="text-blue-600 dark:text-blue-400" /> Unified Campus Operations Environment
+                                <Zap size={14} className="text-blue-600 dark:text-blue-400" /> Dynamic QR Access Control
                             </div>
                             <h1 className="text-5xl lg:text-6xl font-bold mb-6 leading-[1.1] tracking-tight">
-                                Integrated security. <br />
-                                <span className="text-blue-600 dark:text-blue-400">Reassuringly simple</span> <br />
-                                campus operations.
+                                Zero hardware cost. <br />
+                                <span className="text-blue-600 dark:text-blue-400">Scan & verify access</span> <br />
+                                with any smartphone.
                             </h1>
                             <p className="text-lg text-[var(--text-secondary)] mb-8 leading-relaxed max-w-2xl">
-                                Deploy a unified intelligence layer for institutional safety. Monitor gate access, track classroom attendance registers, coordinate transit logistics, and manage campus assets in real time on one centralized, high-performance platform.
+                                Welcome to a lightweight, QR-based campus security ecosystem. Eliminate the need for expensive card printers, hardware scanners, and plastic IDs. Setup is completed in minutes—all your staff, guards, and students need is a simple internet-connected smartphone to manage gates, track attendance, report incidents, and monitor surveillance feeds.
                             </p>
                             
                             <div className="flex flex-wrap gap-4">
@@ -164,16 +174,16 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
                             <div className="mt-12 flex items-center gap-10 border-t border-[var(--border-color)] pt-8">
                                 <div>
-                                    <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">100%</div>
-                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Audit Reliability</div>
+                                    <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">$0</div>
+                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Hardware Required</div>
                                 </div>
                                 <div>
-                                    <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">Real-Time</div>
-                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Activity Tracking</div>
+                                    <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">Instant</div>
+                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Setup Duration</div>
                                 </div>
                                 <div>
-                                    <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">Contactless</div>
-                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Gate Verification</div>
+                                    <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">QR-Based</div>
+                                    <div className="text-[11px] text-[var(--text-secondary)] uppercase font-bold tracking-wider mt-1">Verification Code</div>
                                 </div>
                             </div>
                         </div>
@@ -184,39 +194,39 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                             <div className="flex items-center justify-between mb-6">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
-                                        <Activity className="text-blue-600 dark:text-blue-400" size={20} />
+                                        <Smartphone className="text-blue-600 dark:text-blue-400" size={20} />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-[var(--text-primary)]">System Metrics</h3>
-                                        <p className="text-xs text-[var(--text-secondary)]">Live operational status</p>
+                                        <h3 className="font-bold text-[var(--text-primary)]">Hardware Requisite</h3>
+                                        <p className="text-xs text-[var(--text-secondary)]">Required devices check</p>
                                     </div>
                                 </div>
                                 <span className="px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Compliant
                                 </span>
                             </div>
 
                             <div className="space-y-4">
                                 <div className="p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between hover:border-blue-500/30 transition-all">
                                     <div className="flex items-center gap-3">
-                                        <Shield className="text-blue-600 dark:text-blue-400" size={18} />
-                                        <span className="text-sm font-semibold">Security Gate Logs</span>
+                                        <Smartphone className="text-blue-600 dark:text-blue-400" size={18} />
+                                        <span className="text-sm font-semibold">Any Connected Smartphone</span>
                                     </div>
-                                    <span className="text-xs text-[var(--text-secondary)] font-medium">Auto logging: Active</span>
+                                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">Supported</span>
                                 </div>
                                 <div className="p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between hover:border-blue-500/30 transition-all">
                                     <div className="flex items-center gap-3">
-                                        <Database className="text-blue-600 dark:text-blue-400" size={18} />
-                                        <span className="text-sm font-semibold">Transit Fleet Tracking</span>
+                                        <QrCode className="text-blue-600 dark:text-blue-400" size={18} />
+                                        <span className="text-sm font-semibold">QR Access Generation</span>
                                     </div>
-                                    <span className="text-xs text-blue-600 dark:text-blue-400 font-bold">Trips Enabled</span>
+                                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">Automatic</span>
                                 </div>
                                 <div className="p-4 rounded-2xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between hover:border-blue-500/30 transition-all">
                                     <div className="flex items-center gap-3">
-                                        <CheckCircle className="text-blue-600 dark:text-blue-400" size={18} />
-                                        <span className="text-sm font-semibold">User Verification State</span>
+                                        <Sliders className="text-blue-600 dark:text-blue-400" size={18} />
+                                        <span className="text-sm font-semibold">Additional Hardware Scanners</span>
                                     </div>
-                                    <span className="text-xs px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 font-bold">Secure</span>
+                                    <span className="text-xs text-rose-600 dark:text-rose-400 font-bold">Not Required</span>
                                 </div>
                             </div>
 
@@ -240,11 +250,11 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     <div className="max-w-3xl mb-16">
                         <h2 className="text-3xl md:text-4xl font-bold mb-4">Integrated Campus Functionalities</h2>
                         <p className="text-[var(--text-secondary)] text-lg leading-relaxed">
-                            Discover an array of digital utilities engineered to keep our campus secure, connected, and operating with maximum efficiency.
+                            A completely QR-based ecosystem designed to eliminate hardware procurement. Manage campus security, report incidents, log notice board updates, and track classroom registers.
                         </p>
                     </div>
 
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {campusServices.map((service, index) => (
                             <div
                                 key={index}
@@ -270,14 +280,14 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                         </div>
                         <h2 className="text-3xl md:text-4xl font-bold">Trusted by Campus Teams & Students</h2>
                         <p className="text-[var(--text-secondary)] text-base mt-2 max-w-xl mx-auto">
-                            Hear how our unified operations system transforms daily campus access and management tasks.
+                            Hear how our lightweight QR framework removes logistical friction and saves hardware budgets.
                         </p>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
                         <div className="p-8 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
                             <p className="text-[var(--text-secondary)] italic leading-relaxed text-sm">
-                                "Integrating biometric gate control and academic registers has dramatically streamlined our campus safety operations. It provides clear visibility, reduces manual logs, and keeps records secure."
+                                "By shifting to this QR-based security architecture, our department saved thousands in card printing and hardware scanning equipment. Our guards only use their standard mobile phones connected to the web."
                             </p>
                             <div className="mt-6 flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold text-sm">
@@ -292,7 +302,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
                         <div className="p-8 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
                             <p className="text-[var(--text-secondary)] italic leading-relaxed text-sm">
-                                "Being able to check my attendance record and use contactless gate check-ins has made my daily commute completely seamless. The interface is clean, intuitive, and extremely fast."
+                                "Having our digital IDs as dynamic QR codes on our phones has made campus life completely frictionless. We can check attendance registers, receive notice board alerts, and pass gates instantly."
                             </p>
                             <div className="mt-6 flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold text-sm">
@@ -314,11 +324,11 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     <div className="grid lg:grid-cols-2 gap-16 items-center">
                         <div>
                             <h2 className="text-3xl lg:text-4xl font-bold mb-6 leading-tight">
-                                Safeguarding access, <br />
-                                <span className="text-blue-600 dark:text-blue-400">streamlining operations.</span>
+                                QR access, <br />
+                                <span className="text-blue-600 dark:text-blue-400">integrated campus security.</span>
                             </h2>
                             <p className="text-base text-[var(--text-secondary)] mb-8 leading-relaxed">
-                                Our platform consolidates gate entry point data, attendance registers, assets, and fleets into a single command dashboard to eliminate administrative overhead, paperwork, and security vulnerabilities.
+                                Our platform consolidates gate check-ins, security incident reporting, lost & found logs, notice boards, and surveillance feeds into a unified framework with zero setup barriers.
                             </p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8">
                                 {platformHighlights.map((highlight, index) => (
@@ -333,23 +343,23 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-blue-500/30 transition-all">
                                 <Smartphone className="text-blue-600 dark:text-blue-400 mb-4" size={24} />
-                                <h4 className="font-bold text-sm mb-1">Mobile-First Check-in</h4>
-                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">Scan QR codes and register entries on mobile devices instantly.</p>
+                                <h4 className="font-bold text-sm mb-1">Mobile Web-Based</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">Runs smoothly on any standard mobile browser with internet connection.</p>
                             </div>
                             <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-blue-500/30 transition-all mt-6">
                                 <Lock className="text-blue-600 dark:text-blue-400 mb-4" size={24} />
-                                <h4 className="font-bold text-sm mb-1">Security Standards</h4>
-                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">All check-in parameters are fully encrypted and log-audited.</p>
+                                <h4 className="font-bold text-sm mb-1">Secure & Encrypted</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">QR codes reset dynamically to prevent token copying and unauthorized entries.</p>
                             </div>
                             <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-blue-500/30 transition-all">
                                 <BarChart3 className="text-blue-600 dark:text-blue-400 mb-4" size={24} />
-                                <h4 className="font-bold text-sm mb-1">Detailed Analytics</h4>
-                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">View traffic volumes, vehicle types, and transit loads at a glance.</p>
+                                <h4 className="font-bold text-sm mb-1">Detailed Logs</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">Generate instant spreadsheets of visitors, vehicle traffic, and attendance logs.</p>
                             </div>
                             <div className="p-6 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] hover:border-blue-500/30 transition-all mt-6">
                                 <Bell className="text-blue-600 dark:text-blue-400 mb-4" size={24} />
-                                <h4 className="font-bold text-sm mb-1">Instant Notifications</h4>
-                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">Broadcast announcements and system notifications in real time.</p>
+                                <h4 className="font-bold text-sm mb-1">Real-time Alerting</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">Automatic push notices alert security leads when incidents are submitted.</p>
                             </div>
                         </div>
                     </div>
