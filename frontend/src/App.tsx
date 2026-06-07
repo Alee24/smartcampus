@@ -414,6 +414,62 @@ function App() {
         fetchPublicConfig()
     }, [])
 
+    const [hasUnreadNotices, setHasUnreadNotices] = useState(false)
+
+    // Fetch notice board announcements to check for unread admin notices
+    useEffect(() => {
+        const fetchNoticeAnnouncements = async () => {
+            if (!isAuthenticated) return
+            try {
+                const token = localStorage.getItem('token')
+                const res = await fetch('/api/notice-board', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data && data.length > 0) {
+                        const latestNoticeId = data[0].id
+                        const lastReadNoticeId = localStorage.getItem('lastReadNoticeId')
+                        if (latestNoticeId !== lastReadNoticeId) {
+                            setHasUnreadNotices(true)
+                        } else {
+                            setHasUnreadNotices(false)
+                        }
+                    } else {
+                        setHasUnreadNotices(false)
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch notice board announcements:', e)
+            }
+        }
+        fetchNoticeAnnouncements()
+        const interval = setInterval(fetchNoticeAnnouncements, 30000)
+        return () => clearInterval(interval)
+    }, [isAuthenticated])
+
+    // Automatically clear unread badge when user navigates to notice board
+    useEffect(() => {
+        if (activeTab === 'notice-board' && hasUnreadNotices) {
+            const fetchAndMarkRead = async () => {
+                try {
+                    const token = localStorage.getItem('token')
+                    const res = await fetch('/api/notice-board', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data && data.length > 0) {
+                            localStorage.setItem('lastReadNoticeId', data[0].id)
+                        }
+                    }
+                    setHasUnreadNotices(false)
+                } catch (e) {}
+            }
+            fetchAndMarkRead()
+        }
+    }, [activeTab, hasUnreadNotices])
+
     // Default configuration if none is saved
     const getDefaultConfig = () => {
         return {
@@ -864,6 +920,27 @@ function App() {
                             active={activeTab === 'dashboard' || activeTab === 'student-dashboard'}
                             onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
                         />
+                        <NavItem
+                            icon={
+                                <div className="relative">
+                                    <Megaphone size={18} className={hasUnreadNotices ? "text-red-500 animate-bounce" : ""} />
+                                    {hasUnreadNotices && (
+                                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                        </span>
+                                    )}
+                                </div>
+                            }
+                            label="Notice Board"
+                            active={activeTab === 'notice-board'}
+                            onClick={() => { setActiveTab('notice-board'); setSidebarOpen(false); }}
+                            badge={hasUnreadNotices ? (
+                                <span className="px-2 py-0.5 text-[9px] bg-red-500 text-white rounded-full font-black animate-pulse shadow-sm">
+                                    NEW
+                                </span>
+                            ) : null}
+                        />
                     </SidebarGroup>
 
                     <SidebarGroup title="Events" isOpen={openGroups.events} onToggle={() => toggleGroup('events')} isSidebarCollapsed={isSidebarCollapsed}>
@@ -908,6 +985,29 @@ function App() {
                             label="Dashboard"
                             active={activeTab === 'dashboard'}
                             onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
+                        />
+                    )}
+                    {isMenuEnabled('notice-board') && (
+                        <NavItem
+                            icon={
+                                <div className="relative">
+                                    <Megaphone size={18} className={hasUnreadNotices ? "text-red-500 animate-bounce" : ""} />
+                                    {hasUnreadNotices && (
+                                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                        </span>
+                                    )}
+                                </div>
+                            }
+                            label="Notice Board"
+                            active={activeTab === 'notice-board'}
+                            onClick={() => { setActiveTab('notice-board'); setSidebarOpen(false); }}
+                            badge={hasUnreadNotices ? (
+                                <span className="px-2 py-0.5 text-[9px] bg-red-500 text-white rounded-full font-black animate-pulse shadow-sm">
+                                    NEW
+                                </span>
+                            ) : null}
                         />
                     )}
                 </SidebarGroup>
@@ -1611,7 +1711,7 @@ function App() {
             )}
 
 
-            {/* Floating Get Entry Button for Admins & Guards */}
+            {/* Floating Gate Pass Button for Admins & Guards */}
             {isAuthenticated && ['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
                 <button
                     onClick={() => setShowQuickScanModal(true)}
@@ -1619,7 +1719,7 @@ function App() {
                     style={{ boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.5)' }}
                 >
                     <QrCode size={20} />
-                    <span>GET ENTRY</span>
+                    <span>Gate Pass</span>
                 </button>
             )}
 
@@ -1674,7 +1774,7 @@ function SidebarGroup({ title, children, isOpen, onToggle, isSidebarCollapsed }:
     )
 }
 
-function NavItem({ icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) {
+function NavItem({ icon, label, active, onClick, badge }: { icon: any, label: string, active: boolean, onClick: () => void, badge?: any }) {
     return (
         <button
             onClick={onClick}
@@ -1688,6 +1788,7 @@ function NavItem({ icon, label, active, onClick }: { icon: any, label: string, a
                 {icon}
             </div>
             <span className="text-sm group-[.collapsed]/sidebar:hidden whitespace-nowrap overflow-hidden transition-all">{label}</span>
+            {badge && <span className="ml-auto group-[.collapsed]/sidebar:hidden">{badge}</span>}
             {label === 'Benefits' && <span className="ml-auto text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded font-bold group-[.collapsed]/sidebar:hidden">NEW</span>}
         </button>
     )

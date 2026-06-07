@@ -267,8 +267,31 @@
 .text-primary-600,
 .text-indigo-500,
 .text-blue-500,
-.text-purple-500 {
+.text-purple-500,
+.text-blue-400,
+.text-indigo-400,
+.text-purple-400,
+.text-primary-400 {
   color: var(--primary-color) !important;
+}
+
+.text-blue-300,
+.text-indigo-300,
+.text-purple-300,
+.dark\:text-blue-300,
+.dark\:text-indigo-300,
+.dark\:text-purple-300 {
+  color: color-mix(in srgb, var(--primary-color) 80%, white) !important;
+}
+
+.bg-primary-500,
+.dark\:bg-blue-500,
+.dark\:bg-indigo-500,
+.dark\:bg-purple-500,
+.dark\:bg-blue-600,
+.dark\:bg-indigo-600,
+.dark\:bg-purple-600 {
+  background-color: var(--primary-color) !important;
 }
 
 /* Hover Backgrounds */
@@ -280,16 +303,23 @@
 .hover\:bg-primary-700:hover,
 .hover\:bg-indigo-600:hover,
 .hover\:bg-blue-600:hover,
-.hover\:bg-purple-600:hover {
+.hover\:bg-purple-600:hover,
+.dark\:hover\:bg-blue-600:hover,
+.dark\:hover\:bg-indigo-600:hover,
+.dark\:hover\:bg-blue-700:hover,
+.dark\:hover\:bg-indigo-700:hover {
   background-color: var(--secondary-color) !important;
 }
 
 /* Hover Texts */
+.hover\:text-blue-600:hover,
+.hover\:text-indigo-600:hover,
+.hover\:text-purple-600:hover,
 .hover\:text-blue-700:hover, 
 .hover\:text-indigo-700:hover, 
 .hover\:text-purple-700:hover,
-.hover\:text-indigo-600:hover,
-.hover\:text-blue-600:hover {
+.dark\:hover\:text-blue-400:hover,
+.dark\:hover\:text-indigo-400:hover {
   color: var(--secondary-color) !important;
 }
 
@@ -334,8 +364,18 @@
 .bg-purple-600\/10,
 .bg-indigo-500\/10,
 .bg-blue-500\/10,
-.bg-purple-500\/10 {
+.bg-purple-500\/10,
+.bg-blue-500\/5,
+.bg-indigo-500\/5,
+.bg-purple-500\/5 {
   background-color: color-mix(in srgb, var(--primary-color) 10%, transparent) !important;
+}
+
+/* Specific very low opacity rule */
+.bg-blue-500\/5,
+.bg-indigo-500\/5,
+.bg-purple-500\/5 {
+  background-color: color-mix(in srgb, var(--primary-color) 5%, transparent) !important;
 }
 
 .bg-indigo-600\/20,
@@ -343,7 +383,9 @@
 .bg-purple-600\/20,
 .bg-indigo-500\/20,
 .bg-blue-500\/20,
-.bg-purple-500\/20 {
+.bg-purple-500\/20,
+.bg-primary-500\/20,
+.bg-secondary\/20 {
   background-color: color-mix(in srgb, var(--primary-color) 20%, transparent) !important;
 }
 
@@ -355,7 +397,13 @@
 .bg-purple-500\/25,
 .shadow-indigo-600\/25,
 .shadow-indigo-500\/25,
-.shadow-indigo-500\/30 {
+.shadow-indigo-500\/30,
+.shadow-blue-500\/10,
+.shadow-blue-600\/10,
+.shadow-indigo-500\/10,
+.shadow-indigo-600\/10,
+.shadow-blue-600\/20,
+.shadow-indigo-600\/20 {
   --tw-shadow-color: color-mix(in srgb, var(--primary-color) 25%, transparent) !important;
 }
 
@@ -366,6 +414,9 @@
 .dark .dark\:bg-indigo-950\/20,
 .dark .dark\:bg-blue-950\/20,
 .dark .dark\:bg-purple-950\/20,
+.dark .dark\:bg-blue-900\/40,
+.dark .dark\:bg-indigo-900\/40,
+.dark .dark\:bg-purple-900\/40,
 .bg-indigo-900\/10,
 .bg-blue-900\/10,
 .bg-purple-900\/10 {
@@ -373,9 +424,9 @@
 }
 
 /* Dark Text Contrasts */
-.text-indigo-850,
-.text-blue-850,
-.text-purple-850,
+.text-indigo-855,
+.text-blue-855,
+.text-purple-855,
 .text-indigo-800,
 .text-blue-800,
 .text-purple-800,
@@ -384,7 +435,10 @@
 .text-purple-900,
 .text-indigo-700,
 .text-blue-700,
-.text-purple-700 {
+.text-purple-700,
+.dark .dark\:text-blue-400,
+.dark .dark\:text-indigo-400,
+.dark .dark\:text-purple-400 {
   color: color-mix(in srgb, var(--primary-color) 85%, black) !important;
 }
 
@@ -397,7 +451,10 @@
 .border-purple-200,
 .border-blue-300, 
 .border-indigo-300,
-.border-purple-300 {
+.border-purple-300,
+.dark .dark\:border-blue-900\/50,
+.dark .dark\:border-indigo-900\/50,
+.dark .dark\:border-purple-900\/50 {
   border-color: color-mix(in srgb, var(--primary-color) 20%, transparent) !important;
 }
 
@@ -413,7 +470,9 @@
 .ring-purple-500,
 .focus\:ring-indigo-500\/20:focus,
 .focus\:ring-blue-500\/20:focus,
-.focus\:ring-purple-500\/20:focus {
+.focus\:ring-purple-500\/20:focus,
+.focus\:ring-blue-500:focus,
+.focus\:ring-indigo-500:focus {
   --tw-ring-color: color-mix(in srgb, var(--primary-color) 30%, transparent) !important;
   --tw-ring-offset-color: var(--bg-surface) !important;
 }
