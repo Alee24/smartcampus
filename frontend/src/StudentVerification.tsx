@@ -240,11 +240,11 @@ export default function StudentVerification() {
                         localStorage.setItem('cached_students', JSON.stringify(updated))
                     } catch (e) {}
 
-                    // Reset search page for next scan
-                    setQuery('')
-                    setResult(null)
-                    setShowCard(false)
-                    setSuggestions([])
+                    // Update UI state without disappearing the ID
+                    setResult((prev: any) => ({
+                        ...prev,
+                        gate_status: action === 'check-in' ? 'In' : 'Out'
+                    }))
                     setActionLoading(null)
                     return;
                 }
@@ -264,7 +264,7 @@ export default function StudentVerification() {
         localStorage.setItem('offline_scans', JSON.stringify(queue))
         setOfflineQueue(queue)
 
-        // Update current result state and cached students state
+        // Update cached students state
         const cached = JSON.parse(localStorage.getItem('cached_students') || '[]')
         const updatedCached = cached.map((s: any) => {
             if (s.admission_number === result.admission_number) {
@@ -277,11 +277,11 @@ export default function StudentVerification() {
         playSuccessSound()
         showNotification(`Offline Queued: ${action} for ${result.full_name || result.admission_number}`, 'warning')
         
-        // Reset search page for next scan
-        setQuery('')
-        setResult(null)
-        setShowCard(false)
-        setSuggestions([])
+        // Update UI state without disappearing the ID
+        setResult((prev: any) => ({
+            ...prev,
+            gate_status: action === 'check-in' ? 'In' : 'Out'
+        }))
         setActionLoading(null)
     }
 
