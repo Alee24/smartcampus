@@ -1320,7 +1320,7 @@ async def reset_user_password(
 
 @router.get("/public-company-settings")
 async def get_public_company_settings(session: AsyncSession = Depends(get_session)):
-    """Get public company/university settings (Name, Logo) without auth"""
+    """Get public company/university settings (Name, Logo, Colors) without auth"""
     from app.models import SystemConfig
     import json
     
@@ -1332,12 +1332,21 @@ async def get_public_company_settings(session: AsyncSession = Depends(get_sessio
             data = json.loads(config.value)
             return {
                 "company_name": data.get("company_name", "University"),
-                "logo_url": data.get("logo_url", "")
+                "logo_url": data.get("logo_url", ""),
+                "primary_color": data.get("primary_color", "#2563eb"),
+                "secondary_color": data.get("secondary_color", "#0284c7"),
+                "accent_color": data.get("accent_color", "#10b981")
             }
         except:
             pass
             
-    return {"company_name": "University", "logo_url": ""}
+    return {
+        "company_name": "University",
+        "logo_url": "",
+        "primary_color": "#2563eb",
+        "secondary_color": "#0284c7",
+        "accent_color": "#10b981"
+    }
 
 # --- Unified User Management ---
 

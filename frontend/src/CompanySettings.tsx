@@ -23,6 +23,11 @@ interface CompanySettings {
 
     // Logo
     logo_url: string
+
+    // Custom Theme Colors
+    primary_color?: string
+    secondary_color?: string
+    accent_color?: string
 }
 
 export default function CompanySettings() {
@@ -39,7 +44,10 @@ export default function CompanySettings() {
         instagram: '',
         linkedin: '',
         youtube: '',
-        logo_url: ''
+        logo_url: '',
+        primary_color: '#2563eb',
+        secondary_color: '#0284c7',
+        accent_color: '#10b981'
     })
 
     const [loading, setLoading] = useState(true)
@@ -320,6 +328,103 @@ export default function CompanySettings() {
                                     rows={2}
                                     className="w-full px-4 py-3 border rounded-lg"
                                 />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* System Color Theme Settings */}
+                    <div className="glass-card p-6">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 inline-block animate-pulse"></span>
+                            System Color Theme
+                        </h3>
+                        <p className="text-sm text-[var(--text-secondary)] mb-6">
+                            Choose a pre-configured branding palette or specify custom primary, secondary, and accent colors to customize the application look system-wide.
+                        </p>
+
+                        {/* Presets */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-bold mb-3 text-[var(--text-secondary)] uppercase tracking-wider">Theme Color Presets</label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {[
+                                    { name: 'Classic Blue', primary: '#2563eb', secondary: '#0284c7', accent: '#10b981' },
+                                    { name: 'Emerald Green', primary: '#059669', secondary: '#0d9488', accent: '#eab308' },
+                                    { name: 'Indigo Purple', primary: '#6366f1', secondary: '#8b5cf6', accent: '#f43f5e' },
+                                    { name: 'Crimson Red', primary: '#dc2626', secondary: '#e11d48', accent: '#3b82f6' },
+                                    { name: 'Sunset Orange', primary: '#ea580c', secondary: '#f97316', accent: '#06b6d4' },
+                                    { name: 'Teal Breeze', primary: '#0d9488', secondary: '#0891b2', accent: '#8b5cf6' }
+                                ].map((p) => {
+                                    const isSelected = settings.primary_color === p.primary && settings.secondary_color === p.secondary;
+                                    return (
+                                        <button
+                                            key={p.name}
+                                            type="button"
+                                            onClick={() => setSettings({
+                                                ...settings,
+                                                primary_color: p.primary,
+                                                secondary_color: p.secondary,
+                                                accent_color: p.accent
+                                            })}
+                                            className={`flex flex-col items-start p-3 rounded-xl border-2 transition-all text-left ${
+                                                isSelected 
+                                                    ? 'border-blue-500 bg-blue-50/20 dark:bg-blue-900/10' 
+                                                    : 'border-[var(--border-color)] hover:border-gray-400 bg-transparent'
+                                            }`}
+                                        >
+                                            <div className="flex gap-1.5 mb-2">
+                                                <span className="w-4 h-4 rounded-full inline-block" style={{ backgroundColor: p.primary }}></span>
+                                                <span className="w-4 h-4 rounded-full inline-block" style={{ backgroundColor: p.secondary }}></span>
+                                                <span className="w-4 h-4 rounded-full inline-block" style={{ backgroundColor: p.accent }}></span>
+                                            </div>
+                                            <span className="text-xs font-bold">{p.name}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Custom Color Pickers */}
+                        <div className="border-t border-[var(--border-color)] pt-6">
+                            <label className="block text-sm font-bold mb-4 text-[var(--text-secondary)] uppercase tracking-wider">Custom Branding Colors</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="flex items-center gap-3 bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
+                                    <input
+                                        type="color"
+                                        value={settings.primary_color || '#2563eb'}
+                                        onChange={(e) => setSettings({ ...settings, primary_color: e.target.value })}
+                                        className="w-10 h-10 rounded-lg cursor-pointer border-none bg-transparent"
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-[var(--text-secondary)]">Primary Color</span>
+                                        <span className="text-sm font-mono uppercase">{settings.primary_color}</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
+                                    <input
+                                        type="color"
+                                        value={settings.secondary_color || '#0284c7'}
+                                        onChange={(e) => setSettings({ ...settings, secondary_color: e.target.value })}
+                                        className="w-10 h-10 rounded-lg cursor-pointer border-none bg-transparent"
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-[var(--text-secondary)]">Secondary Color</span>
+                                        <span className="text-sm font-mono uppercase">{settings.secondary_color}</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
+                                    <input
+                                        type="color"
+                                        value={settings.accent_color || '#10b981'}
+                                        onChange={(e) => setSettings({ ...settings, accent_color: e.target.value })}
+                                        className="w-10 h-10 rounded-lg cursor-pointer border-none bg-transparent"
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-[var(--text-secondary)]">Accent Color</span>
+                                        <span className="text-sm font-mono uppercase">{settings.accent_color}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

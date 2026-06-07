@@ -331,6 +331,47 @@ function App() {
         }
     }, [isAuthenticated])
 
+    const [companyColors, setCompanyColors] = useState<any>({
+        primary_color: '#2563eb',
+        secondary_color: '#0284c7',
+        accent_color: '#10b981'
+    })
+
+    // Apply company colors whenever colors or darkMode changes
+    useEffect(() => {
+        const root = document.documentElement;
+        let primary = companyColors.primary_color || '#2563eb';
+        let secondary = companyColors.secondary_color || '#0284c7';
+        let accent = companyColors.accent_color || '#10b981';
+
+        // High contrast lightener for dark mode
+        if (darkMode) {
+            const lighten = (hex: string, amount: number) => {
+                try {
+                    let color = hex.replace('#', '');
+                    let num = parseInt(color, 16);
+                    let r = (num >> 16) + amount;
+                    let g = ((num >> 8) & 0x00FF) + amount;
+                    let b = (num & 0x0000FF) + amount;
+                    r = Math.min(255, Math.max(0, r));
+                    g = Math.min(255, Math.max(0, g));
+                    b = Math.min(255, Math.max(0, b));
+                    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+                } catch (e) {
+                    return hex;
+                }
+            };
+            primary = lighten(primary, 40);
+            secondary = lighten(secondary, 40);
+            accent = lighten(accent, 40);
+        }
+
+        root.style.setProperty('--primary-color', primary);
+        root.style.setProperty('--secondary-color', secondary);
+        root.style.setProperty('--accent-color', accent);
+        root.style.setProperty('--gradient-primary', `linear-gradient(135deg, ${primary} 0%, ${secondary} 100%)`);
+    }, [companyColors, darkMode])
+
     // Fetch company settings (logo, name) for sidebar and all pages
     useEffect(() => {
         const fetchCompanySettings = async () => {
@@ -341,6 +382,11 @@ function App() {
                     setCompanySettings({
                         company_name: data.company_name || 'Smart Campus',
                         logo_url: data.logo_url || ''
+                    })
+                    setCompanyColors({
+                        primary_color: data.primary_color || '#2563eb',
+                        secondary_color: data.secondary_color || '#0284c7',
+                        accent_color: data.accent_color || '#10b981'
                     })
                 }
             } catch (e) {
