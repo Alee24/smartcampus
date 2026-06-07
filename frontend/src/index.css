@@ -259,6 +259,7 @@
   background-color: var(--primary-color) !important;
 }
 
+/* Text Highlights & Accent Color */
 .text-blue-600, 
 .text-indigo-600, 
 .text-purple-600, 
@@ -272,7 +273,7 @@
 .text-indigo-400,
 .text-purple-400,
 .text-primary-400 {
-  color: var(--primary-color) !important;
+  color: var(--accent-color) !important;
 }
 
 .text-blue-300,
@@ -281,7 +282,7 @@
 .dark\:text-blue-300,
 .dark\:text-indigo-300,
 .dark\:text-purple-300 {
-  color: color-mix(in srgb, var(--primary-color) 80%, white) !important;
+  color: color-mix(in srgb, var(--accent-color) 80%, white) !important;
 }
 
 .bg-primary-500,
@@ -333,29 +334,40 @@
   border-color: var(--primary-color) !important;
 }
 
-/* Soft Backgrounds using CSS color-mix */
+/* Headings System Overrides */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--secondary-color) !important;
+}
+
+/* Exclude headings that are explicitly colored white or light */
+h1.text-white, h2.text-white, h3.text-white, h4.text-white, h5.text-white, h6.text-white,
+.text-white h1, .text-white h2, .text-white h3, .text-white h4, .text-white h5, .text-white h6 {
+  color: #ffffff !important;
+}
+
+/* Soft Backgrounds - Made much more subtle (3% instead of 8%) to ensure layouts remain white and clean */
 .bg-blue-50,
 .bg-indigo-50,
 .bg-purple-50 {
-  background-color: color-mix(in srgb, var(--primary-color) 8%, transparent) !important;
+  background-color: color-mix(in srgb, var(--primary-color) 3%, transparent) !important;
 }
 
 .bg-blue-50\/50,
 .bg-indigo-50\/50,
 .bg-purple-50\/50 {
-  background-color: color-mix(in srgb, var(--primary-color) 4%, transparent) !important;
+  background-color: color-mix(in srgb, var(--primary-color) 1.5%, transparent) !important;
 }
 
 .bg-blue-100,
 .bg-indigo-100,
 .bg-purple-100 {
-  background-color: color-mix(in srgb, var(--primary-color) 15%, transparent) !important;
+  background-color: color-mix(in srgb, var(--primary-color) 6%, transparent) !important;
 }
 
 .bg-blue-200,
 .bg-indigo-200,
 .bg-purple-200 {
-  background-color: color-mix(in srgb, var(--primary-color) 25%, transparent) !important;
+  background-color: color-mix(in srgb, var(--primary-color) 12%, transparent) !important;
 }
 
 /* Opacity variants of primary colors */
@@ -368,14 +380,7 @@
 .bg-blue-500\/5,
 .bg-indigo-500\/5,
 .bg-purple-500\/5 {
-  background-color: color-mix(in srgb, var(--primary-color) 10%, transparent) !important;
-}
-
-/* Specific very low opacity rule */
-.bg-blue-500\/5,
-.bg-indigo-500\/5,
-.bg-purple-500\/5 {
-  background-color: color-mix(in srgb, var(--primary-color) 5%, transparent) !important;
+  background-color: color-mix(in srgb, var(--primary-color) 3%, transparent) !important;
 }
 
 .bg-indigo-600\/20,
@@ -386,7 +391,7 @@
 .bg-purple-500\/20,
 .bg-primary-500\/20,
 .bg-secondary\/20 {
-  background-color: color-mix(in srgb, var(--primary-color) 20%, transparent) !important;
+  background-color: color-mix(in srgb, var(--primary-color) 8%, transparent) !important;
 }
 
 .bg-indigo-600\/25,
@@ -404,7 +409,7 @@
 .shadow-indigo-600\/10,
 .shadow-blue-600\/20,
 .shadow-indigo-600\/20 {
-  --tw-shadow-color: color-mix(in srgb, var(--primary-color) 25%, transparent) !important;
+  --tw-shadow-color: color-mix(in srgb, var(--primary-color) 10%, transparent) !important;
 }
 
 /* Dark Mode Tint Backgrounds */
@@ -420,7 +425,7 @@
 .bg-indigo-900\/10,
 .bg-blue-900\/10,
 .bg-purple-900\/10 {
-  background-color: color-mix(in srgb, var(--primary-color) 12%, transparent) !important;
+  background-color: color-mix(in srgb, var(--primary-color) 4%, transparent) !important;
 }
 
 /* Dark Text Contrasts */
@@ -439,7 +444,7 @@
 .dark .dark\:text-blue-400,
 .dark .dark\:text-indigo-400,
 .dark .dark\:text-purple-400 {
-  color: color-mix(in srgb, var(--primary-color) 85%, black) !important;
+  color: color-mix(in srgb, var(--accent-color) 85%, black) !important;
 }
 
 /* Soft Borders */
@@ -455,7 +460,7 @@
 .dark .dark\:border-blue-900\/50,
 .dark .dark\:border-indigo-900\/50,
 .dark .dark\:border-purple-900\/50 {
-  border-color: color-mix(in srgb, var(--primary-color) 20%, transparent) !important;
+  border-color: color-mix(in srgb, var(--primary-color) 10%, transparent) !important;
 }
 
 /* Focus and Outline Rings */
@@ -477,7 +482,7 @@
   --tw-ring-offset-color: var(--bg-surface) !important;
 }
 
-/* Gradients */
+/* Dynamic Gradient Stops mapping for standard Tailwind classes (applied on buttons and text clip elements) */
 .from-blue-600, 
 .from-indigo-600, 
 .from-purple-600, 
@@ -495,13 +500,14 @@
 .to-indigo-600, 
 .to-sky-500,
 .to-blue-750,
-.to-purple-600 {
+.to-purple-600,
+.to-pink-600,
+.to-pink-500 {
   --tw-gradient-to: var(--secondary-color) !important;
 }
 
-.bg-gradient-to-r, 
-.bg-gradient-to-br,
-.bg-gradient-to-tr,
-.bg-gradient-to-t {
-  background-image: var(--gradient-primary) !important;
+.via-indigo-600,
+.via-purple-600,
+.via-pink-600 {
+  --tw-gradient-stops: var(--tw-gradient-from), var(--accent-color), var(--tw-gradient-to) !important;
 }

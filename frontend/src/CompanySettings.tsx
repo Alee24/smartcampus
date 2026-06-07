@@ -381,9 +381,7 @@ export default function CompanySettings() {
                                     );
                                 })}
                             </div>
-                        </div>
-
-                        {/* Custom Color Pickers */}
+                                            {/* Custom Color Pickers */}
                         <div className="border-t border-[var(--border-color)] pt-6">
                             <label className="block text-sm font-bold mb-4 text-[var(--text-secondary)] uppercase tracking-wider">Custom Branding Colors</label>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -395,11 +393,11 @@ export default function CompanySettings() {
                                         className="w-10 h-10 rounded-lg cursor-pointer border-none bg-transparent"
                                     />
                                     <div className="flex flex-col">
-                                        <span className="text-xs font-bold text-[var(--text-secondary)]">Primary Color</span>
+                                        <span className="text-xs font-bold text-[var(--text-secondary)]">Button & Action Color</span>
                                         <span className="text-sm font-mono uppercase">{settings.primary_color}</span>
                                     </div>
                                 </div>
-
+ 
                                 <div className="flex items-center gap-3 bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
                                     <input
                                         type="color"
@@ -408,11 +406,11 @@ export default function CompanySettings() {
                                         className="w-10 h-10 rounded-lg cursor-pointer border-none bg-transparent"
                                     />
                                     <div className="flex flex-col">
-                                        <span className="text-xs font-bold text-[var(--text-secondary)]">Secondary Color</span>
+                                        <span className="text-xs font-bold text-[var(--text-secondary)]">Headings & Titles Color</span>
                                         <span className="text-sm font-mono uppercase">{settings.secondary_color}</span>
                                     </div>
                                 </div>
-
+ 
                                 <div className="flex items-center gap-3 bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
                                     <input
                                         type="color"
@@ -421,12 +419,12 @@ export default function CompanySettings() {
                                         className="w-10 h-10 rounded-lg cursor-pointer border-none bg-transparent"
                                     />
                                     <div className="flex flex-col">
-                                        <span className="text-xs font-bold text-[var(--text-secondary)]">Accent Color</span>
+                                        <span className="text-xs font-bold text-[var(--text-secondary)]">Text Highlights & Accent Color</span>
                                         <span className="text-sm font-mono uppercase">{settings.accent_color}</span>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </div>        </div>
                     </div>
 
                     {/* Contact Information */}
