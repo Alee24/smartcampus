@@ -12,6 +12,67 @@ export default function SelfServiceEntry() {
 
     const [userData, setUserData] = useState<any>(null)
 
+    const [companyColors, setCompanyColors] = useState<any>({
+        primary_color: '#2563eb',
+        secondary_color: '#0284c7',
+        accent_color: '#10b981'
+    })
+
+    // Fetch company settings for branding colors
+    useEffect(() => {
+        const fetchCompanyColors = async () => {
+            try {
+                const res = await fetch('/api/users/public-company-settings')
+                if (res.ok) {
+                    const data = await res.json()
+                    setCompanyColors({
+                        primary_color: data.primary_color || '#2563eb',
+                        secondary_color: data.secondary_color || '#0284c7',
+                        accent_color: data.accent_color || '#10b981'
+                    })
+                }
+            } catch (e) {
+                console.error('Failed to fetch public company settings:', e)
+            }
+        }
+        fetchCompanyColors()
+    }, [])
+
+    // Apply company colors dynamically
+    useEffect(() => {
+        const root = document.documentElement;
+        const isDark = root.classList.contains('dark');
+        let primary = companyColors.primary_color || '#2563eb';
+        let secondary = companyColors.secondary_color || '#0284c7';
+        let accent = companyColors.accent_color || '#10b981';
+
+        if (isDark) {
+            const lighten = (hex: string, amount: number) => {
+                try {
+                    let color = hex.replace('#', '');
+                    let num = parseInt(color, 16);
+                    let r = (num >> 16) + amount;
+                    let g = ((num >> 8) & 0x00FF) + amount;
+                    let b = (num & 0x0000FF) + amount;
+                    r = Math.min(255, Math.max(0, r));
+                    g = Math.min(255, Math.max(0, g));
+                    b = Math.min(255, Math.max(0, b));
+                    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+                } catch (e) {
+                    return hex;
+                }
+            };
+            primary = lighten(primary, 40);
+            secondary = lighten(secondary, 40);
+            accent = lighten(accent, 40);
+        }
+
+        root.style.setProperty('--primary-color', primary);
+        root.style.setProperty('--secondary-color', secondary);
+        root.style.setProperty('--accent-color', accent);
+        root.style.setProperty('--gradient-primary', `linear-gradient(135deg, ${primary} 0%, ${secondary} 100%)`);
+    }, [companyColors])
+
     // Camera Refs & State
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)

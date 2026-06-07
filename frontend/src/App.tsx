@@ -1611,7 +1611,7 @@ function App() {
             )}
 
 
-            {/* Floating Quick Scan Button for Admins & Guards */}
+            {/* Floating Get Entry Button for Admins & Guards */}
             {isAuthenticated && ['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
                 <button
                     onClick={() => setShowQuickScanModal(true)}
@@ -1619,7 +1619,7 @@ function App() {
                     style={{ boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.5)' }}
                 >
                     <QrCode size={20} />
-                    <span>QUICK SCAN</span>
+                    <span>GET ENTRY</span>
                 </button>
             )}
 
