@@ -797,7 +797,7 @@ function App() {
                                 onClick={() => { setActiveTab('vehicles'); setSidebarOpen(false); }}
                             />
                         )}
-                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                        {isMenuEnabled('scan-logs') && (
                             <NavItem
                                 icon={<ClipboardList size={18} />}
                                 label="Scan Logs"
@@ -805,7 +805,7 @@ function App() {
                                 onClick={() => { setActiveTab('scan-logs'); setSidebarOpen(false); }}
                             />
                         )}
-                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                        {isMenuEnabled('gates-dashboard') && (
                             <NavItem
                                 icon={<Activity size={18} />}
                                 label="Gates Analytics"
@@ -879,20 +879,24 @@ function App() {
                                 onClick={() => { setActiveTab('verification'); setSidebarOpen(false); }}
                             />
                         )}
-                        {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                        {(isMenuEnabled('id-printing') || isMenuEnabled('qr-registry')) && (
                             <>
-                                <NavItem
-                                    icon={<Printer size={18} />}
-                                    label="ID Printing"
-                                    active={activeTab === 'id-printing'}
-                                    onClick={() => { setActiveTab('id-printing'); setSidebarOpen(false); }}
-                                />
-                                <NavItem
-                                    icon={<QrCode size={18} />}
-                                    label="QR Asset Hub"
-                                    active={activeTab === 'qr-registry'}
-                                    onClick={() => { setActiveTab('qr-registry'); setSidebarOpen(false); }}
-                                />
+                                {isMenuEnabled('id-printing') && (
+                                    <NavItem
+                                        icon={<Printer size={18} />}
+                                        label="ID Printing"
+                                        active={activeTab === 'id-printing'}
+                                        onClick={() => { setActiveTab('id-printing'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                                {isMenuEnabled('qr-registry') && (
+                                    <NavItem
+                                        icon={<QrCode size={18} />}
+                                        label="QR Asset Hub"
+                                        active={activeTab === 'qr-registry'}
+                                        onClick={() => { setActiveTab('qr-registry'); setSidebarOpen(false); }}
+                                    />
+                                )}
                             </>
                         )}
                     </SidebarGroup>
@@ -959,50 +963,62 @@ function App() {
                 )}
 
                 {/* Fleet Management */}
-                {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin' || role?.toLowerCase() === 'fleetmanager') && (
+                {(isMenuEnabled('fleet') || isMenuEnabled('fleet-tracking') || isMenuEnabled('fleet-trips')) && (
                     <SidebarGroup title="Fleet Management" isOpen={openGroups.fleet} onToggle={() => toggleGroup('fleet')} isSidebarCollapsed={isSidebarCollapsed}>
-                        <NavItem
-                            icon={<Car size={18} />}
-                            label="Fleet Dashboard"
-                            active={activeTab === 'fleet'}
-                            onClick={() => { setActiveTab('fleet'); setSidebarOpen(false); }}
-                        />
-                        <NavItem
-                            icon={<MapPin size={18} />}
-                            label="Live Tracking"
-                            active={activeTab === 'fleet-tracking'}
-                            onClick={() => { setActiveTab('fleet-tracking'); setSidebarOpen(false); }}
-                        />
-                        <NavItem
-                            icon={<Briefcase size={18} />}
-                            label="Trips & Trips"
-                            active={activeTab === 'fleet-trips'}
-                            onClick={() => { setActiveTab('fleet-trips'); setSidebarOpen(false); }}
-                        />
+                        {isMenuEnabled('fleet') && (
+                            <NavItem
+                                icon={<Car size={18} />}
+                                label="Fleet Dashboard"
+                                active={activeTab === 'fleet'}
+                                onClick={() => { setActiveTab('fleet'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('fleet-tracking') && (
+                            <NavItem
+                                icon={<MapPin size={18} />}
+                                label="Live Tracking"
+                                active={activeTab === 'fleet-tracking'}
+                                onClick={() => { setActiveTab('fleet-tracking'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('fleet-trips') && (
+                            <NavItem
+                                icon={<Briefcase size={18} />}
+                                label="Trips & Manifests"
+                                active={activeTab === 'fleet-trips'}
+                                onClick={() => { setActiveTab('fleet-trips'); setSidebarOpen(false); }}
+                            />
+                        )}
                     </SidebarGroup>
                 )}
 
                 {/* Asset Tracking & Management */}
-                {(role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                {(isMenuEnabled('assets') || isMenuEnabled('asset-handovers') || isMenuEnabled('asset-reports')) && (
                     <SidebarGroup title="Asset Management" isOpen={openGroups.assets} onToggle={() => toggleGroup('assets')} isSidebarCollapsed={isSidebarCollapsed}>
-                        <NavItem
-                            icon={<Briefcase size={18} />}
-                            label="Campus Assets"
-                            active={activeTab === 'assets'}
-                            onClick={() => { setActiveTab('assets'); setSidebarOpen(false); }}
-                        />
-                        <NavItem
-                            icon={<ClipboardList size={18} />}
-                            label="Asset Handovers"
-                            active={activeTab === 'asset-handovers'}
-                            onClick={() => { setActiveTab('asset-handovers'); setSidebarOpen(false); }}
-                        />
-                        <NavItem
-                            icon={<FileText size={18} />}
-                            label="Asset Reports"
-                            active={activeTab === 'asset-reports'}
-                            onClick={() => { setActiveTab('asset-reports'); setSidebarOpen(false); }}
-                        />
+                        {isMenuEnabled('assets') && (
+                            <NavItem
+                                icon={<Briefcase size={18} />}
+                                label="Campus Assets"
+                                active={activeTab === 'assets'}
+                                onClick={() => { setActiveTab('assets'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('asset-handovers') && (
+                            <NavItem
+                                icon={<ClipboardList size={18} />}
+                                label="Asset Handovers"
+                                active={activeTab === 'asset-handovers'}
+                                onClick={() => { setActiveTab('asset-handovers'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('asset-reports') && (
+                            <NavItem
+                                icon={<FileText size={18} />}
+                                label="Asset Reports"
+                                active={activeTab === 'asset-reports'}
+                                onClick={() => { setActiveTab('asset-reports'); setSidebarOpen(false); }}
+                            />
+                        )}
                     </SidebarGroup>
                 )}
             </>
@@ -1065,16 +1081,16 @@ function App() {
                 <div className="mt-auto p-4 border-t border-[var(--border-color)]">
                     <nav className="space-y-1 mb-4">
                         {/* Administration - Visible on Mobile for Admins since Top Bar is hidden */}
-                        {role?.toLowerCase() !== 'student' && (role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') && (
+                        {role?.toLowerCase() !== 'student' && (isMenuEnabled('settings') || isMenuEnabled('bulk') || isMenuEnabled('company-settings') || isMenuEnabled('ai-settings') || isMenuEnabled('dashboard-designer') || isMenuEnabled('integrations') || isMenuEnabled('audit') || isMenuEnabled('geofencing')) && (
                             <SidebarGroup title="Administration" isOpen={openGroups.admin} onToggle={() => toggleGroup('admin')} isSidebarCollapsed={isSidebarCollapsed}>
-                                <NavItem icon={<Settings size={18} />} label="General Settings" active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }} />
-                                <NavItem icon={<Database size={18} />} label="Data Management" active={activeTab === 'bulk'} onClick={() => { setActiveTab('bulk'); setSidebarOpen(false); }} />
-                                <NavItem icon={<Building2 size={18} />} label="Company Profile" active={activeTab === 'company-settings'} onClick={() => { setActiveTab('company-settings'); setSidebarOpen(false); }} />
-                                <NavItem icon={<Brain size={18} />} label="AI Configuration" active={activeTab === 'ai-settings'} onClick={() => { setActiveTab('ai-settings'); setSidebarOpen(false); }} />
-                                <NavItem icon={<Sliders size={18} />} label="Design System" active={activeTab === 'dashboard-designer'} onClick={() => { setActiveTab('dashboard-designer'); setSidebarOpen(false); }} />
-                                <NavItem icon={<Server size={18} />} label="API Integrations" active={activeTab === 'integrations'} onClick={() => { setActiveTab('integrations'); setSidebarOpen(false); }} />
-                                <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => { setActiveTab('audit'); setSidebarOpen(false); }} />
-                                <NavItem icon={<Shield size={18} />} label="IP Geofencing" active={activeTab === 'geofencing'} onClick={() => { setActiveTab('geofencing'); setSidebarOpen(false); }} />
+                                {isMenuEnabled('settings') && <NavItem icon={<Settings size={18} />} label="General Settings" active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }} />}
+                                {isMenuEnabled('bulk') && <NavItem icon={<Database size={18} />} label="Data Management" active={activeTab === 'bulk'} onClick={() => { setActiveTab('bulk'); setSidebarOpen(false); }} />}
+                                {isMenuEnabled('company-settings') && <NavItem icon={<Building2 size={18} />} label="Company Profile" active={activeTab === 'company-settings'} onClick={() => { setActiveTab('company-settings'); setSidebarOpen(false); }} />}
+                                {isMenuEnabled('ai-settings') && <NavItem icon={<Brain size={18} />} label="AI Configuration" active={activeTab === 'ai-settings'} onClick={() => { setActiveTab('ai-settings'); setSidebarOpen(false); }} />}
+                                {isMenuEnabled('dashboard-designer') && <NavItem icon={<Sliders size={18} />} label="Design System" active={activeTab === 'dashboard-designer'} onClick={() => { setActiveTab('dashboard-designer'); setSidebarOpen(false); }} />}
+                                {isMenuEnabled('integrations') && <NavItem icon={<Server size={18} />} label="API Integrations" active={activeTab === 'integrations'} onClick={() => { setActiveTab('integrations'); setSidebarOpen(false); }} />}
+                                {isMenuEnabled('audit') && <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => { setActiveTab('audit'); setSidebarOpen(false); }} />}
+                                {isMenuEnabled('geofencing') && <NavItem icon={<Shield size={18} />} label="IP Geofencing" active={activeTab === 'geofencing'} onClick={() => { setActiveTab('geofencing'); setSidebarOpen(false); }} />}
                             </SidebarGroup>
                         )}
                         {role?.toLowerCase() !== 'student' && (
