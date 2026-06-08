@@ -5,11 +5,15 @@ import './index.css'
 
 import { NotificationProvider } from './components/Notification'
 
+import { ErrorBoundary } from './ErrorBoundary'
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-        <NotificationProvider>
-            <App />
-        </NotificationProvider>
+        <ErrorBoundary>
+            <NotificationProvider>
+                <App />
+            </NotificationProvider>
+        </ErrorBoundary>
     </React.StrictMode>,
 )
 
