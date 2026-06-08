@@ -7,6 +7,7 @@ import { useNotification } from './components/Notification';
 
 interface LostFoundItem {
     id: string;
+    serial_number: string;
     item_name: string;
     description: string;
     location_found: string;
@@ -289,8 +290,15 @@ export default function LostAndFound() {
                                 }`}
                             >
                                 <div className="flex justify-between items-start gap-2 mb-2">
-                                    <h4 className="font-bold text-sm text-gray-800 dark:text-white line-clamp-1">{item.item_name}</h4>
-                                    <span className={`px-2.5 py-0.5 text-[9px] font-black rounded-full uppercase border ${getStatusBadge(item.status)}`}>
+                                    <div className="flex items-center gap-2">
+                                        {item.serial_number && (
+                                            <span className="text-[9px] font-black bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 px-2 py-0.5 rounded-full font-mono tracking-wider shrink-0">
+                                                {item.serial_number}
+                                            </span>
+                                        )}
+                                        <h4 className="font-bold text-sm text-gray-800 dark:text-white line-clamp-1">{item.item_name}</h4>
+                                    </div>
+                                    <span className={`px-2.5 py-0.5 text-[9px] font-black rounded-full uppercase border shrink-0 ${getStatusBadge(item.status)}`}>
                                         {item.status}
                                     </span>
                                 </div>
@@ -328,6 +336,13 @@ export default function LostAndFound() {
                                         >
                                             Return / Handover Item
                                         </button>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3 mb-1">
+                                    {activeItem.serial_number && (
+                                        <span className="text-xs font-black font-mono bg-white/20 px-3 py-1 rounded-full tracking-wider">
+                                            {activeItem.serial_number}
+                                        </span>
                                     )}
                                 </div>
                                 <h2 className="text-2xl font-black">{activeItem.item_name}</h2>

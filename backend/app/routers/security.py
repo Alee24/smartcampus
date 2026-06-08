@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile, s
 from app.auth import get_current_user
 from app.models import User, Role, IncidentReport, IncidentFollowup, LostAndFoundItem
 from app.database import get_session
-from sqlmodel import select, or_
+from sqlmodel import select, or_, func
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List, Optional
 from datetime import datetime, date
@@ -73,9 +73,13 @@ async def get_incidents(
         
     incidents = (await session.exec(stmt)).all()
     
+    # Compute serial numbers based on total count (chronological: oldest = INC-0001)
+    total_count_stmt = select(func.count(IncidentReport.id))
+    total_incidents = (await session.exec(total_count_stmt)).one()
+    
     # Enrich results with reporter and target user info
     enriched = []
-    for inc in incidents:
+    for idx, inc in enumerate(incidents):
         reporter = await session.get(User, inc.reporter_id)
         target = await session.get(User, inc.target_user_id) if inc.target_user_id else None
         
@@ -83,9 +87,14 @@ async def get_incidents(
         if role_name not in ["superadmin", "admin", "securitylead", "security", "guard", "management"]:
             if inc.reporter_id != current_user.id and (target is None or target.id != current_user.id):
                 continue
+        
+        # Serial number: since we order by created_at DESC, serial = total - idx
+        serial_num = total_incidents - idx
+        serial_number = f"INC-{serial_num:04d}"
                 
         enriched.append({
             "id": str(inc.id),
+            "serial_number": serial_number,
             "title": inc.title,
             "description": inc.description,
             "reporter_id": str(inc.reporter_id),
@@ -139,8 +148,18 @@ async def get_incident(
             "timestamp": f.timestamp.isoformat()
         })
         
+    # Compute this incident's serial number
+    try:
+        # Count incidents created before or at the same time
+        count_before_stmt = select(func.count(IncidentReport.id)).where(IncidentReport.created_at <= inc.created_at)
+        count_before = (await session.exec(count_before_stmt)).one()
+        serial_number = f"INC-{count_before:04d}"
+    except Exception:
+        serial_number = "INC-????"
+    
     return {
         "id": str(inc.id),
+        "serial_number": serial_number,
         "title": inc.title,
         "description": inc.description,
         "reporter_id": str(inc.reporter_id),
@@ -293,13 +312,21 @@ async def get_lost_found(
         
     items = (await session.exec(stmt)).all()
     
+    # Compute serial numbers for lost & found (chronological: oldest = LNF-0001)
+    total_lnf_stmt = select(func.count(LostAndFoundItem.id))
+    total_lnf = (await session.exec(total_lnf_stmt)).one()
+    
     enriched = []
-    for item in items:
+    for idx, item in enumerate(items):
         handler = await session.get(User, item.handler_id)
         claimant = await session.get(User, item.claimant_id) if item.claimant_id else None
         
+        serial_num = total_lnf - idx
+        serial_number = f"LNF-{serial_num:04d}"
+        
         enriched.append({
             "id": str(item.id),
+            "serial_number": serial_number,
             "item_name": item.item_name,
             "description": item.description,
             "location_found": item.location_found,

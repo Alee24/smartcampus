@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
-import { FileText, Users, Activity, Car, Clock, Calendar, Download, Search, CheckCircle, XCircle, AlertTriangle, Truck, BookOpen, UserCheck, ShieldAlert, Printer } from 'lucide-react'
+import { FileText, Users, Activity, Car, Clock, Calendar, Download, Search, CheckCircle, XCircle, AlertTriangle, Truck, BookOpen, UserCheck, ShieldAlert, Printer, Shield, Inbox, RefreshCw, Filter } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -15,7 +15,7 @@ export default function Reports() {
     const [securityFlags, setSecurityFlags] = useState<any[]>([])
     
     // Tab states
-    const [activeSection, setActiveSection] = useState('overview') // overview, traffic, security, generator
+    const [activeSection, setActiveSection] = useState('overview') // overview, traffic, security, generator, hub
     
     // Generator states
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
@@ -23,6 +23,15 @@ export default function Reports() {
     const [genReport, setGenReport] = useState<any>(null)
     const [generatorSubTab, setGeneratorSubTab] = useState('people') // people, vehicles
     const [searchQuery, setSearchQuery] = useState('')
+
+    // Reports Hub states
+    const [hubCategory, setHubCategory] = useState('incidents')
+    const [hubData, setHubData] = useState<any>(null)
+    const [hubLoading, setHubLoading] = useState(false)
+    const [hubSearch, setHubSearch] = useState('')
+    const [hubFilters, setHubFilters] = useState<any>({
+        status: '', severity: '', role: '', date_from: '', date_to: ''
+    })
 
     // Fetch initial global summary analytics
     const fetchSummaryStats = async () => {
@@ -79,6 +88,88 @@ export default function Reports() {
         } finally {
             setGenLoading(false)
         }
+    }
+
+    // Fetch Reports Hub data
+    const fetchHubReport = async (category?: string, filters?: any) => {
+        const cat = category || hubCategory
+        const f = filters || hubFilters
+        setHubLoading(true)
+        setHubData(null)
+        const token = localStorage.getItem('token')
+        try {
+            let url = `/api/reports/hub/${cat}`
+            if (cat === 'gate_entries') url = `/api/reports/detailed?date=${f.date_from || new Date().toISOString().split('T')[0]}`
+            const params = new URLSearchParams()
+            if (f.status) params.append('status', f.status)
+            if (f.severity) params.append('severity', f.severity)
+            if (f.role) params.append('role', f.role)
+            if (f.date_from) params.append('date_from', f.date_from)
+            if (f.date_to) params.append('date_to', f.date_to)
+            const qs = params.toString()
+            const res = await fetch(`${url}${qs ? '?' + qs : ''}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) {
+                setHubData(await res.json())
+            }
+        } catch(e) {
+            console.error('Hub report error:', e)
+        } finally {
+            setHubLoading(false)
+        }
+    }
+
+    // Export hub report as CSV
+    const exportHubCSV = () => {
+        if (!hubData?.items) return
+        const items = hubData.items
+        if (!items.length) return
+        const headers = Object.keys(items[0]).filter(k => k !== 'id').join(',')
+        const rows = items.map((r: any) =>
+            Object.entries(r).filter(([k]) => k !== 'id').map(([, v]) => `"${v ?? ''}"`).join(',')
+        ).join('\n')
+        const csv = headers + '\n' + rows
+        const blob = new Blob([csv], { type: 'text/csv' })
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = `${hubCategory}_report_${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+    }
+
+    // Export hub report as PDF
+    const exportHubPDF = () => {
+        if (!hubData?.items?.length) return
+        const pdf = new jsPDF('l', 'mm', 'a4')
+        const pageWidth = pdf.internal.pageSize.getWidth()
+        pdf.setFontSize(16)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(`${hubCategory.replace('_', ' ').toUpperCase()} REPORT`, pageWidth / 2, 20, { align: 'center' })
+        pdf.setFontSize(10)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor(107, 114, 128)
+        pdf.text(`Generated: ${new Date().toLocaleString()}   |   Total: ${hubData.total}`, pageWidth / 2, 28, { align: 'center' })
+        const cols = Object.keys(hubData.items[0]).filter(k => k !== 'id')
+        const rows = hubData.items.map((r: any) => cols.map((c: string) => r[c] ?? '-'))
+        autoTable(pdf, {
+            startY: 35,
+            head: [cols.map(c => c.replace(/_/g, ' ').toUpperCase())],
+            body: rows,
+            theme: 'striped',
+            headStyles: { fillColor: [79, 70, 229], fontSize: 8 },
+            bodyStyles: { fontSize: 7 },
+            margin: { left: 10, right: 10 },
+            didParseCell: (data: any) => {
+                if (data.section === 'body') {
+                    const row = hubData.items[data.row.index]
+                    if (row && (row.is_flagged || row.status === 'flagged')) {
+                        data.cell.styles.fillColor = [254, 226, 226]
+                        data.cell.styles.textColor = [153, 27, 27]
+                    }
+                }
+            }
+        })
+        pdf.save(`${hubCategory}_report_${new Date().toISOString().split('T')[0]}.pdf`)
     }
 
     // Export generated logs as CSV
@@ -318,13 +409,16 @@ export default function Reports() {
                     <p className="text-[var(--text-secondary)]">Comprehensive stats and interactive detailed daily report generator.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    {['Overview', 'Traffic', 'Security', 'Generator'].map((s) => (
+                    {['Overview', 'Traffic', 'Security', 'Generator', 'Hub'].map((s) => (
                         <button
                             key={s}
                             onClick={() => {
                                 setActiveSection(s.toLowerCase());
                                 if (s.toLowerCase() === 'generator' && !genReport) {
                                     handleGenerateReport();
+                                }
+                                if (s.toLowerCase() === 'hub') {
+                                    fetchHubReport(hubCategory, hubFilters);
                                 }
                             }}
                             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${activeSection === s.toLowerCase()
@@ -335,6 +429,7 @@ export default function Reports() {
                             {s === 'Overview' && <Activity size={14} />}
                             {s === 'Traffic' && <Car size={14} />}
                             {s === 'Security' && <ShieldAlert size={14} />}
+                            {s === 'Hub' && <Filter size={14} />}
                             {s}
                         </button>
                     ))}
@@ -670,6 +765,420 @@ export default function Reports() {
                                 </div>
                             </div>
                         </>
+                    )}
+                </div>
+            )}
+
+            {/* ═══════════════════════════════════════════════════════
+                REPORTS HUB — System-Wide Filterable Reports
+            ═══════════════════════════════════════════════════════ */}
+            {activeSection === 'hub' && (
+                <div className="space-y-6 animate-fade-in">
+                    {/* Hub Header */}
+                    <div className="glass-card p-5 border border-indigo-200 dark:border-indigo-900/30 bg-gradient-to-br from-indigo-50/50 to-white dark:from-indigo-950/10 dark:to-transparent">
+                        <div className="flex items-center gap-3 mb-1">
+                            <Filter className="text-indigo-600" size={22} />
+                            <h3 className="text-lg font-black text-gray-900 dark:text-white">System-Wide Reports Hub</h3>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Filter, search, and export any system report — incidents, lost & found, users, gate entries, and attendance logs.</p>
+                    </div>
+
+                    {/* Category Tabs */}
+                    <div className="flex flex-wrap gap-2">
+                        {[
+                            { key: 'incidents', label: 'Incident Reports', icon: <Shield size={14} />, },
+                            { key: 'lost_found', label: 'Lost & Found', icon: <Inbox size={14} />, },
+                            { key: 'users', label: 'User Directory', icon: <Users size={14} />, },
+                            { key: 'gate_entries', label: 'Gate Entry Logs', icon: <Activity size={14} />, },
+                            { key: 'attendance', label: 'Attendance', icon: <BookOpen size={14} />, },
+                        ].map(cat => (
+                            <button
+                                key={cat.key}
+                                onClick={() => {
+                                    setHubCategory(cat.key)
+                                    setHubData(null)
+                                    setHubSearch('')
+                                    setHubFilters({ status: '', severity: '', role: '', date_from: '', date_to: '' })
+                                    fetchHubReport(cat.key, { status: '', severity: '', role: '', date_from: '', date_to: '' })
+                                }}
+                                className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm ${
+                                    hubCategory === cat.key
+                                        ? 'bg-[var(--primary-color)] text-white shadow-[var(--primary-color)]/30 scale-[1.02]'
+                                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)]'
+                                }`}
+                            >
+                                {cat.icon}
+                                {cat.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Filters Row */}
+                    <div className="glass-card p-4">
+                        <div className="flex flex-wrap items-end gap-3">
+                            <div className="flex-1 min-w-[140px]">
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Search</label>
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                                    <input
+                                        type="text"
+                                        value={hubSearch}
+                                        onChange={e => setHubSearch(e.target.value)}
+                                        placeholder="Search results..."
+                                        className="w-full pl-8 pr-3 py-2.5 bg-gray-50 dark:bg-gray-900 rounded-xl text-xs border-none outline-none focus:ring-1 focus:ring-[var(--primary-color)]"
+                                    />
+                                </div>
+                            </div>
+
+                            {(hubCategory === 'incidents' || hubCategory === 'lost_found' || hubCategory === 'users') && (
+                                <div className="min-w-[120px]">
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Status</label>
+                                    <select
+                                        value={hubFilters.status}
+                                        onChange={e => setHubFilters((p: any) => ({ ...p, status: e.target.value }))}
+                                        className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 rounded-xl text-xs border-none outline-none focus:ring-1 focus:ring-[var(--primary-color)]"
+                                    >
+                                        <option value="">All Status</option>
+                                        {hubCategory === 'incidents' && <>
+                                            <option value="reported">Reported</option>
+                                            <option value="under_investigation">Under Investigation</option>
+                                            <option value="police_reported">Police Reported</option>
+                                            <option value="disciplinary">Disciplinary</option>
+                                            <option value="resolved">Resolved</option>
+                                        </>}
+                                        {hubCategory === 'lost_found' && <>
+                                            <option value="found">Found</option>
+                                            <option value="claimed">Claimed</option>
+                                            <option value="disposed">Disposed</option>
+                                        </>}
+                                        {hubCategory === 'users' && <>
+                                            <option value="active">Active</option>
+                                            <option value="flagged">Flagged</option>
+                                            <option value="inactive">Inactive</option>
+                                        </>}
+                                    </select>
+                                </div>
+                            )}
+
+                            {hubCategory === 'incidents' && (
+                                <div className="min-w-[120px]">
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Severity</label>
+                                    <select
+                                        value={hubFilters.severity}
+                                        onChange={e => setHubFilters((p: any) => ({ ...p, severity: e.target.value }))}
+                                        className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 rounded-xl text-xs border-none outline-none focus:ring-1 focus:ring-[var(--primary-color)]"
+                                    >
+                                        <option value="">All Severities</option>
+                                        <option value="high">High</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="low">Low</option>
+                                    </select>
+                                </div>
+                            )}
+
+                            {hubCategory === 'users' && (
+                                <div className="min-w-[120px]">
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Role</label>
+                                    <input
+                                        type="text"
+                                        value={hubFilters.role}
+                                        onChange={e => setHubFilters((p: any) => ({ ...p, role: e.target.value }))}
+                                        placeholder="e.g. student"
+                                        className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 rounded-xl text-xs border-none outline-none focus:ring-1 focus:ring-[var(--primary-color)]"
+                                    />
+                                </div>
+                            )}
+
+                            {hubCategory !== 'users' && (
+                                <>
+                                    <div className="min-w-[130px]">
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Date From</label>
+                                        <input
+                                            type="date"
+                                            value={hubFilters.date_from}
+                                            onChange={e => setHubFilters((p: any) => ({ ...p, date_from: e.target.value }))}
+                                            className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 rounded-xl text-xs border-none outline-none focus:ring-1 focus:ring-[var(--primary-color)]"
+                                        />
+                                    </div>
+                                    <div className="min-w-[130px]">
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Date To</label>
+                                        <input
+                                            type="date"
+                                            value={hubFilters.date_to}
+                                            onChange={e => setHubFilters((p: any) => ({ ...p, date_to: e.target.value }))}
+                                            className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 rounded-xl text-xs border-none outline-none focus:ring-1 focus:ring-[var(--primary-color)]"
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            <button
+                                onClick={() => fetchHubReport(hubCategory, hubFilters)}
+                                className="px-4 py-2.5 bg-[var(--primary-color)] hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-[var(--primary-color)]/20"
+                            >
+                                <RefreshCw size={13} className={hubLoading ? 'animate-spin' : ''} />
+                                {hubLoading ? 'Loading...' : 'Generate Report'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Summary Stats + Export */}
+                    {hubData && (
+                        <div className="flex flex-wrap justify-between items-center gap-4">
+                            <div className="flex flex-wrap gap-2">
+                                {hubData.summary && Object.entries(hubData.summary).map(([k, v]: any) => (
+                                    <span key={k} className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-bold text-gray-700 dark:text-gray-300 shadow-sm">
+                                        <span className="text-gray-400 capitalize">{k.replace(/_/g, ' ')}: </span>
+                                        <span className="text-[var(--primary-color)]">{v}</span>
+                                    </span>
+                                ))}
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={exportHubCSV}
+                                    className="px-3 py-2 bg-green-600 text-white rounded-xl text-xs font-bold hover:bg-green-700 active:scale-95 transition-all flex items-center gap-1.5"
+                                >
+                                    <Download size={12} /> Export CSV
+                                </button>
+                                <button
+                                    onClick={exportHubPDF}
+                                    className="px-3 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-1.5"
+                                >
+                                    <Printer size={12} /> Export PDF
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Data Table */}
+                    {hubLoading ? (
+                        <div className="glass-card p-12 text-center">
+                            <RefreshCw className="animate-spin mx-auto text-[var(--primary-color)] mb-3" size={32} />
+                            <p className="text-sm text-gray-500">Generating report...</p>
+                        </div>
+                    ) : hubData ? (
+                        <div className="glass-card overflow-hidden">
+                            <div className="p-4 border-b border-[var(--border-color)] flex justify-between items-center">
+                                <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                                    {hubCategory === 'gate_entries' ? (hubData.entry_logs?.length || 0) : hubData.total} records found
+                                    {hubSearch && ` • Filtered`}
+                                </p>
+                            </div>
+                            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                                {/* INCIDENTS TABLE */}
+                                {hubCategory === 'incidents' && (() => {
+                                    const rows = hubData.items.filter((r: any) =>
+                                        !hubSearch || [r.title, r.reporter_name, r.target_name, r.location, r.severity, r.status, r.serial_number].some((v: any) => v?.toLowerCase().includes(hubSearch.toLowerCase()))
+                                    )
+                                    return (
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="border-b border-[var(--border-color)] bg-gray-50 dark:bg-gray-900/50 text-xs font-bold uppercase tracking-wider text-gray-500 sticky top-0">
+                                                    <th className="p-4">#</th>
+                                                    <th className="p-4">Title</th>
+                                                    <th className="p-4">Reporter</th>
+                                                    <th className="p-4">Target</th>
+                                                    <th className="p-4">Location</th>
+                                                    <th className="p-4">Severity</th>
+                                                    <th className="p-4">Status</th>
+                                                    <th className="p-4">Date</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[var(--border-color)] text-sm">
+                                                {rows.map((r: any) => (
+                                                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                                                        <td className="p-4"><span className="font-mono text-xs font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded">{r.serial_number}</span></td>
+                                                        <td className="p-4 font-bold text-sm max-w-[200px]"><div className="line-clamp-2">{r.title}</div></td>
+                                                        <td className="p-4 text-xs text-gray-600 dark:text-gray-400">{r.reporter_name}</td>
+                                                        <td className="p-4 text-xs">{r.target_name || '-'}</td>
+                                                        <td className="p-4 text-xs">{r.location}</td>
+                                                        <td className="p-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${r.severity === 'high' ? 'bg-red-100 text-red-700' : r.severity === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>{r.severity}</span></td>
+                                                        <td className="p-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${r.status === 'resolved' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>{r.status.replace('_', ' ')}</span></td>
+                                                        <td className="p-4 text-xs text-gray-500">{new Date(r.incident_date).toLocaleDateString()}</td>
+                                                    </tr>
+                                                ))}
+                                                {rows.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-gray-400">No incidents found matching filters.</td></tr>}
+                                            </tbody>
+                                        </table>
+                                    )
+                                })()}
+
+                                {/* LOST & FOUND TABLE */}
+                                {hubCategory === 'lost_found' && (() => {
+                                    const rows = hubData.items.filter((r: any) =>
+                                        !hubSearch || [r.item_name, r.description, r.location_found, r.finder_name, r.claimant_name, r.serial_number].some((v: any) => v?.toLowerCase().includes(hubSearch.toLowerCase()))
+                                    )
+                                    return (
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="border-b border-[var(--border-color)] bg-gray-50 dark:bg-gray-900/50 text-xs font-bold uppercase tracking-wider text-gray-500 sticky top-0">
+                                                    <th className="p-4">#</th>
+                                                    <th className="p-4">Item</th>
+                                                    <th className="p-4">Location Found</th>
+                                                    <th className="p-4">Date Found</th>
+                                                    <th className="p-4">Finder</th>
+                                                    <th className="p-4">Claimant</th>
+                                                    <th className="p-4">Date Claimed</th>
+                                                    <th className="p-4">Handler</th>
+                                                    <th className="p-4">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[var(--border-color)] text-sm">
+                                                {rows.map((r: any) => (
+                                                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                                                        <td className="p-4"><span className="font-mono text-xs font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded">{r.serial_number}</span></td>
+                                                        <td className="p-4 font-bold text-sm">{r.item_name}</td>
+                                                        <td className="p-4 text-xs text-gray-600">{r.location_found}</td>
+                                                        <td className="p-4 text-xs text-gray-500">{new Date(r.date_found).toLocaleDateString()}</td>
+                                                        <td className="p-4 text-xs">{r.finder_name}</td>
+                                                        <td className="p-4 text-xs font-medium">{r.claimant_name}</td>
+                                                        <td className="p-4 text-xs text-gray-500">{r.date_claimed ? new Date(r.date_claimed).toLocaleDateString() : '-'}</td>
+                                                        <td className="p-4 text-xs">{r.handler_name}</td>
+                                                        <td className="p-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${r.status === 'claimed' ? 'bg-green-100 text-green-700' : r.status === 'disposed' ? 'bg-gray-100 text-gray-600' : 'bg-blue-100 text-blue-700'}`}>{r.status}</span></td>
+                                                    </tr>
+                                                ))}
+                                                {rows.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-gray-400">No lost & found items found.</td></tr>}
+                                            </tbody>
+                                        </table>
+                                    )
+                                })()}
+
+                                {/* USERS TABLE */}
+                                {hubCategory === 'users' && (() => {
+                                    const rows = hubData.items.filter((r: any) =>
+                                        !hubSearch || [r.full_name, r.email, r.admission_number, r.role, r.status, r.school, r.serial_number].some((v: any) => v?.toLowerCase().includes(hubSearch.toLowerCase()))
+                                    )
+                                    return (
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="border-b border-[var(--border-color)] bg-gray-50 dark:bg-gray-900/50 text-xs font-bold uppercase tracking-wider text-gray-500 sticky top-0">
+                                                    <th className="p-4">#</th>
+                                                    <th className="p-4">Full Name</th>
+                                                    <th className="p-4">Admission No.</th>
+                                                    <th className="p-4">Email</th>
+                                                    <th className="p-4">Role</th>
+                                                    <th className="p-4">School</th>
+                                                    <th className="p-4">Gender</th>
+                                                    <th className="p-4">Status</th>
+                                                    <th className="p-4">Registered</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[var(--border-color)] text-sm">
+                                                {rows.map((r: any) => (
+                                                    <tr key={r.id} className={`transition-colors ${r.status === 'flagged' ? 'bg-red-50 dark:bg-red-950/20 border-l-4 border-red-500' : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'}`}>
+                                                        <td className="p-4"><span className="font-mono text-xs font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded">{r.serial_number}</span></td>
+                                                        <td className="p-4 font-bold">
+                                                            <div className="flex items-center gap-1.5">
+                                                                {r.full_name}
+                                                                {r.status === 'flagged' && <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-red-600 text-white">FLAGGED</span>}
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-4 font-mono text-xs text-purple-600 dark:text-purple-400">{r.admission_number}</td>
+                                                        <td className="p-4 text-xs text-gray-600">{r.email}</td>
+                                                        <td className="p-4 text-xs capitalize"><span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">{r.role}</span></td>
+                                                        <td className="p-4 text-xs text-gray-600">{r.school}</td>
+                                                        <td className="p-4 text-xs capitalize">{r.gender}</td>
+                                                        <td className="p-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${r.status === 'active' ? 'bg-green-100 text-green-700' : r.status === 'flagged' ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-gray-100 text-gray-600'}`}>{r.status}</span></td>
+                                                        <td className="p-4 text-xs text-gray-500">{r.created_at ? new Date(r.created_at).toLocaleDateString() : '-'}</td>
+                                                    </tr>
+                                                ))}
+                                                {rows.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-gray-400">No users found.</td></tr>}
+                                            </tbody>
+                                        </table>
+                                    )
+                                })()}
+
+                                {/* GATE ENTRIES TABLE */}
+                                {hubCategory === 'gate_entries' && (() => {
+                                    const logs = hubData.entry_logs || []
+                                    const rows = logs.filter((r: any) =>
+                                        !hubSearch || [r.name, r.role, r.gate, r.method, r.guard, r.status].some((v: any) => v?.toLowerCase().includes(hubSearch.toLowerCase()))
+                                    )
+                                    return (
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="border-b border-[var(--border-color)] bg-gray-50 dark:bg-gray-900/50 text-xs font-bold uppercase tracking-wider text-gray-500 sticky top-0">
+                                                    <th className="p-4">#</th>
+                                                    <th className="p-4">Name</th>
+                                                    <th className="p-4">Role</th>
+                                                    <th className="p-4">Gate</th>
+                                                    <th className="p-4">Method</th>
+                                                    <th className="p-4">Entry Time</th>
+                                                    <th className="p-4">Exit Time</th>
+                                                    <th className="p-4">Guard</th>
+                                                    <th className="p-4">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[var(--border-color)] text-sm">
+                                                {rows.map((r: any, idx: number) => (
+                                                    <tr key={r.id || idx} className={`transition-colors ${r.is_flagged ? 'bg-red-50 dark:bg-red-950/20 border-l-4 border-red-500' : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'}`}>
+                                                        <td className="p-4"><span className="font-mono text-xs font-black text-green-700 bg-green-50 px-2 py-0.5 rounded">{String(idx + 1).padStart(4, '0')}</span></td>
+                                                        <td className="p-4 font-bold text-sm">
+                                                            <div className="flex items-center gap-1.5">
+                                                                {r.name}
+                                                                {r.is_flagged && <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-red-600 text-white animate-pulse">FLAGGED</span>}
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-4 text-xs"><span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded capitalize">{r.role}</span></td>
+                                                        <td className="p-4 text-xs font-semibold">{r.gate}</td>
+                                                        <td className="p-4 text-xs font-bold uppercase">{r.method}</td>
+                                                        <td className="p-4 text-xs text-gray-500">{r.entry_time ? new Date(r.entry_time).toLocaleTimeString() : '-'}</td>
+                                                        <td className="p-4 text-xs text-gray-500">{r.exit_time ? new Date(r.exit_time).toLocaleTimeString() : <span className="text-gray-400">On Campus</span>}</td>
+                                                        <td className="p-4 text-xs">{r.guard}</td>
+                                                        <td className="p-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${r.status === 'allowed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{r.status}</span></td>
+                                                    </tr>
+                                                ))}
+                                                {rows.length === 0 && <tr><td colSpan={9} className="p-8 text-center text-gray-400">No gate entries found for selected date.</td></tr>}
+                                            </tbody>
+                                        </table>
+                                    )
+                                })()}
+
+                                {/* ATTENDANCE TABLE */}
+                                {hubCategory === 'attendance' && (() => {
+                                    const rows = (hubData.items || []).filter((r: any) =>
+                                        !hubSearch || [r.student_name, r.admission_number, r.course_name, r.room_code, r.serial_number].some((v: any) => v?.toLowerCase().includes(hubSearch.toLowerCase()))
+                                    )
+                                    return (
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="border-b border-[var(--border-color)] bg-gray-50 dark:bg-gray-900/50 text-xs font-bold uppercase tracking-wider text-gray-500 sticky top-0">
+                                                    <th className="p-4">#</th>
+                                                    <th className="p-4">Student</th>
+                                                    <th className="p-4">Admission No.</th>
+                                                    <th className="p-4">Course</th>
+                                                    <th className="p-4">Room</th>
+                                                    <th className="p-4">Timestamp</th>
+                                                    <th className="p-4">Method</th>
+                                                    <th className="p-4">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[var(--border-color)] text-sm">
+                                                {rows.map((r: any) => (
+                                                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
+                                                        <td className="p-4"><span className="font-mono text-xs font-black text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-0.5 rounded">{r.serial_number}</span></td>
+                                                        <td className="p-4 font-bold text-sm">{r.student_name}</td>
+                                                        <td className="p-4 font-mono text-xs text-purple-600">{r.admission_number}</td>
+                                                        <td className="p-4 text-xs">{r.course_name}</td>
+                                                        <td className="p-4 text-xs font-mono">{r.room_code}</td>
+                                                        <td className="p-4 text-xs text-gray-500">{r.timestamp ? new Date(r.timestamp).toLocaleString() : '-'}</td>
+                                                        <td className="p-4 text-xs font-bold uppercase">{r.method}</td>
+                                                        <td className="p-4"><span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${r.is_successful ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{r.is_successful ? 'Present' : 'Failed'}</span></td>
+                                                    </tr>
+                                                ))}
+                                                {rows.length === 0 && <tr><td colSpan={8} className="p-8 text-center text-gray-400">No attendance records found.</td></tr>}
+                                            </tbody>
+                                        </table>
+                                    )
+                                })()}
+                            </div>
+                        </div>
+                    ) : !hubLoading && (
+                        <div className="glass-card p-12 text-center border-2 border-dashed border-gray-200 dark:border-gray-700">
+                            <Filter className="mx-auto text-gray-300 dark:text-gray-600 mb-3" size={40} />
+                            <p className="font-bold text-gray-500">Select a category and click Generate Report</p>
+                            <p className="text-xs text-gray-400 mt-1">Apply filters above then click the Generate Report button</p>
+                        </div>
                     )}
                 </div>
             )}

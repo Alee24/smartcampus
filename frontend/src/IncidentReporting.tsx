@@ -8,6 +8,7 @@ import { useNotification } from './components/Notification';
 
 interface Incident {
     id: string;
+    serial_number: string;
     title: string;
     description: string;
     reporter_id: string;
@@ -327,11 +328,20 @@ export default function IncidentReporting() {
                                         : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700/80 hover:border-gray-200'
                                 }`}
                             >
-                                <div className="flex justify-between items-start gap-2 mb-2">
-                                    <h4 className="font-bold text-sm text-gray-800 dark:text-white line-clamp-1">{inc.title}</h4>
-                                    <span className={`px-2 py-0.5 text-[9px] font-black rounded-full uppercase border ${getStatusColor(inc.status)}`}>
-                                        {inc.status.replace("_", " ")}
-                                    </span>
+                                <div className="flex flex-col gap-1 mb-2">
+                                    <div className="flex justify-between items-start gap-2">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            {inc.serial_number && (
+                                                <span className="text-[9px] font-black bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 px-2 py-0.5 rounded-full font-mono tracking-wider shrink-0">
+                                                    {inc.serial_number}
+                                                </span>
+                                            )}
+                                            <h4 className="font-bold text-sm text-gray-800 dark:text-white line-clamp-1">{inc.title}</h4>
+                                        </div>
+                                        <span className={`px-2 py-0.5 text-[9px] font-black rounded-full uppercase border shrink-0 ${getStatusColor(inc.status)}`}>
+                                            {inc.status.replace("_", " ")}
+                                        </span>
+                                    </div>
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mb-3">
                                     {inc.description}
@@ -359,9 +369,16 @@ export default function IncidentReporting() {
                             {/* Incident Details Banner */}
                             <div className="bg-gradient-to-br from-gray-900 to-slate-800 p-6 sm:p-8 text-white relative">
                                 <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
-                                    <span className={`px-3 py-1 text-xs font-black rounded-lg uppercase ${getSeverityColor(activeIncident.severity)}`}>
-                                        {activeIncident.severity} Severity
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`px-3 py-1 text-xs font-black rounded-lg uppercase ${getSeverityColor(activeIncident.severity)}`}>
+                                            {activeIncident.severity} Severity
+                                        </span>
+                                        {activeIncident.serial_number && (
+                                            <span className="px-3 py-1 text-xs font-black font-mono bg-white/15 text-white rounded-lg tracking-wider">
+                                                {activeIncident.serial_number}
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="flex gap-2">
                                         <button 
                                             onClick={printIncidentDetails} 

@@ -6,7 +6,7 @@ from app.models import User, EntryLog, VehicleLog, AttendanceRecord, Role, Gate,
 from app.auth import get_current_user
 from datetime import datetime, timedelta
 from app.utils.timezone import get_eat_time
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 router = APIRouter()
 
@@ -341,4 +341,248 @@ async def get_detailed_report(
         },
         "entry_logs": entry_list,
         "vehicle_logs": vehicle_list
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# System-Wide Reports Hub Endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+from app.models import IncidentReport, LostAndFoundItem, AttendanceRecord
+from datetime import date as date_type
+
+@router.get("/hub/incidents")
+async def get_incidents_report(
+    status: Optional[str] = Query(None),
+    severity: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(ensure_admin)
+):
+    """Incidents report with serial numbers and optional filters."""
+    stmt = select(IncidentReport).order_by(IncidentReport.created_at.desc())
+    if status:
+        stmt = stmt.where(IncidentReport.status == status)
+    if severity:
+        stmt = stmt.where(IncidentReport.severity == severity)
+    if date_from:
+        try:
+            df = datetime.strptime(date_from, "%Y-%m-%d")
+            stmt = stmt.where(IncidentReport.created_at >= df)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt = datetime.strptime(date_to, "%Y-%m-%d")
+            from datetime import time
+            stmt = stmt.where(IncidentReport.created_at <= datetime.combine(dt.date(), time.max))
+        except ValueError:
+            pass
+
+    incidents = (await session.exec(stmt)).all()
+
+    # Total unfiltered count for serial numbering
+    total_stmt = select(func.count(IncidentReport.id))
+    if date_from or date_to or status or severity:
+        # Use filtered total for relative serial within the current filter
+        total_stmt = stmt.with_only_columns(func.count(IncidentReport.id))
+    try:
+        total = (await session.exec(select(func.count(IncidentReport.id)))).one()
+    except Exception:
+        total = len(incidents)
+
+    enriched = []
+    for idx, inc in enumerate(incidents):
+        reporter = await session.get(User, inc.reporter_id)
+        target = await session.get(User, inc.target_user_id) if inc.target_user_id else None
+        serial_num = total - idx
+        enriched.append({
+            "serial_number": f"INC-{serial_num:04d}",
+            "id": str(inc.id),
+            "title": inc.title,
+            "reporter_name": reporter.full_name if reporter else "Unknown",
+            "target_name": target.full_name if target else (inc.target_name_external or "-"),
+            "location": inc.location,
+            "severity": inc.severity,
+            "status": inc.status,
+            "incident_date": inc.incident_date.isoformat(),
+            "created_at": inc.created_at.isoformat()
+        })
+
+    return {
+        "total": len(enriched),
+        "items": enriched,
+        "summary": {
+            "total": len(enriched),
+            "resolved": len([i for i in enriched if i["status"] == "resolved"]),
+            "open": len([i for i in enriched if i["status"] != "resolved"]),
+            "high_severity": len([i for i in enriched if i["severity"] == "high"]),
+            "medium_severity": len([i for i in enriched if i["severity"] == "medium"]),
+            "low_severity": len([i for i in enriched if i["severity"] == "low"]),
+        }
+    }
+
+
+@router.get("/hub/lost-found")
+async def get_lost_found_report(
+    status: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(ensure_admin)
+):
+    """Lost & Found items report with serial numbers and optional filters."""
+    stmt = select(LostAndFoundItem).order_by(LostAndFoundItem.created_at.desc())
+    if status:
+        stmt = stmt.where(LostAndFoundItem.status == status)
+    if date_from:
+        try:
+            df = date_type.fromisoformat(date_from)
+            stmt = stmt.where(LostAndFoundItem.date_found >= df)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            dt = date_type.fromisoformat(date_to)
+            stmt = stmt.where(LostAndFoundItem.date_found <= dt)
+        except ValueError:
+            pass
+
+    items = (await session.exec(stmt)).all()
+
+    try:
+        total = (await session.exec(select(func.count(LostAndFoundItem.id)))).one()
+    except Exception:
+        total = len(items)
+
+    enriched = []
+    for idx, item in enumerate(items):
+        handler = await session.get(User, item.handler_id)
+        claimant = await session.get(User, item.claimant_id) if item.claimant_id else None
+        serial_num = total - idx
+        enriched.append({
+            "serial_number": f"LNF-{serial_num:04d}",
+            "id": str(item.id),
+            "item_name": item.item_name,
+            "description": item.description,
+            "location_found": item.location_found,
+            "date_found": item.date_found.isoformat(),
+            "status": item.status,
+            "finder_name": item.finder_name or "Anonymous",
+            "claimant_name": (claimant.full_name if claimant else item.claimant_name) or "-",
+            "date_claimed": item.date_claimed.isoformat() if item.date_claimed else None,
+            "handler_name": handler.full_name if handler else "Unknown",
+            "created_at": item.created_at.isoformat()
+        })
+
+    return {
+        "total": len(enriched),
+        "items": enriched,
+        "summary": {
+            "total": len(enriched),
+            "found": len([i for i in enriched if i["status"] == "found"]),
+            "claimed": len([i for i in enriched if i["status"] == "claimed"]),
+            "disposed": len([i for i in enriched if i["status"] == "disposed"]),
+        }
+    }
+
+
+@router.get("/hub/users")
+async def get_users_report(
+    role_filter: Optional[str] = Query(None, alias="role"),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(ensure_admin)
+):
+    """All registered users report with role and status filters."""
+    stmt = select(User).order_by(User.created_at.desc())
+    if status_filter:
+        stmt = stmt.where(User.status == status_filter)
+
+    users = (await session.exec(stmt)).all()
+
+    enriched = []
+    for idx, u in enumerate(users):
+        role_obj = await session.get(Role, u.role_id) if u.role_id else None
+        role_name = role_obj.name if role_obj else "Unknown"
+        # Optional role filter
+        if role_filter and role_name.lower().replace(" ", "") != role_filter.lower().replace(" ", ""):
+            continue
+        serial_num = len(users) - idx
+        enriched.append({
+            "serial_number": f"USR-{serial_num:04d}",
+            "id": str(u.id),
+            "full_name": u.full_name,
+            "email": u.email,
+            "admission_number": u.admission_number or "-",
+            "phone_number": u.phone_number or "-",
+            "role": role_name,
+            "status": u.status or "active",
+            "school": u.school or "-",
+            "gender": u.gender or "-",
+            "created_at": u.created_at.isoformat() if u.created_at else None
+        })
+
+    return {
+        "total": len(enriched),
+        "items": enriched,
+        "summary": {
+            "total": len(enriched),
+            "active": len([u for u in enriched if u["status"] == "active"]),
+            "flagged": len([u for u in enriched if u["status"] == "flagged"]),
+            "inactive": len([u for u in enriched if u["status"] not in ["active", "flagged"]]),
+        }
+    }
+
+
+@router.get("/hub/attendance")
+async def get_attendance_report(
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(ensure_admin)
+):
+    """Attendance records report with date range filter."""
+    stmt = select(AttendanceRecord).order_by(AttendanceRecord.timestamp.desc())
+    if date_from:
+        try:
+            df = datetime.strptime(date_from, "%Y-%m-%d")
+            stmt = stmt.where(AttendanceRecord.timestamp >= df)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            from datetime import time
+            dt = datetime.strptime(date_to, "%Y-%m-%d")
+            stmt = stmt.where(AttendanceRecord.timestamp <= datetime.combine(dt.date(), time.max))
+        except ValueError:
+            pass
+
+    records = (await session.exec(stmt)).all()
+
+    enriched = []
+    for idx, rec in enumerate(records):
+        student = await session.get(User, rec.user_id) if rec.user_id else None
+        serial_num = len(records) - idx
+        enriched.append({
+            "serial_number": f"ATT-{serial_num:04d}",
+            "id": str(rec.id),
+            "student_name": student.full_name if student else "Unknown",
+            "admission_number": student.admission_number if student else "-",
+            "course_name": rec.course_name or "-",
+            "room_code": rec.room_code or "-",
+            "timestamp": rec.timestamp.isoformat() if rec.timestamp else None,
+            "method": rec.method or "scan",
+            "is_successful": rec.is_successful
+        })
+
+    return {
+        "total": len(enriched),
+        "items": enriched,
+        "summary": {
+            "total": len(enriched),
+            "successful": len([r for r in enriched if r["is_successful"]]),
+            "failed": len([r for r in enriched if not r["is_successful"]]),
+        }
     }
