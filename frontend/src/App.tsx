@@ -415,6 +415,46 @@ function App() {
     }, [])
 
     const [hasUnreadNotices, setHasUnreadNotices] = useState(false)
+    const [unreadIncidents, setUnreadIncidents] = useState(0)
+    const [unreadLostFound, setUnreadLostFound] = useState(0)
+
+    // Fetch latest stats for incidents and lost & found
+    useEffect(() => {
+        const fetchLatestStats = async () => {
+            if (!isAuthenticated) return
+            try {
+                const token = localStorage.getItem('token')
+                const res = await fetch('/api/security/latest-stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (res.ok) {
+                    const data = await res.json()
+                    
+                    const lastViewedInc = localStorage.getItem('lastViewedIncidentTime')
+                    const lastViewedLF = localStorage.getItem('lastViewedLostFoundTime')
+                    
+                    if (data.incidents) {
+                        const newIncCount = lastViewedInc 
+                            ? data.incidents.filter((i: any) => new Date(i.created_at) > new Date(lastViewedInc)).length 
+                            : data.incidents.length
+                        setUnreadIncidents(newIncCount)
+                    }
+                    
+                    if (data.lost_found) {
+                        const newLfCount = lastViewedLF
+                            ? data.lost_found.filter((i: any) => new Date(i.created_at) > new Date(lastViewedLF)).length
+                            : data.lost_found.length
+                        setUnreadLostFound(newLfCount)
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to fetch latest security stats:', e)
+            }
+        }
+        fetchLatestStats()
+        const interval = setInterval(fetchLatestStats, 30000)
+        return () => clearInterval(interval)
+    }, [isAuthenticated])
 
     // Fetch notice board announcements to check for unread admin notices
     useEffect(() => {
@@ -468,7 +508,17 @@ function App() {
             }
             fetchAndMarkRead()
         }
-    }, [activeTab, hasUnreadNotices])
+        
+        if (activeTab === 'incidents' && unreadIncidents > 0) {
+            localStorage.setItem('lastViewedIncidentTime', new Date().toISOString())
+            setUnreadIncidents(0)
+        }
+        
+        if (activeTab === 'lost-found' && unreadLostFound > 0) {
+            localStorage.setItem('lastViewedLostFoundTime', new Date().toISOString())
+            setUnreadLostFound(0)
+        }
+    }, [activeTab, hasUnreadNotices, unreadIncidents, unreadLostFound])
 
     // Default configuration if none is saved
     const getDefaultConfig = () => {
@@ -1085,14 +1135,16 @@ function App() {
                                 label="Incident Reports"
                                 active={activeTab === 'incidents'}
                                 onClick={() => { setActiveTab('incidents'); setSidebarOpen(false); }}
+                                badge={unreadIncidents > 0 ? unreadIncidents : undefined}
                             />
                         )}
                         {isMenuEnabled('lost-found') && (
                             <NavItem
-                                icon={<Inbox size={18} />}
+                                icon={<Search size={18} />}
                                 label="Lost & Found"
                                 active={activeTab === 'lost-found'}
                                 onClick={() => { setActiveTab('lost-found'); setSidebarOpen(false); }}
+                                badge={unreadLostFound > 0 ? unreadLostFound : undefined}
                             />
                         )}
                     </SidebarGroup>
@@ -1367,7 +1419,7 @@ function App() {
 
 
             {/* Main Content */}
-            <main className={`flex-1 p-2 sm:p-3 lg:p-4 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
+            <main className={`flex-1 p-2 sm:p-3 lg:p-4 pb-20 lg:pb-4 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
                 <Suspense fallback={<PageLoader />}>
                     {/* Top Header - 2 Row Layout */}
                     <header className="flex flex-col gap-2 mb-4 pt-1 pb-1">
@@ -1612,7 +1664,67 @@ function App() {
                         <p>&copy; {new Date().getFullYear()} Smart Campus System.</p>
                     </footer>
                 </Suspense>
+
+                {/* Floating Notification Button for Incidents */}
+                {unreadIncidents > 0 && (
+                    <div className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-[60] animate-bounce">
+                        <button
+                            onClick={() => setActiveTab('incidents')}
+                            className="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 sm:gap-3 font-bold text-xs sm:text-sm transition-all"
+                        >
+                            <AlertTriangle size={18} className="animate-pulse" />
+                            Incident Reported
+                            <span className="bg-white text-red-600 px-2 py-0.5 rounded-full text-[10px] sm:text-xs">{unreadIncidents}</span>
+                        </button>
+                    </div>
+                )}
+                
+                {/* Floating Notification Button for Lost & Found */}
+                {unreadLostFound > 0 && unreadIncidents === 0 && (
+                    <div className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-[60] animate-bounce">
+                        <button
+                            onClick={() => setActiveTab('lost-found')}
+                            className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 sm:gap-3 font-bold text-xs sm:text-sm transition-all"
+                        >
+                            <Search size={18} className="animate-pulse" />
+                            New Item Found
+                            <span className="bg-white text-yellow-600 px-2 py-0.5 rounded-full text-[10px] sm:text-xs">{unreadLostFound}</span>
+                        </button>
+                    </div>
+                )}
             </main >
+
+            {/* Mobile PWA Bottom Navigation Bar */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--bg-surface)] border-t border-[var(--border-color)] z-50 px-2 py-2 flex justify-around items-center safe-area-pb shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                {isMenuEnabled('dashboard') && (
+                    <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'dashboard' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
+                        <LayoutDashboard size={22} />
+                        <span className="text-[10px] font-medium mt-1">Home</span>
+                    </button>
+                )}
+                {isMenuEnabled('verification') && (
+                    <button onClick={() => setActiveTab('verification')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'verification' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
+                        <ScanFace size={22} />
+                        <span className="text-[10px] font-medium mt-1">Verify</span>
+                    </button>
+                )}
+                {isMenuEnabled('gate') && (
+                    <button onClick={() => setActiveTab('gate')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'gate' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
+                        <DoorOpen size={22} />
+                        <span className="text-[10px] font-medium mt-1">Gate</span>
+                    </button>
+                )}
+                {isMenuEnabled('scan-logs') && (
+                    <button onClick={() => setActiveTab('scan-logs')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'scan-logs' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
+                        <List size={22} />
+                        <span className="text-[10px] font-medium mt-1">Logs</span>
+                    </button>
+                )}
+                <button onClick={() => setSidebarOpen(true)} className="flex flex-col items-center p-2 rounded-xl transition-colors text-[var(--text-secondary)]">
+                    <Menu size={22} />
+                    <span className="text-[10px] font-medium mt-1">Menu</span>
+                </button>
+            </div>
 
             {/* Profile Picture Modal */}
             {showProfileModal && (

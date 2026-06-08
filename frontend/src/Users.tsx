@@ -561,10 +561,12 @@ export default function Users() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    currentUsers.map((user) => (
+                                    currentUsers.map((user) => {
+                                        const isFlagged = user.status === 'flagged';
+                                        return (
                                         <tr
                                             key={user.id}
-                                            className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                                            className={`transition-colors cursor-pointer ${isFlagged ? 'bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                                             onClick={() => setSelectedUser(user)}
                                         >
                                             <td className="px-4 py-3">
@@ -646,7 +648,8 @@ export default function Users() {
                                                 </button>
                                             </td>
                                         </tr>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
@@ -684,12 +687,14 @@ export default function Users() {
                 /* GRID VIEW */
                 <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
-                        {currentUsers.map((user) => (
-                            <div
-                                key={user.id}
-                                className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-[var(--border-color)] overflow-hidden cursor-pointer group flex flex-col items-center p-6 relative animate-fade-in"
-                                onClick={() => setSelectedUser(user)}
-                            >
+                        {currentUsers.map((user) => {
+                            const isFlagged = user.status === 'flagged';
+                            return (
+                                <div
+                                    key={user.id}
+                                    className={`rounded-3xl p-6 border transition-all cursor-pointer group flex flex-col items-center relative animate-fade-in ${isFlagged ? 'bg-red-50 border-red-200 hover:border-red-300 dark:bg-red-900/10 dark:border-red-900/30' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:border-purple-300 hover:shadow-xl'}`}
+                                    onClick={() => setSelectedUser(user)}
+                                >
 
 
                                 {/* Status Indicator (Top Left) */}
@@ -779,7 +784,8 @@ export default function Users() {
                                     </button>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {/* Pagination for Grid (Duplicated to avoid nested div issues) */}

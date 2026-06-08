@@ -1354,7 +1354,7 @@ export default function GateControl() {
                             <p className="text-xs text-slate-400 font-bold uppercase">Comprehensive activity logs record</p>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-50 dark:border-slate-800">
+                        <div className="flex-1 overflow-x-auto overflow-y-auto rounded-2xl border border-slate-50 dark:border-slate-800">
                             <table className="w-full text-left text-xs font-bold">
                                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 sticky top-0 uppercase tracking-wider font-bold">
                                     <tr>

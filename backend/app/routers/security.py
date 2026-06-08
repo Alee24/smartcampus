@@ -55,6 +55,27 @@ async def lookup_users(
         })
     return results
 
+@router.get("/latest-stats")
+async def get_latest_stats(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Get the latest timestamps to calculate unread counts on the frontend"""
+    role_name = await get_user_role_name(current_user, session)
+    if role_name not in ["superadmin", "admin", "securitylead", "security", "guard", "management"]:
+        return {"incidents": [], "lost_found": []}
+
+    inc_stmt = select(IncidentReport.id, IncidentReport.created_at).order_by(IncidentReport.created_at.desc()).limit(20)
+    inc_results = (await session.exec(inc_stmt)).all()
+    
+    lf_stmt = select(LostAndFoundItem.id, LostAndFoundItem.created_at).order_by(LostAndFoundItem.created_at.desc()).limit(20)
+    lf_results = (await session.exec(lf_stmt)).all()
+
+    return {
+        "incidents": [{"id": str(i[0]), "created_at": i[1].isoformat()} for i in inc_results],
+        "lost_found": [{"id": str(i[0]), "created_at": i[1].isoformat()} for i in lf_results]
+    }
+
 @router.get("/incidents")
 async def get_incidents(
     severity: Optional[str] = None,
