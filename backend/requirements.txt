@@ -20,3 +20,4 @@ Pillow
 qrcode
 apscheduler
 fastapi-mail
+pytesseract

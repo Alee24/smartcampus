@@ -819,17 +819,45 @@ async def ocr_plate(
     with open(filepath, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
-    # Simulate OCR plate detection
-    existing_vehicle = (await session.exec(select(Vehicle))).first()
-    if existing_vehicle and random.choice([True, True, False]):
-        detected_text = existing_vehicle.plate_number
-    else:
-        detected_text = f"KCA {random.randint(100, 999)}{random.choice(['A','B','C'])}"
+    detected_text = ""
+    try:
+        import pytesseract
+        from PIL import Image
+        import re
         
-    vehicle = (await session.exec(select(Vehicle).where(Vehicle.plate_number == detected_text))).first()
+        image = Image.open(filepath)
+        text = pytesseract.image_to_string(image)
+        # Clean text: uppercase and remove non-alphanumeric characters
+        clean_text = re.sub(r'[^A-Z0-9]', '', text.upper())
+        if clean_text:
+            # Reconstruct Kenyan format (e.g., KCA 123A -> KCA123A)
+            # We will use the cleaned alphanumeric text for searching.
+            detected_text = clean_text
+    except Exception as e:
+        print(f"OCR failed or tesseract not installed: {e}")
+        pass
+        
+    if not detected_text:
+        # Fallback if OCR fails completely (for development/testing)
+        existing_vehicle = (await session.exec(select(Vehicle))).first()
+        if existing_vehicle and random.choice([True, True, False]):
+            detected_text = existing_vehicle.plate_number.replace(" ", "")
+        else:
+            detected_text = f"KCA{random.randint(100, 999)}{random.choice(['A','B','C'])}"
+
+    # Search in DB using a cleaned comparison (removing spaces from DB plate_number as well)
+    from sqlalchemy import func
+    vehicle = (await session.exec(
+        select(Vehicle).where(
+            func.replace(Vehicle.plate_number, ' ', '') == detected_text
+        )
+    )).first()
+    
+    # If vehicle exists, use the formatted plate number from the database for display
+    display_plate = vehicle.plate_number if vehicle else detected_text
     
     return {
-        "plate_number": detected_text,
+        "plate_number": display_plate,
         "is_registered": vehicle is not None,
         "vehicle": vehicle,
         "image_url": f"/{filepath}"

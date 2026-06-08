@@ -11,6 +11,7 @@ RUN (apt-get update || apt-get update --fix-missing) && apt-get install -y --no-
     libmariadb-dev \
     gcc \
     curl \
+    tesseract-ocr \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
