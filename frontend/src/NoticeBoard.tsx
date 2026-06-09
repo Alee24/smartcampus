@@ -25,6 +25,22 @@ export default function NoticeBoard() {
     const [formTitle, setFormTitle] = useState('')
     const [formContent, setFormContent] = useState('')
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [expandedImage, setExpandedImage] = useState<string | null>(null)
+
+    // Handle ESC key to close expanded image modal
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setExpandedImage(null)
+            }
+        }
+        if (expandedImage) {
+            window.addEventListener('keydown', handleKeyDown)
+        }
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+        }
+    }, [expandedImage])
 
     // User details
     const currentUserId = localStorage.getItem('userId')
@@ -251,42 +267,70 @@ export default function NoticeBoard() {
                                     </div>
                                 </div>
 
-                                <div className="text-gray-700 dark:text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">
-                                    {notice.content}
-                                </div>
-
-                                {notice.attachment_url && (
-                                    <div className="mt-4 pt-3 border-t border-gray-50 dark:border-gray-800/40">
-                                        {notice.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)/i) ? (
-                                            <div className="space-y-2">
-                                                <a 
-                                                    href={notice.attachment_url} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 hover:underline font-bold"
-                                                >
-                                                    <FileText size={14} /> View Attached Image <ExternalLink size={12} />
-                                                </a>
-                                                <img 
-                                                    src={notice.attachment_url} 
-                                                    alt="Circular Attachment" 
-                                                    className="max-h-96 rounded-lg object-contain border border-gray-200 dark:border-gray-800 shadow-sm"
-                                                />
+                                <div className="mt-2">
+                                    {notice.attachment_url && notice.attachment_url.match(/\.(jpeg|jpg|gif|png|webp)/i) ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                                            {/* Left Column: Content text */}
+                                            <div className="md:col-span-7 lg:col-span-8 space-y-4">
+                                                <div className="text-gray-700 dark:text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">
+                                                    {notice.content}
+                                                </div>
+                                                <div className="pt-2">
+                                                    <a 
+                                                        href={notice.attachment_url} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-bold transition-colors"
+                                                    >
+                                                        <FileText size={14} /> Open Original Image <ExternalLink size={12} />
+                                                    </a>
+                                                </div>
                                             </div>
-                                        ) : (
-                                            <a 
-                                                href={notice.attachment_url} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750 text-xs text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 font-bold transition-all"
-                                            >
-                                                <FileText size={14} className="text-purple-500" />
-                                                Download Attachment Material
-                                                <ExternalLink size={12} />
-                                            </a>
-                                        )}
-                                    </div>
-                                )}
+
+                                            {/* Right Column: Expandable Image Preview */}
+                                            <div className="md:col-span-5 lg:col-span-4">
+                                                <div 
+                                                    onClick={() => setExpandedImage(notice.attachment_url)}
+                                                    className="group/img relative cursor-zoom-in overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800/80 shadow-sm transition-all duration-300 hover:shadow-md hover:border-purple-300 dark:hover:border-purple-900 bg-gray-50 dark:bg-gray-800/30 flex items-center justify-center p-2"
+                                                >
+                                                    <img 
+                                                        src={notice.attachment_url} 
+                                                        alt="Notice Attachment" 
+                                                        className="w-full h-auto max-h-64 object-contain rounded-lg transition-transform duration-300 group-hover/img:scale-[1.02]"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 flex items-center justify-center transition-all duration-300 rounded-xl">
+                                                        <span className="opacity-0 group-hover/img:opacity-100 px-3 py-1.5 bg-black/70 backdrop-blur-sm text-white text-xs font-bold rounded-lg transition-opacity duration-300 flex items-center gap-1 shadow-lg">
+                                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                                                            </svg>
+                                                            Click to Expand
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div className="text-gray-700 dark:text-gray-300 text-sm whitespace-pre-wrap leading-relaxed">
+                                                {notice.content}
+                                            </div>
+                                            {notice.attachment_url && (
+                                                <div className="pt-3 border-t border-gray-50 dark:border-gray-800/40">
+                                                    <a 
+                                                        href={notice.attachment_url} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750 text-xs text-gray-700 dark:text-gray-300 rounded-lg border border-gray-200 dark:border-gray-700 font-bold transition-all hover:scale-[1.01] active:scale-[0.99]"
+                                                    >
+                                                        <FileText size={14} className="text-purple-500" />
+                                                        Download Attachment Material
+                                                        <ExternalLink size={12} />
+                                                    </a>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )
                     })}
@@ -381,6 +425,28 @@ export default function NoticeBoard() {
                             </form>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Expanded Image Modal */}
+            {expandedImage && (
+                <div 
+                    onClick={() => setExpandedImage(null)}
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in cursor-zoom-out"
+                >
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setExpandedImage(null); }}
+                        className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-full transition-all duration-200"
+                        title="Close image"
+                    >
+                        <X size={24} />
+                    </button>
+                    <img 
+                        src={expandedImage} 
+                        alt="Expanded attachment" 
+                        onClick={(e) => e.stopPropagation()}
+                        className="max-w-full max-h-[90vh] object-contain rounded-lg animate-scale-in cursor-default shadow-2xl"
+                    />
                 </div>
             )}
         </div>
