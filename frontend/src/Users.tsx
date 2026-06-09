@@ -23,6 +23,7 @@ export default function Users() {
     const [showSyncModal, setShowSyncModal] = useState(false)
     const [syncLogs, setSyncLogs] = useState<Array<{ time: string; level: 'info' | 'success' | 'error'; msg: string }>>([])
     const [compressing, setCompressing] = useState(false)
+    const [downloadingQRs, setDownloadingQRs] = useState(false)
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1)
@@ -202,6 +203,48 @@ export default function Users() {
             showNotification('Network error occurred.', 'error')
         } finally {
             setCompressing(false)
+        }
+    }
+
+    const handleDownloadQRsZip = async () => {
+        const confirmed = await showConfirm({
+            title: "Download QR Codes ZIP",
+            message: "Are you sure you want to download a ZIP file containing the QR codes for all students and staff? The filenames will correspond to each user's admission number. This might take a few moments to generate.",
+            confirmText: "Download",
+            cancelText: "Cancel"
+        })
+        if (!confirmed) return
+
+        setDownloadingQRs(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/users/download-qrs-zip', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+
+            if (res.ok) {
+                const blob = await res.blob()
+                const url = window.URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = "student_staff_qrs.zip"
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                window.URL.revokeObjectURL(url)
+                showNotification("QR codes ZIP downloaded successfully!", "success")
+            } else {
+                const data = await res.json().catch(() => ({}))
+                showNotification(`Download failed: ${data.detail || 'Unknown error'}`, 'error')
+            }
+        } catch (err) {
+            console.error(err)
+            showNotification('Network error occurred during download.', 'error')
+        } finally {
+            setDownloadingQRs(false)
         }
     }
 
@@ -396,6 +439,16 @@ export default function Users() {
                             <LayoutGrid size={20} />
                         </button>
                     </div>
+
+                    <button
+                        onClick={handleDownloadQRsZip}
+                        disabled={downloadingQRs}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-semibold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all disabled:opacity-50 active:scale-95"
+                        title="Download a ZIP archive of all student and staff QR codes"
+                    >
+                        <Download size={18} className={downloadingQRs ? "animate-bounce text-indigo-500" : "text-indigo-500"} />
+                        {downloadingQRs ? "Downloading QRs..." : "Download QRs ZIP"}
+                    </button>
 
                     <button
                         onClick={handleCompressImages}

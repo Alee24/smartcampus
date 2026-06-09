@@ -1600,3 +1600,77 @@ async def compress_all_images(
         "reduction_percentage": reduction_pct,
         "errors": errors
     }
+
+
+def _generate_qrs_zip_sync(users_data: list, zip_path: str):
+    import zipfile
+    import qrcode
+    import io
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for val in users_data:
+            if not val:
+                continue
+            # sanitize name for filename
+            safe_filename = "".join(c for c in val if c.isalnum() or c in ('-', '_', '.')).strip()
+            if not safe_filename:
+                continue
+            
+            filename = f"{safe_filename}.png"
+            
+            # Generate QR code
+            qr = qrcode.QRCode(version=1, box_size=10, border=4)
+            qr.add_data(val)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='PNG')
+            
+            zip_file.writestr(filename, img_byte_arr.getvalue())
+
+
+@router.get("/download-qrs-zip")
+async def download_qrs_zip(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_admin_user)
+):
+    import os
+    import asyncio
+    import uuid
+    from fastapi.responses import FileResponse
+    from app.models import Role, User
+    
+    # 1. Fetch visitor role if any
+    visitor_role = (await session.exec(select(Role).where(Role.name == "Visitor"))).first()
+    
+    # 2. Query all users (excluding visitors, and ensuring admission number is not empty)
+    query = select(User).where(User.admission_number != None).where(User.admission_number != "")
+    if visitor_role:
+        query = query.where(User.role_id != visitor_role.id)
+        
+    results = await session.exec(query)
+    users = results.all()
+    
+    # Extract admission numbers
+    user_codes = [user.admission_number.strip() for user in users if user.admission_number.strip()]
+    
+    if not user_codes:
+        raise HTTPException(status_code=400, detail="No student or staff records with admission numbers found.")
+        
+    # Create static/downloads directory if not exists
+    os.makedirs("static/downloads", exist_ok=True)
+    
+    # Unique zip file name
+    zip_filename = f"qrs_archive_{uuid.uuid4().hex[:8]}.zip"
+    zip_path = os.path.join("static/downloads", zip_filename)
+    
+    # 3. Offload CPU-bound zip generation to background threadpool
+    await asyncio.to_thread(_generate_qrs_zip_sync, user_codes, zip_path)
+    
+    # 4. Return FileResponse
+    return FileResponse(
+        zip_path,
+        media_type="application/zip",
+        filename="student_staff_qrs.zip"
+    )
+
