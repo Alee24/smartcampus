@@ -1665,33 +1665,60 @@ function App() {
                     </footer>
                 </Suspense>
 
-                {/* Floating Notification Button for Incidents */}
-                {unreadIncidents > 0 && (
-                    <div className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-[60] animate-bounce">
+                {/* ── Floating Action Buttons – top-right stacked, no overlap ── */}
+                <div className="fixed top-16 right-3 z-[95] flex flex-col items-end gap-2 pointer-events-none">
+
+                    {/* Gate Pass – Admin/Guard only */}
+                    {isAuthenticated && ['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
+                        <button
+                            onClick={() => setShowQuickScanModal(true)}
+                            className="pointer-events-auto animate-pulse bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-black tracking-wider text-xs border border-white/20 transition-all hover:scale-105 active:scale-95"
+                            style={{ boxShadow: '0 8px 24px -4px rgba(99,102,241,0.55)' }}
+                        >
+                            <QrCode size={16} />
+                            Gate Pass
+                        </button>
+                    )}
+
+                    {/* Notice Board shortcut */}
+                    {isAuthenticated && (
+                        <button
+                            onClick={() => setActiveTab('notice-board')}
+                            className="pointer-events-auto bg-indigo-500 hover:bg-indigo-600 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
+                            style={{ boxShadow: '0 8px 24px -4px rgba(99,102,241,0.4)' }}
+                        >
+                            <Megaphone size={16} />
+                            Notice Board
+                        </button>
+                    )}
+
+                    {/* Incident Alert */}
+                    {unreadIncidents > 0 && (
                         <button
                             onClick={() => setActiveTab('incidents')}
-                            className="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 sm:gap-3 font-bold text-xs sm:text-sm transition-all"
+                            className="pointer-events-auto animate-pulse bg-red-600 hover:bg-red-700 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
+                            style={{ boxShadow: '0 8px 24px -4px rgba(220,38,38,0.55)' }}
                         >
-                            <AlertTriangle size={18} className="animate-pulse" />
-                            Incident Reported
-                            <span className="bg-white text-red-600 px-2 py-0.5 rounded-full text-[10px] sm:text-xs">{unreadIncidents}</span>
+                            <AlertTriangle size={16} />
+                            Incident
+                            <span className="bg-white text-red-600 px-1.5 py-0.5 rounded-full text-[10px] font-black">{unreadIncidents}</span>
                         </button>
-                    </div>
-                )}
-                
-                {/* Floating Notification Button for Lost & Found */}
-                {unreadLostFound > 0 && unreadIncidents === 0 && (
-                    <div className="fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-[60] animate-bounce">
+                    )}
+
+                    {/* Lost & Found Alert */}
+                    {unreadLostFound > 0 && (
                         <button
                             onClick={() => setActiveTab('lost-found')}
-                            className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-3 rounded-full shadow-2xl flex items-center gap-2 sm:gap-3 font-bold text-xs sm:text-sm transition-all"
+                            className="pointer-events-auto animate-pulse bg-amber-500 hover:bg-amber-600 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
+                            style={{ boxShadow: '0 8px 24px -4px rgba(245,158,11,0.55)' }}
                         >
-                            <Search size={18} className="animate-pulse" />
-                            New Item Found
-                            <span className="bg-white text-yellow-600 px-2 py-0.5 rounded-full text-[10px] sm:text-xs">{unreadLostFound}</span>
+                            <Search size={16} />
+                            Lost &amp; Found
+                            <span className="bg-white text-amber-600 px-1.5 py-0.5 rounded-full text-[10px] font-black">{unreadLostFound}</span>
                         </button>
-                    </div>
-                )}
+                    )}
+
+                </div>
             </main >
 
             {/* Mobile PWA Bottom Navigation Bar */}
@@ -1813,17 +1840,7 @@ function App() {
             )}
 
 
-            {/* Floating Gate Pass Button for Admins & Guards */}
-            {isAuthenticated && ['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
-                <button
-                    onClick={() => setShowQuickScanModal(true)}
-                    className="fixed bottom-6 right-6 z-[90] bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white rounded-full px-5 py-3.5 shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 font-black tracking-wider text-xs border border-white/20 animate-bounce"
-                    style={{ boxShadow: '0 10px 25px -5px rgba(99, 102, 241, 0.5)' }}
-                >
-                    <QrCode size={20} />
-                    <span>Gate Pass</span>
-                </button>
-            )}
+            {/* Gate Pass button is now inside the unified floating actions container above */}
 
             {/* Quick Scan Modal Overlay */}
             {showQuickScanModal && (
