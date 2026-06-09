@@ -19,6 +19,8 @@ export default function LiveClasses({ fullScreen = false }: { fullScreen?: boole
     const [loading, setLoading] = useState(true);
     const [generating, setGenerating] = useState(false);
     const [activating, setActivating] = useState(false);
+    const [activeTab, setActiveTab] = useState<'classes' | 'trips' | 'gate-logs'>('classes');
+    const [recentLogs, setRecentLogs] = useState<any[]>([]);
 
     const fetchLive = async () => {
         try {
@@ -98,6 +100,14 @@ export default function LiveClasses({ fullScreen = false }: { fullScreen?: boole
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) setCampusStats(await res.json());
+        } catch (e) { console.error(e); }
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/dashboard/recent-logs', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) setRecentLogs(await res.json());
         } catch (e) { console.error(e); }
     };
 
@@ -561,81 +571,299 @@ export default function LiveClasses({ fullScreen = false }: { fullScreen?: boole
                 </div>
             )}
 
-            {/* List/Grid */}
-            <div className={gridClasses}>
-                {sessions.length === 0 ? (
-                    <div className="col-span-full flex flex-col items-center justify-center py-20 text-[var(--text-secondary)] opacity-50 bg-[var(--bg-surface)] rounded-2xl border border-dashed border-[var(--border-color)]">
-                        <Activity size={48} className="mb-4" />
-                        <p className="text-xl font-medium">No active classes right now.</p>
-                        <p className="text-sm">Classes will appear here instantly when they start.</p>
+            {/* List/Grid/Table */}
+            {!fullScreen ? (
+                <div className={gridClasses}>
+                    {sessions.length === 0 ? (
+                        <div className="col-span-full flex flex-col items-center justify-center py-20 text-[var(--text-secondary)] opacity-50 bg-[var(--bg-surface)] rounded-2xl border border-dashed border-[var(--border-color)]">
+                            <Activity size={48} className="mb-4" />
+                            <p className="text-xl font-medium">No active classes right now.</p>
+                            <p className="text-sm">Classes will appear here instantly when they start.</p>
+                        </div>
+                    ) : (
+                        sessions.map((sess: any) => (
+                            <div key={sess.session_id} className={`
+                                relative overflow-hidden
+                                bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-color)] 
+                                hover:shadow-lg hover:border-indigo-200 transition-all duration-300 group
+                                p-4 flex justify-between items-center
+                                ${flashingCards.has(sess.session_id) ? 'flash-green' : ''}
+                             `}>
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{sess.room}</span>
+                                        <span className="text-sm text-[var(--text-secondary)] font-medium">{sess.course}</span>
+                                    </div>
+                                    <div className="text-xs text-[var(--text-secondary)] flex items-center gap-3">
+                                        <span className="flex items-center gap-1"><Users size={12} /> {sess.lecturer}</span>
+                                    </div>
+                                </div>
+                                <div className="text-right pl-4">
+                                    <div className="text-xl font-bold text-[var(--text-primary)]">{sess.students}</div>
+                                    {sess.last_activity ? (
+                                        <div className="text-[10px] text-green-600 font-bold justify-end flex">
+                                            {timeAgo(sess.last_activity)}
+                                        </div>
+                                    ) : <div className="text-[10px] text-gray-300">-</div>}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    {/* Tabs for Live Features */}
+                    <div className="flex border-b border-[var(--border-color)] overflow-x-auto gap-2">
+                        <button
+                            onClick={() => setActiveTab('classes')}
+                            className={`px-5 py-3 font-bold text-sm border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+                                activeTab === 'classes'
+                                    ? 'border-[var(--primary-color)] text-[var(--primary-color)]'
+                                    : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            }`}
+                        >
+                            <School size={16} />
+                            Active Classes ({sessions.length})
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('trips')}
+                            className={`px-5 py-3 font-bold text-sm border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+                                activeTab === 'trips'
+                                    ? 'border-[var(--primary-color)] text-[var(--primary-color)]'
+                                    : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            }`}
+                        >
+                            <Bus size={16} />
+                            Ongoing Bus Trips ({campusStats?.fleet?.active_trips?.length || 0})
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('gate-logs')}
+                            className={`px-5 py-3 font-bold text-sm border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+                                activeTab === 'gate-logs'
+                                    ? 'border-[var(--primary-color)] text-[var(--primary-color)]'
+                                    : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                            }`}
+                        >
+                            <Activity size={16} />
+                            Live Gate Access Logs ({recentLogs.length})
+                        </button>
                     </div>
-                ) : (
-                    sessions.map((sess: any) => (
-                        <div key={sess.session_id} className={`
-                            relative overflow-hidden
-                            bg-[var(--bg-surface)] rounded-2xl border border-[var(--border-color)] 
-                            hover:shadow-lg hover:border-indigo-200 transition-all duration-300 group
-                            ${fullScreen ? 'p-6 flex flex-col h-full' : 'p-4 flex justify-between items-center'}
-                            ${flashingCards.has(sess.session_id) ? 'flash-green' : ''}
-                         `}>
-                            {fullScreen ? (
-                                <>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <span className="px-3 py-1 bg-indigo-50 text-indigo-600 font-bold rounded-lg text-sm tracking-wide">
-                                            {sess.room}
-                                        </span>
-                                        {sess.last_activity && (
-                                            <span className="flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                                                <Activity size={12} /> {timeAgo(sess.last_activity)}
-                                            </span>
-                                        )}
-                                    </div>
 
-                                    <h4 className="font-bold text-xl mb-2 text-[var(--text-primary)] line-clamp-2">{sess.course}</h4>
-
-                                    <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-6">
-                                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold">
-                                            {sess.lecturer.charAt(0)}
-                                        </div>
-                                        {sess.lecturer}
-                                    </div>
-
-                                    <div className="mt-auto pt-4 border-t border-[var(--border-color)] flex justify-between items-center">
-                                        <div className="flex flex-col">
-                                            <span className="text-xs text-[var(--text-secondary)] uppercase font-bold">Started</span>
-                                            <span className="font-mono text-sm">{sess.start_time.split('T')[1].slice(0, 5)}</span>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-3xl font-bold text-[var(--text-primary)] block leading-none">{sess.students}</span>
-                                            <span className="text-[10px] text-[var(--text-secondary)] uppercase font-bold">Present</span>
-                                        </div>
-                                    </div>
-                                </>
+                    {/* Tab 1: Active Classes Detailed Table */}
+                    {activeTab === 'classes' && (
+                        <div className="overflow-x-auto bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl shadow-sm">
+                            {sessions.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-20 text-[var(--text-secondary)] opacity-50">
+                                    <Activity size={48} className="mb-4" />
+                                    <p className="text-xl font-medium">No active classes right now.</p>
+                                    <p className="text-sm">Classes will appear here instantly when they start.</p>
+                                </div>
                             ) : (
-                                <>
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded text-sm">{sess.room}</span>
-                                            <span className="text-sm text-[var(--text-secondary)] font-medium">{sess.course}</span>
-                                        </div>
-                                        <div className="text-xs text-[var(--text-secondary)] flex items-center gap-3">
-                                            <span className="flex items-center gap-1"><Users size={12} /> {sess.lecturer}</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-right pl-4">
-                                        <div className="text-xl font-bold text-[var(--text-primary)]">{sess.students}</div>
-                                        {sess.last_activity ? (
-                                            <div className="text-[10px] text-green-600 font-bold justify-end flex">
-                                                {timeAgo(sess.last_activity)}
-                                            </div>
-                                        ) : <div className="text-[10px] text-gray-300">-</div>}
-                                    </div>
-                                </>
+                                <table className="min-w-full divide-y divide-[var(--border-color)]">
+                                    <thead className="bg-[var(--bg-primary)]">
+                                        <tr>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Room</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Course</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Lecturer</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Start Time</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Present</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Last Activity</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[var(--border-color)]">
+                                        {sessions.map((sess: any) => (
+                                            <tr 
+                                                key={sess.session_id} 
+                                                className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${
+                                                    flashingCards.has(sess.session_id) ? 'flash-green' : ''
+                                                }`}
+                                            >
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 font-bold rounded-lg text-xs tracking-wider">
+                                                        {sess.room}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm font-bold text-[var(--text-primary)]">{sess.course}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 flex items-center justify-center text-xs font-bold">
+                                                            {sess.lecturer.charAt(0)}
+                                                        </div>
+                                                        <span className="text-sm text-[var(--text-primary)] font-medium">{sess.lecturer}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm text-[var(--text-secondary)] flex items-center gap-1.5 font-mono">
+                                                        <Clock size={14} className="text-gray-400" />
+                                                        {sess.start_time.split('T')[1].slice(0, 5)}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-black text-[var(--text-primary)]">{sess.students}</span>
+                                                        <div className="w-16 bg-gray-150 dark:bg-gray-750 h-1.5 rounded-full overflow-hidden">
+                                                            <div 
+                                                                className="bg-[var(--primary-color)] h-full"
+                                                                style={{ width: `${Math.min((sess.students / 60) * 100, 100)}%` }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {sess.last_activity ? (
+                                                        <span className="text-xs font-bold text-green-600 bg-green-50 dark:bg-green-950/20 px-2 py-0.5 rounded-full">
+                                                            {timeAgo(sess.last_activity)}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="flex items-center gap-1.5 text-xs text-green-600 font-bold">
+                                                        <span className="h-2 w-2 rounded-full bg-green-500 animate-ping"></span>
+                                                        Live
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             )}
                         </div>
-                    ))
-                )}
-            </div>
+                    )}
+
+                    {/* Tab 2: Ongoing Bus Trips Detailed Table */}
+                    {activeTab === 'trips' && (
+                        <div className="overflow-x-auto bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl shadow-sm">
+                            {!campusStats?.fleet?.active_trips || campusStats.fleet.active_trips.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-20 text-[var(--text-secondary)] opacity-50">
+                                    <Bus size={48} className="mb-4" />
+                                    <p className="text-xl font-medium">No active trips right now.</p>
+                                    <p className="text-sm">Trips will appear here instantly when they are in transit.</p>
+                                </div>
+                            ) : (
+                                <table className="min-w-full divide-y divide-[var(--border-color)]">
+                                    <thead className="bg-[var(--bg-primary)]">
+                                        <tr>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Bus</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Route</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Purpose</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Driver</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Trip Lead</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Passengers</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[var(--border-color)]">
+                                        {campusStats.fleet.active_trips.map((trip: any) => (
+                                            <tr key={trip.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 font-bold rounded-lg text-xs">
+                                                        <Bus size={14} />
+                                                        {trip.vehicle_plate}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm font-bold text-[var(--text-primary)]">{trip.origin} → {trip.destination}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="text-sm text-[var(--text-secondary)] font-medium line-clamp-1 max-w-[200px]" title={trip.purpose}>
+                                                        {trip.purpose}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm font-bold text-[var(--text-primary)]">{trip.driver_name}</div>
+                                                    <div className="text-xs text-[var(--text-secondary)]">{trip.driver_contact}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm font-bold text-[var(--text-primary)]">{trip.trip_lead_name}</div>
+                                                    <div className="text-xs text-[var(--text-secondary)]">{trip.trip_lead_contact}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="text-sm font-black text-[var(--text-primary)]">{trip.passenger_count} present</span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="flex items-center gap-1.5 text-xs text-orange-600 font-bold">
+                                                        <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse"></span>
+                                                        In Transit
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Tab 3: Live Gate Access Logs Detailed Table */}
+                    {activeTab === 'gate-logs' && (
+                        <div className="overflow-x-auto bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl shadow-sm">
+                            {recentLogs.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-20 text-[var(--text-secondary)] opacity-50">
+                                    <Activity size={48} className="mb-4" />
+                                    <p className="text-xl font-medium">No recent gate activity.</p>
+                                    <p className="text-sm">Logs will appear here instantly when swipes occur.</p>
+                                </div>
+                            ) : (
+                                <table className="min-w-full divide-y divide-[var(--border-color)]">
+                                    <thead className="bg-[var(--bg-primary)]">
+                                        <tr>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Subject / Vehicle</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Gate Activity</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Time</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Alert Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[var(--border-color)]">
+                                        {recentLogs.map((log: any, idx: number) => (
+                                            <tr 
+                                                key={idx} 
+                                                className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${
+                                                    log.isAlert ? 'bg-red-50/50 dark:bg-red-950/10' : ''
+                                                }`}
+                                            >
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className={`p-1.5 rounded-lg ${log.status.includes('Vehicle') ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                            {log.status.includes('Vehicle') ? <Car size={16} /> : <User size={16} />}
+                                                        </div>
+                                                        <span className="text-sm font-bold text-[var(--text-primary)]">{log.user}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`text-sm font-semibold ${
+                                                        log.isAlert ? 'text-red-600' : 'text-[var(--text-primary)]'
+                                                    }`}>
+                                                        {log.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="text-sm text-[var(--text-secondary)] font-mono">{log.time}</div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {log.isAlert ? (
+                                                        <span className="px-2 py-0.5 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-xs font-bold rounded">
+                                                            Denied / Alert
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2 py-0.5 bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-400 text-xs font-bold rounded">
+                                                            Passed
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
