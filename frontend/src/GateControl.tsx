@@ -679,7 +679,7 @@ export default function GateControl() {
     const currentInsideToday = vehicleStats.current_inside + visitorStats.active_now + studentStats.active_now
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 animate-fade-in font-sans space-y-6">
+        <div className="w-full max-w-full overflow-x-hidden min-w-0 px-2 sm:px-4 md:px-6 lg:px-8 animate-fade-in font-sans space-y-6">
             <canvas ref={canvasRef} className="hidden" />
             <input 
                 type="file" 
@@ -1304,7 +1304,7 @@ export default function GateControl() {
                             <Search className="absolute left-3.5 top-3.5 text-slate-400" size={16} />
                         </div>
 
-                        <div className="flex-1 overflow-y-auto rounded-2xl border border-slate-50 dark:border-slate-800">
+                        <div className="flex-1 overflow-y-auto overflow-x-auto table-responsive rounded-2xl border border-slate-50 dark:border-slate-800">
                             <table className="w-full text-left text-xs">
                                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 sticky top-0 uppercase tracking-wider font-bold">
                                     <tr>
@@ -1354,7 +1354,7 @@ export default function GateControl() {
                             <p className="text-xs text-slate-400 font-bold uppercase">Comprehensive activity logs record</p>
                         </div>
 
-                        <div className="flex-1 overflow-x-auto overflow-y-auto rounded-2xl border border-slate-50 dark:border-slate-800">
+                        <div className="flex-1 overflow-x-auto overflow-y-auto table-responsive rounded-2xl border border-slate-50 dark:border-slate-800">
                             <table className="w-full text-left text-xs font-bold">
                                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 sticky top-0 uppercase tracking-wider font-bold">
                                     <tr>

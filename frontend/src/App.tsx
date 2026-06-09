@@ -1308,7 +1308,7 @@ function App() {
     }
 
     return (
-        <div className="min-h-screen flex bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300 font-sans">
+        <div className="min-h-screen flex bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300 font-sans overflow-x-hidden w-full max-w-full">
             {/* Security Check Modal */}
             {showSecurityCheck && <SecurityCheckModal onGrant={handleSecurityGrant} />}
 
@@ -1419,22 +1419,22 @@ function App() {
 
 
             {/* Main Content */}
-            <main className={`flex-1 p-2 sm:p-3 lg:p-4 pb-20 lg:pb-4 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
+            <main className={`flex-1 min-w-0 p-2 sm:p-3 lg:p-4 pb-20 lg:pb-4 transition-all duration-300 overflow-x-hidden w-full ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
                 <Suspense fallback={<PageLoader />}>
                     {/* Top Header - 2 Row Layout */}
-                    <header className="flex flex-col gap-2 mb-4 pt-1 pb-1">
+                    <header className="flex flex-col gap-2 mb-4 pt-1 pb-1 w-full min-w-0 overflow-hidden">
                         {/* Row 1: Primary Navigation */}
-                        <div className="flex justify-between items-center w-full">
-                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className="flex justify-between items-center w-full min-w-0 gap-2">
+                            <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                                 <button
                                     onClick={() => setSidebarOpen(true)}
-                                    className="lg:hidden p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--primary-color)] active:scale-95 transition-transform"
+                                    className="lg:hidden p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--primary-color)] active:scale-95 transition-transform shrink-0"
                                 >
-                                    <Briefcase size={20} className="rotate-90" />
+                                    <Menu size={20} />
                                 </button>
 
-                                <h2 className="text-xl sm:text-2xl lg:text-3xl font-black capitalize tracking-tight truncate shrink-0">
-                                    {activeTab.replace('-', ' ')}
+                                <h2 className="text-lg sm:text-xl lg:text-2xl font-black capitalize tracking-tight truncate min-w-0 flex-1">
+                                    {activeTab.replace(/-/g, ' ')}
                                 </h2>
 
                                 {/* Admin Top Bar - Row 1 Inline */}

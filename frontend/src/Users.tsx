@@ -365,7 +365,7 @@ export default function Users() {
     }
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-8 animate-fade-in w-full max-w-full overflow-x-hidden min-w-0">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -525,7 +525,7 @@ export default function Users() {
             {/* Content Area */}
             {viewMode === 'list' ? (
                 <div className="glass-card overflow-hidden">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto table-responsive">
                         <table className="w-full">
                             <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                                 <tr>

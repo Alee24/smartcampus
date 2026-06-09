@@ -402,7 +402,7 @@ export default function Reports() {
     if (!summary) return <div className="p-8 text-center text-[var(--text-secondary)]">Loading reports...</div>
 
     return (
-        <div className="animate-fade-in space-y-6 max-w-7xl mx-auto">
+        <div className="animate-fade-in space-y-6 w-full max-w-full overflow-x-hidden min-w-0 px-2 sm:px-4 md:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold">System Reports & Analytics</h2>
@@ -964,7 +964,7 @@ export default function Reports() {
                                     {hubSearch && ` • Filtered`}
                                 </p>
                             </div>
-                            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                            <div className="overflow-x-auto max-h-[600px] overflow-y-auto table-responsive">
                                 {/* INCIDENTS TABLE */}
                                 {hubCategory === 'incidents' && (() => {
                                     const rows = hubData.items.filter((r: any) =>

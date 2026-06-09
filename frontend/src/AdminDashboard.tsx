@@ -71,7 +71,7 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
     const COLORS = ['#6366f1', '#ec4899', '#14b8a6', '#f59e0b', '#8b5cf6'];
 
     return (
-        <div className="animate-fade-in space-y-6">
+        <div className="animate-fade-in space-y-6 w-full max-w-full overflow-x-hidden min-w-0">
             {/* Header & Quick Actions */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
                 <div>
@@ -230,7 +230,7 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* Left Column: Charts */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-2 space-y-6 min-w-0 overflow-hidden">
                     {/* Weekly Traffic Chart with toggle */}
                     <div className="glass-card p-6">
                         <div className="flex justify-between items-center mb-6">
