@@ -486,6 +486,43 @@ export default function BulkUpload() {
         }
     }
 
+    const handleLoadDummyData = async () => {
+        const confirm = await showConfirm({
+            title: "Load Demo Dummy Data",
+            message: "This will seed comprehensive dummy data across all system tables (students, lecturers, courses, classrooms, timetable slots, attendance, vehicles, lost & found, notice board, and fleet). Existing records will not be deleted but duplicate values will be updated.\n\nAre you sure you want to load the dummy data?",
+            confirmText: "Yes, Load Dummy Data",
+            cancelText: "Cancel",
+            isDanger: false
+        })
+        if (!confirm) return
+
+        setLoading(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/admin/database/seed-dummy', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+
+            const data = await res.json()
+            if (res.ok) {
+                showNotification(data.message || "Success: Demo dummy data loaded.", "success")
+                fetchStats()
+            } else {
+                showNotification("Error: " + (data.detail || data.message || "Failed to load dummy data"), "error")
+            }
+        } catch (e: any) {
+            console.error(e)
+            showNotification("Network error: " + (e.message || "Could not connect to the server"), "error")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+
     return (
         <div className="animate-fade-in max-w-6xl mx-auto space-y-8 pb-20">
             {/* Header */}
@@ -704,6 +741,24 @@ export default function BulkUpload() {
                             className="w-full py-3 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2"
                         >
                             <Download size={16} /> Get Step {currentStep + 1} Template
+                        </button>
+                    </div>
+
+                    {/* Demo Setup */}
+                    <div className="glass-card p-6 rounded-3xl bg-indigo-50 border border-indigo-100">
+                        <h3 className="font-bold text-indigo-700 mb-2 flex items-center gap-2">
+                            <Play size={16} /> Demo Setup
+                        </h3>
+                        <p className="text-xs text-indigo-600/80 mb-4">
+                            Want to test the system with full functionality? This will seed mock users, courses, classrooms, timetable slots, attendance, assets, and vehicle logs.
+                        </p>
+                        <button
+                            onClick={handleLoadDummyData}
+                            disabled={loading}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2"
+                        >
+                            {loading ? <Loader2 size={16} className="animate-spin" /> : <Layers size={16} />}
+                            Load Dummy Data
                         </button>
                     </div>
 

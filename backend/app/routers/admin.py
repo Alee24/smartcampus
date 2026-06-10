@@ -2002,3 +2002,681 @@ async def sync_dynamics_records(
         "warning": f"Live connection failed ({connection_error}). Fell back to simulation mode." if connection_error else None
     }
 
+
+@router.post("/database/seed-dummy")
+async def seed_dummy_database(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(ensure_admin)
+):
+    """
+    Seeds the database with rich mock data for all tables and fields
+    so that when in demo mode, the user can see every functionality in detail.
+    """
+    try:
+        import random
+        from datetime import datetime, date, time, timedelta
+        from sqlmodel import select
+        from app.auth import get_password_hash
+        from sqlalchemy import text as sa_text
+        from app.utils.timezone import get_eat_time
+
+        # Import all models inside function to avoid circular/top-level issues
+        from app.models import (
+            Role, User, Gate, EntryLog, Vehicle, VehicleLog, Classroom, Course,
+            StudentCourseRegistration, TimetableSlot, ClassSession, AttendanceRecord,
+            ScanLog, Visitor, Event, EventVisitor, NoticeBoardItem, Asset, AssetLog,
+            IncidentReport, LostAndFoundItem, FleetTrip, FleetPassengerManifest,
+            FleetFuelLog, FleetGPSLog, FleetMaintenanceLog, SystemConfig, CheatingFlag
+        )
+
+        # 1. Roles seeding
+        roles = {}
+        role_names = [
+            "Student", "Lecturer", "Security", "Visitor", "SuperAdmin", "Admin", 
+            "Driver", "FleetManager", "Stores", "Guest", "Staff", "Security Lead", "Management"
+        ]
+        for r_name in role_names:
+            res = await session.exec(select(Role).where(Role.name == r_name))
+            role = res.first()
+            if not role:
+                role = Role(name=r_name, description=f"{r_name} Role")
+                session.add(role)
+                await session.commit()
+                await session.refresh(role)
+            roles[r_name] = role
+
+        # 2. Gates seeding
+        gates = []
+        for g_name in ["Main Gate", "Back Gate", "Side Walk"]:
+            res = await session.exec(select(Gate).where(Gate.name == g_name))
+            gate = res.first()
+            if not gate:
+                gate = Gate(name=g_name, location="Campus Perimeter", is_active=True)
+                session.add(gate)
+                await session.commit()
+                await session.refresh(gate)
+            gates.append(gate)
+
+        # 3. Key users seeding
+        key_users = [
+            {"email": "mettoalex@gmail.com", "adm": "ADMIN001", "name": "Alex Metto", "role": "SuperAdmin", "school": "Administration"},
+            {"email": "admin@test.com", "adm": "ADM001", "name": "System Administrator", "role": "Admin", "school": "IT Operations"},
+            {"email": "lecturer@test.com", "adm": "LEC001", "name": "Dr. Jane Smith", "role": "Lecturer", "school": "Science"},
+            {"email": "guard@test.com", "adm": "SEC001", "name": "Officer Bob Jones", "role": "Security", "school": "Security"},
+            {"email": "seclead@test.com", "adm": "SEC-LEAD-01", "name": "Chief Security Officer", "role": "Security Lead", "school": "Security Department"},
+            {"email": "student@test.com", "adm": "STD001", "name": "Alice Student", "role": "Student", "school": "Engineering"},
+            {"email": "parent@test.com", "adm": "PAR001", "name": "Robert Parent", "role": "Visitor", "school": "Visitor Center"},
+            {"email": "management@test.com", "adm": "MGT001", "name": "Vice Chancellor Office", "role": "Management", "school": "Administration Office"},
+            {"email": "staff@test.com", "adm": "STF001", "name": "Prof. Charles Xavier", "role": "Staff", "school": "Humanities"},
+            {"email": "guest@test.com", "adm": "GST001", "name": "John Visitor Doe", "role": "Guest", "school": "Visitor Center"},
+            {"email": "stores@test.com", "adm": "STR001", "name": "Inventory Stores Head", "role": "Stores", "school": "Procurement & Stores"},
+            {"email": "kamau@test.com", "adm": "DRV001", "name": "John Kamau", "role": "Driver", "school": "Logistics & Transport", "phone": "0711223344"},
+            {"email": "mwangi@test.com", "adm": "DRV002", "name": "Jane Mwangi", "role": "Driver", "school": "Logistics & Transport", "phone": "0722334455"},
+            {"email": "ochieng@test.com", "adm": "DRV003", "name": "David Ochieng", "role": "Driver", "school": "Logistics & Transport", "phone": "0733445566"},
+        ]
+        user_map = {}
+        for ku in key_users:
+            existing = (await session.exec(select(User).where((User.email == ku["email"]) | (User.admission_number == ku["adm"])))).first()
+            role = roles.get(ku["role"], roles["Student"])
+            if not existing:
+                user = User(
+                    admission_number=ku["adm"],
+                    full_name=ku["name"],
+                    email=ku["email"],
+                    hashed_password=get_password_hash("Digital2025" if ku["role"] in ["SuperAdmin", "Admin"] else "Pass123!"),
+                    role_id=role.id,
+                    school=ku["school"],
+                    status="active",
+                    phone_number=ku.get("phone"),
+                    expiry_date=date.today() + timedelta(days=365)
+                )
+                session.add(user)
+                await session.commit()
+                await session.refresh(user)
+                user_map[ku["email"]] = user
+            else:
+                existing.role_id = role.id
+                existing.status = "active"
+                if ku.get("phone"):
+                    existing.phone_number = ku["phone"]
+                session.add(existing)
+                await session.commit()
+                await session.refresh(existing)
+                user_map[ku["email"]] = existing
+
+        # 4. Random Students seeding
+        students = []
+        first_names = ["James", "Mary", "John", "Patricia", "Robert", "Jennifer", "Michael", "Linda", "William", "Elizabeth", "David", "Barbara", "Richard", "Susan", "Joseph"]
+        last_names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Garcia", "Rodriguez", "Wilson", "Martinez", "Anderson", "Taylor", "Thomas"]
+        schools = ["Engineering", "Science", "Arts", "Business", "Law"]
+        programs = {
+            "Engineering": ["B.Sc Electrical Engineering", "B.Sc Mechanical Engineering", "B.Sc Civil Engineering"],
+            "Science": ["B.Sc Computer Science", "B.Sc Mathematics", "B.Sc Biology"],
+            "Arts": ["B.A Fine Arts", "B.A Literature", "B.A History"],
+            "Business": ["Bachelor of Commerce", "B.Sc Economics", "B.Sc Finance"],
+            "Law": ["Bachelor of Laws (LLB)", "B.A Criminology"]
+        }
+        for i in range(1, 31):
+            adm = f"STD{3000+i}"
+            existing = (await session.exec(select(User).where(User.admission_number == adm))).first()
+            if not existing:
+                fname = random.choice(first_names)
+                lname = random.choice(last_names)
+                full_name = f"{fname} {lname}"
+                sch = random.choice(schools)
+                prog = random.choice(programs[sch])
+                user = User(
+                    admission_number=adm,
+                    first_name=fname,
+                    last_name=lname,
+                    full_name=full_name,
+                    email=f"{fname.lower()}.{lname.lower()}{i}@student.com",
+                    school=sch,
+                    program=prog,
+                    hashed_password=get_password_hash("Student123"),
+                    role_id=roles["Student"].id,
+                    status="active",
+                    gender=random.choice(["male", "female"]),
+                    phone_number=f"+2547{random.randint(10000000, 99999999)}",
+                    expiry_date=date.today() + timedelta(days=365)
+                )
+                session.add(user)
+                await session.commit()
+                await session.refresh(user)
+                students.append(user)
+            else:
+                students.append(existing)
+
+        # 5. Classrooms seeding
+        classrooms = []
+        rooms_data = [
+            {"room_code": "LH1", "room_name": "Lecture Hall 1", "building": "Main Building", "floor": "Ground Floor", "capacity": 150},
+            {"room_code": "LH2", "room_name": "Lecture Hall 2", "building": "Main Building", "floor": "First Floor", "capacity": 120},
+            {"room_code": "LAB1", "room_name": "Computer Lab 1", "building": "ICT Block", "floor": "Ground Floor", "capacity": 40, "room_type": "lab"},
+            {"room_code": "LAB2", "room_name": "Science Lab", "building": "Science Block", "floor": "Second Floor", "capacity": 30, "room_type": "lab"},
+            {"room_code": "ROOM101", "room_name": "Tutorial Room 101", "building": "Academic Block", "floor": "First Floor", "capacity": 25, "room_type": "seminar_room"}
+        ]
+        for rd in rooms_data:
+            existing = (await session.exec(select(Classroom).where(Classroom.room_code == rd["room_code"]))).first()
+            if not existing:
+                cl = Classroom(
+                    room_code=rd["room_code"],
+                    room_name=rd["room_name"],
+                    building=rd["building"],
+                    floor=rd["floor"],
+                    capacity=rd["capacity"],
+                    room_type=rd.get("room_type", "lecture_hall"),
+                    status="available"
+                )
+                session.add(cl)
+                await session.commit()
+                await session.refresh(cl)
+                classrooms.append(cl)
+            else:
+                classrooms.append(existing)
+
+        # 6. Courses seeding
+        courses = []
+        courses_data = [
+            {"code": "CS101", "name": "Introduction to Computer Science", "dept": "CS", "credits": 3, "lec": "lecturer@test.com", "room": "LH1"},
+            {"code": "CS102", "name": "Data Structures & Algorithms", "dept": "CS", "credits": 4, "lec": "lecturer@test.com", "room": "LAB1"},
+            {"code": "MATH101", "name": "Calculus I", "dept": "Mathematics", "credits": 3, "lec": "staff@test.com", "room": "LH2"},
+            {"code": "EE201", "name": "Basic Electronics", "dept": "Engineering", "credits": 3, "lec": "lecturer@test.com", "room": "LAB2"},
+            {"code": "BIO101", "name": "General Biology", "dept": "Biology", "credits": 3, "lec": "staff@test.com", "room": "ROOM101"}
+        ]
+        for cd in courses_data:
+            existing = (await session.exec(select(Course).where(Course.course_code == cd["code"]))).first()
+            lec_user = user_map.get(cd["lec"])
+            rm = next((c for c in classrooms if c.room_code == cd["room"]), None)
+            if not existing:
+                course = Course(
+                    course_code=cd["code"],
+                    course_name=cd["name"],
+                    department=cd["dept"],
+                    credits=cd["credits"],
+                    semester="Semester 1 2026",
+                    classroom_id=rm.id if rm else None,
+                    lecturer_id=lec_user.id if lec_user else None
+                )
+                session.add(course)
+                await session.commit()
+                await session.refresh(course)
+                courses.append(course)
+            else:
+                if lec_user:
+                    existing.lecturer_id = lec_user.id
+                if rm:
+                    existing.classroom_id = rm.id
+                session.add(existing)
+                await session.commit()
+                await session.refresh(existing)
+                courses.append(existing)
+
+        # 7. Student Registrations
+        for student in students + [user_map["student@test.com"]]:
+            registered_courses = random.sample(courses, min(3, len(courses)))
+            for course in registered_courses:
+                existing_reg = (await session.exec(select(StudentCourseRegistration).where(
+                    (StudentCourseRegistration.student_id == student.id) &
+                    (StudentCourseRegistration.course_id == course.id)
+                ))).first()
+                if not existing_reg:
+                    reg = StudentCourseRegistration(
+                        student_id=student.id,
+                        course_id=course.id,
+                        semester="Semester 1 2026"
+                    )
+                    session.add(reg)
+        await session.commit()
+
+        # 8. TimetableSlots seeding
+        slots = []
+        timetable_slots_data = [
+            {"code": "CS101", "day": 0, "start": time(8, 30), "end": time(11, 30)},
+            {"code": "CS102", "day": 1, "start": time(14, 0), "end": time(17, 0)},
+            {"code": "MATH101", "day": 2, "start": time(11, 30), "end": time(13, 30)},
+            {"code": "EE201", "day": 3, "start": time(9, 0), "end": time(12, 0)},
+            {"code": "BIO101", "day": 4, "start": time(14, 0), "end": time(16, 0)}
+        ]
+        for tsd in timetable_slots_data:
+            course = next((c for c in courses if c.course_code == tsd["code"]), None)
+            if not course: continue
+            existing = (await session.exec(select(TimetableSlot).where(
+                (TimetableSlot.course_id == course.id) &
+                (TimetableSlot.day_of_week == tsd["day"])
+            ))).first()
+            if not existing:
+                slot = TimetableSlot(
+                    course_id=course.id,
+                    classroom_id=course.classroom_id,
+                    lecturer_id=course.lecturer_id,
+                    day_of_week=tsd["day"],
+                    start_time=tsd["start"],
+                    end_time=tsd["end"],
+                    is_active=True
+                )
+                session.add(slot)
+                await session.commit()
+                await session.refresh(slot)
+                slots.append(slot)
+            else:
+                slots.append(existing)
+
+        # 9. ClassSessions & Attendance seeding
+        for slot in slots:
+            today = date.today()
+            for d_offset in range(1, 8):
+                past_date = today - timedelta(days=d_offset)
+                if past_date.weekday() == slot.day_of_week:
+                    existing_sess = (await session.exec(select(ClassSession).where(
+                        (ClassSession.course_id == slot.course_id) &
+                        (ClassSession.session_date == past_date)
+                    ))).first()
+                    if not existing_sess:
+                        sess = ClassSession(
+                            course_id=slot.course_id,
+                            timetable_slot_id=slot.id,
+                            session_date=past_date,
+                            start_time=slot.start_time,
+                            end_time=slot.end_time,
+                            classroom_id=slot.classroom_id,
+                            lecturer_id=slot.lecturer_id,
+                            status="completed",
+                            active=False
+                        )
+                        session.add(sess)
+                        await session.commit()
+                        await session.refresh(sess)
+                        
+                        reg_stmt = select(StudentCourseRegistration).where(StudentCourseRegistration.course_id == slot.course_id)
+                        course_regs = (await session.exec(reg_stmt)).all()
+                        for reg in course_regs:
+                            rand = random.random()
+                            status = "present"
+                            if rand < 0.05:
+                                status = "absent"
+                            elif rand < 0.10:
+                                status = "flagged"
+                                
+                            if status != "absent":
+                                scan_dt = datetime.combine(past_date, slot.start_time) + timedelta(minutes=random.randint(0, 25))
+                                att = AttendanceRecord(
+                                    session_id=sess.id,
+                                    student_id=reg.student_id,
+                                    scan_time=scan_dt,
+                                    status=status,
+                                    connection_type=random.choice(["wifi", "cellular", None]),
+                                    connection_name="RU-WIFI"
+                                )
+                                session.add(att)
+                                await session.commit()
+                                await session.refresh(att)
+                                
+                                if status == "flagged":
+                                    flag = CheatingFlag(
+                                        attendance_id=att.id,
+                                        reason=random.choice(["Face match similarity below threshold (0.52)", "IP matches other student session", "Scan coordinate out of bounds"]),
+                                        similarity_score=round(random.uniform(0.3, 0.58), 2)
+                                    )
+                                    session.add(flag)
+                                    await session.commit()
+
+        # 10. Notice Board Items seeding
+        nb_count = (await session.exec(select(NoticeBoardItem))).all()
+        if len(nb_count) < 3:
+            notices = [
+                {"title": "Upcoming Campus Tech Hackathon 2026", "content": "We are excited to announce the annual Campus Tech Hackathon starting on June 20th. Registrations are open on the events portal. Fantastic cash prizes and internship opportunities await the winners!", "author": "admin@test.com", "role": "Admin"},
+                {"title": "Important Timetable Update", "content": "Please note that MATH101 (Calculus I) has been moved from Lecture Hall 2 to Lecture Hall 1 for the remainder of this semester. The slot timing remains unchanged.", "author": "lecturer@test.com", "role": "Lecturer"},
+                {"title": "Wi-Fi Upgrades and Short Disruption", "content": "ICT department will be conducting network maintenance this Saturday from 8:00 AM to 12:00 PM. Expect brief disruptions to the campus Wi-Fi network during this period.", "author": "admin@test.com", "role": "Admin"}
+            ]
+            for notice in notices:
+                auth_user = user_map.get(notice["author"])
+                if auth_user:
+                    ni = NoticeBoardItem(
+                        title=notice["title"],
+                        content=notice["content"],
+                        author_id=auth_user.id,
+                        author_name=auth_user.full_name,
+                        author_role=notice["role"],
+                        created_at=datetime.now() - timedelta(days=random.randint(1, 5))
+                    )
+                    session.add(ni)
+            await session.commit()
+
+        # 11. Incident Reports & Lost & Found seeding
+        inc_count = (await session.exec(select(IncidentReport))).all()
+        if len(inc_count) < 2:
+            incidents = [
+                {"title": "Lost Laptop in Library", "description": "Student reported losing a silver MacBook Air with a blue sticker in the Library reading area on 2nd Floor.", "location": "Library", "severity": "medium", "status": "under_investigation"},
+                {"title": "Minor Car Scrape", "description": "A minor bumper scrape occurred in the main parking lot between KCD 202B and a private vehicle. Settled amicably by security team.", "location": "Main Parking Lot", "severity": "low", "status": "resolved"}
+            ]
+            for inc in incidents:
+                student = user_map["student@test.com"]
+                ir = IncidentReport(
+                    title=inc["title"],
+                    description=inc["description"],
+                    reporter_id=student.id,
+                    status=inc["status"],
+                    location=inc["location"],
+                    severity=inc["severity"],
+                    incident_date=datetime.now() - timedelta(days=random.randint(1, 3))
+                )
+                session.add(ir)
+            await session.commit()
+
+        lf_count = (await session.exec(select(LostAndFoundItem))).all()
+        if len(lf_count) < 2:
+            lf_items = [
+                {"item_name": "Scientific Calculator (Casio fx-991EX)", "description": "Found on the desk of LH1. It has a blue name sticker 'John' on the back.", "location": "Lecture Hall 1", "status": "found"},
+                {"item_name": "Water Bottle (Hydro Flask)", "description": "Black insulated flask left in the computer lab.", "location": "ICT Block LAB1", "status": "found"},
+                {"item_name": "House Keys", "description": "A bunch of 3 keys with a wooden keychain found near Main Gate.", "location": "Main Gate walk-path", "status": "claimed"}
+            ]
+            for lf in lf_items:
+                guard = user_map["guard@test.com"]
+                lfi = LostAndFoundItem(
+                    item_name=lf["item_name"],
+                    description=lf["description"],
+                    location_found=lf["location"],
+                    status=lf["status"],
+                    handler_id=guard.id,
+                    date_found=date.today() - timedelta(days=random.randint(1, 5)),
+                    claimant_name="Alice Student" if lf["status"] == "claimed" else None,
+                    claimant_id=user_map["student@test.com"].id if lf["status"] == "claimed" else None
+                )
+                session.add(lfi)
+            await session.commit()
+
+        # 12. Assets & AssetLogs seeding
+        ast_count = (await session.exec(select(Asset))).all()
+        if len(ast_count) < 2:
+            assets_data = [
+                {"tag": "AST-RU-0012", "name": "Epson Projector Pro", "cat": "electronics", "loc": "LH1", "cost": 750.0},
+                {"tag": "AST-RU-0421", "name": "Dell Latitude 5420 Laptop", "cat": "electronics", "loc": "ICT Office", "cost": 1200.0},
+                {"tag": "AST-RU-0883", "name": "Ergonomic Office Chair", "cat": "furniture", "loc": "Staff Lounge", "cost": 150.0}
+            ]
+            for ad in assets_data:
+                guard = user_map["guard@test.com"]
+                asset = Asset(
+                    tag_number=ad["tag"],
+                    name=ad["name"],
+                    category=ad["cat"],
+                    location=ad["loc"],
+                    cost=ad["cost"],
+                    status="available",
+                    created_at=datetime.now() - timedelta(days=60)
+                )
+                session.add(asset)
+                await session.commit()
+                await session.refresh(asset)
+                
+                al = AssetLog(
+                    asset_id=asset.id,
+                    action="create",
+                    handled_by_id=guard.id,
+                    notes="Initial asset registration during audit."
+                )
+                session.add(al)
+            await session.commit()
+
+        # 13. Events & EventVisitors seeding
+        ev_count = (await session.exec(select(Event))).all()
+        if len(ev_count) < 2:
+            events_data = [
+                {"name": "Career Fair & Expo 2026", "host": "Careers Department", "sch": "Business", "desc": "Annual networking event connecting students with top industry partners.", "visitors": "100+", "type": "Fair"},
+                {"name": "Tech Expo and Hackathon", "host": "Computing School", "sch": "Science", "desc": "Showcase of engineering and programming projects by senior students.", "visitors": "40-80", "type": "Exhibition"}
+            ]
+            for ed in events_data:
+                evt = Event(
+                    name=ed["name"],
+                    host=ed["host"],
+                    school=ed["sch"],
+                    description=ed["desc"],
+                    expected_visitors=ed["visitors"],
+                    event_type=ed["type"],
+                    event_date=date.today() + timedelta(days=random.randint(5, 10)),
+                    qr_code_token=f"EVT_{random.randint(100000, 999999)}",
+                    is_active=True
+                )
+                session.add(evt)
+                await session.commit()
+                await session.refresh(evt)
+                
+                visitors_data = [
+                    {"name": "Mark Zuckerberg", "id_no": "998877", "phone": "0700111111", "email": "mark@meta.com", "status": "checked_in"},
+                    {"name": "Elon Musk", "id_no": "112233", "phone": "0700222222", "email": "elon@spacex.com", "status": "pre_registered"}
+                ]
+                for vd in visitors_data:
+                    ev_vis = EventVisitor(
+                        event_id=evt.id,
+                        visitor_name=vd["name"],
+                        visitor_identifier=vd["id_no"],
+                        phone_number=vd["phone"],
+                        email=vd["email"],
+                        status=vd["status"],
+                        entry_time=datetime.now() - timedelta(hours=random.randint(1, 3))
+                    )
+                    session.add(ev_vis)
+            await session.commit()
+
+        # 14. Vehicles & VehicleLogs seeding
+        vehicles_data = [
+            {"plate": "KCD 202B", "make": "Isuzu", "model": "FVR (Bus)", "type": "bus", "fuel": "diesel", "cap": 200.0, "seats": 62, "is_fleet": True, "odo": 15200.0, "driver": "mwangi@test.com"},
+            {"plate": "KCB 101A", "make": "Toyota", "model": "Hiace (Van)", "type": "van", "fuel": "diesel", "cap": 70.0, "seats": 14, "is_fleet": True, "odo": 48300.0, "driver": "kamau@test.com"},
+            {"plate": "KDD 555Y", "make": "Nissan", "model": "X-Trail", "type": "utility", "fuel": "petrol", "cap": 60.0, "seats": 5, "is_fleet": True, "odo": 12000.0, "driver": "ochieng@test.com"},
+            {"plate": "KCA 777Z", "make": "Subaru", "model": "Forester", "type": "utility", "fuel": "petrol", "cap": 60.0, "seats": 5, "is_fleet": False, "odo": 95000.0, "owner": "student@test.com"},
+            {"plate": "KDA 888W", "make": "Toyota", "model": "Fielder", "type": "utility", "fuel": "petrol", "cap": 50.0, "seats": 5, "is_fleet": False, "odo": 140000.0, "owner": "lecturer@test.com"},
+        ]
+        veh_instances = []
+        for vd in vehicles_data:
+            existing = (await session.exec(select(Vehicle).where(Vehicle.plate_number == vd["plate"]))).first()
+            driver_user = user_map.get(vd.get("driver", ""))
+            owner_user = user_map.get(vd.get("owner", ""))
+            if not existing:
+                v = Vehicle(
+                    plate_number=vd["plate"],
+                    make=vd["make"],
+                    model=vd["model"],
+                    color=random.choice(["White", "Silver", "Black", "Blue"]),
+                    is_fleet=vd["is_fleet"],
+                    vehicle_type=vd["type"],
+                    fuel_type=vd["fuel"],
+                    fuel_capacity=vd["cap"],
+                    seating_capacity=vd["seats"],
+                    current_odometer=vd["odo"],
+                    status="active",
+                    year=2024 if vd["is_fleet"] else 2018,
+                    driver_name=driver_user.full_name if driver_user else None,
+                    driver_contact=driver_user.phone_number if driver_user else None,
+                    owner_id=owner_user.id if owner_user else None
+                )
+                session.add(v)
+                await session.commit()
+                await session.refresh(v)
+                veh_instances.append(v)
+            else:
+                if driver_user:
+                    existing.driver_name = driver_user.full_name
+                    existing.driver_contact = driver_user.phone_number
+                if owner_user:
+                    existing.owner_id = owner_user.id
+                session.add(existing)
+                await session.commit()
+                await session.refresh(existing)
+                veh_instances.append(existing)
+
+        # Vehicle Logs
+        vl_count = (await session.exec(select(VehicleLog))).all()
+        if len(vl_count) < 5:
+            for v in veh_instances:
+                vlog = VehicleLog(
+                    vehicle_id=v.id,
+                    gate_id=gates[0].id,
+                    entry_time=datetime.now() - timedelta(hours=random.randint(1, 5)),
+                    exit_time=None if random.random() > 0.4 else datetime.now(),
+                    guard_id=user_map["guard@test.com"].id,
+                    purpose="Official Duty" if v.is_fleet else "Commute",
+                    destination="Campus Parking"
+                )
+                session.add(vlog)
+            await session.commit()
+
+        # 15. Fleet Trips, Fuel, GPS, Maintenance logs
+        trip_count = (await session.exec(select(FleetTrip))).all()
+        if len(trip_count) < 2:
+            bus = next((v for v in veh_instances if v.plate_number == "KCD 202B"), None)
+            van = next((v for v in veh_instances if v.plate_number == "KCB 101A"), None)
+            
+            if bus:
+                dr = user_map["mwangi@test.com"]
+                t1 = FleetTrip(
+                    vehicle_id=bus.id,
+                    driver_id=dr.id,
+                    purpose="Academic Field Trip",
+                    origin="Main Campus",
+                    destination="Nairobi National Park",
+                    scheduled_departure=datetime.now() - timedelta(days=1, hours=8),
+                    actual_departure=datetime.now() - timedelta(days=1, hours=7, minutes=50),
+                    actual_arrival=datetime.now() - timedelta(days=1, hours=3),
+                    start_odometer=bus.current_odometer - 150,
+                    end_odometer=bus.current_odometer - 50,
+                    status="completed",
+                    trip_lead_name="Dr. Jane Smith",
+                    trip_lead_contact="0712345678"
+                )
+                session.add(t1)
+                await session.commit()
+                await session.refresh(t1)
+                
+                fl = FleetFuelLog(
+                    vehicle_id=bus.id,
+                    driver_id=dr.id,
+                    amount_liters=60.0,
+                    cost=10500.0,
+                    station_name="Shell Limuru Road",
+                    odometer_reading=bus.current_odometer - 150,
+                    timestamp=datetime.now() - timedelta(days=1, hours=8)
+                )
+                session.add(fl)
+                
+            if van:
+                dr2 = user_map["kamau@test.com"]
+                t2 = FleetTrip(
+                    vehicle_id=van.id,
+                    driver_id=dr2.id,
+                    purpose="Inter-Campus Shuttle",
+                    origin="Main Campus",
+                    destination="Town Campus",
+                    scheduled_departure=datetime.now() - timedelta(hours=1),
+                    actual_departure=datetime.now() - timedelta(minutes=50),
+                    start_odometer=van.current_odometer - 10,
+                    status="ongoing",
+                    trip_lead_name="Officer Bob Jones",
+                    trip_lead_contact="0787654321"
+                )
+                session.add(t2)
+                await session.commit()
+                await session.refresh(t2)
+                
+                gps = FleetGPSLog(
+                    vehicle_id=van.id,
+                    latitude=-1.3015,
+                    longitude=36.8244,
+                    speed=35.5,
+                    heading=90.0,
+                    ignition_status=True,
+                    timestamp=datetime.now()
+                )
+                session.add(gps)
+                
+            if bus:
+                maint = FleetMaintenanceLog(
+                    vehicle_id=bus.id,
+                    service_type="regular",
+                    description="Routine 15,000km service - engine oil change, air filter replacement, brake pad checks.",
+                    cost=15000.0,
+                    odometer_reading=15000.0,
+                    service_date=date.today() - timedelta(days=15),
+                    next_service_due_date=date.today() + timedelta(days=180),
+                    next_service_due_odometer=20000.0,
+                    performed_by="Associated Motors Ltd"
+                )
+                session.add(maint)
+            await session.commit()
+
+        # 16. Scan Logs & Entry Logs (Gate scans) for Stats
+        el_count = (await session.exec(select(EntryLog))).all()
+        if len(el_count) < 30:
+            guard = user_map["guard@test.com"]
+            for day_idx in range(14):
+                day_dt = datetime.now() - timedelta(days=day_idx)
+                for _ in range(random.randint(5, 8)):
+                    user = random.choice(students + [user_map["student@test.com"], user_map["lecturer@test.com"]])
+                    gate = random.choice(gates)
+                    entry_hr = random.randint(7, 18)
+                    entry_time = day_dt.replace(hour=entry_hr, minute=random.randint(0, 59), second=0)
+                    exit_time = entry_time + timedelta(hours=random.randint(1, 8))
+                    
+                    method = random.choice(["qr", "face", "manual"])
+                    status = "allowed" if random.random() > 0.04 else "rejected"
+                    
+                    log = EntryLog(
+                        user_id=user.id,
+                        gate_id=gate.id,
+                        entry_time=entry_time,
+                        exit_time=exit_time if status == "allowed" else None,
+                        method=method,
+                        status=status,
+                        guard_id=guard.id
+                    )
+                    session.add(log)
+            await session.commit()
+            
+        sl_count = (await session.exec(select(ScanLog))).all()
+        if len(sl_count) < 15:
+            for day_idx in range(7):
+                day_dt = datetime.now() - timedelta(days=day_idx)
+                for _ in range(random.randint(3, 5)):
+                    user = random.choice(students + [user_map["student@test.com"]])
+                    room = random.choice(classrooms)
+                    scan_time = day_dt.replace(hour=random.randint(8, 16), minute=random.randint(0, 59))
+                    
+                    sl = ScanLog(
+                        student_id=user.id,
+                        room_code=room.room_code,
+                        is_successful=random.random() > 0.05,
+                        status_message="Allowed" if random.random() > 0.05 else "No Class Scheduled",
+                        timestamp=scan_time
+                    )
+                    session.add(sl)
+            await session.commit()
+
+        # 17. System Configuration seeding
+        for key, val, cat in [("demo_mode", "true", "general"), ("enable_geofencing", "false", "general")]:
+            existing_cfg = (await session.exec(select(SystemConfig).where(SystemConfig.key == key))).first()
+            if existing_cfg:
+                existing_cfg.value = val
+                session.add(existing_cfg)
+            else:
+                cfg = SystemConfig(key=key, value=val, category=cat)
+                session.add(cfg)
+        await session.commit()
+
+        await log_action(
+            session=session,
+            action_type="seed_dummy_database",
+            user=admin,
+            table_name="system_configs",
+            description="Seeded database with rich mock data for all tables",
+            new_values={"action": "seed_dummy"},
+            request=request
+        )
+
+        return {"status": "success", "message": "Dummy data seeded successfully across all tables."}
+    except Exception as e:
+        await session.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Database seeding failed: {str(e)}")
+
+

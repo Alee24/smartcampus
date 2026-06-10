@@ -3,7 +3,7 @@ import {
     History, Search, Filter, Calendar, 
     User as UserIcon, Activity, ArrowRight,
     CheckCircle, AlertCircle, Trash2, Edit, LogIn, LogOut, Plus, Info, X,
-    Database, FileText, AlertTriangle
+    Database, FileText, AlertTriangle, Lock
 } from 'lucide-react';
 
 interface AuditLog {
@@ -31,6 +31,47 @@ export default function AuditLogs() {
     const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+
+    // Security PIN states
+    const [pinPromptOpen, setPinPromptOpen] = useState(false);
+    const [pendingLog, setPendingLog] = useState<AuditLog | null>(null);
+    const [enteredPin, setEnteredPin] = useState('');
+    const [pinError, setPinError] = useState('');
+
+    const handlePinSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (enteredPin.length !== 4) {
+            setPinError("PIN must be 4 digits");
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/users/verify-pin', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ pin: enteredPin })
+            });
+
+            if (res.ok) {
+                setSelectedLog(pendingLog);
+                setPinPromptOpen(false);
+                setPendingLog(null);
+                setEnteredPin('');
+                setPinError('');
+            } else {
+                const data = await res.json().catch(() => ({}));
+                setPinError(data.detail || "Invalid PIN. Access denied.");
+            }
+        } catch (err) {
+            console.error("PIN verification failed", err);
+            setPinError("Connection error. Try again.");
+        }
+    };
+
 
     useEffect(() => {
         fetchLogs();
@@ -261,7 +302,10 @@ export default function AuditLogs() {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <button 
-                                                onClick={() => setSelectedLog(log)}
+                                                onClick={() => {
+                                                    setPendingLog(log);
+                                                    setPinPromptOpen(true);
+                                                }}
                                                 className="p-2 hover:bg-primary-50 dark:hover:bg-primary-900/20 text-primary-500 rounded-lg transition-colors"
                                                 title="View Details"
                                             >
@@ -405,6 +449,58 @@ export default function AuditLogs() {
                                 Close View
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PIN Prompt Modal */}
+            {pinPromptOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in animate-in fade-in">
+                    <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-3xl shadow-2xl p-6 border border-[var(--border-color)] text-center">
+                        <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mx-auto mb-4">
+                            <Lock className="text-indigo-600" size={24} />
+                        </div>
+                        <h3 className="text-lg font-black mb-1">Enter Security PIN</h3>
+                        <p className="text-xs text-[var(--text-secondary)] mb-6">
+                            Please enter your 4-digit admin PIN to view confidential payload logs.
+                        </p>
+                        <form onSubmit={handlePinSubmit} className="space-y-4">
+                            <input
+                                type="password"
+                                maxLength={4}
+                                value={enteredPin}
+                                onChange={(e) => {
+                                    setEnteredPin(e.target.value);
+                                    setPinError('');
+                                }}
+                                placeholder="••••"
+                                className="w-32 text-center text-2xl font-mono tracking-widest py-2 rounded-xl border border-[var(--border-color)] bg-[var(--bg-primary)] outline-none focus:ring-2 focus:ring-primary-500/20 transition-all text-sm dark:text-white"
+                                autoFocus
+                            />
+                            {pinError && (
+                                <p className="text-xs text-red-500 font-bold">{pinError}</p>
+                            )}
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPinPromptOpen(false);
+                                        setPendingLog(null);
+                                        setEnteredPin('');
+                                        setPinError('');
+                                    }}
+                                    className="flex-1 py-2.5 rounded-xl border border-[var(--border-color)] hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 py-2.5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-primary-500/20"
+                                >
+                                    Verify & Unlock
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
