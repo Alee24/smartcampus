@@ -159,6 +159,39 @@ async def test_ai_service(
             if "mock" in client_id.lower() or "test" in client_id.lower() or not client_id:
                 return {"success": True, "message": "Dynamics ERP connection simulated successfully (Simulated Fallback Mode)"}
 
+            # Try ERP Middleware check first
+            try:
+                normalized_url = url.rstrip('/')
+                if "/api/erp/dynamics" in normalized_url:
+                    health_url = f"{normalized_url}/health"
+                    students_url = f"{normalized_url}/current-students?status=Current"
+                else:
+                    health_url = f"{normalized_url}/api/erp/dynamics/health"
+                    students_url = f"{normalized_url}/api/erp/dynamics/current-students?status=Current"
+                
+                headers = {"Accept": "application/json"}
+                # Try health first
+                res = requests.get(health_url, headers=headers, timeout=4)
+                if res.status_code == 200:
+                    return {"success": True, "message": "Connected successfully to ERP Middleware (Health status: OK)."}
+                
+                # Try students list as fallback for middleware
+                res_s = requests.get(students_url, headers=headers, timeout=4)
+                if res_s.status_code == 200:
+                    data = res_s.json()
+                    num_students = 0
+                    if isinstance(data, list):
+                        num_students = len(data)
+                    elif isinstance(data, dict):
+                        for k in ["students", "data", "profiles", "value"]:
+                            if k in data and isinstance(data[k], list):
+                                num_students = len(data[k])
+                                break
+                    return {"success": True, "message": f"Connected successfully to ERP Middleware. Found {num_students} students."}
+            except Exception as e:
+                # Silently ignore and fall back to OData
+                print(f"ERP Middleware test failed: {e}. Trying OData...")
+
             # Check if using Azure AD OAuth (GUID format) or Basic Authentication
             is_guid = False
             try:

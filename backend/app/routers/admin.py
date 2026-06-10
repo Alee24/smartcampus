@@ -1519,7 +1519,126 @@ async def sync_dynamics_records(
     dynamics_employees = []
     
     connection_error = None
+    is_middleware = False
     if not is_mock:
+        # Try ERP Middleware API first if url is configured
+        try:
+            normalized_url = url.rstrip('/')
+            if "/api/erp/dynamics" in normalized_url:
+                students_url = f"{normalized_url}/current-students?status=Current"
+                health_url = f"{normalized_url}/health"
+            else:
+                students_url = f"{normalized_url}/api/erp/dynamics/current-students?status=Current"
+                health_url = f"{normalized_url}/api/erp/dynamics/health"
+                
+            headers = {"Accept": "application/json"}
+            print(f"Checking ERP Middleware Health at: {health_url}")
+            
+            # Verify connectivity by hitting current-students
+            res = requests.get(students_url, headers=headers, timeout=10)
+            if res.status_code == 200:
+                is_middleware = True
+                data = res.json()
+                
+                raw_students = []
+                if isinstance(data, list):
+                    raw_students = data
+                elif isinstance(data, dict):
+                    for key in ["students", "data", "profiles", "value"]:
+                        if key in data and isinstance(data[key], list):
+                            raw_students = data[key]
+                            break
+                
+                # Normalize raw students into dynamics_students
+                for s in raw_students:
+                    prof = s.get("profile") if isinstance(s.get("profile"), dict) else s
+                    
+                    adm = prof.get("admission_number") or prof.get("admission_no") or prof.get("No") or prof.get("No_") or prof.get("StudentNo")
+                    name = prof.get("full_name") or prof.get("name") or prof.get("Name") or prof.get("Name_")
+                    if not adm or not name:
+                        continue
+                        
+                    email = prof.get("email") or prof.get("E_Mail") or prof.get("E-Mail") or prof.get("Email")
+                    school = prof.get("school") or prof.get("Global_Dimension_1_Code") or prof.get("department") or "General"
+                    phone = prof.get("phone_number") or prof.get("Phone_No") or prof.get("Phone") or prof.get("Mobile_Phone_No")
+                    program = prof.get("program") or prof.get("Program_Code") or prof.get("Program")
+                    gender = prof.get("gender") or prof.get("Gender")
+                    status = prof.get("status") or prof.get("Status") or "Current"
+                    
+                    mapped_status = "active" if str(status).strip().lower() in ["current", "active"] else status
+                    
+                    dynamics_students.append({
+                        "No": adm,
+                        "Name": name,
+                        "E_Mail": email,
+                        "Global_Dimension_1_Code": school,
+                        "Phone_No": phone,
+                        "Gender": gender,
+                        "Program_Code": program,
+                        "Status": mapped_status
+                    })
+                
+                print(f"Successfully loaded {len(dynamics_students)} students from ERP Middleware.")
+                
+                # Fetch recent registrations from middleware
+                if "/api/erp/dynamics" in normalized_url:
+                    regs_url = f"{normalized_url}/registrations/current-recent?days=7"
+                else:
+                    regs_url = f"{normalized_url}/api/erp/dynamics/registrations/current-recent?days=7"
+                    
+                try:
+                    reg_res = requests.get(regs_url, headers=headers, timeout=5)
+                    if reg_res.status_code == 200:
+                        reg_data = reg_res.json()
+                        raw_regs = reg_data.get("value", reg_data.get("data", reg_data)) if isinstance(reg_data, dict) else reg_data
+                        if isinstance(raw_regs, list):
+                            for r in raw_regs:
+                                r_adm = r.get("Student_No") or r.get("admission_number") or r.get("StudentNo")
+                                r_code = r.get("Course_Code") or r.get("unit_code") or r.get("CourseCode")
+                                if r_adm and r_code:
+                                    dynamics_registrations.append({
+                                        "Student_No": r_adm,
+                                        "Course_Code": r_code
+                                    })
+                except Exception as reg_err:
+                    print(f"Failed to fetch recent registrations from ERP middleware: {reg_err}")
+                
+                # Fetch courses/registrations from units endpoint for a subset of students to ensure some courses exist
+                for s in dynamics_students[:50]:
+                    adm = s["No"]
+                    if "/api/erp/dynamics" in normalized_url:
+                        units_url = f"{normalized_url}/students/{adm}/units/current-semester/compact?refresh=true"
+                    else:
+                        units_url = f"{normalized_url}/api/erp/dynamics/students/{adm}/units/current-semester/compact?refresh=true"
+                        
+                    try:
+                        u_res = requests.get(units_url, headers=headers, timeout=3)
+                        if u_res.status_code == 200:
+                            u_data = u_res.json()
+                            raw_units = u_data.get("units", u_data.get("data", u_data.get("value", u_data))) if isinstance(u_data, dict) else u_data
+                            if isinstance(raw_units, list):
+                                for u in raw_units:
+                                    u_code = u.get("unit_code") or u.get("Course_Code") or u.get("CourseCode")
+                                    u_name = u.get("unit_name") or u.get("Title") or u.get("Name") or f"Course {u_code}"
+                                    if u_code:
+                                        if not any(c["Code"] == u_code for c in dynamics_courses):
+                                            dynamics_courses.append({
+                                                "Code": u_code,
+                                                "Title": u_name
+                                            })
+                                        dynamics_registrations.append({
+                                            "Student_No": adm,
+                                            "Course_Code": u_code
+                                        })
+                    except Exception as u_err:
+                        print(f"Failed to fetch units for student {adm} from ERP middleware: {u_err}")
+                        
+        except Exception as mid_err:
+            print(f"ERP Middleware sync failed or not available: {mid_err}. Trying direct OData.")
+            is_middleware = False
+
+    # Fallback to direct OData connection if middleware did not sync anything
+    if not is_mock and not is_middleware:
         try:
             # Check if using Azure AD OAuth (GUID format) or Web Service Basic Auth
             is_guid = False
