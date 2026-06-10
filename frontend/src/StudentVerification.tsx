@@ -853,8 +853,8 @@ export default function StudentVerification() {
                                         <div className="w-full flex justify-center overflow-hidden" style={{ height: `${520 * scale}px` }}>
                                             <div 
                                                 ref={cardContainerRef}
-                                                className={`relative transition-all duration-700 preserve-3d h-[520px] w-[896px] origin-top-center shrink-0 ${isFlipped ? 'rotate-y-180' : ''}`}
-                                                style={{ transform: `scale(${scale})` }}
+                                                className="relative transition-all duration-700 preserve-3d h-[520px] w-[896px] origin-top shrink-0"
+                                                style={{ transform: `scale(${scale}) ${isFlipped ? 'rotateY(180deg)' : ''}` }}
                                             >
                                                 {/* Front Side - Premium Template */}
                                                 <div 
