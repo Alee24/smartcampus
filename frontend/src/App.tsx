@@ -1315,13 +1315,13 @@ function App() {
             {/* Mobile Sidebar Backstop */}
             {isSidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-20 lg:hidden glass-card backdrop-blur-sm"
+                    className="fixed inset-0 bg-black/50 z-[140] lg:hidden glass-card backdrop-blur-sm"
                     onClick={() => setSidebarOpen(false)}
                 />
             )}
 
             {/* Sidebar - Ovalent Style */}
-            <aside className={`fixed h-full z-30 bg-[var(--bg-primary)] border-r border-[var(--border-color)] flex flex-col transition-all duration-300 ease-in-out group/sidebar ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 shadow-2xl lg:shadow-none ${isSidebarCollapsed ? 'collapsed lg:w-20' : 'lg:w-64'} w-64`}>
+            <aside className={`fixed h-full z-[150] bg-[var(--bg-primary)] border-r border-[var(--border-color)] flex flex-col transition-all duration-300 ease-in-out group/sidebar ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 shadow-2xl lg:shadow-none ${isSidebarCollapsed ? 'collapsed lg:w-20' : 'lg:w-64'} w-64`}>
                 <div className="p-6 relative">
                     <div className="flex items-center justify-between mb-8">
                         <div className={`flex items-center gap-2 transition-all overflow-hidden ${isSidebarCollapsed ? 'justify-center w-full px-0' : ''}`}>
@@ -1541,7 +1541,7 @@ function App() {
                                     </button>
 
                                     {showUserMenu && (
-                                        <div className="absolute right-0 top-full mt-2 w-56 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                        <div className="absolute right-0 top-full mt-2 w-56 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-2xl z-[110] overflow-hidden animate-in fade-in slide-in-from-top-2">
                                             <div className="p-2 space-y-1">
                                                 <button
                                                     onClick={() => { setShowProfileModal(true); setShowUserMenu(false); }}
@@ -1666,7 +1666,7 @@ function App() {
                 </Suspense>
 
                 {/* ── Floating Action Buttons – top-right stacked, no overlap ── */}
-                <div className="fixed top-16 right-3 z-[95] flex flex-col items-end gap-2 pointer-events-none">
+                <div className="fixed top-16 right-3 z-[50] flex flex-col items-end gap-2 pointer-events-none">
 
                     {/* Gate Pass – Admin/Guard only */}
                     {isAuthenticated && ['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
@@ -1677,44 +1677,6 @@ function App() {
                         >
                             <QrCode size={16} />
                             Gate Pass
-                        </button>
-                    )}
-
-                    {/* Notice Board shortcut */}
-                    {isAuthenticated && (
-                        <button
-                            onClick={() => setActiveTab('notice-board')}
-                            className="pointer-events-auto bg-indigo-500 hover:bg-indigo-600 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
-                            style={{ boxShadow: '0 8px 24px -4px rgba(99,102,241,0.4)' }}
-                        >
-                            <Megaphone size={16} />
-                            Notice Board
-                        </button>
-                    )}
-
-                    {/* Incident Alert */}
-                    {unreadIncidents > 0 && (
-                        <button
-                            onClick={() => setActiveTab('incidents')}
-                            className="pointer-events-auto animate-pulse bg-red-600 hover:bg-red-700 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
-                            style={{ boxShadow: '0 8px 24px -4px rgba(220,38,38,0.55)' }}
-                        >
-                            <AlertTriangle size={16} />
-                            Incident
-                            <span className="bg-white text-red-600 px-1.5 py-0.5 rounded-full text-[10px] font-black">{unreadIncidents}</span>
-                        </button>
-                    )}
-
-                    {/* Lost & Found Alert */}
-                    {unreadLostFound > 0 && (
-                        <button
-                            onClick={() => setActiveTab('lost-found')}
-                            className="pointer-events-auto animate-pulse bg-amber-500 hover:bg-amber-600 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
-                            style={{ boxShadow: '0 8px 24px -4px rgba(245,158,11,0.55)' }}
-                        >
-                            <Search size={16} />
-                            Lost &amp; Found
-                            <span className="bg-white text-amber-600 px-1.5 py-0.5 rounded-full text-[10px] font-black">{unreadLostFound}</span>
                         </button>
                     )}
 
