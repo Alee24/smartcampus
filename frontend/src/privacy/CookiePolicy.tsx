@@ -1,7 +1,7 @@
 import React from 'react';
 import { Cookie, Info } from 'lucide-react';
 
-export const CookiePolicy = () => {
+export const CookiePolicy = ({ companyName = 'Smart Campus' }: { companyName?: string }) => {
     return (
         <div className="max-w-4xl mx-auto p-8 animate-fade-in text-[var(--text-primary)]">
             <div className="mb-8 flex items-center gap-4">
@@ -20,7 +20,7 @@ export const CookiePolicy = () => {
                         <Info size={20} /> Strictly Necessary Storage
                     </h2>
                     <p className="mb-4 text-justify leading-relaxed">
-                        Ovalent GatePass utilizes <strong>zero</strong> tracking or marketing cookies. We strictly utilize "Local Storage" and "Session Cookies" essential for system functionality.
+                        {companyName} utilizes <strong>zero</strong> tracking or marketing cookies. We strictly utilize "Local Storage" and "Session Cookies" essential for system functionality.
                     </p>
                 </section>
 

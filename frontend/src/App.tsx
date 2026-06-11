@@ -1743,9 +1743,9 @@ function App() {
                     {activeTab === 'verification' && <StudentVerification />}
                     {activeTab === 'incidents' && <IncidentReporting />}
                     {activeTab === 'lost-found' && <LostAndFound />}
-                    {activeTab === 'privacy' && <PrivacyPolicy />}
-                    {activeTab === 'cookies' && <CookiePolicy />}
-                    {activeTab === 'rights' && <UserDataRights />}
+                    {activeTab === 'privacy' && <PrivacyPolicy companyName={companySettings.company_name} />}
+                    {activeTab === 'cookies' && <CookiePolicy companyName={companySettings.company_name} />}
+                    {activeTab === 'rights' && <UserDataRights companyName={companySettings.company_name} />}
                     {activeTab === 'scan-logs' && <ScanLogs />}
                     {activeTab === 'gates-dashboard' && <GatesDashboard />}
                     {activeTab === 'student-dashboard' && <StudentDashboard />}

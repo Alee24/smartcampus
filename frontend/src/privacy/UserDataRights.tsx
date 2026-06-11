@@ -1,7 +1,7 @@
 import React from 'react';
 import { UserCheck, Trash2, Edit, Scale } from 'lucide-react';
 
-export const UserDataRights = () => {
+export const UserDataRights = ({ companyName = 'Smart Campus' }: { companyName?: string }) => {
     return (
         <div className="max-w-4xl mx-auto p-8 animate-fade-in text-[var(--text-primary)]">
             <div className="mb-8 flex items-center gap-4">
@@ -48,7 +48,7 @@ export const UserDataRights = () => {
                     To exercise any of these rights, please contact the Data Protection Officer (DPO).
                 </p>
                 <div className="bg-gray-50 p-4 rounded border border-gray-200">
-                    <p><strong>Email:</strong> dpo@ovalent.ac.ke</p>
+                    <p><strong>Email:</strong> dpo@{companyName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company'}.ac.ke</p>
                     <p><strong>Phone:</strong> +254 700 000 000</p>
                     <p><strong>Physical Office:</strong> Administration Block, Room 101</p>
                 </div>

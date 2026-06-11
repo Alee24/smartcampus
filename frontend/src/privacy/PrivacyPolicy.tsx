@@ -1,7 +1,7 @@
 import React from 'react';
 import { Shield, Lock, FileText, Database } from 'lucide-react';
 
-export const PrivacyPolicy = () => {
+export const PrivacyPolicy = ({ companyName = 'Smart Campus' }: { companyName?: string }) => {
     return (
         <div className="max-w-4xl mx-auto p-8 animate-fade-in text-[var(--text-primary)]">
             <div className="mb-8 flex items-center gap-4">
@@ -20,7 +20,7 @@ export const PrivacyPolicy = () => {
                         <Database size={20} /> 1. Data Collection & Minimization
                     </h2>
                     <p className="mb-4 text-justify leading-relaxed">
-                        In strict adherence to the <strong>Data Minimization</strong> principle, Ovalent GatePass collects only personal data that is <strong>strictly necessary</strong> for the functionality of Campus Security and Attendance Tracking.
+                        In strict adherence to the <strong>Data Minimization</strong> principle, {companyName} collects only personal data that is <strong>strictly necessary</strong> for the functionality of Campus Security and Attendance Tracking.
                     </p>
                     <ul className="list-disc pl-6 space-y-2 text-sm text-[var(--text-secondary)]">
                         <li><strong>Personal Identifiers:</strong> Name, Admission Number, School Email (for identification).</li>
