@@ -178,6 +178,45 @@ export default function SelfServiceEntry() {
         }
     }
 
+    const handleVehicleRegisterSubmit = async (e: any) => {
+        e.preventDefault()
+        setSubmitting(true)
+        setError(null)
+        try {
+            const res = await fetch('/api/gate/public/register-vehicle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    driver_name: formData.driver_name,
+                    driver_id_number: formData.driver_id_number,
+                    driver_contact: formData.driver_contact,
+                    plate_number: formData.plate_number,
+                    role: formData.role || 'student'
+                })
+            })
+            const data = await res.json()
+            if (res.ok) {
+                setResult({ status: 'success', message: data.message })
+                setStep(3)
+                if ('vibrate' in navigator) {
+                    try { navigator.vibrate(200); } catch (e) {}
+                }
+            } else {
+                setError(data.detail || "Registration failed. Please try again.")
+                if ('vibrate' in navigator) {
+                    try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+                }
+            }
+        } catch (err) {
+            setError("Connection failed. Please ensure the campus server network is online.")
+            if ('vibrate' in navigator) {
+                try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+            }
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
     const handleSubmit = async (e: any) => {
         e.preventDefault()
         setSubmitting(true)
@@ -305,10 +344,11 @@ export default function SelfServiceEntry() {
                             Select your category:
                         </p>
 
-                        <RoleCard icon={User} label="Visitor" desc="Personal visits, enquiries, or guests" onClick={() => { setRole('visitor'); setStep(2); setError(null) }} />
-                        <RoleCard icon={Car} label="Taxi / Cab" desc="Drop-offs, pick-ups, or taxi services" onClick={() => { setRole('taxi'); setStep(2); setError(null) }} />
-                        <RoleCard icon={Truck} label="Delivery" desc="Goods, parcels, couriers, or food deliveries" onClick={() => { setRole('delivery'); setStep(2); setError(null) }} />
-                        <RoleCard icon={UserCheck} label="Student / Staff" desc="Campus verification check-in/out" onClick={() => { setRole('student'); setStep(2); setError(null) }} color="indigo" />
+                        <RoleCard icon={User} label="Visitor" desc="Personal visits, enquiries, or guests" onClick={() => { setRole('visitor'); setStep(2); setError(null); setFormData({}) }} />
+                        <RoleCard icon={Car} label="Taxi / Cab" desc="Drop-offs, pick-ups, or taxi services" onClick={() => { setRole('taxi'); setStep(2); setError(null); setFormData({}) }} />
+                        <RoleCard icon={Truck} label="Delivery" desc="Goods, parcels, couriers, or food deliveries" onClick={() => { setRole('delivery'); setStep(2); setError(null); setFormData({}) }} />
+                        <RoleCard icon={UserCheck} label="Student / Staff" desc="Campus verification check-in/out" onClick={() => { setRole('student'); setStep(2); setError(null); setFormData({}) }} color="indigo" />
+                        <RoleCard icon={Car} label="Vehicle Registration" desc="Register your vehicle details" onClick={() => { setRole('vehicle_registration'); setStep(2); setError(null); setFormData({ role: 'student' }) }} color="indigo" />
                     </div>
                 )}
 
@@ -316,7 +356,7 @@ export default function SelfServiceEntry() {
                     <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 p-6 animate-slide-in">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-black text-slate-900 dark:text-white capitalize">
-                                {role === 'student' ? 'Student / Staff Verify' : `${role} Registration`}
+                                {role === 'student' ? 'Student / Staff Verify' : role === 'vehicle_registration' ? 'Vehicle Registration' : `${role} Registration`}
                             </h2>
                             <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-black uppercase tracking-wider px-3 py-1 rounded-full border border-indigo-100 dark:border-indigo-900">
                                 Step 2 of 2
@@ -428,6 +468,83 @@ export default function SelfServiceEntry() {
                                     </button>
                                 </form>
                             )
+                        ) : role === 'vehicle_registration' ? (
+                            <form className="space-y-4" onSubmit={handleVehicleRegisterSubmit}>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Full Name</label>
+                                    <input 
+                                        required 
+                                        placeholder="e.g. John Doe"
+                                        className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                        value={formData.driver_name || ''}
+                                        onChange={e => setFormData({ ...formData, driver_name: e.target.value })} 
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Phone Number</label>
+                                        <input 
+                                            required 
+                                            type="tel"
+                                            placeholder="e.g. 0712345678"
+                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                            value={formData.driver_contact || ''}
+                                            onChange={e => setFormData({ ...formData, driver_contact: e.target.value })} 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">ID / Passport No</label>
+                                        <input 
+                                            required 
+                                            placeholder="ID Number"
+                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                            value={formData.driver_id_number || ''}
+                                            onChange={e => setFormData({ ...formData, driver_id_number: e.target.value })} 
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-4">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Vehicle Plate</label>
+                                        <input 
+                                            required
+                                            placeholder="KCA 123A"
+                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white font-mono uppercase"
+                                            value={formData.plate_number || ''}
+                                            onChange={e => setFormData({ ...formData, plate_number: e.target.value })} 
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Your Role</label>
+                                        <select
+                                            required
+                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                            value={formData.role || 'student'}
+                                            onChange={e => setFormData({ ...formData, role: e.target.value })}
+                                        >
+                                            <option value="student">Student</option>
+                                            <option value="staff">Staff</option>
+                                            <option value="visitor">Visitor</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="pt-4 flex gap-3">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => { setStep(1); setError(null); }} 
+                                        className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs transition-all active:scale-95"
+                                    >
+                                        Back
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        disabled={submitting} 
+                                        className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-95"
+                                    >
+                                        {submitting ? 'Registering...' : <>Register Vehicle <ArrowRight size={14} /></>}
+                                    </button>
+                                </div>
+                            </form>
                         ) : (
                             <form className="space-y-4" onSubmit={handleSubmit}>
                                 {/* Common Fields */}

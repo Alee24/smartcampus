@@ -37,6 +37,7 @@ export default function GateControl() {
     const [manualPurpose, setManualPurpose] = useState('Visitor / External')
     const [manualDestination, setManualDestination] = useState('')
     const [plateSuggestions, setPlateSuggestions] = useState<any[]>([])
+    const [vehicleIsCheckedIn, setVehicleIsCheckedIn] = useState(false)
 
     // Detailed lists viewing modals (to keep A4 main page compact)
     const [showLogsModal, setShowLogsModal] = useState(false)
@@ -101,10 +102,31 @@ export default function GateControl() {
             try {
                 const token = localStorage.getItem('token')
                 const res = await fetch(`/api/gate/vehicles/search?q=${v}`, { headers: { 'Authorization': `Bearer ${token}` } })
-                if (res.ok) setPlateSuggestions(await res.json())
+                if (res.ok) {
+                    const data = await res.json()
+                    setPlateSuggestions(data)
+                    const cleanV = v.replace(/\s+/g, '')
+                    const exactMatch = data.find((item: any) => item.plate_number.toUpperCase().replace(/\s+/g, '') === cleanV)
+                    if (exactMatch) {
+                        setManualDriverName(exactMatch.driver_name || '')
+                        setManualDriverContact(exactMatch.driver_contact || '')
+                        setManualDriverId(exactMatch.driver_id_number || '')
+                        setVehicleIsCheckedIn(exactMatch.is_checked_in || false)
+                        if (exactMatch.vehicle_type === 'staff') {
+                            setManualPurpose('Staff Check-in')
+                        } else if (exactMatch.vehicle_type === 'student') {
+                            setManualPurpose('Student Check-in')
+                        } else {
+                            setManualPurpose('Visitor / External')
+                        }
+                    } else {
+                        setVehicleIsCheckedIn(false)
+                    }
+                }
             } catch (e) { }
         } else {
             setPlateSuggestions([])
+            setVehicleIsCheckedIn(false)
         }
     }
 
@@ -113,6 +135,14 @@ export default function GateControl() {
         setManualDriverName(v.driver_name || '')
         setManualDriverContact(v.driver_contact || '')
         setManualDriverId(v.driver_id_number || '')
+        setVehicleIsCheckedIn(v.is_checked_in || false)
+        if (v.vehicle_type === 'staff') {
+            setManualPurpose('Staff Check-in')
+        } else if (v.vehicle_type === 'student') {
+            setManualPurpose('Student Check-in')
+        } else {
+            setManualPurpose('Visitor / External')
+        }
         setPlateSuggestions([])
     }
 
@@ -267,9 +297,10 @@ export default function GateControl() {
             const result = await res.json()
             if (res.ok) {
                 setScanStatus('success')
+                const actionMsg = result.action === 'checkout' ? 'checked out' : 'checked in';
                 setLastScan({
                     name: result.data.plate,
-                    role: `Driver: ${manualDriverName || 'Unknown Driver'} (${manualPurpose})`,
+                    role: `Driver: ${manualDriverName || 'Unknown Driver'} (${manualPurpose}) [${result.action === 'checkout' ? 'OUT' : 'IN'}]`,
                     time: result.data.time,
                     image: result.data.image,
                     isVehicle: true,
@@ -282,7 +313,8 @@ export default function GateControl() {
                 setManualDriverId('')
                 setManualPurpose('Visitor / External')
                 setManualDestination('')
-                showNotification(`Vehicle ${result.data.plate} logged successfully`, 'success')
+                setVehicleIsCheckedIn(false)
+                showNotification(`Vehicle ${result.data.plate} ${actionMsg} successfully`, 'success')
                 refreshData()
             } else {
                 showNotification(result.detail || "Error logging vehicle", "error")
@@ -414,13 +446,22 @@ export default function GateControl() {
                     setManualDriverName(data.vehicle.driver_name || '')
                     setManualDriverContact(data.vehicle.driver_contact || '')
                     setManualDriverId(data.vehicle.driver_id_number || '')
-                    setManualPurpose(data.vehicle.is_fleet ? 'Staff Check-in' : 'Student Check-in')
-                    showNotification(`Plate transcribed: ${data.plate_number} (Registered vehicle). Click Register Vehicle to proceed.`, 'success')
+                    setVehicleIsCheckedIn(data.is_checked_in || false)
+                    if (data.vehicle.vehicle_type === 'staff') {
+                        setManualPurpose('Staff Check-in')
+                    } else if (data.vehicle.vehicle_type === 'student') {
+                        setManualPurpose('Student Check-in')
+                    } else {
+                        setManualPurpose('Visitor / External')
+                    }
+                    const actionMsg = data.is_checked_in ? 'Check Out' : 'Check In';
+                    showNotification(`Plate transcribed: ${data.plate_number} (Registered vehicle). Click ${actionMsg} Vehicle to proceed.`, 'success')
                 } else {
                     setManualDriverName('')
                     setManualDriverContact('')
                     setManualDriverId('')
                     setManualPurpose('Visitor / External')
+                    setVehicleIsCheckedIn(false)
                     showNotification(`Plate transcribed: ${data.plate_number} (Unregistered vehicle). Please fill in the driver details.`, 'info')
                 }
             } else {
@@ -594,13 +635,22 @@ export default function GateControl() {
                              setManualDriverName(data.vehicle.driver_name || '')
                              setManualDriverContact(data.vehicle.driver_contact || '')
                              setManualDriverId(data.vehicle.driver_id_number || '')
-                             setManualPurpose(data.vehicle.is_fleet ? 'Staff Check-in' : 'Student Check-in')
-                             showNotification(`Plate transcribed: ${data.plate_number} (Registered vehicle). Click Register Vehicle to proceed.`, 'success')
+                             setVehicleIsCheckedIn(data.is_checked_in || false)
+                             if (data.vehicle.vehicle_type === 'staff') {
+                                 setManualPurpose('Staff Check-in')
+                             } else if (data.vehicle.vehicle_type === 'student') {
+                                 setManualPurpose('Student Check-in')
+                             } else {
+                                 setManualPurpose('Visitor / External')
+                             }
+                             const actionMsg = data.is_checked_in ? 'Check Out' : 'Check In';
+                             showNotification(`Plate transcribed: ${data.plate_number} (Registered vehicle). Click ${actionMsg} Vehicle to proceed.`, 'success')
                          } else {
                              setManualDriverName('')
                              setManualDriverContact('')
                              setManualDriverId('')
                              setManualPurpose('Visitor / External')
+                             setVehicleIsCheckedIn(false)
                              showNotification(`Plate transcribed: ${data.plate_number} (Unregistered vehicle). Please fill in the driver details.`, 'info')
                          }
                      } else {
@@ -1065,7 +1115,7 @@ export default function GateControl() {
                                         className="py-3.5 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-orange-600/20 transition-all active:scale-95"
                                     >
                                         {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Car size={14} />}
-                                        Register Vehicle
+                                        {vehicleIsCheckedIn ? 'Check Out Vehicle' : 'Check In Vehicle'}
                                     </button>
                                 </div>
                             </form>

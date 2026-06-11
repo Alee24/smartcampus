@@ -85,7 +85,7 @@ async def manual_vehicle_entry(
     session: AsyncSession = Depends(get_session)
 ):
     """
-    Manually log vehicle entry with passenger count.
+    Manually log vehicle entry/exit (check-in/check-out) with passenger count.
     Payload: { "plate_number": str, "passengers": int }
     """
     plate = payload.get("plate_number", "").strip().upper()
@@ -94,8 +94,14 @@ async def manual_vehicle_entry(
     if not plate:
         raise HTTPException(status_code=400, detail="Plate number required")
 
+    # Clean plate number for lookup
+    clean_plate = plate.replace(" ", "").upper()
+
     # 1. Lookup/Create Vehicle
-    vehicle = (await session.exec(select(Vehicle).where(Vehicle.plate_number == plate))).first()
+    from sqlalchemy import func
+    vehicle = (await session.exec(
+        select(Vehicle).where(func.replace(Vehicle.plate_number, ' ', '') == clean_plate)
+    )).first()
     
     status = "allowed"
     if not vehicle:
@@ -104,9 +110,12 @@ async def manual_vehicle_entry(
             plate_number=plate,
             make="Unknown",
             model="Auto-Logged",
-            color="Unknown"
+            color="Unknown",
+            vehicle_type="visitor"
         )
         status = "visitor"
+    else:
+        status = vehicle.vehicle_type if vehicle.vehicle_type in ["staff", "student", "visitor"] else "allowed"
     
     # Update/Set Driver Details
     if payload.get("driver_name"): vehicle.driver_name = payload["driver_name"]
@@ -134,43 +143,83 @@ async def manual_vehicle_entry(
             await session.commit()
             await session.refresh(gate)
 
-    # 3. Log Entry
-    log = VehicleLog(
-        vehicle_id=vehicle.id,
-        gate_id=gate.id,
-        entry_time=get_eat_time(),
-        vehicle_images={},
-        manual_override=True,
-        detected_passengers=passengers,
-        purpose=payload.get("purpose"),
-        destination=payload.get("destination")
-    )
-    
-    session.add(log)
-    await session.commit()
-    await session.refresh(log)
+    # Check if the vehicle is currently checked in (has an active log with exit_time == None)
+    active_log = (await session.exec(
+        select(VehicleLog)
+        .where(VehicleLog.vehicle_id == vehicle.id)
+        .where(VehicleLog.exit_time == None)
+        .order_by(VehicleLog.entry_time.desc())
+    )).first()
 
-    # Log manual vehicle entry
-    await log_action(
-        session=session,
-        action_type="create",
-        table_name="vehicle_logs",
-        record_id=str(log.id),
-        description=f"Manual vehicle entry logged for {plate} ({passengers} passengers)",
-        request=request
-    )
+    if active_log:
+        # Check-out logic
+        active_log.exit_time = get_eat_time()
+        active_log.exit_gate_id = gate.id
+        session.add(active_log)
+        await session.commit()
+        await session.refresh(active_log)
 
-    return {
-        "status": status,
-        "message": f"Vehicle {plate} logged manually",
-        "data": {
-            "plate": plate,
-            "passengers": passengers,
-            "time": log.entry_time.strftime("%I:%M %p"),
-            "isVehicle": True,
-            "image": "https://cdn-icons-png.flaticon.com/512/3202/3202926.png" # Car Icon
+        # Log manual vehicle exit action
+        await log_action(
+            session=session,
+            action_type="update",
+            table_name="vehicle_logs",
+            record_id=str(active_log.id),
+            description=f"Manual vehicle exit logged for {plate}",
+            request=request
+        )
+
+        return {
+            "status": status,
+            "action": "checkout",
+            "message": f"Vehicle {plate} checked out successfully",
+            "data": {
+                "plate": plate,
+                "passengers": active_log.detected_passengers or 1,
+                "time": active_log.exit_time.strftime("%I:%M %p"),
+                "isVehicle": True,
+                "image": "https://cdn-icons-png.flaticon.com/512/3202/3202926.png" # Car Icon
+            }
         }
-    }
+    else:
+        # Check-in logic
+        log = VehicleLog(
+            vehicle_id=vehicle.id,
+            gate_id=gate.id,
+            entry_time=get_eat_time(),
+            vehicle_images={},
+            manual_override=True,
+            detected_passengers=passengers,
+            purpose=payload.get("purpose"),
+            destination=payload.get("destination")
+        )
+        
+        session.add(log)
+        await session.commit()
+        await session.refresh(log)
+
+        # Log manual vehicle entry action
+        await log_action(
+            session=session,
+            action_type="create",
+            table_name="vehicle_logs",
+            record_id=str(log.id),
+            description=f"Manual vehicle entry logged for {plate} ({passengers} passengers)",
+            request=request
+        )
+
+        return {
+            "status": status,
+            "action": "checkin",
+            "message": f"Vehicle {plate} checked in successfully",
+            "data": {
+                "plate": plate,
+                "passengers": passengers,
+                "time": log.entry_time.strftime("%I:%M %p"),
+                "isVehicle": True,
+                "image": "https://cdn-icons-png.flaticon.com/512/3202/3202926.png" # Car Icon
+            }
+        }
 
 @router.post("/scan")
 async def scan_entry(
@@ -797,43 +846,89 @@ async def scan_vehicle_plate(
             "school": "Guest/External"
         }
 
-    # Log with AI Insights (Passengers)
-    log = VehicleLog(
-        vehicle_id=vehicle.id,
-        gate_id=gate.id,
-        entry_time=get_eat_time(),
-        vehicle_images={"front": f"/{filepath}"},
-        manual_override=False,
-        detected_passengers=random.randint(1, 4)
-    )
-    
-    session.add(log)
-    await session.commit()
-    await session.refresh(log)
-    
-    await log_action(
-        session=session,
-        action_type="vehicle_scan",
-        table_name="vehicle_logs",
-        record_id=str(log.id),
-        description=f"AI Vehicle scan for {detected_text} at {gate.name} - Status: {status}",
-        request=request
-    )
-    
-    return {
-        "status": status,
-        "message": f"Vehicle {detected_text} processed",
-        "data": {
-            "plate": detected_text,
-            "make": vehicle.make,
-            "model": vehicle.model,
-            "color": vehicle.color,
-            "passengers": log.detected_passengers,
-            "entry_time": log.entry_time.strftime("%I:%M %p"),
-            "image_url": f"/{filepath}",
-            "owner": owner_data
+    # Check if the vehicle is currently checked in (has an active log with exit_time == None)
+    active_log = (await session.exec(
+        select(VehicleLog)
+        .where(VehicleLog.vehicle_id == vehicle.id)
+        .where(VehicleLog.exit_time == None)
+        .order_by(VehicleLog.entry_time.desc())
+    )).first()
+
+    if active_log:
+        # Check-out logic
+        active_log.exit_time = get_eat_time()
+        active_log.exit_gate_id = gate.id
+        if filepath:
+            if not active_log.vehicle_images:
+                active_log.vehicle_images = {}
+            active_log.vehicle_images["exit"] = f"/{filepath}"
+        session.add(active_log)
+        await session.commit()
+        await session.refresh(active_log)
+
+        await log_action(
+            session=session,
+            action_type="vehicle_scan_exit",
+            table_name="vehicle_logs",
+            record_id=str(active_log.id),
+            description=f"AI Vehicle scan exit for {detected_text} at {gate.name} - Status: {status}",
+            request=request
+        )
+
+        return {
+            "status": status,
+            "action": "checkout",
+            "message": f"Vehicle {detected_text} checked out",
+            "data": {
+                "plate": detected_text,
+                "make": vehicle.make,
+                "model": vehicle.model,
+                "color": vehicle.color,
+                "passengers": active_log.detected_passengers or 1,
+                "exit_time": active_log.exit_time.strftime("%I:%M %p"),
+                "image_url": f"/{filepath}",
+                "owner": owner_data
+            }
         }
-    }
+    else:
+        # Log with AI Insights (Passengers)
+        log = VehicleLog(
+            vehicle_id=vehicle.id,
+            gate_id=gate.id,
+            entry_time=get_eat_time(),
+            vehicle_images={"front": f"/{filepath}"},
+            manual_override=False,
+            detected_passengers=random.randint(1, 4)
+        )
+        
+        session.add(log)
+        await session.commit()
+        await session.refresh(log)
+        
+        await log_action(
+            session=session,
+            action_type="vehicle_scan",
+            table_name="vehicle_logs",
+            record_id=str(log.id),
+            description=f"AI Vehicle scan for {detected_text} at {gate.name} - Status: {status}",
+            request=request
+        )
+        
+        return {
+            "status": status,
+            "action": "checkin",
+            "message": f"Vehicle {detected_text} processed",
+            "data": {
+                "plate": detected_text,
+                "make": vehicle.make,
+                "model": vehicle.model,
+                "color": vehicle.color,
+                "passengers": log.detected_passengers,
+                "entry_time": log.entry_time.strftime("%I:%M %p"),
+                "image_url": f"/{filepath}",
+                "owner": owner_data
+            }
+        }
 
 @router.post("/ocr-plate")
 async def ocr_plate(
@@ -998,6 +1093,7 @@ async def ocr_plate(
     display_plate = vehicle.plate_number if vehicle else detected_text
     
     vehicle_dict = None
+    is_checked_in = False
     if vehicle:
         d_name = vehicle.driver_name
         d_contact = vehicle.driver_contact
@@ -1020,12 +1116,23 @@ async def ocr_plate(
             "driver_name": d_name or "",
             "driver_contact": d_contact or "",
             "driver_id_number": d_id or "",
-            "is_fleet": vehicle.is_fleet
+            "is_fleet": vehicle.is_fleet,
+            "vehicle_type": vehicle.vehicle_type or "visitor"
         }
+
+        # Check check-in status
+        active_log = (await session.exec(
+            select(VehicleLog)
+            .where(VehicleLog.vehicle_id == vehicle.id)
+            .where(VehicleLog.exit_time == None)
+            .order_by(VehicleLog.entry_time.desc())
+        )).first()
+        is_checked_in = active_log is not None
     
     return {
         "plate_number": display_plate,
         "is_registered": vehicle is not None,
+        "is_checked_in": is_checked_in,
         "vehicle": vehicle_dict,
         "image_url": f"/{filepath}"
     }
@@ -1063,9 +1170,32 @@ async def get_all_vehicles(limit: int = 100, session: AsyncSession = Depends(get
 async def search_vehicles(q: str, session: AsyncSession = Depends(get_session)):
     """Autocomplete search for vehicles by plate"""
     if len(q) < 2: return []
-    query = select(Vehicle).where(Vehicle.plate_number.contains(q)).limit(10)
+    
+    clean_q = q.replace(" ", "").upper()
+    from sqlalchemy import func
+    query = select(Vehicle).where(func.replace(Vehicle.plate_number, ' ', '').contains(clean_q)).limit(10)
     results = await session.exec(query)
-    return results.all()
+    vehicles = results.all()
+    
+    output = []
+    for v in vehicles:
+        active_log = (await session.exec(
+            select(VehicleLog)
+            .where(VehicleLog.vehicle_id == v.id)
+            .where(VehicleLog.exit_time == None)
+            .order_by(VehicleLog.entry_time.desc())
+        )).first()
+        
+        output.append({
+            "id": str(v.id),
+            "plate_number": v.plate_number,
+            "driver_name": v.driver_name,
+            "driver_contact": v.driver_contact,
+            "driver_id_number": v.driver_id_number,
+            "vehicle_type": v.vehicle_type or "visitor",
+            "is_checked_in": active_log is not None
+        })
+    return output
 
 @router.post("/vehicle-exit")
 async def vehicle_exit(payload: dict, session: AsyncSession = Depends(get_session)):
@@ -1749,6 +1879,84 @@ async def public_access_request(
              raise HTTPException(400, "User ID required for student entry")
         
     return {"status": "pending", "message": "Request processed"}
+
+@router.post("/public/register-vehicle")
+async def public_register_vehicle(
+    payload: dict,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Self-service vehicle registration endpoint.
+    Payload: {
+        "driver_name": str,
+        "driver_id_number": str,
+        "driver_contact": str,
+        "plate_number": str,
+        "role": str
+    }
+    """
+    driver_name = payload.get("driver_name", "").strip()
+    driver_id_number = payload.get("driver_id_number", "").strip()
+    driver_contact = payload.get("driver_contact", "").strip()
+    plate_number = payload.get("plate_number", "").strip().upper()
+    role = payload.get("role", "visitor").strip().lower()
+
+    if not plate_number or not driver_name or not driver_id_number or not driver_contact:
+        raise HTTPException(status_code=400, detail="All fields (Name, ID, Contact, Plate) are required.")
+
+    if role not in ["staff", "student", "visitor"]:
+        raise HTTPException(status_code=400, detail="Invalid role. Must be Staff, Student, or Visitor.")
+
+    # Clean plate number for lookup
+    clean_plate = plate_number.replace(" ", "").upper()
+    
+    # 1. Lookup vehicle by plate
+    from sqlalchemy import func
+    vehicle = (await session.exec(
+        select(Vehicle).where(func.replace(Vehicle.plate_number, ' ', '') == clean_plate)
+    )).first()
+
+    if not vehicle:
+        vehicle = Vehicle(
+            plate_number=plate_number,
+            make="Self-Reg",
+            model="User Registered",
+            color="Unknown"
+        )
+
+    # 2. Update vehicle details
+    vehicle.driver_name = driver_name
+    vehicle.driver_contact = driver_contact
+    vehicle.driver_id_number = driver_id_number
+    vehicle.vehicle_type = role  # staff, student, visitor
+    vehicle.status = "active"
+
+    # 3. Try to link to a system user (owner)
+    owner = (await session.exec(
+        select(User).where(User.admission_number == driver_id_number)
+    )).first()
+    if not owner and driver_contact:
+        owner = (await session.exec(
+            select(User).where(User.phone_number == driver_contact)
+        )).first()
+        
+    if owner:
+        vehicle.owner_id = owner.id
+
+    session.add(vehicle)
+    await session.commit()
+    await session.refresh(vehicle)
+
+    return {
+        "status": "success",
+        "message": f"Vehicle {plate_number} registered successfully as {role.upper()}.",
+        "data": {
+            "id": str(vehicle.id),
+            "plate_number": vehicle.plate_number,
+            "driver_name": vehicle.driver_name,
+            "role": role
+        }
+    }
 
 @router.get("/scan-logs")
 async def get_all_gate_scan_logs(limit: int = 100, session: AsyncSession = Depends(get_session)):
