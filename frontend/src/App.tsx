@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import {
     LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut,
     Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode, Megaphone, Trash2, Plus,
-    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, UserCheck, X, Activity, BarChart3, Play, History, Printer, Download, Inbox, Search, ScanFace, DoorOpen, List, Menu
+    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, UserCheck, X, Activity, BarChart3, Play, History, Printer, Download, Inbox, Search, ScanFace, DoorOpen, List, Menu, BookOpen, Grid
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
@@ -273,6 +273,7 @@ function App() {
     const [showProfileModal, setShowProfileModal] = useState(false)
     const [syncingAD, setSyncingAD] = useState(false)
     const [showQuickScanModal, setShowQuickScanModal] = useState(false)
+    const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false)
     const hasValidated = useState(false)[0] // Simple mount check
 
     // URL Deep Link Handler (QR Codes)
@@ -1788,22 +1789,80 @@ function App() {
                     </footer>
                 </Suspense>
 
-                {/* ── Floating Action Buttons – top-right stacked, no overlap ── */}
-                <div className="fixed top-16 right-3 z-[95] flex flex-col items-end gap-2 pointer-events-none opacity-10 hover:opacity-100 transition-opacity duration-300 ease-in-out">
+                {/* ── Quicker Access FAB Menu – Floating at bottom-right with expanding options ── */}
+                {isAuthenticated && (
+                    <div className="fixed bottom-6 right-6 z-[1000] flex flex-col items-end gap-3">
+                        {/* Floating Sub-buttons (shown with custom animation when menu is open) */}
+                        {isQuickMenuOpen && (
+                            <div className="flex flex-col items-end gap-3 mb-2 animate-fade-in">
+                                {/* Gate Pass Option – Admin/Guard only */}
+                                {['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
+                                    <div 
+                                        onClick={() => { setShowQuickScanModal(true); setIsQuickMenuOpen(false); }}
+                                        className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                    >
+                                        <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
+                                            Gate Pass
+                                        </span>
+                                        <button className="w-12 h-12 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
+                                            <QrCode size={18} />
+                                        </button>
+                                    </div>
+                                )}
+                                
+                                {/* Events Option */}
+                                <div 
+                                    onClick={() => { setActiveTab('events'); setIsQuickMenuOpen(false); }}
+                                    className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                >
+                                    <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
+                                        Events
+                                    </span>
+                                    <button className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
+                                        <Calendar size={18} />
+                                    </button>
+                                </div>
 
-                    {/* Gate Pass – Admin/Guard only */}
-                    {isAuthenticated && ['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
+                                {/* Academics Option */}
+                                <div 
+                                    onClick={() => { setActiveTab('timetable'); setIsQuickMenuOpen(false); }}
+                                    className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                >
+                                    <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
+                                        Academics
+                                    </span>
+                                    <button className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
+                                        <BookOpen size={18} />
+                                    </button>
+                                </div>
+
+                                {/* Fleet Option */}
+                                <div 
+                                    onClick={() => { setActiveTab('fleet'); setIsQuickMenuOpen(false); }}
+                                    className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                >
+                                    <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
+                                        Fleet Management
+                                    </span>
+                                    <button className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
+                                        <Car size={18} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Main FAB Toggle Button */}
                         <button
-                            onClick={() => setShowQuickScanModal(true)}
-                            className="pointer-events-auto animate-pulse bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-black tracking-wider text-xs border border-white/20 transition-all hover:scale-105 active:scale-95"
-                            style={{ boxShadow: '0 8px 24px -4px rgba(99,102,241,0.55)' }}
+                            onClick={() => setIsQuickMenuOpen(!isQuickMenuOpen)}
+                            className={`w-14 h-14 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 border border-white/20 pointer-events-auto ${
+                                isQuickMenuOpen ? 'rotate-45' : ''
+                            }`}
+                            style={{ boxShadow: '0 8px 30px rgba(99, 102, 241, 0.4)' }}
                         >
-                            <QrCode size={16} />
-                            Gate Pass
+                            {isQuickMenuOpen ? <X size={24} /> : <Grid size={24} />}
                         </button>
-                    )}
-
-                </div>
+                    </div>
+                )}
             </main >
 
             {/* Mobile PWA Bottom Navigation Bar */}
