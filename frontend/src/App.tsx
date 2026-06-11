@@ -417,6 +417,62 @@ function App() {
     const [hasUnreadNotices, setHasUnreadNotices] = useState(false)
     const [unreadIncidents, setUnreadIncidents] = useState(0)
     const [unreadLostFound, setUnreadLostFound] = useState(0)
+    const [hasUnreadUsersActivity, setHasUnreadUsersActivity] = useState(false)
+
+    // Check for user activity (total users count changes)
+    useEffect(() => {
+        const checkUsersActivity = async () => {
+            if (!isAuthenticated) return
+            try {
+                const token = localStorage.getItem('token')
+                const res = await fetch('/api/users', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data && Array.isArray(data)) {
+                        const storedCount = localStorage.getItem('lastViewedUsersCount')
+                        if (storedCount) {
+                            if (data.length > parseInt(storedCount)) {
+                                setHasUnreadUsersActivity(true)
+                            } else {
+                                setHasUnreadUsersActivity(false)
+                            }
+                        } else {
+                            localStorage.setItem('lastViewedUsersCount', data.length.toString())
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to check user activity:', e)
+            }
+        }
+        checkUsersActivity()
+        const interval = setInterval(checkUsersActivity, 45000)
+        return () => clearInterval(interval)
+    }, [isAuthenticated])
+
+    // Clear user activity notification when viewing users tab
+    useEffect(() => {
+        if (activeTab === 'users' && hasUnreadUsersActivity) {
+            const clearUsersActivity = async () => {
+                try {
+                    const token = localStorage.getItem('token')
+                    const res = await fetch('/api/users', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                    if (res.ok) {
+                        const data = await res.json()
+                        if (data && Array.isArray(data)) {
+                            localStorage.setItem('lastViewedUsersCount', data.length.toString())
+                            setHasUnreadUsersActivity(false)
+                        }
+                    }
+                } catch (e) {}
+            }
+            clearUsersActivity()
+        }
+    }, [activeTab, hasUnreadUsersActivity])
 
     // Fetch latest stats for incidents and lost & found
     useEffect(() => {
@@ -1131,20 +1187,48 @@ function App() {
                         )}
                         {isMenuEnabled('incidents') && (
                             <NavItem
-                                icon={<AlertTriangle size={18} />}
+                                icon={
+                                    <div className="relative">
+                                        <AlertTriangle size={18} className={unreadIncidents > 0 ? "text-red-500 animate-bounce animate-pulse" : ""} />
+                                        {unreadIncidents > 0 && (
+                                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                            </span>
+                                        )}
+                                    </div>
+                                }
                                 label="Incident Reports"
                                 active={activeTab === 'incidents'}
                                 onClick={() => { setActiveTab('incidents'); setSidebarOpen(false); }}
-                                badge={unreadIncidents > 0 ? unreadIncidents : undefined}
+                                badge={unreadIncidents > 0 ? (
+                                    <span className="px-2 py-0.5 text-[9px] bg-red-500 text-white rounded-full font-black animate-pulse shadow-sm">
+                                        {unreadIncidents}
+                                    </span>
+                                ) : undefined}
                             />
                         )}
                         {isMenuEnabled('lost-found') && (
                             <NavItem
-                                icon={<Search size={18} />}
+                                icon={
+                                    <div className="relative">
+                                        <Search size={18} className={unreadLostFound > 0 ? "text-amber-500 animate-bounce animate-pulse" : ""} />
+                                        {unreadLostFound > 0 && (
+                                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                                            </span>
+                                        )}
+                                    </div>
+                                }
                                 label="Lost & Found"
                                 active={activeTab === 'lost-found'}
                                 onClick={() => { setActiveTab('lost-found'); setSidebarOpen(false); }}
-                                badge={unreadLostFound > 0 ? unreadLostFound : undefined}
+                                badge={unreadLostFound > 0 ? (
+                                    <span className="px-2 py-0.5 text-[9px] bg-amber-500 text-white rounded-full font-black animate-pulse shadow-sm">
+                                        {unreadLostFound}
+                                    </span>
+                                ) : undefined}
                             />
                         )}
                     </SidebarGroup>
@@ -1155,10 +1239,25 @@ function App() {
                     <SidebarGroup title="People" isOpen={openGroups.people} onToggle={() => toggleGroup('people')} isSidebarCollapsed={isSidebarCollapsed}>
                         {isMenuEnabled('users') && (
                             <NavItem
-                                icon={<Users size={18} />}
+                                icon={
+                                    <div className="relative">
+                                        <Users size={18} className={hasUnreadUsersActivity ? "text-purple-600 animate-bounce animate-pulse" : ""} />
+                                        {hasUnreadUsersActivity && (
+                                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                                            </span>
+                                        )}
+                                    </div>
+                                }
                                 label="Students / Staff"
                                 active={activeTab === 'users'}
                                 onClick={() => { setActiveTab('users'); setSidebarOpen(false); }}
+                                badge={hasUnreadUsersActivity ? (
+                                    <span className="px-2 py-0.5 text-[9px] bg-purple-600 text-white rounded-full font-black animate-pulse shadow-sm">
+                                        NEW
+                                    </span>
+                                ) : null}
                             />
                         )}
                         {(isMenuEnabled('id-printing') || isMenuEnabled('qr-registry')) && (
@@ -1680,44 +1779,6 @@ function App() {
                         </button>
                     )}
 
-                    {/* Notice Board shortcut */}
-                    {isAuthenticated && (
-                        <button
-                            onClick={() => setActiveTab('notice-board')}
-                            className="pointer-events-auto bg-indigo-500 hover:bg-indigo-600 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
-                            style={{ boxShadow: '0 8px 24px -4px rgba(99,102,241,0.4)' }}
-                        >
-                            <Megaphone size={16} />
-                            Notice Board
-                        </button>
-                    )}
-
-                    {/* Incident Alert */}
-                    {unreadIncidents > 0 && (
-                        <button
-                            onClick={() => setActiveTab('incidents')}
-                            className="pointer-events-auto animate-pulse bg-red-600 hover:bg-red-700 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
-                            style={{ boxShadow: '0 8px 24px -4px rgba(220,38,38,0.55)' }}
-                        >
-                            <AlertTriangle size={16} />
-                            Incident
-                            <span className="bg-white text-red-600 px-1.5 py-0.5 rounded-full text-[10px] font-black">{unreadIncidents}</span>
-                        </button>
-                    )}
-
-                    {/* Lost & Found Alert */}
-                    {unreadLostFound > 0 && (
-                        <button
-                            onClick={() => setActiveTab('lost-found')}
-                            className="pointer-events-auto animate-pulse bg-amber-500 hover:bg-amber-600 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
-                            style={{ boxShadow: '0 8px 24px -4px rgba(245,158,11,0.55)' }}
-                        >
-                            <Search size={16} />
-                            Lost &amp; Found
-                            <span className="bg-white text-amber-600 px-1.5 py-0.5 rounded-full text-[10px] font-black">{unreadLostFound}</span>
-                        </button>
-                    )}
-
                 </div>
             </main >
 
@@ -1747,8 +1808,16 @@ function App() {
                         <span className="text-[10px] font-medium mt-1">Logs</span>
                     </button>
                 )}
-                <button onClick={() => setSidebarOpen(true)} className="flex flex-col items-center p-2 rounded-xl transition-colors text-[var(--text-secondary)]">
-                    <Menu size={22} />
+                <button onClick={() => setSidebarOpen(true)} className="flex flex-col items-center p-2 rounded-xl transition-colors text-[var(--text-secondary)] relative">
+                    <div className="relative">
+                        <Menu size={22} className={(hasUnreadNotices || unreadIncidents > 0 || unreadLostFound > 0 || hasUnreadUsersActivity) ? "text-indigo-600 animate-pulse" : ""} />
+                        {(hasUnreadNotices || unreadIncidents > 0 || unreadLostFound > 0 || hasUnreadUsersActivity) && (
+                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                            </span>
+                        )}
+                    </div>
                     <span className="text-[10px] font-medium mt-1">Menu</span>
                 </button>
             </div>
