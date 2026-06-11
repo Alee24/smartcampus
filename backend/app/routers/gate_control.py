@@ -626,57 +626,62 @@ async def scan_entry_inner(
             await session.refresh(vehicle)
             
         if current_user:
-            trip = (await session.exec(
-                select(FleetTrip)
-                .where(FleetTrip.vehicle_id == vehicle.id)
-                .where(FleetTrip.status == "ongoing")
-            )).first()
+            from app.models import Role
+            user_role = await session.get(Role, current_user.role_id)
+            user_role_name = user_role.name if user_role else "Student"
             
-            if not trip:
-                trip = FleetTrip(
-                    vehicle_id=vehicle.id,
-                    driver_id=vehicle.driver_id,
-                    purpose="Ad-hoc boarding via scan",
-                    origin="Campus",
-                    destination="Destination",
-                    status="ongoing",
-                    actual_departure=get_eat_time(),
-                    start_odometer=vehicle.current_odometer or 0.0
-                )
-                session.add(trip)
-                await session.commit()
-                await session.refresh(trip)
+            if user_role_name not in ["Security", "SuperAdmin"]:
+                trip = (await session.exec(
+                    select(FleetTrip)
+                    .where(FleetTrip.vehicle_id == vehicle.id)
+                    .where(FleetTrip.status == "ongoing")
+                )).first()
                 
-            passenger = (await session.exec(
-                select(FleetPassengerManifest)
-                .where(FleetPassengerManifest.trip_id == trip.id)
-                .where(FleetPassengerManifest.user_id == current_user.id)
-            )).first()
-            
-            if not passenger:
-                passenger = FleetPassengerManifest(
-                    trip_id=trip.id,
-                    user_id=current_user.id,
-                    passenger_name=current_user.full_name,
-                    phone_number=current_user.phone_number,
-                    admission_number=current_user.admission_number,
-                    arrival_confirmed=True,
-                    check_in_time=get_eat_time(),
-                    added_via_scan=True
-                )
-                session.add(passenger)
-                await session.commit()
+                if not trip:
+                    trip = FleetTrip(
+                        vehicle_id=vehicle.id,
+                        driver_id=None,
+                        purpose="Ad-hoc boarding via scan",
+                        origin="Campus",
+                        destination="Destination",
+                        status="ongoing",
+                        actual_departure=get_eat_time(),
+                        start_odometer=vehicle.current_odometer or 0.0
+                    )
+                    session.add(trip)
+                    await session.commit()
+                    await session.refresh(trip)
+                    
+                passenger = (await session.exec(
+                    select(FleetPassengerManifest)
+                    .where(FleetPassengerManifest.trip_id == trip.id)
+                    .where(FleetPassengerManifest.user_id == current_user.id)
+                )).first()
                 
-            return {
-                "status": "allowed",
-                "message": f"Boarded vehicle {vehicle.plate_number} successfully",
-                "data": {
-                    "name": current_user.full_name,
-                    "role": f"Boarded {vehicle.make} {vehicle.model} ({vehicle.plate_number})",
-                    "time": get_eat_time().strftime("%I:%M %p"),
-                    "image": current_user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                if not passenger:
+                    passenger = FleetPassengerManifest(
+                        trip_id=trip.id,
+                        user_id=current_user.id,
+                        passenger_name=current_user.full_name,
+                        phone_number=current_user.phone_number,
+                        admission_number=current_user.admission_number,
+                        arrival_confirmed=True,
+                        check_in_time=get_eat_time(),
+                        added_via_scan=True
+                    )
+                    session.add(passenger)
+                    await session.commit()
+                    
+                return {
+                    "status": "allowed",
+                    "message": f"Boarded vehicle {vehicle.plate_number} successfully",
+                    "data": {
+                        "name": current_user.full_name,
+                        "role": f"Boarded {vehicle.make} {vehicle.model} ({vehicle.plate_number})",
+                        "time": get_eat_time().strftime("%I:%M %p"),
+                        "image": current_user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                    }
                 }
-            }
             
         open_log = (await session.exec(
             select(VehicleLog)

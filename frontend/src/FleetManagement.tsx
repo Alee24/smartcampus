@@ -9,6 +9,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import { QRCodeCanvas } from 'qrcode.react';
 
 // Fix Leaflet icon issue
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -3002,44 +3003,78 @@ function VehicleDetailsView({ vehicleId, onBack, showToast }: VehicleDetailsView
 
             {/* Main content grid: Vehicle details card + logs tabs */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Vehicle specifications card */}
-                <div className="glass-card p-6 h-fit space-y-6">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-3 flex items-center gap-2">
-                        <Car size={18} className="text-primary-600" />
-                        Specifications
-                    </h3>
-                    <div className="space-y-4 text-sm">
-                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
-                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Vehicle Type</span>
-                            <span className="font-extrabold text-gray-800 dark:text-gray-200 capitalize">{vehicle.vehicle_type}</span>
+                <div className="space-y-6 h-fit">
+                    {/* Vehicle QR Code Card */}
+                    <div className="glass-card p-6 flex flex-col items-center justify-center text-center space-y-4">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-3 w-full flex items-center justify-center gap-2">
+                            <QrCode size={18} className="text-primary-600" />
+                            Vehicle QR Pass
+                        </h3>
+                        <div className="p-3 bg-white rounded-2xl shadow-inner border border-gray-100 dark:border-gray-700 inline-block">
+                            <QRCodeCanvas 
+                                value={(() => {
+                                    const serverIpOrDomain = localStorage.getItem('server_ip_or_domain');
+                                    let base = window.location.origin;
+                                    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+                                        if (serverIpOrDomain) {
+                                            base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                                                ? serverIpOrDomain
+                                                : `${window.location.protocol}//${serverIpOrDomain}`;
+                                        }
+                                    }
+                                    return `${base}/?vehicle=${vehicle.plate_number}`;
+                                })()} 
+                                size={160}
+                                level="H"
+                            />
                         </div>
-                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
-                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Fuel Type</span>
-                            <span className="font-extrabold text-gray-800 dark:text-gray-200 capitalize">{vehicle.fuel_type}</span>
+                        <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider">Scan to Board</p>
+                            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 max-w-[200px] mx-auto font-medium">
+                                Scanning this QR code from the portal will automatically board you to this vehicle's active trip manifest.
+                            </p>
                         </div>
-                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
-                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Fuel Capacity</span>
-                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.fuel_capacity} Liters</span>
-                        </div>
-                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
-                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Seating Capacity</span>
-                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.seating_capacity} Seats</span>
-                        </div>
-                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
-                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Manufacture Year</span>
-                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.year || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
-                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Color</span>
-                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.color || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
-                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Assigned Driver</span>
-                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.driver_name || 'Unassigned'}</span>
-                        </div>
-                        <div className="flex justify-between pb-1">
-                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Driver Contact</span>
-                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.driver_contact || 'N/A'}</span>
+                    </div>
+
+                    {/* Vehicle specifications card */}
+                    <div className="glass-card p-6 h-fit space-y-6">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-3 flex items-center gap-2">
+                            <Car size={18} className="text-primary-600" />
+                            Specifications
+                        </h3>
+                        <div className="space-y-4 text-sm">
+                            <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                                <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Vehicle Type</span>
+                                <span className="font-extrabold text-gray-800 dark:text-gray-200 capitalize">{vehicle.vehicle_type}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                                <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Fuel Type</span>
+                                <span className="font-extrabold text-gray-800 dark:text-gray-200 capitalize">{vehicle.fuel_type}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                                <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Fuel Capacity</span>
+                                <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.fuel_capacity} Liters</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                                <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Seating Capacity</span>
+                                <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.seating_capacity} Seats</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                                <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Manufacture Year</span>
+                                <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.year || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                                <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Color</span>
+                                <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.color || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                                <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Assigned Driver</span>
+                                <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.driver_name || 'Unassigned'}</span>
+                            </div>
+                            <div className="flex justify-between pb-1">
+                                <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Driver Contact</span>
+                                <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.driver_contact || 'N/A'}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
