@@ -179,11 +179,35 @@ async def scan_entry(
     session: AsyncSession = Depends(get_session)
 ):
     import re
+    import urllib.parse
+    from sqlalchemy import func
+    
     code = scan_data.get("admission_number", "").strip()
     if not code:
         return {"status": "rejected", "message": "Scanned code is empty", "data": None}
 
-    # 1. Check for Gate
+    # 1. Parse URL query parameters if code is a URL (e.g. from QR Asset Hub)
+    if "://" in code or "?" in code:
+        try:
+            parsed_url = urllib.parse.urlparse(code)
+            params = urllib.parse.parse_qs(parsed_url.query)
+            if "user" in params:
+                code = params["user"][0].strip()
+            elif "vehicle" in params:
+                code = params["vehicle"][0].strip()
+            elif "room" in params:
+                code = params["room"][0].strip()
+            elif "course" in params:
+                code = params["course"][0].strip()
+            elif "event" in params:
+                code = "EVENT:" + params["event"][0].strip()
+            elif "visitor" in params:
+                code = "VISITOR:" + params["visitor"][0].strip()
+        except Exception as e:
+            print(f"Error parsing scan URL: {e}")
+            pass
+
+    # 2. Check for Gate
     gate = None
     gate_id = scan_data.get("gate_id")
     if gate_id:
@@ -201,7 +225,7 @@ async def scan_entry(
             await session.commit()
             await session.refresh(gate)
 
-    # 2. Check for Prefix
+    # 3. Check for Prefix
     upper_code = code.upper()
     parsed_code = code
     entity_type = None
@@ -219,22 +243,29 @@ async def scan_entry(
         entity_type = "user"
         parsed_code = code.split(":", 1)[1].strip()
     
-    # 3. If no prefix matched, we auto-identify from the string format/data
+    # 4. If no prefix matched, we auto-identify from the string format/data
     if not entity_type:
-        # Check User first
-        user = (await session.exec(select(User).where(User.admission_number == code))).first()
+        # Check User first (case-insensitive)
+        user = (await session.exec(
+            select(User).where(func.lower(User.admission_number) == func.lower(code))
+        )).first()
         if user:
             entity_type = "user"
             parsed_code = code
         else:
-            # Check Vehicle table
-            vehicle = (await session.exec(select(Vehicle).where(Vehicle.plate_number == code.upper()))).first()
+            # Check Vehicle table (case-insensitive, space-insensitive)
+            clean_code = code.replace(" ", "").lower()
+            vehicle = (await session.exec(
+                select(Vehicle).where(func.lower(func.replace(Vehicle.plate_number, ' ', '')) == clean_code)
+            )).first()
             if vehicle:
                 entity_type = "vehicle"
                 parsed_code = code
             else:
                 # Check Visitor table
-                visitor = (await session.exec(select(Visitor).where(Visitor.id_number == code))).first()
+                visitor = (await session.exec(
+                    select(Visitor).where(func.lower(Visitor.id_number) == func.lower(code))
+                )).first()
                 if not visitor:
                     # check if code is UUID matching visitor ID
                     try:
@@ -471,7 +502,10 @@ async def scan_entry(
             }
 
     else: # user
-        user = (await session.exec(select(User).where(User.admission_number == parsed_code))).first()
+        from sqlalchemy import func
+        user = (await session.exec(
+            select(User).where(func.lower(User.admission_number) == func.lower(parsed_code.strip()))
+        )).first()
         if not user:
             return {
                 "status": "rejected",
@@ -481,7 +515,7 @@ async def scan_entry(
             
         status = "allowed"
         message = "Access Granted"
-        if user.status != "active":
+        if user.status.lower() != "active":
             status = "rejected"
             message = f"User is inactive ({user.status})"
             return {
@@ -820,46 +854,179 @@ async def ocr_plate(
         shutil.copyfileobj(file.file, buffer)
         
     detected_text = ""
-    try:
-        import pytesseract
-        from PIL import Image
+    
+    def extract_license_plate(text_str: str) -> str:
+        if not text_str:
+            return ""
+        text_str = text_str.upper()
         import re
         
-        image = Image.open(filepath)
-        text = pytesseract.image_to_string(image)
-        # Clean text: uppercase and remove non-alphanumeric characters
-        clean_text = re.sub(r'[^A-Z0-9]', '', text.upper())
-        if clean_text:
-            # Reconstruct Kenyan format (e.g., KCA 123A -> KCA123A)
-            # We will use the cleaned alphanumeric text for searching.
-            detected_text = clean_text
-    except Exception as e:
-        print(f"OCR failed or tesseract not installed: {e}")
-        pass
-        
+        # Kenyan format: KAA 123A (3 letters, digits, 1 letter)
+        match = re.search(r'([KkGg][A-Za-z]{2})\s*(\d{3})\s*([A-Za-z])', text_str)
+        if match:
+            return f"{match.group(1).upper()} {match.group(2)}{match.group(3).upper()}"
+            
+        # Old/Alternate: KAA 1234 or KAA 123
+        match_alt = re.search(r'([KkGg][A-Za-z]{2})\s*(\d{3,4})', text_str)
+        if match_alt:
+            return f"{match_alt.group(1).upper()} {match_alt.group(2)}"
+            
+        # Alphanumeric length 5-10
+        clean = re.sub(r'[^A-Z0-9]', '', text_str)
+        if len(clean) >= 5 and len(clean) <= 10:
+            return clean
+            
+        return ""
+
+    # Load system AI config
+    stmt = select(SystemConfig).where(SystemConfig.key == "ai_config")
+    config_record = (await session.exec(stmt)).first()
+    ai_config = {}
+    if config_record:
+        try:
+            import json
+            ai_config = json.loads(config_record.value)
+        except Exception:
+            pass
+
+    google_key = ai_config.get("google_vision_api_key", "").strip()
+    openai_key = ai_config.get("openai_api_key", "").strip()
+
+    # 1. Try Google Vision OCR if key is set
+    if google_key and not detected_text:
+        try:
+            from google.cloud import vision
+            import json
+            if google_key.startswith("{"):
+                from google.oauth2 import service_account
+                info = json.loads(google_key)
+                credentials = service_account.Credentials.from_service_account_info(info)
+                client = vision.ImageAnnotatorClient(credentials=credentials)
+            else:
+                from google.api_core.client_options import ClientOptions
+                client_options = ClientOptions(api_key=google_key)
+                client = vision.ImageAnnotatorClient(client_options=client_options)
+                
+            with open(filepath, 'rb') as image_file:
+                content = image_file.read()
+            image = vision.Image(content=content)
+            response = client.text_detection(image=image)
+            texts = response.text_annotations
+            if texts:
+                raw_text = texts[0].description
+                detected_text = extract_license_plate(raw_text)
+                print(f"Google Vision OCR Extracted: '{detected_text}' from raw: '{raw_text}'")
+        except Exception as e:
+            print(f"Google Vision OCR failed: {e}")
+
+    # 2. Try OpenAI Vision if key is set
+    if openai_key and not detected_text:
+        try:
+            import base64
+            import requests
+            with open(filepath, "rb") as image_file:
+                encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+                
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {openai_key}"
+            }
+            payload = {
+                "model": "gpt-4o",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "What is the vehicle license plate number shown in this image? Respond with ONLY the license plate number (e.g. KCA 123A) and nothing else. If none is found, respond with 'NONE'."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{encoded_image}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "max_tokens": 10
+            }
+            response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=10)
+            if response.status_code == 200:
+                res_json = response.json()
+                gpt_text = res_json['choices'][0]['message']['content'].strip()
+                if gpt_text != "NONE":
+                    detected_text = extract_license_plate(gpt_text)
+                    print(f"OpenAI Vision OCR Extracted: '{detected_text}' from GPT: '{gpt_text}'")
+        except Exception as e:
+            print(f"OpenAI Vision OCR failed: {e}")
+
+    # 3. Fallback to local Tesseract OCR
     if not detected_text:
-        # Fallback if OCR fails completely (for development/testing)
+        try:
+            import pytesseract
+            from PIL import Image
+            
+            image = Image.open(filepath)
+            text = pytesseract.image_to_string(image)
+            detected_text = extract_license_plate(text)
+            print(f"Local Tesseract OCR Extracted: '{detected_text}'")
+        except Exception as e:
+            print(f"Local OCR failed or tesseract not installed: {e}")
+            
+    # 4. Final simulation fallback
+    if not detected_text:
         existing_vehicle = (await session.exec(select(Vehicle))).first()
         if existing_vehicle and random.choice([True, True, False]):
-            detected_text = existing_vehicle.plate_number.replace(" ", "")
+            detected_text = existing_vehicle.plate_number
         else:
-            detected_text = f"KCA{random.randint(100, 999)}{random.choice(['A','B','C'])}"
+            detected_text = f"KCA {random.randint(100, 999)}{random.choice(['A','B','C'])}"
 
-    # Search in DB using a cleaned comparison (removing spaces from DB plate_number as well)
+    # Search in DB using a cleaned comparison (removing spaces)
     from sqlalchemy import func
+    from sqlalchemy.orm import selectinload
+    
+    clean_detected = detected_text.replace(" ", "").upper()
     vehicle = (await session.exec(
-        select(Vehicle).where(
-            func.replace(Vehicle.plate_number, ' ', '') == detected_text
-        )
+        select(Vehicle)
+        .where(func.replace(Vehicle.plate_number, ' ', '') == clean_detected)
+        .options(selectinload(Vehicle.owner))
     )).first()
     
     # If vehicle exists, use the formatted plate number from the database for display
     display_plate = vehicle.plate_number if vehicle else detected_text
     
+    vehicle_dict = None
+    if vehicle:
+        d_name = vehicle.driver_name
+        d_contact = vehicle.driver_contact
+        d_id = vehicle.driver_id_number
+        
+        # Fallback to owner details if driver details are empty
+        if not d_name and vehicle.owner:
+            d_name = vehicle.owner.full_name
+        if not d_contact and vehicle.owner:
+            d_contact = vehicle.owner.phone_number
+        if not d_id and vehicle.owner:
+            d_id = vehicle.owner.admission_number
+            
+        vehicle_dict = {
+            "id": str(vehicle.id),
+            "plate_number": vehicle.plate_number,
+            "make": vehicle.make or "Unknown",
+            "model": vehicle.model or "Unknown",
+            "color": vehicle.color or "Unknown",
+            "driver_name": d_name or "",
+            "driver_contact": d_contact or "",
+            "driver_id_number": d_id or "",
+            "is_fleet": vehicle.is_fleet
+        }
+    
     return {
         "plate_number": display_plate,
         "is_registered": vehicle is not None,
-        "vehicle": vehicle,
+        "vehicle": vehicle_dict,
         "image_url": f"/{filepath}"
     }
 
