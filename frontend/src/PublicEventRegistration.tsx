@@ -1,8 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { Calendar, Users, MapPin, Shield, Check, Info, Loader2, X, Download, AlertTriangle } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
+import html2canvas from 'html2canvas'
 import { PrivacyPolicy } from './privacy/PrivacyPolicy'
 import { CookiePolicy } from './privacy/CookiePolicy'
+
+const getMaskedId = (id: string) => {
+    if (!id) return '';
+    const clean = id.trim();
+    if (clean.length <= 4) return clean;
+    return '•••• ' + clean.slice(-4);
+}
 
 export default function PublicEventRegistration() {
     const [event, setEvent] = useState<any>(null)
@@ -23,8 +31,8 @@ export default function PublicEventRegistration() {
     const [showPrivacyModal, setShowPrivacyModal] = useState(false)
     const [showCookieModal, setShowCookieModal] = useState(false)
     
-    // QR download ref
-    const passQrRef = useRef<HTMLDivElement>(null)
+    // Pass Card download ref
+    const passCardRef = useRef<HTMLDivElement>(null)
 
     // Extract token from URL path
     const token = window.location.pathname.split('/').pop() || ''
@@ -136,15 +144,21 @@ export default function PublicEventRegistration() {
         }
     }
 
-    const downloadPass = () => {
-        if (!passQrRef.current) return
-        const canvas = passQrRef.current.querySelector("canvas")
-        if (canvas) {
+    const downloadPass = async () => {
+        if (!passCardRef.current) return
+        try {
+            const canvas = await html2canvas(passCardRef.current, {
+                scale: 3, // High resolution
+                useCORS: true,
+                backgroundColor: '#ffffff'
+            })
             const pngFile = canvas.toDataURL("image/png")
             const downloadLink = document.createElement("a")
-            downloadLink.download = `EventPass_${event?.name}_${successData?.visitor_name}.png`
+            downloadLink.download = `GatePass_${event?.name || 'Event'}_${successData?.visitor_name || 'Guest'}.png`
             downloadLink.href = pngFile
             downloadLink.click()
+        } catch (err) {
+            console.error("Error generating pass image:", err)
         }
     }
 
@@ -232,50 +246,88 @@ export default function PublicEventRegistration() {
 
                 {/* Success Registration Pass */}
                 {successData ? (
-                    <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl p-8 text-center shadow-2xl max-w-md mx-auto">
-                        <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/60 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Check className="text-emerald-600" size={32} />
-                        </div>
-                        
-                        <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">
-                            {successData.status === 'checked_in' ? 'Checked In Successfully!' : 'Registered Successfully!'}
-                        </h3>
-                        <p className="text-gray-500 text-sm mb-6">
-                            {successData.status === 'checked_in' 
-                                ? 'Welcome! You have been logged as present. Show this gate pass to campus guards if requested.'
-                                : 'Your pass is ready. Guard scan at the gate on the event day will check you in.'}
-                        </p>
-
-                        <div className="bg-white p-5 rounded-2xl border border-gray-200 inline-block mb-6 shadow-sm" ref={passQrRef}>
-                            <QRCodeCanvas
-                                value={`VISITOR:${successData.id}`}
-                                size={180}
-                                level="H"
-                            />
-                        </div>
-
-                        <div className="text-left bg-gray-50 dark:bg-gray-800/60 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 mb-6 text-sm">
-                            <div className="mb-3">
-                                <span className="text-xs text-gray-400 font-bold uppercase">Event</span>
-                                <div className="font-bold text-gray-800 dark:text-gray-200">{event.name}</div>
+                    <div className="text-center max-w-md mx-auto">
+                        <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border border-gray-150 dark:border-gray-800 rounded-3xl p-6 mb-6 shadow-xl flex flex-col items-center">
+                            <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-950/60 rounded-full flex items-center justify-center mb-4">
+                                <Check className="text-emerald-600" size={24} />
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <span className="text-xs text-gray-400 font-bold uppercase">Guest</span>
-                                    <div className="font-bold text-gray-800 dark:text-gray-200">{successData.visitor_name}</div>
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white mb-1">
+                                {successData.status === 'checked_in' ? 'Checked In Successfully!' : 'Registered Successfully!'}
+                            </h3>
+                            <p className="text-gray-500 text-xs leading-relaxed max-w-xs">
+                                {successData.status === 'checked_in' 
+                                    ? 'Welcome! You have been logged as present. Show the pass below to campus guards.'
+                                    : 'Your pass is ready. Show this pass to campus guards at the gate to scan and check in.'}
+                            </p>
+                        </div>
+
+                        {/* Professional Gate Pass Card (Download Target) */}
+                        <div 
+                            ref={passCardRef}
+                            className="bg-white text-gray-900 p-8 rounded-3xl border border-gray-200 shadow-2xl text-center max-w-sm mx-auto mb-6 relative overflow-hidden"
+                            style={{ backgroundColor: '#ffffff', color: '#111827' }}
+                        >
+                            {/* Accent line on top of download */}
+                            <div className="absolute top-0 left-0 right-0 h-2.5 bg-gradient-to-r from-purple-600 to-indigo-650" />
+                            
+                            <div className="flex flex-col items-center">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-purple-600 mb-1">
+                                    {event.event_type}
                                 </div>
-                                <div>
-                                    <span className="text-xs text-gray-400 font-bold uppercase">ID Number</span>
-                                    <div className="font-mono text-gray-700 dark:text-gray-300">{successData.visitor_identifier}</div>
+                                <h4 className="text-xl font-black text-gray-900 tracking-tight leading-snug mb-1">
+                                    {event.name}
+                                </h4>
+                                <div className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-6">
+                                    Gate Pass
+                                </div>
+
+                                {/* QR Code Centered & Large */}
+                                <div className="bg-white p-4.5 rounded-2xl border border-gray-150 inline-block mb-6 shadow-sm">
+                                    <QRCodeCanvas
+                                        value={`VISITOR:${successData.id}`}
+                                        size={220}
+                                        level="H"
+                                        includeMargin={true}
+                                    />
+                                </div>
+
+                                {/* Card details table */}
+                                <div className="w-full space-y-4.5 text-left border-t border-gray-150 pt-5">
+                                    <div className="flex justify-between items-start gap-4">
+                                        <div>
+                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">Guest Name</span>
+                                            <span className="text-sm font-black text-gray-900 block leading-tight">{successData.visitor_name}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">ID Number</span>
+                                            <span className="text-sm font-mono font-bold text-gray-800 block">
+                                                {getMaskedId(successData.visitor_identifier)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-3">
+                                        <div>
+                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">Event Date & Time</span>
+                                            <span className="text-xs font-extrabold text-gray-700 block leading-tight">
+                                                {new Date(event.event_date).toDateString()}<br />@{event.start_time}
+                                            </span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">Event Venue</span>
+                                            <span className="text-xs font-extrabold text-gray-700 block truncate max-w-[140px]" title={event.school}>
+                                                {event.school}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <button
                             onClick={downloadPass}
-                            className="w-full py-4 bg-purple-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors shadow-lg shadow-purple-500/20"
+                            className="w-full py-4.5 bg-purple-600 text-white rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-purple-700 transition-all shadow-lg shadow-purple-500/20 active:scale-[0.98] border-none outline-none cursor-pointer text-sm"
                         >
-                            <Download size={20} /> Download Gate Pass
+                            <Download size={18} /> Download Professional Pass
                         </button>
                     </div>
                 ) : (

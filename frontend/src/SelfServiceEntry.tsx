@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Car, User, Truck, CheckCircle, ArrowRight, UserCheck, Shield, Camera, AlertCircle, RefreshCcw, Upload, FileText, X } from 'lucide-react'
+import { Car, User, Truck, CheckCircle, ArrowRight, UserCheck, Shield, Camera, AlertCircle, RefreshCcw, Upload, FileText, X, Info, Check, Clock, ChevronRight, HelpCircle, Lock } from 'lucide-react'
 import { PrivacyPolicy } from './privacy/PrivacyPolicy'
 import { CookiePolicy } from './privacy/CookiePolicy'
 
@@ -693,601 +693,694 @@ export default function SelfServiceEntry() {
                 className="hidden" 
             />
 
-            <div className="max-w-md mx-auto w-full relative flex-1">
-                {/* Back to Homepage Button */}
-                <div className="flex justify-start mb-4 pt-2">
+            <div className="max-w-6xl mx-auto w-full relative flex-1 flex flex-col justify-between py-6">
+                {/* Header Back Link & Brand */}
+                <div className="flex justify-between items-center mb-8">
                     <button 
                         onClick={() => window.location.href = '/'}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl text-xs font-black shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-400 hover:text-indigo-650 dark:hover:text-indigo-400 rounded-2xl text-xs font-black shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer focus:ring-2 focus:ring-indigo-500/20 outline-none"
                     >
                         &larr; Back to Homepage
                     </button>
+                    <div className="flex items-center gap-2 text-slate-800 dark:text-white">
+                        <Shield className="text-indigo-600" size={20} />
+                        <span className="font-black text-sm tracking-wider uppercase">{companyColors.company_name}</span>
+                    </div>
                 </div>
-                <header className="mb-6 text-center">
-                    <div className="inline-flex p-3 bg-indigo-600/10 rounded-2xl mb-3">
-                        <Shield className="text-indigo-600" size={28} />
-                    </div>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                        Smart Gate Pass
-                    </h1>
-                    <p className="text-slate-500 text-xs uppercase tracking-widest font-black mt-1">
-                        Self-Service Portal
-                    </p>
-                </header>
-
-                {error && (
-                    <div className="mb-5 p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/30 rounded-2xl text-rose-700 dark:text-rose-400 text-xs font-bold flex items-start gap-2.5 shadow-sm">
-                        <AlertCircle className="shrink-0 text-rose-500 mt-0.5" size={16} />
-                        <div>{error}</div>
-                    </div>
-                )}
 
                 {step === 1 && (
-                    <div className="space-y-4 animate-fade-in">
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-wider pl-1 mb-2">
-                            Select your category:
-                        </p>
+                    <div className="space-y-8 animate-fade-in flex-1 flex flex-col justify-center my-auto">
+                        <div className="text-center max-w-2xl mx-auto mb-4">
+                            <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-none bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3">
+                                Smart Gate Pass
+                            </h1>
+                            <p className="text-sm font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest pl-1 mb-4">
+                                Self-Service Registration Portal
+                            </p>
+                            <p className="text-sm text-slate-500 dark:text-slate-450 font-medium">
+                                Welcome! Please select your category below to initiate your entry registration. All records are securely maintained in accordance with privacy regulations.
+                            </p>
+                        </div>
 
-                        <RoleCard icon={User} label="Visitor" desc="Personal visits, enquiries, or guests" onClick={() => { setRole('visitor'); setStep(2); setError(null); setFormData({}); setAutoDelete24h(false); }} />
-                        <RoleCard icon={Car} label="Taxi / Cab" desc="Drop-offs, pick-ups, or taxi services" onClick={() => { setRole('taxi'); setStep(2); setError(null); setFormData({ passengers: 1 }); setAutoDelete24h(false); }} />
-                        <RoleCard icon={Truck} label="Delivery" desc="Goods, parcels, couriers, or food deliveries" onClick={() => { setRole('delivery'); setStep(2); setError(null); setFormData({}); setAutoDelete24h(false); }} />
-                        <RoleCard icon={UserCheck} label="Student / Staff" desc="Campus verification check-in/out" onClick={() => { setRole('student'); setStep(2); setError(null); setFormData({}); setAutoDelete24h(false); }} color="indigo" />
-                        <RoleCard icon={Car} label="Vehicle Registration" desc="Register your vehicle details" onClick={() => { setRole('vehicle_registration'); setStep(2); setError(null); setFormData({ role: 'student' }); setAutoDelete24h(false); }} color="indigo" />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto w-full">
+                            <RoleCard 
+                                icon={User} 
+                                label="Visitor" 
+                                desc="Personal visits, business enquiries, guest passes, or general enquiries." 
+                                onClick={() => { setRole('visitor'); setStep(2); setError(null); setFormData({}); setAutoDelete24h(false); }} 
+                                color="purple"
+                            />
+                            <RoleCard 
+                                icon={Car} 
+                                label="Taxi / Cab" 
+                                desc="Drop-offs, passenger pick-ups, or taxi services for students and staff." 
+                                onClick={() => { setRole('taxi'); setStep(2); setError(null); setFormData({ passengers: 1 }); setAutoDelete24h(false); }} 
+                                color="blue"
+                            />
+                            <RoleCard 
+                                icon={Truck} 
+                                label="Delivery" 
+                                desc="Goods delivery, parcel couriers, package drop-offs, or food delivery." 
+                                onClick={() => { setRole('delivery'); setStep(2); setError(null); setFormData({}); setAutoDelete24h(false); }} 
+                                color="amber"
+                            />
+                            <RoleCard 
+                                icon={UserCheck} 
+                                label="Student / Staff" 
+                                desc="Campus check-in or checkout verification with real-time physical presence capture." 
+                                onClick={() => { setRole('student'); setStep(2); setError(null); setFormData({}); setAutoDelete24h(false); }} 
+                                color="indigo" 
+                            />
+                            <RoleCard 
+                                icon={Car} 
+                                label="Vehicle Registration" 
+                                desc="Self-register vehicle details for parking checks and check-in audits." 
+                                onClick={() => { setRole('vehicle_registration'); setStep(2); setError(null); setFormData({ role: 'student' }); setAutoDelete24h(false); }} 
+                                color="emerald" 
+                            />
+                            
+                            {/* Interactive Help Desk Card */}
+                            <div className="glass-card bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-900 dark:to-slate-950/30 p-6 rounded-3xl border border-slate-200/60 dark:border-slate-800 flex flex-col justify-between hover:shadow-lg transition-all group select-none h-56">
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/20 text-indigo-650 dark:text-indigo-400 flex items-center justify-center shadow-inner border border-indigo-100 dark:border-indigo-900/30">
+                                        <Info size={26} />
+                                    </div>
+                                    <span className="text-[9px] bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-400 px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
+                                        Help Desk
+                                    </span>
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-black text-slate-800 dark:text-white text-base">Need Assistance?</h3>
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1.5 leading-relaxed">
+                                        Please consult gate security officers or dial campus helpline 100 for support.
+                                    </p>
+                                </div>
+                                <div className="pt-3 border-t border-slate-150 dark:border-slate-850 flex items-center justify-between text-xs font-black text-indigo-600 dark:text-indigo-400 cursor-pointer" onClick={() => setShowPrivacyModal(true)}>
+                                    <span>Data Protection Act Details</span>
+                                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {step === 2 && (
-                    <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 p-6 animate-slide-in">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-black text-slate-900 dark:text-white capitalize">
-                                {role === 'student' ? 'Student / Staff Verify' : role === 'vehicle_registration' ? 'Vehicle Registration' : `${role} Registration`}
-                            </h2>
-                            <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-black uppercase tracking-wider px-3 py-1 rounded-full border border-indigo-100 dark:border-indigo-900">
-                                Step 2 of 2
-                            </span>
-                        </div>
-
-                        {/* Data Protection summary before they fill details */}
-                        {role !== 'student' && (
-                            <div className="p-4 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl text-slate-650 dark:text-slate-350 text-xs font-bold leading-relaxed mb-6 space-y-2">
-                                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-black uppercase tracking-wider text-[10px]">
-                                    <Shield size={14} /> Data Protection & Privacy Summary
+                    <div className="max-w-5xl mx-auto w-full relative flex-1 animate-slide-in flex flex-col justify-center">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+                            {/* Left Pane (40%): Immersive Branding, role guidelines, and Data Protection Act notices */}
+                            <div className="lg:col-span-5 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 text-white rounded-3xl p-8 flex flex-col justify-between shadow-xl min-h-[400px]">
+                                <div className="space-y-6">
+                                    <div className="flex justify-between items-start">
+                                        <div className="p-3 bg-white/10 rounded-2xl">
+                                            <Shield className="text-white" size={28} />
+                                        </div>
+                                        <span className="text-[10px] bg-white/20 text-white font-black uppercase tracking-widest px-3 py-1 rounded-full border border-white/10">
+                                            Step 2 of 2
+                                        </span>
+                                    </div>
+                                    
+                                    <div>
+                                        <span className="text-[10px] text-indigo-200 font-black uppercase tracking-wider">
+                                            Gatepass Portal
+                                        </span>
+                                        <h2 className="text-3xl font-black mt-1 capitalize leading-snug">
+                                            {role === 'student' ? 'Verify Identity' : role === 'vehicle_registration' ? 'Vehicle Details' : `${role} Registration`}
+                                        </h2>
+                                        <p className="text-xs text-indigo-100 font-medium leading-relaxed mt-3">
+                                            {role === 'visitor' && "Please input your visitor details to request campus gate access. Security guards will verify these records at the gate."}
+                                            {role === 'taxi' && "Taxi registrations require vehicle plate number, passengers count, and target student/staff lookup."}
+                                            {role === 'delivery' && "Submit delivery agent credentials and capture clear photos of package items and receipts."}
+                                            {role === 'student' && "Confirm your pre-loaded student/staff profile and snap a quick photo for verification check-in."}
+                                            {role === 'vehicle_registration' && "Self-register your vehicle details under student, staff, or visitor role."}
+                                        </p>
+                                    </div>
                                 </div>
-                                <p>
-                                    To comply with the <strong>Kenya Data Protection Act 2019</strong>, we notify you that this portal collects your full name, phone number, national ID, and purpose of visit. This data is processed strictly for campus security and log auditing.
-                                </p>
-                                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
-                                    We do not use tracking cookies. View our full <button type="button" onClick={() => setShowPrivacyModal(true)} className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">Privacy Policy</button> and <button type="button" onClick={() => setShowCookieModal(true)} className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">Cookie Policy</button>.
-                                </p>
+
+                                {/* Data Protection Act details */}
+                                {role !== 'student' && (
+                                    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 space-y-3 mt-6">
+                                        <div className="flex items-center gap-2 text-white font-black uppercase tracking-wider text-[10px]">
+                                            <Shield size={14} /> Data Protection Act 2019
+                                        </div>
+                                        <p className="text-[11px] text-indigo-150 leading-relaxed font-bold">
+                                            To comply with data protection regulations, we notify you that this portal collects visitor biodata (Name, ID, Phone) strictly for gate audit logs.
+                                        </p>
+                                        <div className="text-[10px] text-indigo-200 font-medium pt-2 border-t border-white/10">
+                                            View our full <button type="button" onClick={() => setShowPrivacyModal(true)} className="text-white hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">Privacy Policy</button> and <button type="button" onClick={() => setShowCookieModal(true)} className="text-white hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">Cookie Policy</button>.
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="mt-8 text-[10px] text-indigo-200 font-bold border-t border-white/10 pt-4 flex justify-between items-center">
+                                    <span>{companyColors.company_name} | Smart Gate</span>
+                                    <span>v1.2.0</span>
+                                </div>
                             </div>
-                        )}
 
-                        {role === 'student' ? (
-                            userData ? (
-                                <div className="space-y-5 text-center">
-                                    <div className="p-5 bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 dark:from-indigo-950/20 dark:to-slate-900 border border-indigo-500/20 rounded-2xl text-left">
-                                        <div className="font-black text-slate-800 dark:text-white text-lg">{userData.full_name}</div>
-                                        <div className="text-xs text-indigo-600 dark:text-indigo-400 font-bold font-mono uppercase mt-0.5">{userData.admission_number}</div>
-                                        <div className="mt-3 text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 px-2.5 py-1 rounded-lg inline-block font-black uppercase tracking-wider">
-                                            Authenticated
-                                        </div>
-                                    </div>
-
-                                    <p className="text-slate-500 dark:text-slate-400 text-xs font-bold leading-relaxed">
-                                        Please take a photo of the entrance to verify your physical presence.
-                                    </p>
-
-                                    {/* Camera UI */}
-                                    <div className="mb-4">
-                                        {!image ? (
-                                            <div className="rounded-2xl overflow-hidden bg-black aspect-video relative shadow-inner">
-                                                <video ref={videoRef} playsInline autoPlay muted className="w-full h-full object-cover" />
-                                                {!cameraActive && (
-                                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-white z-10 p-4">
-                                                        <button 
-                                                            onClick={startCamera} 
-                                                            className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2 active:scale-95 text-xs cursor-pointer"
-                                                        >
-                                                            <Camera size={16} /> Open Device Camera
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                <canvas ref={canvasRef} className="hidden" />
-                                            </div>
-                                        ) : (
-                                            <div className="rounded-2xl overflow-hidden aspect-video relative shadow-lg ring-4 ring-indigo-50 dark:ring-indigo-950/30">
-                                                <img src={image} className="w-full h-full object-cover" />
-                                                <button
-                                                    onClick={() => { setImage(null); startCamera() }}
-                                                    className="absolute bottom-4 right-4 bg-white/95 text-slate-900 px-4 py-2 rounded-xl text-xs font-black shadow hover:bg-white flex items-center gap-1.5 transition-all cursor-pointer"
-                                                >
-                                                    <RefreshCcw size={12} /> Retake
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex gap-3 pt-2">
-                                        <button 
-                                            onClick={() => { setStep(1); setError(null); }} 
-                                            className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs active:scale-95 transition-all cursor-pointer"
-                                        >
-                                            Back
-                                        </button>
-
-                                        {cameraActive && !image && (
-                                            <button 
-                                                onClick={takePhoto} 
-                                                className="flex-[2] py-3.5 bg-slate-900 hover:bg-black text-white rounded-2xl font-black text-xs shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                                            >
-                                                <Camera size={14} /> Capture Photo
-                                            </button>
-                                        )}
-
-                                        {image && (
-                                            <button
-                                                onClick={handleStudentSubmit}
-                                                disabled={submitting}
-                                                className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-750 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 hover:opacity-95 shadow-lg shadow-indigo-600/20 transition-all active:scale-95 cursor-pointer"
-                                            >
-                                                {submitting ? 'Verifying...' : 'Submit Verification'}
-                                            </button>
-                                        )}
-
-                                        {!cameraActive && !image && (
-                                            <button 
-                                                disabled 
-                                                className="flex-[2] py-3.5 bg-slate-100 text-slate-400 dark:bg-slate-800/50 dark:text-slate-600 rounded-2xl font-black text-xs cursor-not-allowed"
-                                            >
-                                                Capture Photo First
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <form className="space-y-4" onSubmit={(e) => {
-                                    e.preventDefault()
-                                }}>
-                                    <div className="p-4 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-150 dark:border-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-2xl text-xs font-bold leading-relaxed">
-                                        You are currently logged out. Start by logging into your account to perform gate pass checks.
-                                    </div>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => window.location.href = '/'} 
-                                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 text-xs active:scale-95 transition-all cursor-pointer"
-                                    >
-                                        Go to Login Page
-                                    </button>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => { setStep(1); setError(null); }} 
-                                        className="w-full py-3.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-355 text-xs font-black cursor-pointer"
-                                    >
-                                        Back to Categories
-                                    </button>
-                                </form>
-                            )
-                        ) : role === 'vehicle_registration' ? (
-                            <form className="space-y-4" onSubmit={handleVehicleRegisterSubmit}>
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Full Name</label>
-                                    <input 
-                                        required 
-                                        placeholder="e.g. John Doe"
-                                        className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                        value={formData.driver_name || ''}
-                                        onChange={e => setFormData({ ...formData, driver_name: e.target.value })} 
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
-                                        <input 
-                                            required 
-                                            type="tel"
-                                            placeholder="e.g. 0712345678"
-                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                            value={formData.driver_contact || ''}
-                                            onChange={e => setFormData({ ...formData, driver_contact: e.target.value })} 
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport No</label>
-                                        <input 
-                                            required 
-                                            placeholder="ID Number"
-                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                            value={formData.driver_id_number || ''}
-                                            onChange={e => setFormData({ ...formData, driver_id_number: e.target.value })} 
-                                        />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-4">
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Vehicle Plate</label>
-                                        <input 
-                                            required
-                                            placeholder="KCA 123A"
-                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white font-mono uppercase"
-                                            value={formData.plate_number || ''}
-                                            onChange={e => setFormData({ ...formData, plate_number: e.target.value })} 
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Your Role</label>
-                                        <select
-                                            required
-                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                            value={formData.role || 'student'}
-                                            onChange={e => setFormData({ ...formData, role: e.target.value })}
-                                        >
-                                            <option value="student">Student</option>
-                                            <option value="staff">Staff</option>
-                                            <option value="visitor">Visitor</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {/* 24h Auto delete option checkbox */}
-                                <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4 mb-2">
-                                    <label className="flex items-start gap-3 cursor-pointer select-none">
-                                        <input
-                                            type="checkbox"
-                                            checked={autoDelete24h}
-                                            onChange={(e) => setAutoDelete24h(e.target.checked)}
-                                            className="rounded border-slate-300 dark:border-slate-800 text-indigo-650 focus:ring-indigo-500/20 w-4.5 h-4.5 mt-0.5 cursor-pointer"
-                                        />
-                                        <div>
-                                            <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider block">Auto-Scrub My Data</span>
-                                            <span className="text-[10px] text-slate-450 dark:text-slate-500 font-bold block leading-normal mt-0.5">
-                                                Automatically delete my name, contact, and ID details from campus records exactly 24 hours after my visit ends.
-                                            </span>
-                                        </div>
-                                    </label>
-                                </div>
-
-                                <div className="pt-4 flex gap-3">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => { setStep(1); setError(null); }} 
-                                        className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-355 rounded-2xl font-black text-xs transition-all active:scale-95 cursor-pointer"
-                                    >
-                                        Back
-                                    </button>
-                                    <button 
-                                        type="submit"
-                                        disabled={submitting} 
-                                        className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-95 cursor-pointer"
-                                    >
-                                        {submitting ? 'Submitting...' : <>Submit Request <ArrowRight size={14} /></>}
-                                    </button>
-                                </div>
-                            </form>
-                        ) : (
-                            <form className="space-y-4" onSubmit={handleSubmit}>
-                                {/* Full Name: Hide for taxi driver */}
-                                {role !== 'taxi' && (
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Full Name</label>
-                                        <input 
-                                            required 
-                                            placeholder="e.g. John Doe"
-                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                            value={formData.name || ''}
-                                            onChange={e => setFormData({ ...formData, name: e.target.value })} 
-                                        />
-                                    </div>
-                                )}
-
-                                {role !== 'taxi' && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
-                                            <input 
-                                                required 
-                                                type="tel"
-                                                placeholder="e.g. 0712345678"
-                                                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                                value={formData.mobile || ''}
-                                                onChange={e => setFormData({ ...formData, mobile: e.target.value })} 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport No</label>
-                                            <div className="flex gap-2">
-                                                <input 
-                                                    required 
-                                                    placeholder="ID Number"
-                                                    className="flex-1 p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                                    value={formData.id_number || ''}
-                                                    onChange={e => setFormData({ ...formData, id_number: e.target.value })} 
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => lookupVisitor(formData.id_number)}
-                                                    disabled={loadingVisitor || !formData.id_number}
-                                                    className="px-4 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-                                                >
-                                                    {loadingVisitor ? 'Searching...' : 'Lookup'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Vehicle Fields for Taxi ONLY */}
-                                {role === 'taxi' && (
-                                    <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-4">
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Vehicle Plate</label>
-                                            <input 
-                                                required
-                                                placeholder="KCA 123A"
-                                                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white font-mono uppercase"
-                                                onChange={e => setFormData({ ...formData, plate_number: e.target.value })} 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Passengers</label>
-                                            <input 
-                                                type="number" 
-                                                min="1" 
-                                                required
-                                                placeholder="1"
-                                                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                                onChange={e => setFormData({ ...formData, passengers: e.target.value })} 
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Specifics for Delivery */}
-                                {role === 'delivery' && (
-                                    <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3 space-y-4">
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Delivery Details</label>
-                                            <input 
-                                                required 
-                                                placeholder="e.g. DHL Package for Admin Office" 
-                                                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                                onChange={e => setFormData({ ...formData, delivery_details: e.target.value })} 
-                                            />
-                                        </div>
-
-                                        {/* Pictures of Package & Receipt */}
-                                        <div className="grid grid-cols-2 gap-3 pt-2">
-                                            {/* Package Image Card */}
-                                            <div className="space-y-1.5">
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase block">Delivery Package Photo</label>
-                                                {!deliveryPackageImage ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => document.getElementById('delivery-package-input')?.click()}
-                                                        className="w-full aspect-video border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-650 hover:border-indigo-500/30 transition-all bg-slate-50/50 dark:bg-slate-905 cursor-pointer"
-                                                    >
-                                                        <Camera size={18} />
-                                                        <span className="text-[9px] font-bold mt-1">Capture</span>
-                                                    </button>
-                                                ) : (
-                                                    <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 dark:border-slate-850">
-                                                        <img src={deliveryPackageImage} className="w-full h-full object-cover" />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setDeliveryPackageImage(null)}
-                                                            className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[9px] font-bold opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
-                                                        >
-                                                            Remove
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Receipt Image Card */}
-                                            <div className="space-y-1.5">
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase block">Receipt / Note Photo</label>
-                                                {!deliveryReceiptImage ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => document.getElementById('delivery-receipt-input')?.click()}
-                                                        className="w-full aspect-video border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-650 hover:border-indigo-500/30 transition-all bg-slate-50/50 dark:bg-slate-905 cursor-pointer"
-                                                    >
-                                                        <FileText size={18} />
-                                                        <span className="text-[9px] font-bold mt-1">Capture</span>
-                                                    </button>
-                                                ) : (
-                                                    <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 dark:border-slate-850">
-                                                        <img src={deliveryReceiptImage} className="w-full h-full object-cover" />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setDeliveryReceiptImage(null)}
-                                                            className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[9px] font-bold opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
-                                                        >
-                                                            Remove
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Pick Up / Drop Off & User search for Taxi */}
-                                {role === 'taxi' && (
-                                    <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4 space-y-4">
-                                        <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Service Type</label>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setTaxiServiceType('dropoff');
-                                                        setSelectedUserObj(null);
-                                                        setDropoffAdmission('');
-                                                        setDropoffName('');
-                                                        setUserSearchQuery('');
-                                                        setError(null);
-                                                    }}
-                                                    className={`py-3 px-4 rounded-xl text-xs font-black border transition-all active:scale-95 cursor-pointer ${
-                                                        taxiServiceType === 'dropoff'
-                                                            ? 'bg-indigo-600 text-white border-indigo-650 shadow-lg shadow-indigo-600/20'
-                                                            : 'bg-slate-50 dark:bg-slate-850 border-slate-150 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-                                                    }`}
-                                                >
-                                                    Drop Off
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setTaxiServiceType('pickup');
-                                                        setSelectedUserObj(null);
-                                                        setDropoffAdmission('');
-                                                        setDropoffName('');
-                                                        setUserSearchQuery('');
-                                                        setError(null);
-                                                    }}
-                                                    className={`py-3 px-4 rounded-xl text-xs font-black border transition-all active:scale-95 cursor-pointer ${
-                                                        taxiServiceType === 'pickup'
-                                                            ? 'bg-indigo-600 text-white border-indigo-650 shadow-lg shadow-indigo-600/20'
-                                                            : 'bg-slate-50 dark:bg-slate-850 border-slate-150 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-                                                    }`}
-                                                >
-                                                    Pick Up
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="relative">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold font-bold">
-                                                Search Student / Staff (Name or Admission/ID)
-                                            </label>
-                                            <input
-                                                required
-                                                type="text"
-                                                placeholder="Start typing name, admission number..."
-                                                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                                value={userSearchQuery}
-                                                onChange={(e) => {
-                                                    setUserSearchQuery(e.target.value);
-                                                    if (selectedUserObj) {
-                                                        setSelectedUserObj(null);
-                                                        setDropoffAdmission('');
-                                                        setDropoffName('');
-                                                    }
-                                                }}
-                                            />
-                                            {/* Autocomplete dropdown suggestions */}
-                                            {userSearchResults.length > 0 && (
-                                                <div className="absolute left-0 right-0 z-[60] mt-1 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
-                                                    {userSearchResults.map((user) => (
-                                                        <button
-                                                            key={user.id}
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setSelectedUserObj(user);
-                                                                setDropoffAdmission(user.admission_number);
-                                                                setDropoffName(user.full_name);
-                                                                setUserSearchQuery(`${user.full_name} (${user.admission_number})`);
-                                                                setUserSearchResults([]);
-                                                            }}
-                                                            className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-slate-850/50 last:border-none cursor-pointer"
-                                                        >
-                                                            <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border shrink-0">
-                                                                {user.profile_image ? (
-                                                                    <img src={user.profile_image} className="w-full h-full object-cover" />
-                                                                ) : (
-                                                                    <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-605 font-bold text-xs">
-                                                                        {user.full_name[0]}
-                                                                    </div>
-                                                                )}
+                            {/* Right Pane (60%): Interactive Input Form */}
+                            <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-xl flex flex-col justify-between">
+                                <div className="w-full">
+                                    {role === 'student' ? (
+                                        userData ? (
+                                            <div className="space-y-6 text-center">
+                                                <div className="p-6 bg-gradient-to-br from-indigo-50 to-purple-50/50 dark:from-slate-800/40 dark:to-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-2xl text-left flex items-center gap-4">
+                                                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-200 border shadow-sm shrink-0">
+                                                        {userData.profile_image ? (
+                                                            <img src={userData.profile_image} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-650 font-black text-xl">
+                                                                {userData.full_name[0]}
                                                             </div>
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="text-xs font-bold text-slate-800 dark:text-white truncate">{user.full_name}</div>
-                                                                <div className="text-[9px] text-slate-400 font-mono mt-0.5 truncate">{user.admission_number} | {user.school || 'Campus'}</div>
-                                                            </div>
-                                                        </button>
-                                                    ))}
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="font-black text-slate-850 dark:text-white text-base truncate">{userData.full_name}</div>
+                                                        <div className="text-xs text-indigo-600 dark:text-indigo-400 font-bold font-mono mt-0.5 uppercase">{userData.admission_number}</div>
+                                                        <div className="mt-1 text-[9px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-455 px-2.5 py-0.5 rounded-lg inline-block font-black uppercase tracking-wider">
+                                                            Authenticated User
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            )}
-                                        </div>
 
-                                        {/* Selected User Details Card */}
-                                        {selectedUserObj && (
-                                            <div className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-900 dark:to-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl flex items-center gap-4 animate-scale-in">
-                                                <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-200 border border-white dark:border-slate-800 shadow-sm shrink-0">
-                                                    {selectedUserObj.profile_image ? (
-                                                        <img src={selectedUserObj.profile_image} className="w-full h-full object-cover" />
+                                                <p className="text-slate-500 dark:text-slate-400 text-xs font-bold leading-relaxed text-left pl-1">
+                                                    Please capture a verification photo of the gate/surroundings to confirm your physical presence.
+                                                </p>
+
+                                                {/* Camera UI */}
+                                                <div className="mb-4">
+                                                    {!image ? (
+                                                        <div className="rounded-2xl overflow-hidden bg-black aspect-video relative shadow-inner">
+                                                            <video ref={videoRef} playsInline autoPlay muted className="w-full h-full object-cover" />
+                                                            {!cameraActive && (
+                                                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-white z-10 p-4">
+                                                                    <button 
+                                                                        onClick={startCamera} 
+                                                                        className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2 active:scale-95 text-xs cursor-pointer border-none outline-none"
+                                                                    >
+                                                                        <Camera size={16} /> Open Device Camera
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                            <canvas ref={canvasRef} className="hidden" />
+                                                        </div>
                                                     ) : (
-                                                        <div className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-700 font-black text-lg">
-                                                            {selectedUserObj.full_name[0]}
+                                                        <div className="rounded-2xl overflow-hidden aspect-video relative shadow-lg ring-4 ring-indigo-50 dark:ring-indigo-950/30">
+                                                            <img src={image} className="w-full h-full object-cover" />
+                                                            <button
+                                                                onClick={() => { setImage(null); startCamera() }}
+                                                                className="absolute bottom-4 right-4 bg-white/95 text-slate-900 px-4 py-2 rounded-xl text-xs font-black shadow hover:bg-white flex items-center gap-1.5 transition-all cursor-pointer border-none"
+                                                            >
+                                                                <RefreshCcw size={12} /> Retake
+                                                            </button>
                                                         </div>
                                                     )}
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="font-bold text-slate-800 dark:text-white text-xs truncate">{selectedUserObj.full_name}</div>
-                                                    <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono mt-0.5">{selectedUserObj.admission_number}</div>
-                                                    <div className="text-[9px] text-slate-405 mt-0.5 capitalize">{selectedUserObj.school || 'Campus'}</div>
+
+                                                <div className="flex gap-3 pt-2">
+                                                    <button 
+                                                        onClick={() => { setStep(1); setError(null); }} 
+                                                        className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-805 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs active:scale-95 transition-all cursor-pointer border-none"
+                                                    >
+                                                        Cancel
+                                                    </button>
+
+                                                    {cameraActive && !image && (
+                                                        <button 
+                                                            onClick={takePhoto} 
+                                                            className="flex-[2] py-3.5 bg-slate-900 hover:bg-black text-white rounded-2xl font-black text-xs shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer border-none"
+                                                        >
+                                                            <Camera size={14} /> Capture Photo
+                                                        </button>
+                                                    )}
+
+                                                    {image && (
+                                                        <button
+                                                            onClick={handleStudentSubmit}
+                                                            disabled={submitting}
+                                                            className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-750 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 hover:opacity-95 shadow-lg shadow-indigo-600/20 transition-all active:scale-95 cursor-pointer border-none"
+                                                        >
+                                                            {submitting ? 'Verifying...' : 'Submit Verification'}
+                                                        </button>
+                                                    )}
+
+                                                    {!cameraActive && !image && (
+                                                        <button 
+                                                            disabled 
+                                                            className="flex-[2] py-3.5 bg-slate-100 text-slate-400 dark:bg-slate-805/50 dark:text-slate-600 rounded-2xl font-black text-xs cursor-not-allowed border-none"
+                                                        >
+                                                            Capture Photo First
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
-                                )}
+                                        ) : (
+                                            <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+                                                <div className="p-4 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-150 dark:border-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-2xl text-xs font-bold leading-relaxed">
+                                                    You are currently logged out. Start by logging into your account to perform gate pass checks.
+                                                </div>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => window.location.href = '/'} 
+                                                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-755 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 text-xs active:scale-95 transition-all cursor-pointer border-none"
+                                                >
+                                                    Go to Login Page
+                                                </button>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => { setStep(1); setError(null); }} 
+                                                    className="w-full py-3.5 text-slate-500 hover:text-slate-850 dark:hover:text-slate-355 text-xs font-black cursor-pointer border-none bg-transparent"
+                                                >
+                                                    Back to Categories
+                                                </button>
+                                            </form>
+                                        )
+                                    ) : role === 'vehicle_registration' ? (
+                                        <form className="space-y-4" onSubmit={handleVehicleRegisterSubmit}>
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Full Name</label>
+                                                <input 
+                                                    required 
+                                                    placeholder="e.g. John Doe"
+                                                    className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                    value={formData.driver_name || ''}
+                                                    onChange={e => setFormData({ ...formData, driver_name: e.target.value })} 
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
+                                                    <input 
+                                                        required 
+                                                        type="tel"
+                                                        placeholder="e.g. 0712345678"
+                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                        value={formData.driver_contact || ''}
+                                                        onChange={e => setFormData({ ...formData, driver_contact: e.target.value })} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport No</label>
+                                                    <input 
+                                                        required 
+                                                        placeholder="ID Number"
+                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                        value={formData.driver_id_number || ''}
+                                                        onChange={e => setFormData({ ...formData, driver_id_number: e.target.value })} 
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-800/80 pt-4">
+                                                <div>
+                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Vehicle Plate</label>
+                                                    <input 
+                                                        required
+                                                        placeholder="KCA 123A"
+                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white font-mono uppercase"
+                                                        value={formData.plate_number || ''}
+                                                        onChange={e => setFormData({ ...formData, plate_number: e.target.value })} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Your Role</label>
+                                                    <select
+                                                        required
+                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                        value={formData.role || 'student'}
+                                                        onChange={e => setFormData({ ...formData, role: e.target.value })}
+                                                    >
+                                                        <option value="student">Student</option>
+                                                        <option value="staff">Staff</option>
+                                                        <option value="visitor">Visitor</option>
+                                                    </select>
+                                                </div>
+                                            </div>
 
-                                {/* Purpose of Visit: Visitor ONLY */}
-                                {role === 'visitor' && (
-                                    <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Purpose of Visit</label>
-                                        <input 
-                                            required 
-                                            placeholder="e.g. Meeting with Registrar, General Inquiry"
-                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                            onChange={e => setFormData({ ...formData, purpose: e.target.value })} 
-                                        />
-                                    </div>
-                                )}
+                                            {/* 24h Auto delete option checkbox */}
+                                            <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4 mb-2">
+                                                <label className="flex items-start gap-3 cursor-pointer select-none">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={autoDelete24h}
+                                                        onChange={(e) => setAutoDelete24h(e.target.checked)}
+                                                        className="rounded border-slate-350 dark:border-slate-800 text-indigo-605 focus:ring-indigo-500/20 w-4.5 h-4.5 mt-0.5 cursor-pointer"
+                                                    />
+                                                    <div>
+                                                        <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider block font-bold">Auto-Scrub My Data</span>
+                                                        <span className="text-[10px] text-slate-450 dark:text-slate-500 font-bold block leading-normal mt-0.5">
+                                                            Automatically delete my name, contact, and ID details from campus records exactly 24 hours after my visit ends.
+                                                        </span>
+                                                    </div>
+                                                </label>
+                                            </div>
 
-                                {/* 24h Auto delete option checkbox */}
-                                <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4 mb-2">
-                                    <label className="flex items-start gap-3 cursor-pointer select-none">
-                                        <input
-                                            type="checkbox"
-                                            checked={autoDelete24h}
-                                            onChange={(e) => setAutoDelete24h(e.target.checked)}
-                                            className="rounded border-slate-300 dark:border-slate-800 text-indigo-650 focus:ring-indigo-500/20 w-4.5 h-4.5 mt-0.5 cursor-pointer"
-                                        />
-                                        <div>
-                                            <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider block">Auto-Scrub My Data</span>
-                                            <span className="text-[10px] text-slate-450 dark:text-slate-500 font-bold block leading-normal mt-0.5">
-                                                Automatically delete my name, contact, and ID details from campus records exactly 24 hours after my visit ends.
-                                            </span>
-                                        </div>
-                                    </label>
+                                            <div className="pt-4 flex gap-3">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => { setStep(1); setError(null); }} 
+                                                    className="flex-1 py-4 bg-slate-100 hover:bg-slate-205 dark:bg-slate-805 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs transition-all active:scale-95 cursor-pointer border-none"
+                                                >
+                                                    Back
+                                                </button>
+                                                <button 
+                                                    type="submit"
+                                                    disabled={submitting} 
+                                                    className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-755 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 transition-all active:scale-95 cursor-pointer border-none"
+                                                >
+                                                    {submitting ? 'Submitting...' : <>Submit Request <ArrowRight size={14} /></>}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    ) : (
+                                        <form className="space-y-4" onSubmit={handleSubmit}>
+                                            {/* Full Name */}
+                                            {role !== 'taxi' && (
+                                                <div>
+                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Full Name</label>
+                                                    <input 
+                                                        required 
+                                                        placeholder="e.g. John Doe"
+                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                        value={formData.name || ''}
+                                                        onChange={e => setFormData({ ...formData, name: e.target.value })} 
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {role !== 'taxi' && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
+                                                        <input 
+                                                            required 
+                                                            type="tel"
+                                                            placeholder="e.g. 0712345678"
+                                                            className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                            value={formData.mobile || ''}
+                                                            onChange={e => setFormData({ ...formData, mobile: e.target.value })} 
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport No</label>
+                                                        <div className="flex gap-2">
+                                                            <input 
+                                                                required 
+                                                                placeholder="ID Number"
+                                                                className="flex-1 p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                                value={formData.id_number || ''}
+                                                                onChange={e => setFormData({ ...formData, id_number: e.target.value })} 
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => lookupVisitor(formData.id_number)}
+                                                                disabled={loadingVisitor || !formData.id_number}
+                                                                className="px-4 bg-slate-900 text-white rounded-2xl text-xs font-bold hover:bg-black transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none"
+                                                            >
+                                                                {loadingVisitor ? 'Searching...' : 'Lookup'}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Vehicle Fields for Taxi ONLY */}
+                                            {role === 'taxi' && (
+                                                <div className="grid grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Vehicle Plate</label>
+                                                        <input 
+                                                            required
+                                                            placeholder="KCA 123A"
+                                                            className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-855 dark:text-white font-mono uppercase"
+                                                            value={formData.plate_number || ''}
+                                                            onChange={e => setFormData({ ...formData, plate_number: e.target.value })} 
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Passengers</label>
+                                                        <input 
+                                                            type="number" 
+                                                            min="1" 
+                                                            required
+                                                            value={formData.passengers || 1}
+                                                            className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-855 dark:text-white"
+                                                            onChange={e => setFormData({ ...formData, passengers: e.target.value })} 
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Specifics for Delivery */}
+                                            {role === 'delivery' && (
+                                                <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-4">
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Delivery Details</label>
+                                                        <input 
+                                                            required 
+                                                            placeholder="e.g. DHL Package for Admin Office" 
+                                                            className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-855 dark:text-white"
+                                                            value={formData.delivery_details || ''}
+                                                            onChange={e => setFormData({ ...formData, delivery_details: e.target.value })} 
+                                                        />
+                                                    </div>
+
+                                                    {/* Pictures of Package & Receipt */}
+                                                    <div className="grid grid-cols-2 gap-4 pt-2">
+                                                        {/* Package Image Card */}
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase block font-bold">Delivery Package Photo</label>
+                                                            {!deliveryPackageImage ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => document.getElementById('delivery-package-input')?.click()}
+                                                                    className="w-full aspect-video border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 hover:text-indigo-650 hover:border-indigo-500/30 transition-all bg-slate-50 dark:bg-slate-850 cursor-pointer"
+                                                                >
+                                                                    <Camera size={18} />
+                                                                    <span className="text-[9px] font-bold mt-1">Capture</span>
+                                                                </button>
+                                                            ) : (
+                                                                <div className="relative aspect-video rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
+                                                                    <img src={deliveryPackageImage} className="w-full h-full object-cover" />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setDeliveryPackageImage(null)}
+                                                                        className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[9px] font-bold opacity-0 hover:opacity-100 transition-opacity cursor-pointer border-none"
+                                                                    >
+                                                                        Remove
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Receipt Image Card */}
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase block font-bold">Receipt / Note Photo</label>
+                                                            {!deliveryReceiptImage ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => document.getElementById('delivery-receipt-input')?.click()}
+                                                                    className="w-full aspect-video border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 hover:text-indigo-655 hover:border-indigo-500/30 transition-all bg-slate-50 dark:bg-slate-850 cursor-pointer"
+                                                                >
+                                                                    <FileText size={18} />
+                                                                    <span className="text-[9px] font-bold mt-1">Capture</span>
+                                                                </button>
+                                                            ) : (
+                                                                <div className="relative aspect-video rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm">
+                                                                    <img src={deliveryReceiptImage} className="w-full h-full object-cover" />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setDeliveryReceiptImage(null)}
+                                                                        className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[9px] font-bold opacity-0 hover:opacity-100 transition-opacity cursor-pointer border-none"
+                                                                    >
+                                                                        Remove
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Pick Up / Drop Off & User search for Taxi */}
+                                            {role === 'taxi' && (
+                                                <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-4 font-sans">
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold font-bold font-bold font-bold">Service Type</label>
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setTaxiServiceType('dropoff');
+                                                                    setSelectedUserObj(null);
+                                                                    setDropoffAdmission('');
+                                                                    setDropoffName('');
+                                                                    setUserSearchQuery('');
+                                                                    setError(null);
+                                                                }}
+                                                                className={`py-3.5 px-4 rounded-xl text-xs font-black border transition-all active:scale-95 cursor-pointer ${
+                                                                    taxiServiceType === 'dropoff'
+                                                                        ? 'bg-indigo-600 text-white border-indigo-650 shadow-lg shadow-indigo-600/20'
+                                                                        : 'bg-slate-50 dark:bg-slate-850 border-slate-150 dark:border-slate-805 text-slate-700 dark:text-slate-300'
+                                                                }`}
+                                                            >
+                                                                Drop Off
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setTaxiServiceType('pickup');
+                                                                    setSelectedUserObj(null);
+                                                                    setDropoffAdmission('');
+                                                                    setDropoffName('');
+                                                                    setUserSearchQuery('');
+                                                                    setError(null);
+                                                                }}
+                                                                className={`py-3.5 px-4 rounded-xl text-xs font-black border transition-all active:scale-95 cursor-pointer ${
+                                                                    taxiServiceType === 'pickup'
+                                                                        ? 'bg-indigo-600 text-white border-indigo-650 shadow-lg shadow-indigo-600/20'
+                                                                        : 'bg-slate-50 dark:bg-slate-850 border-slate-150 dark:border-slate-805 text-slate-700 dark:text-slate-300'
+                                                                }`}
+                                                            >
+                                                                Pick Up
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="relative">
+                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold font-bold font-bold">
+                                                            Search Student / Staff (Name or Admission/ID)
+                                                        </label>
+                                                        <input
+                                                            required
+                                                            type="text"
+                                                            placeholder="Start typing name, admission number..."
+                                                            className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                            value={userSearchQuery}
+                                                            onChange={(e) => {
+                                                                setUserSearchQuery(e.target.value);
+                                                                if (selectedUserObj) {
+                                                                    setSelectedUserObj(null);
+                                                                    setDropoffAdmission('');
+                                                                    setDropoffName('');
+                                                                }
+                                                            }}
+                                                        />
+                                                        {/* Autocomplete dropdown suggestions */}
+                                                        {userSearchResults.length > 0 && (
+                                                            <div className="absolute left-0 right-0 z-[60] mt-1 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+                                                                {userSearchResults.map((user) => (
+                                                                    <button
+                                                                        key={user.id}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setSelectedUserObj(user);
+                                                                            setDropoffAdmission(user.admission_number);
+                                                                            setDropoffName(user.full_name);
+                                                                            setUserSearchQuery(`${user.full_name} (${user.admission_number})`);
+                                                                            setUserSearchResults([]);
+                                                                        }}
+                                                                        className="w-full text-left px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-slate-850/50 last:border-none cursor-pointer border-none bg-transparent"
+                                                                    >
+                                                                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-105 border shrink-0">
+                                                                            {user.profile_image ? (
+                                                                                <img src={user.profile_image} className="w-full h-full object-cover" />
+                                                                            ) : (
+                                                                                <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-650 font-bold text-xs">
+                                                                                    {user.full_name[0]}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <div className="text-xs font-bold text-slate-805 dark:text-white truncate">{user.full_name}</div>
+                                                                            <div className="text-[9px] text-slate-400 font-mono mt-0.5 truncate">{user.admission_number} | {user.school || 'Campus'}</div>
+                                                                        </div>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Selected User Details Card */}
+                                                    {selectedUserObj && (
+                                                        <div className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-900 dark:to-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl flex items-center gap-4 animate-scale-in">
+                                                            <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-205 border border-white dark:border-slate-800 shadow-sm shrink-0">
+                                                                {selectedUserObj.profile_image ? (
+                                                                    <img src={selectedUserObj.profile_image} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-700 font-black text-lg">
+                                                                        {selectedUserObj.full_name[0]}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-bold text-slate-800 dark:text-white text-xs truncate">{selectedUserObj.full_name}</div>
+                                                                <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono mt-0.5">{selectedUserObj.admission_number}</div>
+                                                                <div className="text-[9px] text-slate-400 mt-0.5 capitalize">{selectedUserObj.school || 'Campus'}</div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Purpose of Visit: Visitor ONLY */}
+                                            {role === 'visitor' && (
+                                                <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-505 uppercase tracking-widest block mb-1.5 font-bold font-bold font-bold font-bold font-bold">Purpose of Visit</label>
+                                                    <input 
+                                                        required 
+                                                        placeholder="e.g. Meeting with Registrar, General Inquiry"
+                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                        value={formData.purpose || ''}
+                                                        onChange={e => setFormData({ ...formData, purpose: e.target.value })} 
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* 24h Auto delete option checkbox */}
+                                            <div className="border-t border-slate-100 dark:border-slate-800 pt-4 mb-2">
+                                                <label className="flex items-start gap-3 cursor-pointer select-none">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={autoDelete24h}
+                                                        onChange={(e) => setAutoDelete24h(e.target.checked)}
+                                                        className="rounded border-slate-350 dark:border-slate-800 text-indigo-650 focus:ring-indigo-500/20 w-4.5 h-4.5 mt-0.5 cursor-pointer"
+                                                    />
+                                                    <div>
+                                                        <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider block font-bold">Auto-Scrub My Data</span>
+                                                        <span className="text-[10px] text-slate-450 dark:text-slate-500 font-bold block leading-normal mt-0.5">
+                                                            Automatically delete my name, contact, and ID details from campus records exactly 24 hours after my visit ends.
+                                                        </span>
+                                                    </div>
+                                                </label>
+                                            </div>
+
+                                            <div className="pt-4 flex gap-3">
+                                                <button 
+                                                    type="button" 
+                                                    onClick={() => { setStep(1); setError(null); }} 
+                                                    className="flex-1 py-4 bg-slate-100 hover:bg-slate-205 dark:bg-slate-805 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs transition-all active:scale-95 cursor-pointer border-none"
+                                                >
+                                                    Back
+                                                </button>
+                                                <button 
+                                                    type="submit"
+                                                    disabled={submitting} 
+                                                    className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-705 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-95 cursor-pointer border-none"
+                                                >
+                                                    {submitting ? 'Processing...' : <>Submit Request <ArrowRight size={14} /></>}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    )}
                                 </div>
-
-                                <div className="pt-4 flex gap-3">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => { setStep(1); setError(null); }} 
-                                        className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs transition-all active:scale-95 cursor-pointer"
-                                    >
-                                        Back
-                                    </button>
-                                    <button 
-                                        type="submit"
-                                        disabled={submitting} 
-                                        className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-95 cursor-pointer"
-                                    >
-                                        {submitting ? 'Processing...' : <>Submit Request <ArrowRight size={14} /></>}
-                                    </button>
-                                </div>
-                            </form>
-                        )}
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
 
             {/* Premium Dynamic Sticky Footer displaying policy menu items */}
-            <footer className="w-full text-center text-[10px] text-slate-450 dark:text-slate-500 font-bold py-4 mt-6 border-t border-slate-150/40 dark:border-slate-850/60 bg-white/20 dark:bg-slate-950/20 backdrop-blur-md">
-                <span>{companyColors.company_name} Smart Campus Portal &copy; {new Date().getFullYear()} | </span>
+            <footer className="w-full text-center text-[10px] text-slate-450 dark:text-slate-500 font-bold py-4 mt-8 border-t border-slate-150/40 dark:border-slate-850/60 bg-white/20 dark:bg-slate-950/20 backdrop-blur-md">
+                <span>{companyColors.company_name} Smart Gate Portal &copy; {new Date().getFullYear()} | </span>
                 <button 
                     onClick={() => setShowPrivacyModal(true)} 
                     className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold bg-transparent border-none p-0 cursor-pointer"
@@ -1314,7 +1407,7 @@ export default function SelfServiceEntry() {
                             </div>
                             <button 
                                 onClick={() => setShowPrivacyModal(false)} 
-                                className="p-2 text-slate-400 hover:text-red-500 rounded-full transition-colors cursor-pointer"
+                                className="p-2 text-slate-400 hover:text-red-500 rounded-full transition-colors cursor-pointer border-none bg-transparent"
                             >
                                 <X size={20} />
                             </button>
@@ -1325,7 +1418,7 @@ export default function SelfServiceEntry() {
                         <div className="p-4 border-t border-[var(--border-color)] bg-slate-50/50 dark:bg-slate-905 flex justify-end">
                             <button 
                                 onClick={() => setShowPrivacyModal(false)}
-                                className="px-5 py-2.5 bg-indigo-650 text-white font-black rounded-xl text-xs active:scale-95 transition-all shadow-md cursor-pointer"
+                                className="px-5 py-2.5 bg-indigo-650 text-white font-black rounded-xl text-xs active:scale-95 transition-all shadow-md cursor-pointer border-none"
                             >
                                 I Understand
                             </button>
@@ -1345,7 +1438,7 @@ export default function SelfServiceEntry() {
                             </div>
                             <button 
                                 onClick={() => setShowCookieModal(false)} 
-                                className="p-2 text-slate-400 hover:text-red-500 rounded-full transition-colors cursor-pointer"
+                                className="p-2 text-slate-400 hover:text-red-500 rounded-full transition-colors cursor-pointer border-none bg-transparent"
                             >
                                 <X size={20} />
                             </button>
@@ -1356,7 +1449,7 @@ export default function SelfServiceEntry() {
                         <div className="p-4 border-t border-[var(--border-color)] bg-slate-50/50 dark:bg-slate-905 flex justify-end">
                             <button 
                                 onClick={() => setShowCookieModal(false)}
-                                className="px-5 py-2.5 bg-indigo-650 text-white font-black rounded-xl text-xs active:scale-95 transition-all shadow-md cursor-pointer"
+                                className="px-5 py-2.5 bg-indigo-650 text-white font-black rounded-xl text-xs active:scale-95 transition-all shadow-md cursor-pointer border-none"
                             >
                                 Close
                             </button>
@@ -1371,12 +1464,24 @@ export default function SelfServiceEntry() {
 function RoleCard({ icon: Icon, label, desc, onClick, color = "blue" }: any) {
     const colorClasses: any = {
         blue: {
-            bg: 'bg-blue-50 dark:bg-blue-950/20',
-            text: 'text-blue-600 dark:text-blue-400',
+            bg: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/40',
+            glow: 'hover:shadow-blue-500/10 hover:border-blue-300'
         },
         indigo: {
-            bg: 'bg-indigo-50 dark:bg-indigo-950/20',
-            text: 'text-indigo-600 dark:text-indigo-400',
+            bg: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/40',
+            glow: 'hover:shadow-indigo-500/10 hover:border-indigo-300'
+        },
+        purple: {
+            bg: 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-900/40',
+            glow: 'hover:shadow-purple-500/10 hover:border-purple-300'
+        },
+        amber: {
+            bg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/40',
+            glow: 'hover:shadow-amber-500/10 hover:border-amber-300'
+        },
+        emerald: {
+            bg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40',
+            glow: 'hover:shadow-emerald-500/10 hover:border-emerald-300'
         }
     };
     const activeColor = colorClasses[color] || colorClasses.blue;
@@ -1384,17 +1489,19 @@ function RoleCard({ icon: Icon, label, desc, onClick, color = "blue" }: any) {
     return (
         <button 
             onClick={onClick} 
-            className="w-full bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-4.5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center gap-4 hover:shadow-md hover:border-indigo-500/30 transition-all text-left group active:scale-[0.99] cursor-pointer"
+            className={`w-full bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between h-56 text-left group hover:shadow-xl hover:-translate-y-1 transition-all active:scale-[0.98] cursor-pointer ${activeColor.glow}`}
         >
-            <div className={`w-12 h-12 rounded-2xl ${activeColor.bg} ${activeColor.text} flex items-center justify-center shadow-inner`}>
-                <Icon size={22} />
+            <div className="flex items-start justify-between w-full mb-4">
+                <div className={`w-14 h-14 rounded-2xl ${activeColor.bg} flex items-center justify-center shadow-inner border`}>
+                    <Icon size={26} />
+                </div>
+                <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-850 flex items-center justify-center text-slate-350 dark:text-slate-605 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:scale-110 transition-all">
+                    <ArrowRight size={16} />
+                </div>
             </div>
-            <div className="flex-1 min-w-0">
-                <h3 className="font-black text-slate-900 dark:text-white text-sm">{label}</h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold truncate mt-0.5">{desc}</p>
-            </div>
-            <div className="text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all">
-                <ArrowRight size={18} />
+            <div className="mt-auto">
+                <h3 className="font-black text-slate-800 dark:text-white text-base leading-snug group-hover:text-indigo-650 dark:group-hover:text-indigo-400 transition-colors">{label}</h3>
+                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1.5 leading-relaxed">{desc}</p>
             </div>
         </button>
     )

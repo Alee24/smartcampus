@@ -790,6 +790,40 @@ async def scan_entry(
                 await session.commit()
                 await session.refresh(visitor)
         else:
+            try:
+                val_uuid = uuid.UUID(parsed_code)
+                event_visitor = await session.get(EventVisitor, val_uuid)
+                if event_visitor:
+                    event_obj = await session.get(Event, event_visitor.event_id)
+                    event_name = event_obj.name if event_obj else "Event"
+                    
+                    event_visitor.status = "checked_in"
+                    event_visitor.entry_time = get_eat_time()
+                    session.add(event_visitor)
+                    await session.commit()
+                    
+                    await log_action(
+                        session=session,
+                        action_type="event_visitor_checkin",
+                        table_name="event_visitors",
+                        record_id=str(event_visitor.id),
+                        description=f"Event guest checkin for {event_visitor.visitor_name} to {event_name}",
+                        request=request
+                    )
+                    
+                    return {
+                        "status": "allowed",
+                        "message": f"Guest {event_visitor.visitor_name} checked IN to event: {event_name}",
+                        "data": {
+                            "name": event_visitor.visitor_name,
+                            "role": f"Checked IN - Event Guest going to {event_name}",
+                            "time": get_eat_time().strftime("%I:%M %p"),
+                            "image": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                        }
+                    }
+            except Exception:
+                pass
+
             visitor = (await session.exec(select(Visitor).where(Visitor.id_number == parsed_code))).first()
             if not visitor:
                 try:
