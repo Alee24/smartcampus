@@ -99,6 +99,7 @@ function FleetManagementContent({ initialTab = 'dashboard' }: FleetManagementPro
     const [fuelLogs, setFuelLogs] = useState<any[]>([]);
     const [maintenanceLogs, setMaintenanceLogs] = useState<any[]>([]);
     const [locations, setLocations] = useState<any[]>([]);
+    const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
     const [toast, setToast] = useState<{msg: string, type: 'success'|'error'|'info'} | null>(null);
 
     const [stats, setStats] = useState<any>({
@@ -602,10 +603,25 @@ function FleetManagementContent({ initialTab = 'dashboard' }: FleetManagementPro
                     <Loader2 size={48} className="animate-spin mb-4" />
                     <p className="font-bold">Syncing Fleet Data...</p>
                 </div>
+            ) : selectedVehicleId ? (
+                <VehicleDetailsView 
+                    vehicleId={selectedVehicleId} 
+                    onBack={() => setSelectedVehicleId(null)} 
+                    showToast={showToast} 
+                />
             ) : (
                 <>
                 {activeTab === 'dashboard' && renderDashboard()}
-                    {activeTab === 'vehicles' && <VehiclesManager vehicles={vehicles} onUpdate={fetchData} setShowAddVehicle={setShowAddVehicle} setEditingVehicle={setEditingVehicle} showToast={showToast} />}
+                    {activeTab === 'vehicles' && (
+                        <VehiclesManager 
+                            vehicles={vehicles} 
+                            onUpdate={fetchData} 
+                            setShowAddVehicle={setShowAddVehicle} 
+                            setEditingVehicle={setEditingVehicle} 
+                            showToast={showToast} 
+                            onSelectVehicle={setSelectedVehicleId} 
+                        />
+                    )}
                     {activeTab === 'tracking' && renderTracking()}
                     {activeTab === 'trips' && <TripsManager trips={trips} vehicles={vehicles} onUpdate={fetchData} showToast={showToast} />}
                     {activeTab === 'fuel' && <FuelManagement vehicles={vehicles} logs={fuelLogs} onUpdate={fetchData} showToast={showToast} />}
@@ -1876,9 +1892,10 @@ interface VehiclesManagerProps {
     onUpdate: () => void;
     setShowAddVehicle: (show: boolean) => void;
     setEditingVehicle: (vehicle: any) => void;
+    onSelectVehicle: (vehicleId: string) => void;
 }
 
-function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehicle }: VehiclesManagerProps) {
+function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehicle, onSelectVehicle }: VehiclesManagerProps) {
     const { showConfirm, showNotification } = useNotification();
     const role = localStorage.getItem('userRole');
     const isAdmin = role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin';
@@ -2065,7 +2082,12 @@ function VehiclesManager({ vehicles, onUpdate, setShowAddVehicle, setEditingVehi
                                             {getVehicleTypeIcon(vehicle.vehicle_type)}
                                         </span>
                                         <div>
-                                            <h4 className="font-black text-gray-900 text-lg uppercase tracking-tight">{vehicle.plate_number}</h4>
+                                            <h4 
+                                                onClick={() => onSelectVehicle(vehicle.id)}
+                                                className="font-black text-gray-900 text-lg uppercase tracking-tight cursor-pointer hover:text-primary-600 hover:underline transition-colors"
+                                            >
+                                                {vehicle.plate_number}
+                                            </h4>
                                             <p className="text-xs text-gray-400 font-bold uppercase">{vehicle.make} {vehicle.model}</p>
                                         </div>
                                     </div>
@@ -2865,5 +2887,291 @@ function MaintenanceForm({ vehicles, onSuccess, showToast }: any) {
                 {isSubmitting ? 'Saving...' : 'Post Service Record'}
             </button>
         </form>
+    );
+}
+
+interface VehicleDetailsViewProps {
+    vehicleId: string;
+    onBack: () => void;
+    showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+}
+
+function VehicleDetailsView({ vehicleId, onBack, showToast }: VehicleDetailsViewProps) {
+    const [details, setDetails] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [activeSubTab, setActiveSubTab] = useState<'trips' | 'fuel' | 'scans'>('trips');
+
+    const fetchDetails = async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/fleet/vehicles/${vehicleId}/details`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setDetails(data);
+            } else {
+                showToast("Failed to load vehicle details", "error");
+            }
+        } catch (e) {
+            console.error(e);
+            showToast("Network error loading vehicle details", "error");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchDetails();
+    }, [vehicleId]);
+
+    if (loading) {
+        return (
+            <div className="h-[400px] flex flex-col items-center justify-center text-gray-400">
+                <Loader2 size={48} className="animate-spin mb-4 text-primary-600" />
+                <p className="font-bold">Loading Vehicle Analytics...</p>
+            </div>
+        );
+    }
+
+    if (!details || !details.vehicle) {
+        return (
+            <div className="text-center py-16 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                <p className="text-gray-400 font-bold text-lg mb-1">Vehicle Details Not Found</p>
+                <button onClick={onBack} className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm">
+                    Back to Fleet
+                </button>
+            </div>
+        );
+    }
+
+    const { vehicle, total_distance_trips, trips, fuel_logs, today_scans } = details;
+
+    return (
+        <div className="space-y-6 animate-fade-in">
+            {/* Header with back button */}
+            <div className="flex items-center gap-4">
+                <button 
+                    onClick={onBack}
+                    className="p-2.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-700 transition-colors shadow-sm flex items-center justify-center dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-750"
+                    title="Back to Vehicles"
+                >
+                    <ArrowLeft size={20} />
+                </button>
+                <div>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white uppercase">
+                            {vehicle.plate_number}
+                        </h1>
+                        <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
+                            vehicle.status === 'active' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/35 dark:text-green-400 dark:border-green-900' :
+                            vehicle.status === 'maintenance' ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/35 dark:text-amber-400 dark:border-amber-900' :
+                            'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                        }`}>
+                            {vehicle.status}
+                        </span>
+                    </div>
+                    <p className="text-gray-500 dark:text-gray-400 font-medium capitalize">{vehicle.make} {vehicle.model} • {vehicle.vehicle_type}</p>
+                </div>
+            </div>
+
+            {/* Quick Metrics Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="glass-card p-5 border-l-4 border-primary-500">
+                    <p className="text-gray-500 dark:text-gray-400 font-bold text-xs mb-1 uppercase tracking-wider">Total Kilometers</p>
+                    <div className="text-2xl font-black text-gray-900 dark:text-white">{(total_distance_trips ?? 0).toLocaleString()} KM</div>
+                    <p className="text-[10px] text-gray-450 dark:text-gray-500 font-medium mt-1">Calculated from completed trips</p>
+                </div>
+                <div className="glass-card p-5 border-l-4 border-blue-500">
+                    <p className="text-gray-500 dark:text-gray-400 font-bold text-xs mb-1 uppercase tracking-wider">Current Odometer</p>
+                    <div className="text-2xl font-black text-gray-900 dark:text-white">{(vehicle.current_odometer ?? 0).toLocaleString()} KM</div>
+                    <p className="text-[10px] text-gray-455 dark:text-gray-500 font-medium mt-1">Live dashboard reading</p>
+                </div>
+                <div className="glass-card p-5 border-l-4 border-green-500">
+                    <p className="text-gray-500 dark:text-gray-400 font-bold text-xs mb-1 uppercase tracking-wider">Total Trips</p>
+                    <div className="text-2xl font-black text-gray-900 dark:text-white">{trips.length}</div>
+                    <p className="text-[10px] text-gray-455 dark:text-gray-500 font-medium mt-1">Scheduled & ongoing</p>
+                </div>
+                <div className="glass-card p-5 border-l-4 border-purple-500">
+                    <p className="text-gray-500 dark:text-gray-400 font-bold text-xs mb-1 uppercase tracking-wider">Scans Today</p>
+                    <div className="text-2xl font-black text-gray-900 dark:text-white">{today_scans.length}</div>
+                    <p className="text-[10px] text-gray-455 dark:text-gray-500 font-medium mt-1">Today's transport check-ins</p>
+                </div>
+            </div>
+
+            {/* Main content grid: Vehicle details card + logs tabs */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Vehicle specifications card */}
+                <div className="glass-card p-6 h-fit space-y-6">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-3 flex items-center gap-2">
+                        <Car size={18} className="text-primary-600" />
+                        Specifications
+                    </h3>
+                    <div className="space-y-4 text-sm">
+                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Vehicle Type</span>
+                            <span className="font-extrabold text-gray-800 dark:text-gray-200 capitalize">{vehicle.vehicle_type}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Fuel Type</span>
+                            <span className="font-extrabold text-gray-800 dark:text-gray-200 capitalize">{vehicle.fuel_type}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Fuel Capacity</span>
+                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.fuel_capacity} Liters</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Seating Capacity</span>
+                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.seating_capacity} Seats</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Manufacture Year</span>
+                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.year || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Color</span>
+                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.color || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between border-b border-gray-55 dark:border-gray-800 pb-2">
+                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Assigned Driver</span>
+                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.driver_name || 'Unassigned'}</span>
+                        </div>
+                        <div className="flex justify-between pb-1">
+                            <span className="text-gray-400 dark:text-gray-500 font-bold uppercase text-xs">Driver Contact</span>
+                            <span className="font-extrabold text-gray-800 dark:text-gray-200">{vehicle.driver_contact || 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Logs tabs (Trips, Fuel, Scans) */}
+                <div className="lg:col-span-2 glass-card p-6 flex flex-col min-h-[400px]">
+                    <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-4 mb-4">
+                        <div className="flex gap-2">
+                            {[
+                                { id: 'trips', label: 'Trips History' },
+                                { id: 'fuel', label: 'Fuel Logs' },
+                                { id: 'scans', label: "Today's Scans" }
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveSubTab(tab.id as any)}
+                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                                        activeSubTab === tab.id
+                                            ? 'bg-primary-600 text-white shadow-md animate-scale-in'
+                                            : 'text-gray-500 hover:bg-gray-100 dark:text-gray-450 dark:hover:bg-gray-800'
+                                    }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                        <button 
+                            onClick={fetchDetails} 
+                            className="p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 rounded-xl transition-all"
+                            title="Refresh logs"
+                        >
+                            <RefreshCw size={16} />
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto max-h-[450px] space-y-3">
+                        {activeSubTab === 'trips' && (
+                            trips.length === 0 ? (
+                                <div className="text-center py-12 text-gray-400">
+                                    <Navigation className="mx-auto mb-2 text-gray-300 dark:text-gray-700" size={32} />
+                                    <p className="font-bold">No trips recorded for this vehicle</p>
+                                </div>
+                            ) : (
+                                trips.map((t: any) => (
+                                    <div key={t.id} className="p-4 bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800 rounded-2xl flex justify-between items-center gap-4 hover:shadow-md transition-all">
+                                        <div className="space-y-1">
+                                            <p className="font-extrabold text-sm text-gray-850 dark:text-gray-200">{t.origin} → {t.destination}</p>
+                                            <p className="text-xs text-gray-500 font-semibold">{t.purpose}</p>
+                                            <p className="text-[10px] text-gray-400 font-medium">
+                                                Driver: {t.driver_name} • Dep: {t.actual_departure ? new Date(t.actual_departure).toLocaleString() : new Date(t.scheduled_departure).toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div className="text-right space-y-1.5">
+                                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide inline-block border ${
+                                                t.status === 'ongoing' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/35 dark:text-green-400 dark:border-green-900' :
+                                                t.status === 'completed' ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/35 dark:text-blue-400 dark:border-blue-900' :
+                                                t.status === 'cancelled' ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/35 dark:text-red-400 dark:border-red-900' : 
+                                                'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
+                                            }`}>
+                                                {t.status}
+                                            </span>
+                                            {t.end_odometer !== null && (
+                                                <p className="text-xs font-black text-gray-750 dark:text-gray-300">
+                                                    {(t.end_odometer - t.start_odometer).toLocaleString()} KM covered
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))
+                            )
+                        )}
+
+                        {activeSubTab === 'fuel' && (
+                            fuel_logs.length === 0 ? (
+                                <div className="text-center py-12 text-gray-400">
+                                    <Fuel className="mx-auto mb-2 text-gray-300 dark:text-gray-700" size={32} />
+                                    <p className="font-bold">No fuel logs recorded for this vehicle</p>
+                                </div>
+                            ) : (
+                                fuel_logs.map((f: any) => (
+                                    <div key={f.id} className="p-4 bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800 rounded-2xl flex justify-between items-center gap-4 hover:shadow-md transition-all">
+                                        <div className="space-y-1">
+                                            <p className="font-extrabold text-sm text-gray-850 dark:text-gray-200">{f.amount_liters} Liters at {f.station_name || 'Unknown Station'}</p>
+                                            <p className="text-xs text-gray-500 font-semibold">Odometer reading: {f.odometer_reading?.toLocaleString()} KM</p>
+                                            <p className="text-[10px] text-gray-400 font-medium">
+                                                Refueled on {new Date(f.timestamp).toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">KES {f.cost.toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                ))
+                            )
+                        )}
+
+                        {activeSubTab === 'scans' && (
+                            today_scans.length === 0 ? (
+                                <div className="text-center py-12 text-gray-400">
+                                    <QrCode className="mx-auto mb-2 text-gray-300 dark:text-gray-700" size={32} />
+                                    <p className="font-bold">No scans recorded today</p>
+                                </div>
+                            ) : (
+                                today_scans.map((s: any) => (
+                                    <div key={s.id} className="p-4 bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800 rounded-2xl flex justify-between items-center gap-4 hover:shadow-md transition-all">
+                                        <div className="space-y-1">
+                                            <p className="font-extrabold text-sm text-gray-850 dark:text-gray-200">{s.student_name}</p>
+                                            <p className="text-xs text-purple-600 dark:text-purple-400 font-bold font-mono">{s.admission_number}</p>
+                                            <p className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
+                                                <Clock size={10} /> {new Date(s.timestamp).toLocaleTimeString()}
+                                                {s.detected_location && ` • At ${s.detected_location}`}
+                                            </p>
+                                        </div>
+                                        <div className="text-right space-y-1">
+                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 border ${
+                                                s.is_successful 
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/35 dark:text-emerald-400 dark:border-emerald-900' 
+                                                : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/35 dark:text-red-400 dark:border-red-900'
+                                            }`}>
+                                                {s.is_successful ? 'Success' : 'Failed'}
+                                            </span>
+                                            <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold max-w-[150px] truncate" title={s.status_message}>
+                                                {s.status_message}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))
+                            )
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }

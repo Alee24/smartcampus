@@ -221,11 +221,10 @@ async def manual_vehicle_entry(
             }
         }
 
-@router.post("/scan")
-async def scan_entry(
+async def scan_entry_inner(
     request: Request,
     scan_data: dict, # { "admission_number": "...", "gate_id": "optional" }
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession
 ):
     import re
     import urllib.parse
@@ -409,15 +408,6 @@ async def scan_entry(
                 metadata_info=json.dumps({"method": "gate_qr_scan"})
             )
             session.add(record)
-            scan_log = ScanLog(
-                timestamp=get_eat_time(),
-                student_id=current_user.id,
-                room_code=code, 
-                is_successful=True,
-                status_message="Room Scan: Present",
-                class_session_id=active_session.id
-            )
-            session.add(scan_log)
             await session.commit()
             return {
                 "status": "allowed",
@@ -491,15 +481,6 @@ async def scan_entry(
                 metadata_info=json.dumps({"method": "gate_qr_scan"})
             )
             session.add(record)
-            scan_log = ScanLog(
-                timestamp=get_eat_time(),
-                student_id=current_user.id,
-                room_code=code, 
-                is_successful=True,
-                status_message="Course Scan: Present",
-                class_session_id=active_session.id
-            )
-            session.add(scan_log)
             await session.commit()
             return {
                 "status": "allowed",
@@ -993,6 +974,221 @@ async def scan_entry(
                     "image": user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
                 }
             }
+
+@router.post("/scan")
+async def scan_entry(
+    request: Request,
+    scan_data: dict, # { "admission_number": "...", "gate_id": "optional" }
+    session: AsyncSession = Depends(get_session)
+):
+    import urllib.parse
+    from sqlalchemy import select, func
+    from app.models import ScanLog, User, Classroom, ClassSession
+    from app.utils.timezone import get_eat_time
+
+    code = scan_data.get("admission_number", "").strip()
+    if not code:
+        return {"status": "rejected", "message": "Scanned code is empty", "data": None}
+
+    # Helper to resolve authenticated user optionally
+    current_user = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        try:
+            from jose import jwt
+            from app.auth import SECRET_KEY, ALGORITHM
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            email: str = payload.get("sub")
+            if email:
+                current_user = (await session.exec(select(User).where(User.email == email))).first()
+        except Exception:
+            pass
+
+    # Detect the scanned type to help with logging/resolve student_id
+    scanned_type = None
+    temp_code = code
+    if "://" in temp_code or "?" in temp_code:
+        try:
+            parsed_url = urllib.parse.urlparse(temp_code)
+            params = urllib.parse.parse_qs(parsed_url.query)
+            if "user" in params:
+                temp_code = params["user"][0].strip()
+                scanned_type = "user"
+            elif "vehicle" in params:
+                temp_code = params["vehicle"][0].strip()
+                scanned_type = "vehicle"
+            elif "room" in params:
+                temp_code = params["room"][0].strip()
+                scanned_type = "room"
+            elif "course" in params:
+                temp_code = params["course"][0].strip()
+                scanned_type = "course"
+            elif "event" in params:
+                temp_code = params["event"][0].strip()
+                scanned_type = "event"
+            elif "visitor" in params:
+                temp_code = params["visitor"][0].strip()
+                scanned_type = "visitor"
+            elif "asset" in params:
+                temp_code = params["asset"][0].strip()
+                scanned_type = "asset"
+        except Exception:
+            pass
+
+    if not scanned_type:
+        upper_code = temp_code.upper()
+        if upper_code.startswith("EVENT:"):
+            scanned_type = "event"
+            temp_code = temp_code[6:].strip()
+        elif upper_code.startswith("VEHICLE:") or upper_code.startswith("BUS:"):
+            scanned_type = "vehicle"
+            temp_code = temp_code.split(":", 1)[1].strip()
+        elif upper_code.startswith("VISITOR:"):
+            scanned_type = "visitor"
+            temp_code = temp_code[8:].strip()
+        elif upper_code.startswith("STUDENT:") or upper_code.startswith("STAFF:"):
+            scanned_type = "user"
+            temp_code = temp_code.split(":", 1)[1].strip()
+        else:
+            room = (await session.exec(select(Classroom).where(Classroom.room_code == temp_code))).first()
+            if room:
+                scanned_type = "room"
+            else:
+                from app.models import Course
+                course = (await session.exec(select(Course).where(Course.course_code == temp_code))).first()
+                if course:
+                    scanned_type = "course"
+                else:
+                    from app.models import Asset
+                    asset = (await session.exec(select(Asset).where(Asset.tag_number == temp_code))).first()
+                    if asset:
+                        scanned_type = "asset"
+                    else:
+                        user = (await session.exec(select(User).where(func.lower(User.admission_number) == func.lower(temp_code)))).first()
+                        if user:
+                            scanned_type = "user"
+                        else:
+                            from app.models import Vehicle
+                            clean_plate = temp_code.replace(" ", "").lower()
+                            vehicle = (await session.exec(select(Vehicle).where(func.lower(func.replace(Vehicle.plate_number, ' ', '')) == clean_plate))).first()
+                            if vehicle:
+                                scanned_type = "vehicle"
+                            else:
+                                from app.models import Visitor
+                                visitor = (await session.exec(select(Visitor).where(func.lower(Visitor.id_number) == func.lower(temp_code)))).first()
+                                if visitor:
+                                    scanned_type = "visitor"
+                                else:
+                                    try:
+                                        import uuid
+                                        from app.models import Event
+                                        val_uuid = uuid.UUID(temp_code)
+                                        ev = await session.get(Event, val_uuid)
+                                        if ev:
+                                            scanned_type = "event"
+                                    except Exception:
+                                        pass
+                                    if not scanned_type:
+                                        scanned_type = "user"
+
+    # Call the original scan logic
+    res = None
+    try:
+        res = await scan_entry_inner(request, scan_data, session)
+    except Exception as e:
+        res = {"status": "rejected", "message": f"Scan error: {str(e)}", "data": None}
+        raise e
+    finally:
+        # Log the scan!
+        if res:
+            is_success = res.get("status") in ["allowed", "event_pass"]
+            status_msg = res.get("message") or "Scan processed"
+            
+            # Prefix status message with scan type
+            prefix = f"{scanned_type.upper() if scanned_type else 'UNKNOWN'} Scan: "
+            if not status_msg.startswith(prefix):
+                status_msg = f"{prefix}{status_msg}"
+                
+            # Get location name
+            gate_name = None
+            gate_id = scan_data.get("gate_id")
+            if gate_id:
+                try:
+                    import uuid
+                    from app.models import Gate
+                    gate = await session.get(Gate, uuid.UUID(str(gate_id)))
+                    if gate:
+                        gate_name = gate.name
+                except Exception:
+                    pass
+            if not gate_name:
+                from app.models import Gate
+                gate = (await session.exec(select(Gate).where(Gate.name == "Main Gate"))).first()
+                if gate:
+                    gate_name = gate.name
+
+            # Resolve student_id
+            log_student_id = None
+            if current_user:
+                log_student_id = current_user.id
+            else:
+                # Try to find user matching the scanned code
+                user_obj = (await session.exec(select(User).where(func.lower(User.admission_number) == func.lower(temp_code)))).first()
+                if user_obj:
+                    log_student_id = user_obj.id
+                else:
+                    # Fallback to the first active user
+                    fallback_user = (await session.exec(select(User).limit(1))).first()
+                    if fallback_user:
+                        log_student_id = fallback_user.id
+
+            if log_student_id:
+                # Resolve class session id if we can find one active for today in this room
+                class_sess_id = None
+                if scanned_type in ["room", "course"]:
+                    # Find active session today
+                    now_time = get_eat_time().time()
+                    today = get_eat_time().date()
+                    if scanned_type == "room":
+                        room = (await session.exec(select(Classroom).where(Classroom.room_code == temp_code))).first()
+                        if room:
+                            query = select(ClassSession).where(
+                                ClassSession.classroom_id == room.id,
+                                ClassSession.session_date == today,
+                                ClassSession.start_time <= now_time,
+                                ClassSession.end_time >= now_time,
+                                ClassSession.active == True
+                            )
+                            active_session = (await session.exec(query)).first()
+                            if active_session:
+                                class_sess_id = active_session.id
+                    else: # course
+                        from app.models import Course
+                        course = (await session.exec(select(Course).where(Course.course_code == temp_code))).first()
+                        if course:
+                            query = select(ClassSession).where(
+                                ClassSession.course_id == course.id,
+                                ClassSession.session_date == today,
+                                ClassSession.active == True
+                            )
+                            active_session = (await session.exec(query)).first()
+                            if active_session:
+                                class_sess_id = active_session.id
+
+                scan_log = ScanLog(
+                    timestamp=get_eat_time(),
+                    student_id=log_student_id,
+                    room_code=temp_code[:255],
+                    is_successful=is_success,
+                    status_message=status_msg,
+                    class_session_id=class_sess_id,
+                    detected_location=gate_name
+                )
+                session.add(scan_log)
+                await session.commit()
+                
+    return res
 
 @router.post("/check-in/{admission_number}")
 async def check_in_user(

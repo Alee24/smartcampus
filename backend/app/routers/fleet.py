@@ -294,6 +294,127 @@ async def get_vehicle(vehicle_id: UUID, session: AsyncSession = Depends(get_sess
         is_checked_in=open_log is not None
     )
 
+@router.get("/vehicles/{vehicle_id}/details")
+async def get_vehicle_details(vehicle_id: UUID, session: AsyncSession = Depends(get_session)):
+    from app.models import ScanLog
+    from datetime import datetime, time
+    v = await session.get(Vehicle, vehicle_id)
+    if not v:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+        
+    # Query trips
+    trips_query = (
+        select(FleetTrip)
+        .where(FleetTrip.vehicle_id == vehicle_id)
+        .order_by(FleetTrip.scheduled_departure.desc())
+    )
+    trips = (await session.exec(trips_query)).all()
+    
+    # Query fuel logs
+    fuel_query = (
+        select(FleetFuelLog)
+        .where(FleetFuelLog.vehicle_id == vehicle_id)
+        .order_by(FleetFuelLog.timestamp.desc())
+    )
+    fuel_logs = (await session.exec(fuel_query)).all()
+    
+    # Calculate total kilometers from completed trips
+    total_km_trips = 0.0
+    for trip in trips:
+        if trip.status == "completed" and trip.end_odometer is not None:
+            distance = trip.end_odometer - trip.start_odometer
+            if distance > 0:
+                total_km_trips += distance
+                
+    # Query today's scans where room_code matches the plate number
+    eat_now = get_eat_time()
+    start_of_today = datetime.combine(eat_now.date(), time.min)
+    
+    clean_plate = v.plate_number.upper().replace("-", " ").strip()
+    
+    scans_query = (
+        select(ScanLog, User)
+        .join(User, ScanLog.student_id == User.id)
+        .where(
+            (ScanLog.room_code == clean_plate) | 
+            (ScanLog.room_code == v.plate_number)
+        )
+        .where(ScanLog.timestamp >= start_of_today)
+        .order_by(ScanLog.timestamp.desc())
+    )
+    scan_results = (await session.exec(scans_query)).all()
+    
+    formatted_scans = []
+    for log, user in scan_results:
+        formatted_scans.append({
+            "id": str(log.id),
+            "timestamp": log.timestamp.isoformat(),
+            "student_name": user.full_name,
+            "admission_number": user.admission_number,
+            "is_successful": log.is_successful,
+            "status_message": log.status_message,
+            "detected_location": log.detected_location
+        })
+        
+    formatted_trips = []
+    for t in trips:
+        # Resolve driver if available
+        driver_name = t.trip_lead_name or "N/A"
+        if t.driver_id:
+            driver_user = await session.get(User, t.driver_id)
+            if driver_user:
+                driver_name = driver_user.full_name
+                
+        formatted_trips.append({
+            "id": str(t.id),
+            "purpose": t.purpose,
+            "origin": t.origin,
+            "destination": t.destination,
+            "scheduled_departure": t.scheduled_departure.isoformat() if t.scheduled_departure else None,
+            "actual_departure": t.actual_departure.isoformat() if t.actual_departure else None,
+            "actual_arrival": t.actual_arrival.isoformat() if t.actual_arrival else None,
+            "start_odometer": t.start_odometer,
+            "end_odometer": t.end_odometer,
+            "status": t.status,
+            "driver_name": driver_name
+        })
+        
+    formatted_fuel = []
+    for f in fuel_logs:
+        formatted_fuel.append({
+            "id": str(f.id),
+            "amount_liters": f.amount_liters,
+            "cost": f.cost,
+            "station_name": f.station_name,
+            "odometer_reading": f.odometer_reading,
+            "timestamp": f.timestamp.isoformat()
+        })
+        
+    return {
+        "vehicle": {
+            "id": str(v.id),
+            "plate_number": v.plate_number,
+            "make": v.make,
+            "model": v.model,
+            "color": v.color,
+            "driver_name": v.driver_name,
+            "driver_contact": v.driver_contact,
+            "vehicle_type": v.vehicle_type,
+            "fuel_type": v.fuel_type,
+            "fuel_capacity": v.fuel_capacity,
+            "seating_capacity": v.seating_capacity,
+            "year": v.year,
+            "status": v.status,
+            "current_odometer": v.current_odometer,
+            "insurance_expiry": v.insurance_expiry.isoformat() if v.insurance_expiry else None,
+            "last_service_date": v.last_service_date.isoformat() if v.last_service_date else None,
+        },
+        "total_distance_trips": total_km_trips,
+        "trips": formatted_trips,
+        "fuel_logs": formatted_fuel,
+        "today_scans": formatted_scans
+    }
+
 @router.put("/vehicles/{vehicle_id}")
 async def update_vehicle(
     request: Request,
