@@ -1976,7 +1976,8 @@ async def public_access_request(
              dropoff_admission_number=data.get("dropoff_admission_number"),
              check_in_student=bool(data.get("check_in_student", False)),
              delivery_image_package=pkg_img,
-             delivery_image_receipt=rcpt_img
+             delivery_image_receipt=rcpt_img,
+             auto_delete_24h=bool(data.get("auto_delete_24h", False))
          )
 
          # Look up drop-off user if admission number is provided

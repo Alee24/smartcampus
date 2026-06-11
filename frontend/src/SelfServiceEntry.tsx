@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { Car, User, Truck, CheckCircle, ArrowRight, UserCheck, Shield, Camera, AlertCircle, RefreshCcw, Upload, FileText } from 'lucide-react'
+import { Car, User, Truck, CheckCircle, ArrowRight, UserCheck, Shield, Camera, AlertCircle, RefreshCcw, Upload, FileText, X } from 'lucide-react'
+import { PrivacyPolicy } from './privacy/PrivacyPolicy'
+import { CookiePolicy } from './privacy/CookiePolicy'
 
 export default function SelfServiceEntry() {
     const [step, setStep] = useState(1) // 1: Role, 2: Form, 3: Success
@@ -25,13 +27,19 @@ export default function SelfServiceEntry() {
     const [loadingStudent, setLoadingStudent] = useState(false)
     const [systemUsers, setSystemUsers] = useState<any[]>([])
 
+    // Data Protection Preferences
+    const [autoDelete24h, setAutoDelete24h] = useState(false)
+    const [showPrivacyModal, setShowPrivacyModal] = useState(false)
+    const [showCookieModal, setShowCookieModal] = useState(false)
+
     const [companyColors, setCompanyColors] = useState<any>({
         primary_color: '#2563eb',
         secondary_color: '#0284c7',
-        accent_color: '#10b981'
+        accent_color: '#10b981',
+        company_name: 'Smart Campus'
     })
 
-    // Fetch company settings for branding colors
+    // Fetch company settings for branding colors & name
     useEffect(() => {
         const fetchCompanyColors = async () => {
             try {
@@ -41,7 +49,8 @@ export default function SelfServiceEntry() {
                     setCompanyColors({
                         primary_color: data.primary_color || '#2563eb',
                         secondary_color: data.secondary_color || '#0284c7',
-                        accent_color: data.accent_color || '#10b981'
+                        accent_color: data.accent_color || '#10b981',
+                        company_name: data.company_name || 'Smart Campus'
                     })
                 }
             } catch (e) {
@@ -108,7 +117,7 @@ export default function SelfServiceEntry() {
         root.style.setProperty('--gradient-primary', `linear-gradient(135deg, ${primary} 0%, ${secondary} 100%)`);
     }, [companyColors])
 
-    // Camera Refs & State (For Student self-check-in presence)
+    // Camera Refs & State
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [image, setImage] = useState<string | null>(null)
@@ -241,7 +250,6 @@ export default function SelfServiceEntry() {
         setSubmitting(true)
         setError(null)
         try {
-            // Register Vehicle details but store in pending Visitor state for guard approval
             const res = await fetch('/api/gate/public/access-request', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -253,7 +261,8 @@ export default function SelfServiceEntry() {
                         driver_id_number: formData.driver_id_number,
                         driver_contact: formData.driver_contact,
                         plate_number: formData.plate_number,
-                        vehicle_role: formData.role || 'student'
+                        vehicle_role: formData.role || 'student',
+                        auto_delete_24h: autoDelete24h
                     }
                 })
             })
@@ -292,7 +301,8 @@ export default function SelfServiceEntry() {
                 name: formData.name,
                 mobile: formData.mobile,
                 id_number: formData.id_number,
-                purpose: formData.purpose
+                purpose: formData.purpose,
+                auto_delete_24h: autoDelete24h
             }
         } else if (role === 'taxi') {
             payloadData = {
@@ -303,7 +313,8 @@ export default function SelfServiceEntry() {
                 purpose: `Drop off: ${dropoffType === 'student' ? 'Student ' + (dropoffUser?.full_name || dropoffAdmission) : dropoffType === 'staff' ? 'Staff ' + dropoffName : 'New User ' + dropoffName}`,
                 dropoff_admission_number: dropoffType === 'student' ? dropoffAdmission : undefined,
                 dropoff_name: dropoffType !== 'student' ? dropoffName : undefined,
-                check_in_student: dropoffType === 'student' ? checkInStudent : false
+                check_in_student: dropoffType === 'student' ? checkInStudent : false,
+                auto_delete_24h: autoDelete24h
             }
         } else if (role === 'delivery') {
             payloadData = {
@@ -312,7 +323,8 @@ export default function SelfServiceEntry() {
                 id_number: formData.id_number,
                 delivery_details: formData.delivery_details,
                 delivery_image_package: deliveryPackageImage,
-                delivery_image_receipt: deliveryReceiptImage
+                delivery_image_receipt: deliveryReceiptImage,
+                auto_delete_24h: autoDelete24h
             }
         }
 
@@ -400,7 +412,7 @@ export default function SelfServiceEntry() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50/50 via-slate-100 to-purple-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/20 p-4 font-sans">
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50/50 via-slate-100 to-purple-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/20 p-4 pb-20 font-sans flex flex-col justify-between">
             <input 
                 type="file" 
                 id="self-pass-photo-file-input" 
@@ -438,9 +450,9 @@ export default function SelfServiceEntry() {
                 className="hidden" 
             />
 
-            <div className="max-w-md mx-auto relative">
+            <div className="max-w-md mx-auto w-full relative flex-1">
                 {/* Back to Homepage Button */}
-                <div className="flex justify-start mb-4 pt-4">
+                <div className="flex justify-start mb-4 pt-2">
                     <button 
                         onClick={() => window.location.href = '/'}
                         className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl text-xs font-black shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer focus:ring-2 focus:ring-indigo-500/20 outline-none"
@@ -448,7 +460,7 @@ export default function SelfServiceEntry() {
                         &larr; Back to Homepage
                     </button>
                 </div>
-                <header className="mb-8 text-center">
+                <header className="mb-6 text-center">
                     <div className="inline-flex p-3 bg-indigo-600/10 rounded-2xl mb-3">
                         <Shield className="text-indigo-600" size={28} />
                     </div>
@@ -473,11 +485,11 @@ export default function SelfServiceEntry() {
                             Select your category:
                         </p>
 
-                        <RoleCard icon={User} label="Visitor" desc="Personal visits, enquiries, or guests" onClick={() => { setRole('visitor'); setStep(2); setError(null); setFormData({}) }} />
-                        <RoleCard icon={Car} label="Taxi / Cab" desc="Drop-offs, pick-ups, or taxi services" onClick={() => { setRole('taxi'); setStep(2); setError(null); setFormData({ passengers: 1 }) }} />
-                        <RoleCard icon={Truck} label="Delivery" desc="Goods, parcels, couriers, or food deliveries" onClick={() => { setRole('delivery'); setStep(2); setError(null); setFormData({}) }} />
-                        <RoleCard icon={UserCheck} label="Student / Staff" desc="Campus verification check-in/out" onClick={() => { setRole('student'); setStep(2); setError(null); setFormData({}) }} color="indigo" />
-                        <RoleCard icon={Car} label="Vehicle Registration" desc="Register your vehicle details" onClick={() => { setRole('vehicle_registration'); setStep(2); setError(null); setFormData({ role: 'student' }) }} color="indigo" />
+                        <RoleCard icon={User} label="Visitor" desc="Personal visits, enquiries, or guests" onClick={() => { setRole('visitor'); setStep(2); setError(null); setFormData({}); setAutoDelete24h(false); }} />
+                        <RoleCard icon={Car} label="Taxi / Cab" desc="Drop-offs, pick-ups, or taxi services" onClick={() => { setRole('taxi'); setStep(2); setError(null); setFormData({ passengers: 1 }); setAutoDelete24h(false); }} />
+                        <RoleCard icon={Truck} label="Delivery" desc="Goods, parcels, couriers, or food deliveries" onClick={() => { setRole('delivery'); setStep(2); setError(null); setFormData({}); setAutoDelete24h(false); }} />
+                        <RoleCard icon={UserCheck} label="Student / Staff" desc="Campus verification check-in/out" onClick={() => { setRole('student'); setStep(2); setError(null); setFormData({}); setAutoDelete24h(false); }} color="indigo" />
+                        <RoleCard icon={Car} label="Vehicle Registration" desc="Register your vehicle details" onClick={() => { setRole('vehicle_registration'); setStep(2); setError(null); setFormData({ role: 'student' }); setAutoDelete24h(false); }} color="indigo" />
                     </div>
                 )}
 
@@ -491,6 +503,21 @@ export default function SelfServiceEntry() {
                                 Step 2 of 2
                             </span>
                         </div>
+
+                        {/* Data Protection summary before they fill details */}
+                        {role !== 'student' && (
+                            <div className="p-4 bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 rounded-2xl text-slate-650 dark:text-slate-350 text-xs font-bold leading-relaxed mb-6 space-y-2">
+                                <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-black uppercase tracking-wider text-[10px]">
+                                    <Shield size={14} /> Data Protection & Privacy Summary
+                                </div>
+                                <p>
+                                    To comply with the <strong>Kenya Data Protection Act 2019</strong>, we notify you that this portal collects your full name, phone number, national ID, and purpose of visit. This data is processed strictly for campus security and log auditing.
+                                </p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                    We do not use tracking cookies. View our full <button type="button" onClick={() => setShowPrivacyModal(true)} className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">Privacy Policy</button> and <button type="button" onClick={() => setShowCookieModal(true)} className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">Cookie Policy</button>.
+                                </p>
+                            </div>
+                        )}
 
                         {role === 'student' ? (
                             userData ? (
@@ -516,7 +543,7 @@ export default function SelfServiceEntry() {
                                                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/90 text-white z-10 p-4">
                                                         <button 
                                                             onClick={startCamera} 
-                                                            className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2 active:scale-95 text-xs"
+                                                            className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2 active:scale-95 text-xs cursor-pointer"
                                                         >
                                                             <Camera size={16} /> Open Device Camera
                                                         </button>
@@ -529,7 +556,7 @@ export default function SelfServiceEntry() {
                                                 <img src={image} className="w-full h-full object-cover" />
                                                 <button
                                                     onClick={() => { setImage(null); startCamera() }}
-                                                    className="absolute bottom-4 right-4 bg-white/95 text-slate-900 px-4 py-2 rounded-xl text-xs font-black shadow hover:bg-white flex items-center gap-1.5 transition-all"
+                                                    className="absolute bottom-4 right-4 bg-white/95 text-slate-900 px-4 py-2 rounded-xl text-xs font-black shadow hover:bg-white flex items-center gap-1.5 transition-all cursor-pointer"
                                                 >
                                                     <RefreshCcw size={12} /> Retake
                                                 </button>
@@ -540,7 +567,7 @@ export default function SelfServiceEntry() {
                                     <div className="flex gap-3 pt-2">
                                         <button 
                                             onClick={() => { setStep(1); setError(null); }} 
-                                            className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-355 rounded-2xl font-black text-xs active:scale-95 transition-all"
+                                            className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs active:scale-95 transition-all cursor-pointer"
                                         >
                                             Back
                                         </button>
@@ -548,7 +575,7 @@ export default function SelfServiceEntry() {
                                         {cameraActive && !image && (
                                             <button 
                                                 onClick={takePhoto} 
-                                                className="flex-[2] py-3.5 bg-slate-900 hover:bg-black text-white rounded-2xl font-black text-xs shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                                                className="flex-[2] py-3.5 bg-slate-900 hover:bg-black text-white rounded-2xl font-black text-xs shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                                             >
                                                 <Camera size={14} /> Capture Photo
                                             </button>
@@ -558,7 +585,7 @@ export default function SelfServiceEntry() {
                                             <button
                                                 onClick={handleStudentSubmit}
                                                 disabled={submitting}
-                                                className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-750 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 hover:opacity-95 shadow-lg shadow-indigo-600/20 transition-all active:scale-95"
+                                                className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-750 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 hover:opacity-95 shadow-lg shadow-indigo-600/20 transition-all active:scale-95 cursor-pointer"
                                             >
                                                 {submitting ? 'Verifying...' : 'Submit Verification'}
                                             </button>
@@ -584,14 +611,14 @@ export default function SelfServiceEntry() {
                                     <button 
                                         type="button" 
                                         onClick={() => window.location.href = '/'} 
-                                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 text-xs active:scale-95 transition-all"
+                                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 text-xs active:scale-95 transition-all cursor-pointer"
                                     >
                                         Go to Login Page
                                     </button>
                                     <button 
                                         type="button" 
                                         onClick={() => { setStep(1); setError(null); }} 
-                                        className="w-full py-3.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-355 text-xs font-black"
+                                        className="w-full py-3.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-355 text-xs font-black cursor-pointer"
                                     >
                                         Back to Categories
                                     </button>
@@ -657,18 +684,37 @@ export default function SelfServiceEntry() {
                                         </select>
                                     </div>
                                 </div>
+
+                                {/* 24h Auto delete option checkbox */}
+                                <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4 mb-2">
+                                    <label className="flex items-start gap-3 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={autoDelete24h}
+                                            onChange={(e) => setAutoDelete24h(e.target.checked)}
+                                            className="rounded border-slate-300 dark:border-slate-800 text-indigo-650 focus:ring-indigo-500/20 w-4.5 h-4.5 mt-0.5 cursor-pointer"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider block">Auto-Scrub My Data</span>
+                                            <span className="text-[10px] text-slate-450 dark:text-slate-500 font-bold block leading-normal mt-0.5">
+                                                Automatically delete my name, contact, and ID details from campus records exactly 24 hours after my visit ends.
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+
                                 <div className="pt-4 flex gap-3">
                                     <button 
                                         type="button" 
                                         onClick={() => { setStep(1); setError(null); }} 
-                                        className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs transition-all active:scale-95"
+                                        className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-355 rounded-2xl font-black text-xs transition-all active:scale-95 cursor-pointer"
                                     >
                                         Back
                                     </button>
                                     <button 
                                         type="submit"
                                         disabled={submitting} 
-                                        className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-95"
+                                        className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-95 cursor-pointer"
                                     >
                                         {submitting ? 'Submitting...' : <>Submit Request <ArrowRight size={14} /></>}
                                     </button>
@@ -711,7 +757,7 @@ export default function SelfServiceEntry() {
                                     </div>
                                 </div>
 
-                                {/* Vehicle Fields for Taxi ONLY (Visitor plate is now completely hidden) */}
+                                {/* Vehicle Fields for Taxi ONLY */}
                                 {role === 'taxi' && (
                                     <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-4">
                                         <div>
@@ -759,7 +805,7 @@ export default function SelfServiceEntry() {
                                                     <button
                                                         type="button"
                                                         onClick={() => document.getElementById('delivery-package-input')?.click()}
-                                                        className="w-full aspect-video border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-650 hover:border-indigo-500/30 transition-all bg-slate-50/50 dark:bg-slate-905"
+                                                        className="w-full aspect-video border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-650 hover:border-indigo-500/30 transition-all bg-slate-50/50 dark:bg-slate-905 cursor-pointer"
                                                     >
                                                         <Camera size={18} />
                                                         <span className="text-[9px] font-bold mt-1">Capture</span>
@@ -770,7 +816,7 @@ export default function SelfServiceEntry() {
                                                         <button
                                                             type="button"
                                                             onClick={() => setDeliveryPackageImage(null)}
-                                                            className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[9px] font-bold opacity-0 hover:opacity-100 transition-opacity"
+                                                            className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[9px] font-bold opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
                                                         >
                                                             Remove
                                                         </button>
@@ -785,7 +831,7 @@ export default function SelfServiceEntry() {
                                                     <button
                                                         type="button"
                                                         onClick={() => document.getElementById('delivery-receipt-input')?.click()}
-                                                        className="w-full aspect-video border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-650 hover:border-indigo-500/30 transition-all bg-slate-50/50 dark:bg-slate-905"
+                                                        className="w-full aspect-video border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-650 hover:border-indigo-500/30 transition-all bg-slate-50/50 dark:bg-slate-905 cursor-pointer"
                                                     >
                                                         <FileText size={18} />
                                                         <span className="text-[9px] font-bold mt-1">Capture</span>
@@ -796,7 +842,7 @@ export default function SelfServiceEntry() {
                                                         <button
                                                             type="button"
                                                             onClick={() => setDeliveryReceiptImage(null)}
-                                                            className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[9px] font-bold opacity-0 hover:opacity-100 transition-opacity"
+                                                            className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[9px] font-bold opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
                                                         >
                                                             Remove
                                                         </button>
@@ -824,9 +870,9 @@ export default function SelfServiceEntry() {
                                                             setDropoffName('');
                                                             setError(null);
                                                         }}
-                                                        className={`py-2 px-3 text-[10px] font-black rounded-lg capitalize border active:scale-95 transition-all ${
+                                                        className={`py-2 px-3 text-[10px] font-black rounded-lg capitalize border active:scale-95 transition-all cursor-pointer ${
                                                             dropoffType === type
-                                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                                                                ? 'bg-indigo-605 border-indigo-600 text-white shadow-md'
                                                                 : 'bg-white border-slate-200 text-slate-650 dark:bg-slate-900 dark:border-slate-800'
                                                         }`}
                                                     >
@@ -852,7 +898,7 @@ export default function SelfServiceEntry() {
                                                             type="button"
                                                             onClick={lookupStudent}
                                                             disabled={loadingStudent || !dropoffAdmission}
-                                                            className="px-4 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all active:scale-95 disabled:opacity-50"
+                                                            className="px-4 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                                                         >
                                                             {loadingStudent ? 'Searching...' : 'Lookup'}
                                                         </button>
@@ -866,7 +912,7 @@ export default function SelfServiceEntry() {
                                                             {dropoffUser.profile_image ? (
                                                                 <img src={dropoffUser.profile_image} className="w-full h-full object-cover" />
                                                             ) : (
-                                                                <div className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-700 font-black text-lg">
+                                                                <div className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-705 font-black text-lg">
                                                                     {dropoffUser.full_name[0]}
                                                                 </div>
                                                             )}
@@ -881,7 +927,7 @@ export default function SelfServiceEntry() {
                                                                     type="checkbox"
                                                                     checked={checkInStudent}
                                                                     onChange={e => setCheckInStudent(e.target.checked)}
-                                                                    className="rounded border-slate-300 dark:border-slate-800 text-indigo-600 focus:ring-indigo-500/20 w-3.5 h-3.5"
+                                                                    className="rounded border-slate-300 dark:border-slate-800 text-indigo-605 focus:ring-indigo-505/20 w-3.5 h-3.5 cursor-pointer"
                                                                 />
                                                                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Check student in to campus</span>
                                                             </label>
@@ -940,18 +986,36 @@ export default function SelfServiceEntry() {
                                     </div>
                                 )}
 
+                                {/* 24h Auto delete option checkbox */}
+                                <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4 mb-2">
+                                    <label className="flex items-start gap-3 cursor-pointer select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={autoDelete24h}
+                                            onChange={(e) => setAutoDelete24h(e.target.checked)}
+                                            className="rounded border-slate-300 dark:border-slate-800 text-indigo-650 focus:ring-indigo-500/20 w-4.5 h-4.5 mt-0.5 cursor-pointer"
+                                        />
+                                        <div>
+                                            <span className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider block">Auto-Scrub My Data</span>
+                                            <span className="text-[10px] text-slate-450 dark:text-slate-500 font-bold block leading-normal mt-0.5">
+                                                Automatically delete my name, contact, and ID details from campus records exactly 24 hours after my visit ends.
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+
                                 <div className="pt-4 flex gap-3">
                                     <button 
                                         type="button" 
                                         onClick={() => { setStep(1); setError(null); }} 
-                                        className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs transition-all active:scale-95"
+                                        className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs transition-all active:scale-95 cursor-pointer"
                                     >
                                         Back
                                     </button>
                                     <button 
                                         type="submit"
                                         disabled={submitting} 
-                                        className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-95"
+                                        className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-95 cursor-pointer"
                                     >
                                         {submitting ? 'Processing...' : <>Submit Request <ArrowRight size={14} /></>}
                                     </button>
@@ -961,6 +1025,86 @@ export default function SelfServiceEntry() {
                     </div>
                 )}
             </div>
+
+            {/* Premium Dynamic Sticky Footer displaying policy menu items */}
+            <footer className="w-full text-center text-[10px] text-slate-450 dark:text-slate-500 font-bold py-4 mt-6 border-t border-slate-150/40 dark:border-slate-850/60 bg-white/20 dark:bg-slate-950/20 backdrop-blur-md">
+                <span>{companyColors.company_name} Smart Campus Portal &copy; {new Date().getFullYear()} | </span>
+                <button 
+                    onClick={() => setShowPrivacyModal(true)} 
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold bg-transparent border-none p-0 cursor-pointer"
+                >
+                    Privacy Policy
+                </button>
+                <span> | </span>
+                <button 
+                    onClick={() => setShowCookieModal(true)} 
+                    className="text-indigo-600 dark:text-indigo-400 hover:underline font-bold bg-transparent border-none p-0 cursor-pointer"
+                >
+                    Cookie Policy
+                </button>
+            </footer>
+
+            {/* Privacy Policy Modal */}
+            {showPrivacyModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-[var(--bg-surface)] w-full max-w-4xl rounded-3xl shadow-2xl border border-[var(--border-color)] overflow-hidden animate-scale-in flex flex-col max-h-[85vh]">
+                        <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-slate-50/50 dark:bg-slate-905">
+                            <div className="flex items-center gap-2 text-slate-800 dark:text-white font-black text-lg">
+                                <Shield className="text-indigo-600" size={20} />
+                                {companyColors.company_name} Privacy Policy
+                            </div>
+                            <button 
+                                onClick={() => setShowPrivacyModal(false)} 
+                                className="p-2 text-slate-400 hover:text-red-500 rounded-full transition-colors cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1">
+                            <PrivacyPolicy companyName={companyColors.company_name} />
+                        </div>
+                        <div className="p-4 border-t border-[var(--border-color)] bg-slate-50/50 dark:bg-slate-905 flex justify-end">
+                            <button 
+                                onClick={() => setShowPrivacyModal(false)}
+                                className="px-5 py-2.5 bg-indigo-650 text-white font-black rounded-xl text-xs active:scale-95 transition-all shadow-md cursor-pointer"
+                            >
+                                I Understand
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Cookie Policy Modal */}
+            {showCookieModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-[var(--bg-surface)] w-full max-w-4xl rounded-3xl shadow-2xl border border-[var(--border-color)] overflow-hidden animate-scale-in flex flex-col max-h-[85vh]">
+                        <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-slate-50/50 dark:bg-slate-905">
+                            <div className="flex items-center gap-2 text-slate-800 dark:text-white font-black text-lg">
+                                <Shield className="text-indigo-600" size={20} />
+                                {companyColors.company_name} Cookie & Storage Policy
+                            </div>
+                            <button 
+                                onClick={() => setShowCookieModal(false)} 
+                                className="p-2 text-slate-400 hover:text-red-500 rounded-full transition-colors cursor-pointer"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1">
+                            <CookiePolicy companyName={companyColors.company_name} />
+                        </div>
+                        <div className="p-4 border-t border-[var(--border-color)] bg-slate-50/50 dark:bg-slate-905 flex justify-end">
+                            <button 
+                                onClick={() => setShowCookieModal(false)}
+                                className="px-5 py-2.5 bg-indigo-650 text-white font-black rounded-xl text-xs active:scale-95 transition-all shadow-md cursor-pointer"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

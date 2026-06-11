@@ -405,7 +405,8 @@ async def migrate_self_service():
         "dropoff_admission_number": "VARCHAR(255) DEFAULT NULL",
         "check_in_student": "BOOLEAN DEFAULT FALSE",
         "delivery_image_package": "VARCHAR(512) DEFAULT NULL",
-        "delivery_image_receipt": "VARCHAR(512) DEFAULT NULL"
+        "delivery_image_receipt": "VARCHAR(512) DEFAULT NULL",
+        "auto_delete_24h": "BOOLEAN DEFAULT FALSE"
     }
     try:
         async with engine.begin() as conn:
