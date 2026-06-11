@@ -22,6 +22,33 @@ export default function GateControl() {
 
     const refreshData = () => setRefreshTrigger(prev => prev + 1)
 
+    const cleanQRData = (input: string): string => {
+        if (!input) return "";
+        const cleanInput = input.trim();
+        try {
+            if (cleanInput.toUpperCase().startsWith("HTTP://") || cleanInput.toUpperCase().startsWith("HTTPS://")) {
+                const url = new URL(cleanInput);
+                const userParam = url.searchParams.get("USER") || url.searchParams.get("user");
+                if (userParam) return userParam.trim();
+                const admParam = url.searchParams.get("admission") || url.searchParams.get("adm");
+                if (admParam) return admParam.trim();
+                const tripParam = url.searchParams.get("trip");
+                if (tripParam) return `TRIP:${tripParam.trim()}`;
+                const vehicleParam = url.searchParams.get("vehicle");
+                if (vehicleParam) return `VEHICLE:${vehicleParam.trim()}`;
+                const pathSegments = url.pathname.split("/").filter(Boolean);
+                if (pathSegments.length > 0) return pathSegments[pathSegments.length - 1].trim();
+            }
+        } catch (e) {}
+        const userMatch = cleanInput.match(/[?&][uU][sS][eE][rR]=([^&]+)/);
+        if (userMatch && userMatch[1]) return userMatch[1].trim();
+        const tripMatch = cleanInput.match(/[?&]trip=([^&]+)/);
+        if (tripMatch && tripMatch[1]) return `TRIP:${tripMatch[1].trim()}`;
+        const vehicleMatch = cleanInput.match(/[?&]vehicle=([^&]+)/);
+        if (vehicleMatch && vehicleMatch[1]) return `VEHICLE:${vehicleMatch[1].trim()}`;
+        return cleanInput;
+    };
+
     // Manual Form States
     const [activeTab, setActiveTab] = useState<'student' | 'visitor' | 'vehicle'>('student')
     
@@ -179,7 +206,7 @@ export default function GateControl() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ admission_number: admissionNumber, gate_id: selectedGateId })
+                body: JSON.stringify({ admission_number: cleanQRData(admissionNumber), gate_id: selectedGateId })
             })
 
             const result = await res.json()
@@ -568,7 +595,7 @@ export default function GateControl() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ admission_number: code, gate_id: selectedGateId })
+                body: JSON.stringify({ admission_number: cleanQRData(code), gate_id: selectedGateId })
             })
 
             const result = await res.json()

@@ -665,6 +665,13 @@ async def scan_entry_inner(
                     .where(FleetPassengerManifest.user_id == current_user.id)
                 )).first()
                 
+                if not passenger and current_user.admission_number:
+                    passenger = (await session.exec(
+                        select(FleetPassengerManifest)
+                        .where(FleetPassengerManifest.trip_id == trip.id)
+                        .where(func.lower(FleetPassengerManifest.admission_number) == func.lower(current_user.admission_number))
+                    )).first()
+
                 if not passenger:
                     passenger = FleetPassengerManifest(
                         trip_id=trip.id,
@@ -676,6 +683,14 @@ async def scan_entry_inner(
                         check_in_time=get_eat_time(),
                         added_via_scan=True
                     )
+                    session.add(passenger)
+                    await session.commit()
+                else:
+                    passenger.arrival_confirmed = True
+                    passenger.check_in_time = get_eat_time()
+                    # Link user_id if it wasn't linked (e.g. from CSV import)
+                    if passenger.user_id is None:
+                        passenger.user_id = current_user.id
                     session.add(passenger)
                     await session.commit()
                     
@@ -802,8 +817,15 @@ async def scan_entry_inner(
         passenger = (await session.exec(
             select(FleetPassengerManifest)
             .where(FleetPassengerManifest.trip_id == trip.id)
-            .where(func.lower(FleetPassengerManifest.admission_number) == func.lower(current_user.admission_number))
+            .where(FleetPassengerManifest.user_id == current_user.id)
         )).first()
+
+        if not passenger and current_user.admission_number:
+            passenger = (await session.exec(
+                select(FleetPassengerManifest)
+                .where(FleetPassengerManifest.trip_id == trip.id)
+                .where(func.lower(FleetPassengerManifest.admission_number) == func.lower(current_user.admission_number))
+            )).first()
 
         if not passenger:
             passenger = FleetPassengerManifest(

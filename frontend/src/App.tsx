@@ -293,6 +293,7 @@ function App() {
         const room = params.get('room')
         const course = params.get('course')
         const trip = params.get('trip')
+        const vehicle = params.get('vehicle')
         if (trip && isAuthenticated) {
             const boardUser = async () => {
                 try {
@@ -304,6 +305,31 @@ function App() {
                             'Authorization': `Bearer ${token}` 
                         },
                         body: JSON.stringify({ admission_number: `TRIP:${trip}` })
+                    })
+                    const data = await res.json()
+                    if (res.ok && data.status === 'allowed') {
+                        alert(`Boarding Info: ${data.message}`)
+                    } else {
+                        alert(`Boarding status: ${data.message || 'Verification completed'}`)
+                    }
+                } catch (e: any) {
+                    console.error("Deep link boarding error", e)
+                }
+            }
+            boardUser()
+            // Clean URL
+            window.history.replaceState({}, '', window.location.pathname)
+        } else if (vehicle && isAuthenticated) {
+            const boardUser = async () => {
+                try {
+                    const token = localStorage.getItem('token')
+                    const res = await fetch('/api/gate/scan', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}` 
+                        },
+                        body: JSON.stringify({ admission_number: `VEHICLE:${vehicle}` })
                     })
                     const data = await res.json()
                     if (res.ok && data.status === 'allowed') {
