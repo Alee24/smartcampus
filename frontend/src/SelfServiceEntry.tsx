@@ -478,6 +478,14 @@ export default function SelfServiceEntry() {
         }
     }
 
+    const handleCheckInLater = () => {
+        setResult({
+            status: 'success',
+            message: 'Pre-registration saved! You can complete your check-in with the gate guard when you arrive.'
+        });
+        setStep(4);
+    }
+
     const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'package' | 'receipt') => {
         const file = e.target.files?.[0]
         if (file) {
@@ -537,21 +545,47 @@ export default function SelfServiceEntry() {
                     </span>
 
                     <h2 className="text-2xl font-black mt-4 mb-2 text-slate-850 dark:text-white">
-                        Verify Identification Document
+                        Verify Your Identity
                     </h2>
                     
                     <p className="text-slate-500 dark:text-slate-400 text-xs font-bold leading-relaxed mb-6">
-                        Guard: Please compare the ID/Passport document provided by the visitor with the number shown below.
+                        Please prepare and present your physical ID or Passport to the security guard at the gate for verification. Make sure the ID/Passport number shown below matches your document. Note: providing wrong or incorrect details will lead to access being denied.
                     </p>
 
-                    {/* Prominent ID Number Display */}
-                    <div className="bg-slate-50 dark:bg-slate-905 border border-slate-150 dark:border-slate-850 rounded-2xl p-6 mb-6">
-                        <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
-                            ID / Passport / Admission Number
-                        </div>
-                        <div className="text-4xl md:text-5xl font-black text-indigo-650 dark:text-indigo-400 font-mono tracking-wider break-words uppercase">
-                            {displayIdNumber}
-                        </div>
+                    {/* Prominent ID Number or Student/Staff Photo Display */}
+                    <div className="bg-slate-50 dark:bg-slate-905 border border-slate-150 dark:border-slate-850 rounded-2xl p-6 mb-6 flex flex-col items-center justify-center">
+                        {role === 'taxi' ? (
+                            <>
+                                <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-3 text-center">
+                                    Student / Staff Profile Photo for Verification
+                                </div>
+                                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-100 dark:border-indigo-950 shadow-md bg-slate-200 flex items-center justify-center">
+                                    {(selectedUserObj?.profile_image || dropoffUser?.profile_image) ? (
+                                        <img 
+                                            src={selectedUserObj?.profile_image || dropoffUser?.profile_image} 
+                                            className="w-full h-full object-cover" 
+                                            alt="Student/Staff Profile"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-650 text-3xl font-black">
+                                            {(selectedUserObj?.full_name || dropoffName || "Student")[0]}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mt-3 text-sm font-black text-indigo-650 dark:text-indigo-400 font-mono uppercase tracking-wider">
+                                    ID / Admission: {displayIdNumber}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 text-center">
+                                    ID / Passport / Admission Number
+                                </div>
+                                <div className="text-4xl md:text-5xl font-black text-indigo-650 dark:text-indigo-400 font-mono tracking-wider break-words uppercase text-center w-full">
+                                    {displayIdNumber}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Visitor/User Info Details */}
@@ -602,13 +636,23 @@ export default function SelfServiceEntry() {
                                 {isCheckingInOut ? 'Checking Out...' : 'Verify & Check Out'}
                             </button>
                         ) : (
-                            <button
-                                onClick={() => executeVisitorAction('checkin')}
-                                disabled={isCheckingInOut}
-                                className="w-full py-4 bg-indigo-600 hover:bg-indigo-750 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/25 active:scale-95 transition-all text-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer border-none outline-none"
-                            >
-                                {isCheckingInOut ? 'Checking In...' : 'Verify & Check In'}
-                            </button>
+                            <div className="flex flex-col gap-3 w-full">
+                                <button
+                                    onClick={() => executeVisitorAction('checkin')}
+                                    disabled={isCheckingInOut}
+                                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-750 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/25 active:scale-95 transition-all text-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer border-none outline-none"
+                                >
+                                    {isCheckingInOut ? 'Checking In...' : 'Verify & Check In'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleCheckInLater}
+                                    disabled={isCheckingInOut}
+                                    className="w-full py-4 bg-purple-650 hover:bg-purple-750 text-white rounded-2xl font-black shadow-lg shadow-purple-650/25 active:scale-95 transition-all text-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer border-none outline-none"
+                                >
+                                    Check In Later
+                                </button>
+                            </div>
                         )}
 
                         <button 
@@ -788,7 +832,7 @@ export default function SelfServiceEntry() {
                     <div className="max-w-5xl mx-auto w-full relative flex-1 animate-slide-in flex flex-col justify-center">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
                             {/* Left Pane (40%): Immersive Branding, role guidelines, and Data Protection Act notices */}
-                            <div className="lg:col-span-5 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 text-white rounded-3xl p-8 flex flex-col justify-between shadow-xl min-h-[400px]">
+                            <div className="lg:col-span-5 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 text-white rounded-3xl p-8 flex flex-col justify-between shadow-xl min-h-[400px] order-2 lg:order-1">
                                 <div className="space-y-6">
                                     <div className="flex justify-between items-start">
                                         <div className="p-3 bg-white/10 rounded-2xl">
@@ -801,17 +845,17 @@ export default function SelfServiceEntry() {
                                     
                                     <div>
                                         <span className="text-[10px] text-indigo-200 font-black uppercase tracking-wider">
-                                            Gatepass Portal
+                                    Gatepass Portal
                                         </span>
                                         <h2 className="text-3xl font-black mt-1 capitalize leading-snug">
                                             {role === 'student' ? 'Verify Identity' : role === 'vehicle_registration' ? 'Vehicle Details' : `${role} Registration`}
                                         </h2>
-                                        <p className="text-xs text-indigo-100 font-medium leading-relaxed mt-3">
-                                            {role === 'visitor' && "Please input your visitor details to request campus gate access. Security guards will verify these records at the gate."}
-                                            {role === 'taxi' && "Taxi registrations require vehicle plate number, passengers count, and target student/staff lookup."}
-                                            {role === 'delivery' && "Submit delivery agent credentials and capture clear photos of package items and receipts."}
-                                            {role === 'student' && "Confirm your pre-loaded student/staff profile and snap a quick photo for verification check-in."}
-                                            {role === 'vehicle_registration' && "Self-register your vehicle details under student, staff, or visitor role."}
+                                        <p className="text-xs text-indigo-150 font-medium leading-relaxed mt-3">
+                                            {role === 'visitor' && "Welcome! Please enter your details in the form to register for gate entry. Ensure your ID/Passport and phone number are correct, as the security guard will verify them against your physical document. Incorrect details will result in denied access."}
+                                            {role === 'taxi' && "Please provide the taxi license plate number and the number of passengers. Use the search field to look up the student or staff member you are picking up or dropping off."}
+                                            {role === 'delivery' && "Please input your details and delivery description. Capture clear photos of the delivery package and receipt for campus security check-in records."}
+                                            {role === 'student' && "Confirm your pre-loaded student/staff profile and take a quick selfie to verify your physical presence at the gate."}
+                                            {role === 'vehicle_registration' && "Self-register your vehicle details under your campus role (Student, Staff, or Visitor) for parking and gate audit records."}
                                         </p>
                                     </div>
                                 </div>
@@ -838,7 +882,7 @@ export default function SelfServiceEntry() {
                             </div>
 
                             {/* Right Pane (60%): Interactive Input Form */}
-                            <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-xl flex flex-col justify-between">
+                            <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-xl flex flex-col justify-between order-1 lg:order-2">
                                 <div className="w-full">
                                     {role === 'student' ? (
                                         userData ? (
@@ -1067,38 +1111,38 @@ export default function SelfServiceEntry() {
                                             )}
 
                                             {role !== 'taxi' && (
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
-                                                        <input 
-                                                            required 
-                                                            type="tel"
-                                                            placeholder="e.g. 0712345678"
-                                                            className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
-                                                            value={formData.mobile || ''}
-                                                            onChange={e => setFormData({ ...formData, mobile: e.target.value })} 
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport No</label>
-                                                        <div className="flex gap-2">
+                                                <div className="space-y-4">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="text-[10px] font-black text-slate-400 dark:text-slate-505 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
+                                                            <input 
+                                                                required 
+                                                                type="tel"
+                                                                placeholder="e.g. 0712345678"
+                                                                className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                                value={formData.mobile || ''}
+                                                                onChange={e => setFormData({ ...formData, mobile: e.target.value })} 
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-black text-slate-400 dark:text-slate-505 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport No</label>
                                                             <input 
                                                                 required 
                                                                 placeholder="ID Number"
-                                                                className="flex-1 p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                                className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
                                                                 value={formData.id_number || ''}
                                                                 onChange={e => setFormData({ ...formData, id_number: e.target.value })} 
                                                             />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => lookupVisitor(formData.id_number)}
-                                                                disabled={loadingVisitor || !formData.id_number}
-                                                                className="px-4 bg-slate-900 text-white rounded-2xl text-xs font-bold hover:bg-black transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none"
-                                                            >
-                                                                {loadingVisitor ? 'Searching...' : 'Lookup'}
-                                                            </button>
                                                         </div>
                                                     </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => lookupVisitor(formData.id_number)}
+                                                        disabled={loadingVisitor || !formData.id_number}
+                                                        className="w-full py-3.5 bg-slate-900 hover:bg-black dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-2xl text-xs font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none shadow-sm flex items-center justify-center gap-2"
+                                                    >
+                                                        {loadingVisitor ? 'Searching Records...' : 'Lookup Existing Visitor Details'}
+                                                    </button>
                                                 </div>
                                             )}
 

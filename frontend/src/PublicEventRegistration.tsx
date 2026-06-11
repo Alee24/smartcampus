@@ -259,6 +259,12 @@ export default function PublicEventRegistration() {
                                     ? 'Welcome! You have been logged as present. Show the pass below to campus guards.'
                                     : 'Your pass is ready. Show this pass to campus guards at the gate to scan and check in.'}
                             </p>
+                            <div className="mt-4 p-3.5 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl text-amber-850 dark:text-amber-400 text-xs font-semibold leading-relaxed flex items-start gap-2.5">
+                                <AlertTriangle className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" size={16} />
+                                <span className="text-left">
+                                    <strong>ID Verification Required:</strong> Please make sure your physical ID/Passport is ready for verification at the gate. Registered details must match your physical document exactly, or campus access will be denied.
+                                </span>
+                            </div>
                         </div>
 
                         {/* Professional Gate Pass Card (Download Target) */}
