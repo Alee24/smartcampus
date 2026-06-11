@@ -19,6 +19,15 @@ export default function PublicEventRegistration() {
     const [error, setError] = useState<string | null>(null)
     const [successData, setSuccessData] = useState<any>(null)
     
+    // Company settings & colors
+    const [companySettings, setCompanySettings] = useState<any>({
+        company_name: 'Smart Campus',
+        logo_url: '',
+        primary_color: '#2563eb',
+        secondary_color: '#0284c7',
+        accent_color: '#10b981'
+    })
+    
     // Form States
     const [fullName, setFullName] = useState('')
     const [idNumber, setIdNumber] = useState('')
@@ -38,8 +47,27 @@ export default function PublicEventRegistration() {
     const token = window.location.pathname.split('/').pop() || ''
 
     useEffect(() => {
+        const fetchCompanyColors = async () => {
+            try {
+                const res = await fetch('/api/users/public-company-settings')
+                if (res.ok) {
+                    const data = await res.json()
+                    setCompanySettings({
+                        company_name: data.company_name || 'Smart Campus',
+                        logo_url: data.logo_url || '',
+                        primary_color: data.primary_color || '#2563eb',
+                        secondary_color: data.secondary_color || '#0284c7',
+                        accent_color: data.accent_color || '#10b981'
+                    })
+                }
+            } catch (e) {
+                console.error('Failed to fetch public company settings:', e)
+            }
+        }
+        
         if (token) {
             fetchEventDetails()
+            fetchCompanyColors()
         } else {
             setError("No event token specified")
             setLoading(false)
@@ -270,68 +298,132 @@ export default function PublicEventRegistration() {
                         {/* Professional Gate Pass Card (Download Target) */}
                         <div 
                             ref={passCardRef}
-                            className="bg-white text-gray-900 p-8 rounded-3xl border border-gray-200 shadow-2xl text-center max-w-sm mx-auto mb-6 relative overflow-hidden"
-                            style={{ backgroundColor: '#ffffff', color: '#111827' }}
+                            className="bg-white p-10 flex flex-col items-center justify-center mx-auto mb-6 select-none"
+                            style={{ backgroundColor: '#ffffff', minHeight: '820px', width: '100%', maxWidth: '440px' }}
                         >
-                            {/* Accent line on top of download */}
-                            <div className="absolute top-0 left-0 right-0 h-2.5 bg-gradient-to-r from-purple-600 to-indigo-650" />
-                            
-                            <div className="flex flex-col items-center">
-                                <div className="text-[10px] font-black uppercase tracking-widest text-purple-600 mb-1">
-                                    {event.event_type}
-                                </div>
-                                <h4 className="text-xl font-black text-gray-900 tracking-tight leading-snug mb-1">
-                                    {event.name}
-                                </h4>
-                                <div className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-6">
-                                    Gate Pass
-                                </div>
+                            {/* Ribbons */}
+                            <div className="w-full h-32 relative overflow-hidden flex justify-center mb-1">
+                                {/* Left Strap */}
+                                <div 
+                                    className="absolute h-40 w-8 origin-bottom-right"
+                                    style={{
+                                        background: `linear-gradient(to right, ${companySettings.primary_color}, ${companySettings.secondary_color})`,
+                                        transform: 'rotate(-32deg) translate(-22px, -8px)',
+                                        opacity: 0.95,
+                                        boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                                        borderRight: '1px solid rgba(255,255,255,0.2)'
+                                    }}
+                                />
+                                {/* Right Strap */}
+                                <div 
+                                    className="absolute h-40 w-8 origin-bottom-left"
+                                    style={{
+                                        background: `linear-gradient(to left, ${companySettings.primary_color}, ${companySettings.accent_color || companySettings.secondary_color})`,
+                                        transform: 'rotate(32deg) translate(22px, -8px)',
+                                        opacity: 0.95,
+                                        boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                                        borderLeft: '1px solid rgba(255,255,255,0.2)'
+                                    }}
+                                />
+                            </div>
 
-                                {/* QR Code Centered & Large */}
-                                <div className="bg-white p-4.5 rounded-2xl border border-gray-150 inline-block mb-6 shadow-sm">
-                                    <QRCodeCanvas
-                                        value={`VISITOR:${successData.id}`}
-                                        size={220}
-                                        level="H"
-                                        includeMargin={true}
-                                    />
+                            {/* Metal / Plastic Buckle Connector */}
+                            <div className="w-10 h-10 bg-gradient-to-b from-gray-300 to-gray-400 rounded-lg shadow-md flex items-center justify-center relative -mt-5 z-20 border border-gray-400/50">
+                                <div className="w-4 h-4 bg-gray-600 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 bg-gray-900 rounded-full" />
                                 </div>
+                                <div className="absolute bottom-[-14px] w-5 h-6 bg-gradient-to-r from-gray-400 to-gray-500 rounded-b-md shadow border-x border-b border-gray-400" />
+                            </div>
 
-                                {/* Card details table */}
-                                <div className="w-full space-y-4.5 text-left border-t border-gray-150 pt-5">
-                                    <div className="flex justify-between items-start gap-4">
-                                        <div>
-                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">Guest Name</span>
-                                            <span className="text-sm font-black text-gray-900 block leading-tight">{successData.visitor_name}</span>
+                            {/* Hanger slot connector of the card casing */}
+                            <div className="w-16 h-8 bg-indigo-50/60 rounded-t-xl border-t border-x border-gray-300/40 relative z-10 mt-3 flex items-center justify-center">
+                                <div className="w-8 h-2 bg-gray-800/80 rounded-full border border-white/20" />
+                            </div>
+
+                            {/* Plastic Casing / Holder Card */}
+                            <div className="w-full bg-slate-50/40 rounded-[32px] p-4.5 border-2 border-slate-200/60 shadow-2xl relative -mt-1 backdrop-blur-sm">
+                                {/* Card itself */}
+                                <div 
+                                    className="bg-white rounded-[24px] overflow-hidden relative shadow-lg flex flex-col items-center pb-8 pt-24"
+                                    style={{ minHeight: '520px', border: '1px solid rgba(0,0,0,0.05)' }}
+                                >
+                                    {/* Top Waves SVG */}
+                                    <svg viewBox="0 0 400 180" fill="none" xmlns="http://www.w3.org/2000/svg" className="absolute top-0 left-0 w-full h-40">
+                                        <path d="M0 0H400V130C350 160 300 120 200 145C100 170 50 130 0 160V0Z" fill={companySettings.primary_color} opacity="0.1" />
+                                        <path d="M0 0H400V105C320 135 280 85 200 115C120 145 80 100 0 130V0Z" fill={companySettings.secondary_color} opacity="0.6" />
+                                        <path d="M0 0H400V85C340 105 260 70 200 95C140 120 60 85 0 105V0Z" fill={companySettings.primary_color} />
+                                    </svg>
+
+                                    {/* Circular Logo */}
+                                    <div 
+                                        className="w-24 h-24 rounded-full bg-white shadow-md border-4 flex items-center justify-center relative z-10 -mt-14 overflow-hidden shrink-0" 
+                                        style={{ borderColor: companySettings.primary_color }}
+                                    >
+                                        {companySettings.logo_url ? (
+                                            <img src={companySettings.logo_url} className="w-16 h-16 object-contain" alt="Logo" />
+                                        ) : (
+                                            <Shield className="w-12 h-12" style={{ color: companySettings.primary_color }} />
+                                        )}
+                                    </div>
+
+                                    {/* Company Name & Tagline */}
+                                    <h2 className="text-lg font-black tracking-wider uppercase mt-4 text-center px-4" style={{ color: '#111827' }}>
+                                        {companySettings.company_name}
+                                    </h2>
+                                    <div className="text-[9px] uppercase tracking-widest text-gray-400 font-extrabold mb-4 text-center">
+                                        Verified Event Guest
+                                    </div>
+
+                                    {/* Guest Name block */}
+                                    <div className="text-center mb-4 px-4">
+                                        <span className="text-[8px] uppercase tracking-widest font-black text-gray-400 block mb-0.5">Guest Name</span>
+                                        <span className="text-xl font-black block tracking-wide truncate max-w-[280px]" style={{ color: companySettings.primary_color }}>
+                                            {successData.visitor_name}
+                                        </span>
+                                    </div>
+
+                                    {/* QR Code Container */}
+                                    <div className="bg-white p-3.5 rounded-2xl border border-gray-150 inline-block mb-4 shadow-sm relative z-10">
+                                        <QRCodeCanvas
+                                            value={`VISITOR:${successData.id}`}
+                                            size={200}
+                                            level="H"
+                                            includeMargin={true}
+                                        />
+                                    </div>
+
+                                    {/* Event Details Footer inside card */}
+                                    <div className="text-center mt-2 px-6 relative z-10 w-full">
+                                        <div className="text-[11px] font-black uppercase tracking-wider text-gray-800 truncate max-w-[320px] mx-auto">
+                                            {event.name}
                                         </div>
-                                        <div className="text-right">
-                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">ID Number</span>
-                                            <span className="text-sm font-mono font-bold text-gray-800 block">
-                                                {getMaskedId(successData.visitor_identifier)}
-                                            </span>
+                                        <div className="text-[9px] font-black text-gray-400 mt-1.5 uppercase tracking-wide">
+                                            {new Date(event.event_date).toDateString()} @ {event.start_time}
+                                        </div>
+                                        <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wide truncate max-w-[300px] mx-auto">
+                                            {event.school}
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-3">
-                                        <div>
-                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">Event Date & Time</span>
-                                            <span className="text-xs font-extrabold text-gray-700 block leading-tight">
-                                                {new Date(event.event_date).toDateString()}<br />@{event.start_time}
-                                            </span>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">Event Venue</span>
-                                            <span className="text-xs font-extrabold text-gray-700 block truncate max-w-[140px]" title={event.school}>
-                                                {event.school}
-                                            </span>
-                                        </div>
+
+                                    {/* Bottom Website Tag */}
+                                    <div className="text-[9px] font-mono font-bold text-gray-400 tracking-widest mt-5 uppercase relative z-10">
+                                        {window.location.hostname}
                                     </div>
+
+                                    {/* Bottom Waves SVG */}
+                                    <svg viewBox="0 0 400 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="absolute bottom-0 left-0 w-full h-28 pointer-events-none">
+                                        <path d="M0 120H400V40C350 10 300 50 200 25C100 0 50 40 0 10V120Z" fill={companySettings.primary_color} opacity="0.1" />
+                                        <path d="M0 120H400V60C320 30 280 80 200 50C120 20 80 65 0 35V120Z" fill={companySettings.secondary_color} opacity="0.6" />
+                                        <path d="M0 120H400V75C340 55 260 90 200 65C140 40 60 75 0 55V120Z" fill={companySettings.primary_color} />
+                                    </svg>
                                 </div>
                             </div>
                         </div>
 
                         <button
                             onClick={downloadPass}
-                            className="w-full py-4.5 bg-purple-600 text-white rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-purple-700 transition-all shadow-lg shadow-purple-500/20 active:scale-[0.98] border-none outline-none cursor-pointer text-sm"
+                            className="w-full py-4.5 text-white rounded-2xl font-black flex items-center justify-center gap-2 transition-all active:scale-[0.98] border-none outline-none cursor-pointer text-sm"
+                            style={{ backgroundColor: companySettings.primary_color, boxShadow: `0 8px 20px -4px ${companySettings.primary_color}40` }}
                         >
                             <Download size={18} /> Download Professional Pass
                         </button>
