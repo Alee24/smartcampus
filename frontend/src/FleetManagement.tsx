@@ -810,7 +810,17 @@ function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
         const checkedInCount = trip.passengers ? trip.passengers.filter((p: any) => p.arrival_confirmed).length : 0;
         const attendanceRate = totalPassCount > 0 ? Math.round((checkedInCount / totalPassCount) * 100) : 0;
 
-        const qrCodeData = encodeURIComponent(`TRIP:${trip.id}|VEHICLE:${trip.vehicle.plate_number}`);
+        const serverIpOrDomain = localStorage.getItem('server_ip_or_domain');
+        let base = window.location.origin;
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+            if (serverIpOrDomain) {
+                base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                    ? serverIpOrDomain
+                    : `${window.location.protocol}//${serverIpOrDomain}`;
+            }
+        }
+        const deepLinkUrl = `${base}/?trip=${trip.id}`;
+        const qrCodeData = encodeURIComponent(deepLinkUrl);
         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrCodeData}`;
 
         printWin.document.write(`
@@ -1576,16 +1586,39 @@ function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
                                 <p className="text-xs text-gray-500 mt-1 mb-6">Scan at main gates to instantly verify vehicle, occupants, and trip validity.</p>
                             </div>
                             
-                            <div className="p-4 bg-white dark:bg-gray-800 rounded-3xl shadow-inner border border-gray-100 dark:border-gray-700/80">
-                                <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent("TRIP:" + trip.id + "|VEHICLE:" + trip.vehicle.plate_number)}`} 
-                                    alt="Trip Authorization QR" 
-                                    className="w-44 h-44 rounded-xl border-4 border-white"
+                            <div className="p-4 bg-white rounded-2xl shadow-inner border border-gray-100 dark:border-gray-700/80 inline-block">
+                                <QRCodeCanvas 
+                                    value={(() => {
+                                        const serverIpOrDomain = localStorage.getItem('server_ip_or_domain');
+                                        let base = window.location.origin;
+                                        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+                                            if (serverIpOrDomain) {
+                                                base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                                                    ? serverIpOrDomain
+                                                    : `${window.location.protocol}//${serverIpOrDomain}`;
+                                            }
+                                        }
+                                        return `${base}/?trip=${trip.id}`;
+                                    })()} 
+                                    size={160}
+                                    level="H"
                                 />
                             </div>
 
                             <button 
-                                onClick={() => window.open(`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent("TRIP:" + trip.id + "|VEHICLE:" + trip.vehicle.plate_number)}`, '_blank')}
+                                onClick={() => {
+                                    const serverIpOrDomain = localStorage.getItem('server_ip_or_domain');
+                                    let base = window.location.origin;
+                                    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '::1') {
+                                        if (serverIpOrDomain) {
+                                            base = serverIpOrDomain.startsWith('http://') || serverIpOrDomain.startsWith('https://')
+                                                ? serverIpOrDomain
+                                                : `${window.location.protocol}//${serverIpOrDomain}`;
+                                        }
+                                    }
+                                    const deepLinkUrl = `${base}/?trip=${trip.id}`;
+                                    window.open(`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(deepLinkUrl)}`, '_blank');
+                                }}
                                 className="mt-6 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5 hover:bg-gray-50 transition-colors"
                             >
                                 <Download size={14} /> Download high resolution QR

@@ -637,7 +637,8 @@ async def scan_entry_inner(
             user_role = await session.get(Role, current_user.role_id)
             user_role_name = user_role.name if user_role else "Student"
             
-            if user_role_name not in ["Security", "SuperAdmin"]:
+            is_gate_operator_scan = (user_role_name in ["Security", "SuperAdmin"]) and (scan_data.get("gate_id") is not None)
+            if not is_gate_operator_scan:
                 trip = (await session.exec(
                     select(FleetTrip)
                     .where(FleetTrip.vehicle_id == vehicle.id)
@@ -797,8 +798,9 @@ async def scan_entry_inner(
             user_role = await session.get(Role, current_user.role_id)
             user_role_name = user_role.name if user_role else "Student"
 
-        # If security guard scans, just verify trip details
-        if user_role_name in ["Security", "SuperAdmin"]:
+        # If security guard scans at a gate, just verify trip details
+        is_gate_operator_scan = (user_role_name in ["Security", "SuperAdmin"]) and (scan_data.get("gate_id") is not None)
+        if is_gate_operator_scan:
             return {
                 "status": "allowed",
                 "message": f"Verified trip: {trip.purpose} on vehicle {vehicle_info}",

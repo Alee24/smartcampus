@@ -1010,12 +1010,42 @@ async def board_passenger(
             await session.commit()
             await session.refresh(passenger)
             
+            try:
+                from app.models import ScanLog
+                scan_log = ScanLog(
+                    timestamp=get_eat_time(),
+                    student_id=passenger.user_id,
+                    room_code=f"TRIP:{trip_id}",
+                    is_successful=True,
+                    status_message=f"TRIP Scan: Dynamically boarded trip manifest via scanner",
+                    detected_location="Trip Boarding Scanner"
+                )
+                session.add(scan_log)
+                await session.commit()
+            except Exception as e:
+                print(f"Error logging scan: {e}")
+            
             return {
                 "status": "success",
                 "message": f"Successfully checked in {passenger.passenger_name} (dynamic addition)."
             }
 
         if passenger.arrival_confirmed:
+            try:
+                from app.models import ScanLog
+                if passenger.user_id:
+                    scan_log = ScanLog(
+                        timestamp=get_eat_time(),
+                        student_id=passenger.user_id,
+                        room_code=f"TRIP:{trip_id}",
+                        is_successful=True,
+                        status_message=f"TRIP Scan: Already checked in to trip manifest",
+                        detected_location="Trip Boarding Scanner"
+                    )
+                    session.add(scan_log)
+                    await session.commit()
+            except Exception as e:
+                print(f"Error logging scan: {e}")
             return {"status": "success", "message": f"{passenger.passenger_name} is already checked in."}
 
         passenger.arrival_confirmed = True
@@ -1023,6 +1053,22 @@ async def board_passenger(
         session.add(passenger)
         await session.commit()
         await session.refresh(passenger)
+
+        try:
+            from app.models import ScanLog
+            if passenger.user_id:
+                scan_log = ScanLog(
+                    timestamp=get_eat_time(),
+                    student_id=passenger.user_id,
+                    room_code=f"TRIP:{trip_id}",
+                    is_successful=True,
+                    status_message=f"TRIP Scan: Checked in to trip manifest via scanner",
+                    detected_location="Trip Boarding Scanner"
+                )
+                session.add(scan_log)
+                await session.commit()
+        except Exception as e:
+            print(f"Error logging scan: {e}")
 
         return {
             "status": "success", 
