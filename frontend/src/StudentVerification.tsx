@@ -257,28 +257,27 @@ export default function StudentVerification() {
         setSyncing(false)
     }
 
-    const handleGateAction = async (action: 'check-in' | 'check-out') => {
-        if (!result || !result.admission_number) return
+    const executeGateAction = async (action: 'check-in' | 'check-out', admissionNumber: string, fullName: string) => {
         setActionLoading(action)
         
         let online = navigator.onLine
         if (online) {
             try {
                 const token = localStorage.getItem('token')
-                const res = await fetch(`/api/gate/${action}/${result.admission_number}?gate_id=${selectedGateId || ''}`, {
+                const res = await fetch(`/api/gate/${action}/${admissionNumber}?gate_id=${selectedGateId || ''}`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
                 if (res.ok) {
                     const data = await res.json()
                     playSuccessSound()
-                    showNotification(`${action === 'check-in' ? 'Check-in' : 'Check-out'} recorded for ${result.full_name || result.admission_number} at ${data.time}`, 'success')
+                    showNotification(`${action === 'check-in' ? 'Check-in' : 'Check-out'} recorded for ${fullName} at ${data.time}`, 'success')
                     
                     // Update cache status for offline
                     try {
                         const cached = JSON.parse(localStorage.getItem('cached_students') || '[]')
                         const updated = cached.map((s: any) => {
-                            if (s.admission_number === result.admission_number) {
+                            if (s.admission_number === admissionNumber) {
                                 return { ...s, gate_status: action === 'check-in' ? 'In' : 'Out' }
                             }
                             return s
@@ -287,10 +286,15 @@ export default function StudentVerification() {
                     } catch (e) {}
 
                     // Update UI state without disappearing the ID
-                    setResult((prev: any) => ({
-                        ...prev,
-                        gate_status: action === 'check-in' ? 'In' : 'Out'
-                    }))
+                    setResult((prev: any) => {
+                        if (prev && prev.admission_number === admissionNumber) {
+                            return {
+                                ...prev,
+                                gate_status: action === 'check-in' ? 'In' : 'Out'
+                            }
+                        }
+                        return prev
+                    })
                     setActionLoading(null)
                     return;
                 }
@@ -302,7 +306,7 @@ export default function StudentVerification() {
         // Offline check-in/out fallback
         const queue = JSON.parse(localStorage.getItem('offline_scans') || '[]')
         queue.push({
-            admission_number: result.admission_number,
+            admission_number: admissionNumber,
             action,
             gate_id: selectedGateId,
             timestamp: new Date().toISOString()
@@ -313,7 +317,7 @@ export default function StudentVerification() {
         // Update cached students state
         const cached = JSON.parse(localStorage.getItem('cached_students') || '[]')
         const updatedCached = cached.map((s: any) => {
-            if (s.admission_number === result.admission_number) {
+            if (s.admission_number === admissionNumber) {
                 return { ...s, gate_status: action === 'check-in' ? 'In' : 'Out' }
             }
             return s
@@ -321,14 +325,24 @@ export default function StudentVerification() {
         localStorage.setItem('cached_students', JSON.stringify(updatedCached))
         
         playSuccessSound()
-        showNotification(`Offline Queued: ${action} for ${result.full_name || result.admission_number}`, 'warning')
+        showNotification(`Offline Queued: ${action} for ${fullName}`, 'warning')
         
         // Update UI state without disappearing the ID
-        setResult((prev: any) => ({
-            ...prev,
-            gate_status: action === 'check-in' ? 'In' : 'Out'
-        }))
+        setResult((prev: any) => {
+            if (prev && prev.admission_number === admissionNumber) {
+                return {
+                    ...prev,
+                    gate_status: action === 'check-in' ? 'In' : 'Out'
+                }
+            }
+            return prev
+        })
         setActionLoading(null)
+    }
+
+    const handleGateAction = async (action: 'check-in' | 'check-out') => {
+        if (!result || !result.admission_number) return
+        await executeGateAction(action, result.admission_number, result.full_name || result.admission_number)
     }
 
     const extractAdmissionNumber = (input: string): string => {
@@ -387,6 +401,11 @@ export default function StudentVerification() {
                         setCachedCount(filtered.length)
                     } catch (e) {}
 
+                    if (isScanned && data.admission_number && !data.error) {
+                        const nextAction = (data.gate_status && data.gate_status.toLowerCase() === 'in') ? 'check-out' : 'check-in';
+                        executeGateAction(nextAction, data.admission_number, data.full_name || data.admission_number);
+                    }
+
                     if (!data.ad_found) {
                         setTimeout(() => {
                             setShowCard(true)
@@ -426,6 +445,12 @@ export default function StudentVerification() {
                 gate_status: found.gate_status || 'Out'
             }
             setResult(data)
+
+            if (isScanned && data.admission_number) {
+                const nextAction = (data.gate_status && data.gate_status.toLowerCase() === 'in') ? 'check-out' : 'check-in';
+                executeGateAction(nextAction, data.admission_number, data.full_name || data.admission_number);
+            }
+
             setTimeout(() => {
                 setShowCard(true)
                 setEditData({ full_name: found.full_name, school: found.school })

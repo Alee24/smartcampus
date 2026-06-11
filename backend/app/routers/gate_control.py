@@ -229,11 +229,34 @@ async def scan_entry(
 ):
     import re
     import urllib.parse
+    import json
     from sqlalchemy import func
+    from app.models import (
+        Classroom, Course, Asset, AttendanceRecord, ScanLog,
+        EventVisitor, FleetTrip, FleetPassengerManifest, ClassSession, UserLocationLog
+    )
+    from app.utils.timezone import get_eat_time
     
     code = scan_data.get("admission_number", "").strip()
     if not code:
         return {"status": "rejected", "message": "Scanned code is empty", "data": None}
+
+    # Helper to resolve authenticated user optionally
+    current_user = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        try:
+            from jose import jwt
+            from app.auth import SECRET_KEY, ALGORITHM
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            email: str = payload.get("sub")
+            if email:
+                current_user = (await session.exec(select(User).where(User.email == email))).first()
+        except Exception:
+            pass
+
+    scanned_type = None
 
     # 1. Parse URL query parameters if code is a URL (e.g. from QR Asset Hub)
     if "://" in code or "?" in code:
@@ -242,16 +265,25 @@ async def scan_entry(
             params = urllib.parse.parse_qs(parsed_url.query)
             if "user" in params:
                 code = params["user"][0].strip()
+                scanned_type = "user"
             elif "vehicle" in params:
                 code = params["vehicle"][0].strip()
+                scanned_type = "vehicle"
             elif "room" in params:
                 code = params["room"][0].strip()
+                scanned_type = "room"
             elif "course" in params:
                 code = params["course"][0].strip()
+                scanned_type = "course"
             elif "event" in params:
-                code = "EVENT:" + params["event"][0].strip()
+                code = params["event"][0].strip()
+                scanned_type = "event"
             elif "visitor" in params:
-                code = "VISITOR:" + params["visitor"][0].strip()
+                code = params["visitor"][0].strip()
+                scanned_type = "visitor"
+            elif "asset" in params:
+                code = params["asset"][0].strip()
+                scanned_type = "asset"
         except Exception as e:
             print(f"Error parsing scan URL: {e}")
             pass
@@ -274,93 +306,311 @@ async def scan_entry(
             await session.commit()
             await session.refresh(gate)
 
-    # 3. Check for Prefix
-    upper_code = code.upper()
-    parsed_code = code
-    entity_type = None
-
-    if upper_code.startswith("EVENT:"):
-        entity_type = "event"
-        parsed_code = code[6:].strip()
-    elif upper_code.startswith("VEHICLE:") or upper_code.startswith("BUS:"):
-        entity_type = "vehicle"
-        parsed_code = code.split(":", 1)[1].strip()
-    elif upper_code.startswith("VISITOR:"):
-        entity_type = "visitor"
-        parsed_code = code[8:].strip()
-    elif upper_code.startswith("STUDENT:") or upper_code.startswith("STAFF:"):
-        entity_type = "user"
-        parsed_code = code.split(":", 1)[1].strip()
-    
-    # 4. If no prefix matched, we auto-identify from the string format/data
-    if not entity_type:
-        # Check User first (case-insensitive)
-        user = (await session.exec(
-            select(User).where(func.lower(User.admission_number) == func.lower(code))
-        )).first()
-        if user:
-            entity_type = "user"
-            parsed_code = code
+    # 3. Auto-detect category type if not determined by URL params
+    if not scanned_type:
+        upper_code = code.upper()
+        if upper_code.startswith("EVENT:"):
+            scanned_type = "event"
+            code = code[6:].strip()
+        elif upper_code.startswith("VEHICLE:") or upper_code.startswith("BUS:"):
+            scanned_type = "vehicle"
+            code = code.split(":", 1)[1].strip()
+        elif upper_code.startswith("VISITOR:"):
+            scanned_type = "visitor"
+            code = code[8:].strip()
+        elif upper_code.startswith("STUDENT:") or upper_code.startswith("STAFF:"):
+            scanned_type = "user"
+            code = code.split(":", 1)[1].strip()
         else:
-            # Check Vehicle table (case-insensitive, space-insensitive)
-            clean_code = code.replace(" ", "").lower()
-            vehicle = (await session.exec(
-                select(Vehicle).where(func.lower(func.replace(Vehicle.plate_number, ' ', '')) == clean_code)
-            )).first()
-            if vehicle:
-                entity_type = "vehicle"
-                parsed_code = code
+            # Query databases to detect type
+            room = (await session.exec(select(Classroom).where(Classroom.room_code == code))).first()
+            if room:
+                scanned_type = "room"
             else:
-                # Check Visitor table
-                visitor = (await session.exec(
-                    select(Visitor).where(func.lower(Visitor.id_number) == func.lower(code))
-                )).first()
-                if not visitor:
-                    # check if code is UUID matching visitor ID
-                    try:
-                        import uuid
-                        val_uuid = uuid.UUID(code)
-                        visitor = await session.get(Visitor, val_uuid)
-                    except Exception:
-                        pass
-                
-                if visitor:
-                    entity_type = "visitor"
-                    parsed_code = code
+                course = (await session.exec(select(Course).where(Course.course_code == code))).first()
+                if course:
+                    scanned_type = "course"
                 else:
-                    # Check if code matches standard Kenyan vehicle plate formats or generic alphanumeric format
-                    is_plate = bool(re.match(r'^[A-Z]{2,3}\s?\d{3,4}\s?[A-Z]{0,2}$', upper_code)) or bool(re.match(r'^[A-Z0-9\s]{5,10}$', upper_code))
-                    if is_plate:
-                        entity_type = "vehicle"
-                        parsed_code = code
+                    asset = (await session.exec(select(Asset).where(Asset.tag_number == code))).first()
+                    if asset:
+                        scanned_type = "asset"
                     else:
-                        entity_type = "user"
-                        parsed_code = code
+                        user = (await session.exec(select(User).where(func.lower(User.admission_number) == func.lower(code)))).first()
+                        if user:
+                            scanned_type = "user"
+                        else:
+                            clean_plate = code.replace(" ", "").lower()
+                            vehicle = (await session.exec(select(Vehicle).where(func.lower(func.replace(Vehicle.plate_number, ' ', '')) == clean_plate))).first()
+                            if vehicle:
+                                scanned_type = "vehicle"
+                            else:
+                                visitor = (await session.exec(select(Visitor).where(func.lower(Visitor.id_number) == func.lower(code)))).first()
+                                if visitor:
+                                    scanned_type = "visitor"
+                                else:
+                                    try:
+                                        import uuid
+                                        val_uuid = uuid.UUID(code)
+                                        ev = await session.get(Event, val_uuid)
+                                        if ev:
+                                            scanned_type = "event"
+                                    except Exception:
+                                        pass
+                                        
+                                    if not scanned_type:
+                                        scanned_type = "user"
 
-    # Now handle based on detected entity type
-    if entity_type == "event":
-        token = parsed_code
-        ev = (await session.exec(select(Event).where(Event.qr_code_token == token))).first()
-        if ev:
-             return {
-                 "status": "event_pass",
-                 "message": f"Valid Event Pass: {ev.name}",
-                 "data": {
-                     "name": ev.name,
-                     "host": ev.host,
-                     "school": ev.school,
-                     "event_id": str(ev.id),
-                     "is_active": ev.is_active
-                 }
-             }
+    # Define parsed_code to prevent NameError in user and visitor blocks
+    parsed_code = code
+
+    # Now handle based on detected scanned type
+    if scanned_type == "room":
+        room = (await session.exec(select(Classroom).where(Classroom.room_code == code))).first()
+        if not room:
+            return {"status": "rejected", "message": f"Classroom {code} not found", "data": None}
+            
+        if not current_user:
+            return {"status": "rejected", "message": "Authentication required to sign in to room", "data": None}
+            
+        now_time = get_eat_time().time()
+        today = get_eat_time().date()
+        query = select(ClassSession).where(
+            ClassSession.classroom_id == room.id,
+            ClassSession.session_date == today,
+            ClassSession.start_time <= now_time,
+            ClassSession.end_time >= now_time,
+            ClassSession.active == True 
+        )
+        active_session = (await session.exec(query)).first()
+        
+        if active_session:
+            existing = (await session.exec(select(AttendanceRecord).where(
+                AttendanceRecord.session_id == active_session.id,
+                AttendanceRecord.student_id == current_user.id
+            ))).first()
+            if existing:
+                return {
+                    "status": "allowed",
+                    "message": f"Already signed in to {active_session.id} (Refreshed Data)",
+                    "data": {
+                        "name": current_user.full_name,
+                        "role": f"Already present in {room.room_name}",
+                        "time": get_eat_time().strftime("%I:%M %p"),
+                        "image": current_user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                    }
+                }
+                
+            record = AttendanceRecord(
+                session_id=active_session.id,
+                student_id=current_user.id,
+                status="present",
+                live_image=None,
+                connection_type="wifi",
+                metadata_info=json.dumps({"method": "gate_qr_scan"})
+            )
+            session.add(record)
+            scan_log = ScanLog(
+                timestamp=get_eat_time(),
+                student_id=current_user.id,
+                room_code=code, 
+                is_successful=True,
+                status_message="Room Scan: Present",
+                class_session_id=active_session.id
+            )
+            session.add(scan_log)
+            await session.commit()
+            return {
+                "status": "allowed",
+                "message": f"Signed in to {active_session.id} via Room Scan",
+                "data": {
+                    "name": current_user.full_name,
+                    "role": f"Signed in to {room.room_name} (Class: {active_session.id})",
+                    "time": get_eat_time().strftime("%I:%M %p"),
+                    "image": current_user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                }
+            }
         else:
-             return {"status": "rejected", "message": "Invalid Event Pass"}
+            log = UserLocationLog(
+                user_id=current_user.id,
+                ip_address=request.client.host if request.client else "unknown",
+                scanned_code=code,
+                context_type="room_scan"
+            )
+            session.add(log)
+            await session.commit()
+            return {
+                "status": "allowed",
+                "message": f"Entered Room: {room.room_name} (No class active)",
+                "data": {
+                    "name": current_user.full_name,
+                    "role": f"Entered {room.room_name}",
+                    "time": get_eat_time().strftime("%I:%M %p"),
+                    "image": current_user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                }
+            }
 
-    elif entity_type == "vehicle":
-        plate = parsed_code.upper().replace("-", " ")
+    elif scanned_type == "course":
+        course = (await session.exec(select(Course).where(Course.course_code == code))).first()
+        if not course:
+            return {"status": "rejected", "message": f"Course {code} not found", "data": None}
+            
+        if not current_user:
+            return {"status": "rejected", "message": "Authentication required to sign in to class", "data": None}
+            
+        today = get_eat_time().date()
+        query = select(ClassSession).where(
+            ClassSession.course_id == course.id,
+            ClassSession.session_date == today,
+            ClassSession.active == True 
+        )
+        active_session = (await session.exec(query)).first()
+        
+        if active_session:
+            existing = (await session.exec(select(AttendanceRecord).where(
+                AttendanceRecord.session_id == active_session.id,
+                AttendanceRecord.student_id == current_user.id
+            ))).first()
+            if existing:
+                return {
+                    "status": "allowed",
+                    "message": f"Already present in class {course.course_name}",
+                    "data": {
+                        "name": current_user.full_name,
+                        "role": f"Class: {course.course_name} ({course.course_code})",
+                        "time": get_eat_time().strftime("%I:%M %p"),
+                        "image": current_user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                    }
+                }
+                
+            record = AttendanceRecord(
+                session_id=active_session.id,
+                student_id=current_user.id,
+                status="present",
+                live_image=None,
+                connection_type="wifi",
+                metadata_info=json.dumps({"method": "gate_qr_scan"})
+            )
+            session.add(record)
+            scan_log = ScanLog(
+                timestamp=get_eat_time(),
+                student_id=current_user.id,
+                room_code=code, 
+                is_successful=True,
+                status_message="Course Scan: Present",
+                class_session_id=active_session.id
+            )
+            session.add(scan_log)
+            await session.commit()
+            return {
+                "status": "allowed",
+                "message": f"Signed in to class {course.course_name} successfully",
+                "data": {
+                    "name": current_user.full_name,
+                    "role": f"Signed in to {course.course_name} ({course.course_code})",
+                    "time": get_eat_time().strftime("%I:%M %p"),
+                    "image": current_user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                }
+            }
+        else:
+            return {
+                "status": "rejected",
+                "message": f"No active class session today for {course.course_name}",
+                "data": {
+                    "name": current_user.full_name,
+                    "role": f"Course: {course.course_name}",
+                    "time": get_eat_time().strftime("%I:%M %p"),
+                    "image": current_user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                }
+            }
+
+    elif scanned_type == "asset":
+        asset = (await session.exec(select(Asset).where(Asset.tag_number == code))).first()
+        if not asset:
+            return {"status": "rejected", "message": f"Asset {code} not found", "data": None}
+            
+        assigned_name = None
+        if asset.assigned_to_id:
+            user = await session.get(User, asset.assigned_to_id)
+            if user:
+                assigned_name = user.full_name
+                
+        status_label = f"Tag: {asset.tag_number} | Status: {asset.status} | Location: {asset.location}"
+        if assigned_name:
+            status_label += f" | Assigned to: {assigned_name}"
+            
+        return {
+            "status": "allowed",
+            "message": f"Asset Found: {asset.name}",
+            "data": {
+                "name": asset.name,
+                "role": status_label,
+                "time": get_eat_time().strftime("%I:%M %p"),
+                "image": "https://cdn-icons-png.flaticon.com/512/684/684908.png"
+            }
+        }
+
+    elif scanned_type == "event":
+        import uuid
+        ev = None
+        try:
+            val_uuid = uuid.UUID(code)
+            ev = await session.get(Event, val_uuid)
+        except Exception:
+            pass
+        if not ev:
+            ev = (await session.exec(select(Event).where(Event.qr_code_token == code))).first()
+            
+        if not ev:
+            return {"status": "rejected", "message": "Invalid Event Pass"}
+            
+        if not current_user:
+            return {
+                "status": "event_pass",
+                "message": f"Valid Event Pass: {ev.name}",
+                "data": {
+                    "name": ev.name,
+                    "host": ev.host,
+                    "school": ev.school,
+                    "event_id": str(ev.id),
+                    "is_active": ev.is_active
+                }
+            }
+            
+        visitor = (await session.exec(
+            select(EventVisitor)
+            .where(EventVisitor.event_id == ev.id)
+            .where(EventVisitor.visitor_identifier == current_user.admission_number)
+        )).first()
+        
+        if not visitor:
+            visitor = EventVisitor(
+                event_id=ev.id,
+                visitor_name=current_user.full_name,
+                visitor_identifier=current_user.admission_number,
+                phone_number=current_user.phone_number or "N/A",
+                email=current_user.email,
+                status="checked_in",
+                entry_time=get_eat_time(),
+                scanned_by=current_user.id
+            )
+            session.add(visitor)
+            await session.commit()
+            
+        return {
+            "status": "allowed",
+            "message": f"Registered for Event {ev.name} successfully",
+            "data": {
+                "name": current_user.full_name,
+                "role": f"Attending Event: {ev.name}",
+                "time": get_eat_time().strftime("%I:%M %p"),
+                "image": current_user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+            }
+        }
+
+    elif scanned_type == "vehicle":
+        plate = code.upper().replace("-", " ")
         vehicle = (await session.exec(select(Vehicle).where(Vehicle.plate_number == plate))).first()
         
-        # Auto-create vehicle if not exists
         if not vehicle:
             import random
             ai_colors = ["White", "Silver", "Black", "Blue", "Red", "Grey"]
@@ -372,13 +622,66 @@ async def scan_entry(
                 make=random.choice(ai_makes),
                 model=random.choice(ai_models),
                 color=random.choice(ai_colors),
-                vehicle_type="bus" if "BUS" in upper_code else "utility"
+                vehicle_type="bus" if "BUS" in code.upper() else "utility",
+                is_fleet=True
             )
             session.add(vehicle)
             await session.commit()
             await session.refresh(vehicle)
             
-        # Check logs for open entry (exit_time is null)
+        if current_user:
+            trip = (await session.exec(
+                select(FleetTrip)
+                .where(FleetTrip.vehicle_id == vehicle.id)
+                .where(FleetTrip.status == "ongoing")
+            )).first()
+            
+            if not trip:
+                trip = FleetTrip(
+                    vehicle_id=vehicle.id,
+                    driver_id=vehicle.driver_id,
+                    purpose="Ad-hoc boarding via scan",
+                    origin="Campus",
+                    destination="Destination",
+                    status="ongoing",
+                    actual_departure=get_eat_time(),
+                    start_odometer=vehicle.current_odometer or 0.0
+                )
+                session.add(trip)
+                await session.commit()
+                await session.refresh(trip)
+                
+            passenger = (await session.exec(
+                select(FleetPassengerManifest)
+                .where(FleetPassengerManifest.trip_id == trip.id)
+                .where(FleetPassengerManifest.user_id == current_user.id)
+            )).first()
+            
+            if not passenger:
+                passenger = FleetPassengerManifest(
+                    trip_id=trip.id,
+                    user_id=current_user.id,
+                    passenger_name=current_user.full_name,
+                    phone_number=current_user.phone_number,
+                    admission_number=current_user.admission_number,
+                    arrival_confirmed=True,
+                    check_in_time=get_eat_time(),
+                    added_via_scan=True
+                )
+                session.add(passenger)
+                await session.commit()
+                
+            return {
+                "status": "allowed",
+                "message": f"Boarded vehicle {vehicle.plate_number} successfully",
+                "data": {
+                    "name": current_user.full_name,
+                    "role": f"Boarded {vehicle.make} {vehicle.model} ({vehicle.plate_number})",
+                    "time": get_eat_time().strftime("%I:%M %p"),
+                    "image": current_user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                }
+            }
+            
         open_log = (await session.exec(
             select(VehicleLog)
             .where(VehicleLog.vehicle_id == vehicle.id)
@@ -387,7 +690,6 @@ async def scan_entry(
         )).first()
 
         if open_log:
-            # Check Out
             open_log.exit_time = get_eat_time()
             open_log.exit_gate_id = gate.id
             session.add(open_log)
@@ -413,7 +715,6 @@ async def scan_entry(
                 }
             }
         else:
-            # Check In
             new_log = VehicleLog(
                 vehicle_id=vehicle.id,
                 gate_id=gate.id,
@@ -445,7 +746,7 @@ async def scan_entry(
                 }
             }
 
-    elif entity_type == "visitor":
+    elif scanned_type == "visitor":
         # Look up visitor by parsing details or ID number
         import uuid
         visitor = None
