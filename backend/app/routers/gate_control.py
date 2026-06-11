@@ -639,12 +639,29 @@ async def scan_entry_inner(
             
             is_gate_operator_scan = (user_role_name in ["Security", "SuperAdmin"]) and (scan_data.get("gate_id") is not None)
             if not is_gate_operator_scan:
+                # 1. Search for an ongoing trip first
                 trip = (await session.exec(
                     select(FleetTrip)
                     .where(FleetTrip.vehicle_id == vehicle.id)
                     .where(FleetTrip.status == "ongoing")
                 )).first()
                 
+                # 2. If not found, look for a scheduled trip for this vehicle today
+                if not trip:
+                    from datetime import datetime, time
+                    eat_now = get_eat_time()
+                    start_of_today = datetime.combine(eat_now.date(), time.min)
+                    end_of_today = datetime.combine(eat_now.date(), time.max)
+                    trip = (await session.exec(
+                        select(FleetTrip)
+                        .where(FleetTrip.vehicle_id == vehicle.id)
+                        .where(FleetTrip.status == "scheduled")
+                        .where(FleetTrip.scheduled_departure >= start_of_today)
+                        .where(FleetTrip.scheduled_departure <= end_of_today)
+                        .order_by(FleetTrip.scheduled_departure.asc())
+                    )).first()
+                
+                # 3. Fallback: create a new ad-hoc ongoing trip (ensuring required fields are filled)
                 if not trip:
                     trip = FleetTrip(
                         vehicle_id=vehicle.id,
@@ -653,6 +670,7 @@ async def scan_entry_inner(
                         origin="Campus",
                         destination="Destination",
                         status="ongoing",
+                        scheduled_departure=get_eat_time(),
                         actual_departure=get_eat_time(),
                         start_odometer=vehicle.current_odometer or 0.0
                     )
