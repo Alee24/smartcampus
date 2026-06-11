@@ -374,6 +374,35 @@ export default function StudentVerification() {
         setResult(null)
         setShowSuggestions(false)
 
+        // Intercept Trip QR Code scans
+        if (searchQuery.toUpperCase().startsWith("TRIP:") || searchQuery.toUpperCase().includes("VEHICLE:")) {
+            try {
+                const token = localStorage.getItem('token')
+                const res = await fetch('/api/gate/scan', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify({ admission_number: searchQuery })
+                })
+                const data = await res.json()
+                if (res.ok && data.status === 'allowed') {
+                    showNotification(data.message, 'success')
+                    playSuccessSound()
+                } else {
+                    showNotification(data.message || 'Verification failed', 'error')
+                    playWarningSound()
+                }
+            } catch (e: any) {
+                showNotification(e.message, 'error')
+                playWarningSound()
+            } finally {
+                setLoading(false)
+            }
+            return;
+        }
+
         let online = navigator.onLine
         if (online) {
             try {

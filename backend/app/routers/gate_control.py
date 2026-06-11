@@ -283,6 +283,9 @@ async def scan_entry_inner(
             elif "asset" in params:
                 code = params["asset"][0].strip()
                 scanned_type = "asset"
+            elif "trip" in params:
+                code = params["trip"][0].strip()
+                scanned_type = "trip"
         except Exception as e:
             print(f"Error parsing scan URL: {e}")
             pass
@@ -311,6 +314,10 @@ async def scan_entry_inner(
         if upper_code.startswith("EVENT:"):
             scanned_type = "event"
             code = code[6:].strip()
+        elif upper_code.startswith("TRIP:"):
+            scanned_type = "trip"
+            parts = code.split("|")
+            code = parts[0].split(":", 1)[1].strip()
         elif upper_code.startswith("VEHICLE:") or upper_code.startswith("BUS:"):
             scanned_type = "vehicle"
             code = code.split(":", 1)[1].strip()
@@ -747,6 +754,89 @@ async def scan_entry_inner(
                 }
             }
 
+    elif scanned_type == "trip":
+        import uuid
+        trip_uuid = None
+        try:
+            trip_uuid = uuid.UUID(code)
+        except Exception:
+            pass
+
+        trip = None
+        if trip_uuid:
+            trip = await session.get(FleetTrip, trip_uuid)
+
+        if not trip:
+            return {"status": "rejected", "message": f"Trip not found for code: {code}", "data": None}
+
+        if trip.status in ["completed", "cancelled"]:
+            return {"status": "rejected", "message": f"Cannot board. Trip status is {trip.status}", "data": None}
+
+        from app.models import Vehicle
+        vehicle = await session.get(Vehicle, trip.vehicle_id)
+        vehicle_info = f"{vehicle.make} {vehicle.model} ({vehicle.plate_number})" if vehicle else "Bus"
+
+        user_role_name = "Student"
+        if current_user:
+            from app.models import Role
+            user_role = await session.get(Role, current_user.role_id)
+            user_role_name = user_role.name if user_role else "Student"
+
+        # If security guard scans, just verify trip details
+        if user_role_name in ["Security", "SuperAdmin"]:
+            return {
+                "status": "allowed",
+                "message": f"Verified trip: {trip.purpose} on vehicle {vehicle_info}",
+                "data": {
+                    "name": f"Trip: {trip.purpose}",
+                    "role": f"Vehicle: {vehicle_info} | Passengers: {len(trip.passengers)}",
+                    "time": get_eat_time().strftime("%I:%M %p"),
+                    "image": "https://cdn-icons-png.flaticon.com/512/3202/3202926.png"
+                }
+            }
+
+        if not current_user:
+            return {"status": "rejected", "message": "Authentication required. Please log in to board.", "data": None}
+
+        # Board the user (passenger)
+        passenger = (await session.exec(
+            select(FleetPassengerManifest)
+            .where(FleetPassengerManifest.trip_id == trip.id)
+            .where(func.lower(FleetPassengerManifest.admission_number) == func.lower(current_user.admission_number))
+        )).first()
+
+        if not passenger:
+            passenger = FleetPassengerManifest(
+                trip_id=trip.id,
+                user_id=current_user.id,
+                passenger_name=current_user.full_name,
+                phone_number=current_user.phone_number,
+                admission_number=current_user.admission_number,
+                arrival_confirmed=True,
+                check_in_time=get_eat_time(),
+                added_via_scan=True
+            )
+            session.add(passenger)
+            await session.commit()
+            await session.refresh(passenger)
+        else:
+            passenger.arrival_confirmed = True
+            passenger.check_in_time = get_eat_time()
+            passenger.added_via_scan = True
+            session.add(passenger)
+            await session.commit()
+
+        return {
+            "status": "allowed",
+            "message": f"Successfully boarded trip: {trip.purpose} on vehicle {vehicle_info}",
+            "data": {
+                "name": current_user.full_name,
+                "role": f"Boarded {vehicle_info}",
+                "time": get_eat_time().strftime("%I:%M %p"),
+                "image": current_user.profile_image or "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+            }
+        }
+
     elif scanned_type == "visitor":
         # Look up visitor by parsing details or ID number
         import uuid
@@ -1046,6 +1136,10 @@ async def scan_entry(
         if upper_code.startswith("EVENT:"):
             scanned_type = "event"
             temp_code = temp_code[6:].strip()
+        elif upper_code.startswith("TRIP:"):
+            scanned_type = "trip"
+            parts = temp_code.split("|")
+            temp_code = parts[0].split(":", 1)[1].strip()
         elif upper_code.startswith("VEHICLE:") or upper_code.startswith("BUS:"):
             scanned_type = "vehicle"
             temp_code = temp_code.split(":", 1)[1].strip()
@@ -1092,6 +1186,11 @@ async def scan_entry(
                                         ev = await session.get(Event, val_uuid)
                                         if ev:
                                             scanned_type = "event"
+                                        else:
+                                            from app.models import FleetTrip
+                                            ft = await session.get(FleetTrip, val_uuid)
+                                            if ft:
+                                                scanned_type = "trip"
                                     except Exception:
                                         pass
                                     if not scanned_type:

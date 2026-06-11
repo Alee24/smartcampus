@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import {
-    LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut,
+    LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut, Check,
     Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode, Megaphone, Trash2, Plus,
     Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, UserCheck, X, Activity, BarChart3, Play, History, Printer, Download, Inbox, Search, ScanFace, DoorOpen, List, Menu, BookOpen, Grid
 } from 'lucide-react'
@@ -274,6 +274,17 @@ function App() {
     const [syncingAD, setSyncingAD] = useState(false)
     const [showQuickScanModal, setShowQuickScanModal] = useState(false)
     const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false)
+    const [showQuickNotifications, setShowQuickNotifications] = useState(false)
+    const [selectedNotificationTab, setSelectedNotificationTab] = useState<'all' | 'announcement' | 'lost_found' | 'system'>('all')
+    const [combinedNotifications, setCombinedNotifications] = useState<any[]>([])
+    const [readIds, setReadIds] = useState<string[]>(() => {
+        try {
+            return JSON.parse(localStorage.getItem('read_notification_ids') || '[]')
+        } catch (e) {
+            return []
+        }
+    })
+    const [currentNotificationTip, setCurrentNotificationTip] = useState<string>('')
     const hasValidated = useState(false)[0] // Simple mount check
 
     // URL Deep Link Handler (QR Codes)
@@ -281,7 +292,33 @@ function App() {
         const params = new URLSearchParams(window.location.search)
         const room = params.get('room')
         const course = params.get('course')
-        if ((room || course) && isAuthenticated) {
+        const trip = params.get('trip')
+        if (trip && isAuthenticated) {
+            const boardUser = async () => {
+                try {
+                    const token = localStorage.getItem('token')
+                    const res = await fetch('/api/gate/scan', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}` 
+                        },
+                        body: JSON.stringify({ admission_number: `TRIP:${trip}` })
+                    })
+                    const data = await res.json()
+                    if (res.ok && data.status === 'allowed') {
+                        alert(`Boarding Info: ${data.message}`)
+                    } else {
+                        alert(`Boarding status: ${data.message || 'Verification completed'}`)
+                    }
+                } catch (e: any) {
+                    console.error("Deep link boarding error", e)
+                }
+            }
+            boardUser()
+            // Clean URL
+            window.history.replaceState({}, '', window.location.pathname)
+        } else if ((room || course) && isAuthenticated) {
             // Store scanned values for Attendance component
             if (room) localStorage.setItem('scannedRoom', room)
             if (course) localStorage.setItem('scannedCourse', course)
@@ -586,6 +623,134 @@ function App() {
             setUnreadLostFound(0)
         }
     }, [activeTab, hasUnreadNotices, unreadIncidents, unreadLostFound])
+
+    const fetchAllAlerts = async () => {
+        if (!isAuthenticated) return
+        try {
+            const token = localStorage.getItem('token')
+            const headers = { 'Authorization': `Bearer ${token}` }
+            
+            // 1. Fetch system notifications
+            let sysNotifs: any[] = []
+            try {
+                const res = await fetch('/api/notifications', { headers })
+                if (res.ok) sysNotifs = await res.json()
+            } catch (e) { console.error("Error fetching notifications:", e) }
+            
+            // 2. Fetch notice board announcements
+            let noticeNotifs: any[] = []
+            try {
+                const res = await fetch('/api/notice-board', { headers })
+                if (res.ok) noticeNotifs = await res.json()
+            } catch (e) { console.error("Error fetching notice board:", e) }
+            
+            // 3. Fetch lost & found items
+            let lfNotifs: any[] = []
+            try {
+                const res = await fetch('/api/security/lost-found', { headers })
+                if (res.ok) lfNotifs = await res.json()
+            } catch (e) { console.error("Error fetching lost & found:", e) }
+            
+            // Map and merge
+            const mappedSys = sysNotifs.map((n: any) => ({
+                id: n.id,
+                title: n.title,
+                message: n.message,
+                severity: n.severity || 'info',
+                timestamp: n.timestamp,
+                category: 'system'
+            }))
+            
+            const mappedNotice = noticeNotifs.map((n: any) => ({
+                id: n.id,
+                title: `Announcement: ${n.title}`,
+                message: n.content,
+                severity: 'info',
+                timestamp: n.created_at,
+                category: 'announcement'
+            }))
+            
+            const mappedLf = lfNotifs.map((n: any) => ({
+                id: n.id,
+                title: `Lost & Found: ${n.item_name} (${n.status})`,
+                message: n.description,
+                severity: n.status === 'lost' ? 'warning' : 'success',
+                timestamp: n.created_at,
+                category: 'lost_found'
+            }))
+            
+            const merged = [...mappedSys, ...mappedNotice, ...mappedLf].sort((a, b) => 
+                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            )
+            
+            setCombinedNotifications(merged)
+        } catch (err) {
+            console.error("Combined notifications error:", err)
+        }
+    }
+
+    const markItemAsRead = (id: string) => {
+        try {
+            const readList = JSON.parse(localStorage.getItem('read_notification_ids') || '[]')
+            if (!readList.includes(id)) {
+                readList.push(id)
+                localStorage.setItem('read_notification_ids', JSON.stringify(readList))
+                setReadIds(readList)
+            }
+        } catch (e) {}
+    }
+
+    const markAllItemsAsRead = (items: any[]) => {
+        try {
+            const readList = JSON.parse(localStorage.getItem('read_notification_ids') || '[]')
+            items.forEach(item => {
+                if (!readList.includes(item.id)) {
+                    readList.push(item.id)
+                }
+            })
+            localStorage.setItem('read_notification_ids', JSON.stringify(readList))
+            setReadIds(readList)
+        } catch (e) {}
+    }
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchAllAlerts()
+            const interval = setInterval(fetchAllAlerts, 30000)
+            return () => clearInterval(interval)
+        }
+    }, [isAuthenticated])
+
+    const unreadAlerts = combinedNotifications.filter(item => !readIds.includes(item.id))
+    const totalUnreadCount = unreadAlerts.length
+
+    useEffect(() => {
+        if (!isAuthenticated) return
+        
+        const tips: string[] = []
+        const unreadNotices = unreadAlerts.filter(a => a.category === 'announcement')
+        const unreadLf = unreadAlerts.filter(a => a.category === 'lost_found')
+        const unreadSys = unreadAlerts.filter(a => a.category === 'system')
+        
+        if (unreadNotices.length > 0) tips.push(`📢 Announcement!`)
+        if (unreadLf.length > 0) tips.push(`🔍 Lost & Found!`)
+        if (unreadSys.length > 0) tips.push(`⚠️ System Alert!`)
+        
+        if (tips.length === 0) {
+            setCurrentNotificationTip('')
+            return
+        }
+        
+        let index = 0
+        setCurrentNotificationTip(tips[0])
+        
+        const interval = setInterval(() => {
+            index = (index + 1) % tips.length
+            setCurrentNotificationTip(tips[index])
+        }, 3000)
+        
+        return () => clearInterval(interval)
+    }, [unreadAlerts, isAuthenticated])
 
     // Default configuration if none is saved
     const getDefaultConfig = () => {
@@ -1791,7 +1956,7 @@ function App() {
 
                 {/* ── Quicker Access FAB Menu – Floating at bottom-right with expanding options ── */}
                 {isAuthenticated && (
-                    <div className="fixed bottom-6 right-6 z-[1000] flex flex-col items-end gap-3">
+                    <div className="fixed bottom-20 lg:bottom-6 right-6 z-[1000] flex flex-col items-end gap-3">
                         {/* Floating Sub-buttons (shown with custom animation when menu is open) */}
                         {isQuickMenuOpen && (
                             <div className="flex flex-col items-end gap-3 mb-2 animate-fade-in">
@@ -1809,6 +1974,27 @@ function App() {
                                         </button>
                                     </div>
                                 )}
+                                
+                                {/* Notifications Option */}
+                                <div 
+                                    onClick={() => { setShowQuickNotifications(true); setIsQuickMenuOpen(false); }}
+                                    className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                >
+                                    <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none relative">
+                                        Notifications
+                                        {totalUnreadCount > 0 && (
+                                            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 text-[9px] font-black flex items-center justify-center animate-pulse">
+                                                {totalUnreadCount}
+                                            </span>
+                                        )}
+                                    </span>
+                                    <button className="w-12 h-12 bg-gradient-to-r from-red-500 via-pink-500 to-purple-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20 relative">
+                                        <Bell size={18} />
+                                        {totalUnreadCount > 0 && (
+                                            <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-ping" />
+                                        )}
+                                    </button>
+                                </div>
                                 
                                 {/* Events Option */}
                                 <div 
@@ -1852,15 +2038,29 @@ function App() {
                         )}
 
                         {/* Main FAB Toggle Button */}
-                        <button
-                            onClick={() => setIsQuickMenuOpen(!isQuickMenuOpen)}
-                            className={`w-14 h-14 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 border border-white/20 pointer-events-auto ${
-                                isQuickMenuOpen ? 'rotate-45' : ''
-                            }`}
-                            style={{ boxShadow: '0 8px 30px rgba(99, 102, 241, 0.4)' }}
-                        >
-                            {isQuickMenuOpen ? <X size={24} /> : <Grid size={24} />}
-                        </button>
+                        <div className="relative pointer-events-auto">
+                            {/* Notification text preview tooltip cycling through unread notifications */}
+                            {!isQuickMenuOpen && currentNotificationTip && (
+                                <div className="absolute right-16 top-1/2 -translate-y-1/2 bg-indigo-600 text-white text-[10px] font-black px-3 py-1.5 rounded-xl shadow-xl whitespace-nowrap animate-bounce flex items-center gap-1.5 border border-indigo-400">
+                                    {currentNotificationTip}
+                                    <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-indigo-600 rotate-45 border-t border-r border-indigo-400" />
+                                </div>
+                            )}
+                            <button
+                                onClick={() => setIsQuickMenuOpen(!isQuickMenuOpen)}
+                                className={`w-14 h-14 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 border border-white/20 pointer-events-auto ${
+                                    isQuickMenuOpen ? 'rotate-45' : ''
+                                } ${totalUnreadCount > 0 && !isQuickMenuOpen ? 'animate-wiggle' : ''}`}
+                                style={{ boxShadow: '0 8px 30px rgba(99, 102, 241, 0.4)' }}
+                            >
+                                {isQuickMenuOpen ? <X size={24} /> : <Grid size={24} />}
+                                {totalUnreadCount > 0 && !isQuickMenuOpen && (
+                                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-950 animate-pulse">
+                                        {totalUnreadCount}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 )}
             </main >
@@ -2018,6 +2218,198 @@ function App() {
                     </div>
                 </div>
             )}
+
+            {/* Quick Notifications Modal Overlay */}
+            {showQuickNotifications && (
+                <div 
+                    className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-fade-in"
+                    onClick={() => setShowQuickNotifications(false)}
+                >
+                    <div 
+                        className="bg-white dark:bg-gray-905 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-2xl overflow-hidden animate-scale-in max-h-[90vh] sm:max-h-[80vh] flex flex-col relative"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Top Gradient Highlight Accent */}
+                        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-500 via-pink-500 to-purple-600" />
+                        
+                        {/* Header */}
+                        <div className="p-5 border-b border-gray-150 dark:border-gray-800 flex items-center justify-between mt-1">
+                            <div className="flex items-center gap-2">
+                                <Bell className="text-pink-600 animate-pulse" size={22} />
+                                <h2 className="text-xl font-black text-gray-900 dark:text-white">Notification Center</h2>
+                                {totalUnreadCount > 0 && (
+                                    <span className="bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400 text-xs font-black px-2.5 py-1 rounded-full animate-bounce">
+                                        {totalUnreadCount} New
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {totalUnreadCount > 0 && (
+                                    <button 
+                                        onClick={() => markAllItemsAsRead(unreadAlerts)}
+                                        className="text-xs text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 font-extrabold transition-colors mr-2 flex items-center gap-1"
+                                    >
+                                        Mark all as read
+                                    </button>
+                                )}
+                                <button 
+                                    onClick={() => setShowQuickNotifications(false)}
+                                    className="p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Category Segmented Selector */}
+                        <div className="p-3 bg-slate-50 dark:bg-gray-950 border-b border-gray-150 dark:border-gray-850 flex gap-2 overflow-x-auto no-scrollbar">
+                            {([
+                                { id: 'all', label: 'All Alerts' },
+                                { id: 'announcement', label: 'Announcements' },
+                                { id: 'lost_found', label: 'Lost & Found' },
+                                { id: 'system', label: 'System Alerts' }
+                            ] as const).map(cat => {
+                                const count = cat.id === 'all' 
+                                    ? totalUnreadCount 
+                                    : unreadAlerts.filter(a => a.category === cat.id).length
+                                
+                                return (
+                                    <button
+                                        key={cat.id}
+                                        onClick={() => setSelectedNotificationTab(cat.id)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                                            selectedNotificationTab === cat.id
+                                                ? 'bg-gradient-to-r from-red-500 to-indigo-600 text-white shadow-md'
+                                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800'
+                                        }`}
+                                    >
+                                        {cat.label}
+                                        {count > 0 && (
+                                            <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
+                                                selectedNotificationTab === cat.id
+                                                    ? 'bg-white text-indigo-700'
+                                                    : 'bg-red-500 text-white'
+                                            }`}>
+                                                {count}
+                                            </span>
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
+
+                        {/* Notifications list */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            {(() => {
+                                const filtered = combinedNotifications.filter(item => 
+                                    selectedNotificationTab === 'all' || item.category === selectedNotificationTab
+                                )
+                                
+                                if (filtered.length === 0) {
+                                    return (
+                                        <div className="py-16 text-center text-gray-400 dark:text-gray-600 flex flex-col items-center">
+                                            <Bell size={40} className="text-gray-300 dark:text-gray-700 mb-3 animate-bounce" />
+                                            <p className="font-extrabold text-sm">All Caught Up!</p>
+                                            <p className="text-xs text-gray-400 mt-1">No alerts found in this category.</p>
+                                        </div>
+                                    )
+                                }
+                                
+                                return filtered.map(item => {
+                                    const isRead = readIds.includes(item.id)
+                                    
+                                    return (
+                                        <div 
+                                            key={item.id}
+                                            className={`p-4 rounded-2xl border transition-all relative ${
+                                                isRead 
+                                                    ? 'bg-white dark:bg-gray-850/40 border-gray-100 dark:border-gray-800 opacity-60' 
+                                                    : 'bg-indigo-50/45 dark:bg-indigo-950/10 border-indigo-100 dark:border-indigo-900/40 shadow-sm'
+                                            }`}
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                                                            item.category === 'announcement' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400' :
+                                                            item.category === 'lost_found' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400' :
+                                                            'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400'
+                                                        }`}>
+                                                            {item.category.replace('_', ' ')}
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold">
+                                                            {new Date(item.timestamp).toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                    <h4 className={`text-sm font-black truncate ${
+                                                        isRead ? 'text-gray-700 dark:text-gray-300' : 'text-gray-900 dark:text-white'
+                                                    }`}>
+                                                        {item.title}
+                                                    </h4>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
+                                                        {item.message}
+                                                    </p>
+                                                    
+                                                    {/* Category Specific Action buttons */}
+                                                    {item.category === 'announcement' && (
+                                                        <button 
+                                                            onClick={() => {
+                                                                markItemAsRead(item.id);
+                                                                setActiveTab('notice-board');
+                                                                setShowQuickNotifications(false);
+                                                            }}
+                                                            className="mt-3 px-3 py-1 bg-indigo-655 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1"
+                                                        >
+                                                            <Megaphone size={12} /> View Notice Board
+                                                        </button>
+                                                    )}
+                                                    {item.category === 'lost_found' && (
+                                                        <button 
+                                                            onClick={() => {
+                                                                markItemAsRead(item.id);
+                                                                setActiveTab('lost-found');
+                                                                setShowQuickNotifications(false);
+                                                            }}
+                                                            className="mt-3 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold rounded-lg transition-colors flex items-center gap-1"
+                                                        >
+                                                            <Search size={12} /> View Lost & Found
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                
+                                                {!isRead && (
+                                                    <button 
+                                                        onClick={() => markItemAsRead(item.id)}
+                                                        className="p-1 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 transition-colors"
+                                                        title="Mark as read"
+                                                    >
+                                                        <Check size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )
+                                })
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style>{`
+                @keyframes wiggle {
+                    0%, 100% { transform: rotate(0deg); }
+                    15% { transform: rotate(-8deg) scale(1.05); }
+                    30% { transform: rotate(8deg) scale(1.05); }
+                    45% { transform: rotate(-4deg) scale(1.05); }
+                    60% { transform: rotate(4deg) scale(1.05); }
+                    75% { transform: rotate(-2deg) scale(1.05); }
+                    90% { transform: rotate(2deg) scale(1.05); }
+                }
+                .animate-wiggle {
+                    animation: wiggle 2s ease-in-out infinite;
+                }
+            `}</style>
 
             <InstallPWA />
             <PermissionsModal />

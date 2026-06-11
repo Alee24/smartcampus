@@ -759,6 +759,374 @@ function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
         }
     };
 
+    const handlePrintReport = async () => {
+        if (!trip || !report) return;
+        
+        let companySettings = { company_name: 'Smart Campus Portal', logo_url: '', primary_color: '#7a1975' };
+        try {
+            const res = await fetch('/api/users/public-company-settings');
+            if (res.ok) {
+                const data = await res.json();
+                companySettings = { ...companySettings, ...data };
+            }
+        } catch (e) {
+            console.error("Failed to fetch company settings for print", e);
+        }
+
+        const printWin = window.open('', '_blank');
+        if (!printWin) {
+            alert("Please allow popups to print the report");
+            return;
+        }
+
+        const primaryColor = companySettings.primary_color || '#7a1975';
+        
+        // Generate passenger rows
+        const passengerRows = trip.passengers && trip.passengers.length > 0 
+            ? trip.passengers.map((p: any) => `
+                <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+                    <td style="padding: 10px; font-weight: bold; font-family: monospace; color: ${primaryColor};">${p.admission_number || 'N/A'}</td>
+                    <td style="padding: 10px; font-weight: bold; color: #1e293b;">
+                        ${p.passenger_name}
+                        ${p.added_via_scan ? '<span class="badge-scan" style="background: #fef3c7; color: #d97706; font-size: 8px; font-weight: 900; padding: 1px 4px; border-radius: 4px; margin-left: 5px; text-transform: uppercase; border: 1px solid #fde68a;">Scan</span>' : ''}
+                    </td>
+                    <td style="padding: 10px; color: #475569;">${p.phone_number || 'N/A'}</td>
+                    <td style="padding: 10px; color: #475569;">${p.pickup_location || 'Campus'}</td>
+                    <td style="padding: 10px; color: #475569;">${p.drop_off_location || 'Destination'}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        <span class="badge-${p.arrival_confirmed ? 'success' : 'pending'}" style="font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 9999px; text-transform: uppercase; ${p.arrival_confirmed ? 'background: #dcfce7; color: #15803d;' : 'background: #fef9c3; color: #a16207;'}">
+                            ${p.arrival_confirmed ? 'Checked In' : 'Pending'}
+                        </span>
+                    </td>
+                    <td style="padding: 10px; font-family: monospace; color: #475569; text-align: right;">
+                        ${p.check_in_time ? new Date(p.check_in_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A'}
+                    </td>
+                </tr>
+            `).join('')
+            : `<tr><td colspan="7" style="padding: 24px; text-align: center; color: #94a3b8; font-weight: bold;">No passengers registered on this manifest.</td></tr>`;
+
+        // Calculate attendance counts
+        const totalPassCount = trip.passengers ? trip.passengers.length : 0;
+        const checkedInCount = trip.passengers ? trip.passengers.filter((p: any) => p.arrival_confirmed).length : 0;
+        const attendanceRate = totalPassCount > 0 ? Math.round((checkedInCount / totalPassCount) * 100) : 0;
+
+        const qrCodeData = encodeURIComponent(`TRIP:${trip.id}|VEHICLE:${trip.vehicle.plate_number}`);
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrCodeData}`;
+
+        printWin.document.write(`
+            <html>
+            <head>
+                <title>Transit Logistics Report - ${trip.vehicle.plate_number}</title>
+                <style>
+                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+                    body {
+                        font-family: 'Inter', system-ui, sans-serif;
+                        color: #1e293b;
+                        background: white;
+                        margin: 0;
+                        padding: 30px;
+                        line-height: 1.5;
+                    }
+                    .header-container {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 3px double #e2e8f0;
+                        padding-bottom: 20px;
+                        margin-bottom: 25px;
+                    }
+                    .company-logo-container {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                    }
+                    .logo-img {
+                        height: 50px;
+                        width: auto;
+                        max-width: 180px;
+                        object-fit: contain;
+                    }
+                    .company-initial-badge {
+                        width: 44px;
+                        height: 44px;
+                        border-radius: 50%;
+                        background: ${primaryColor}15;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        color: ${primaryColor};
+                        font-weight: 900;
+                        font-size: 18px;
+                        border: 2px solid ${primaryColor}30;
+                    }
+                    .company-name {
+                        font-size: 18px;
+                        font-weight: 800;
+                        color: ${primaryColor};
+                        text-transform: uppercase;
+                        letter-spacing: -0.025em;
+                    }
+                    .report-title-container {
+                        text-align: right;
+                    }
+                    .report-title {
+                        font-size: 20px;
+                        font-weight: 900;
+                        color: #0f172a;
+                        margin: 0;
+                        text-transform: uppercase;
+                        letter-spacing: -0.025em;
+                    }
+                    .report-subtitle {
+                        font-size: 11px;
+                        font-weight: 700;
+                        color: #64748b;
+                        text-transform: uppercase;
+                        letter-spacing: 0.1em;
+                        margin-top: 4px;
+                    }
+                    .grid-details {
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 15px;
+                        margin-bottom: 25px;
+                    }
+                    .detail-card {
+                        background: #f8fafc;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 12px;
+                        padding: 12px 16px;
+                    }
+                    .detail-label {
+                        font-size: 9px;
+                        font-weight: 800;
+                        color: #94a3b8;
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                        margin-bottom: 4px;
+                    }
+                    .detail-value {
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: #0f172a;
+                    }
+                    .detail-value-highlight {
+                        color: ${primaryColor};
+                    }
+                    .stats-banner {
+                        display: grid;
+                        grid-template-columns: repeat(4, 1fr);
+                        gap: 15px;
+                        background: ${primaryColor}08;
+                        border: 2px solid ${primaryColor}20;
+                        border-radius: 16px;
+                        padding: 16px;
+                        margin-bottom: 30px;
+                    }
+                    .stat-card {
+                        text-align: center;
+                    }
+                    .stat-value {
+                        font-size: 24px;
+                        font-weight: 900;
+                        color: ${primaryColor};
+                    }
+                    .table-title {
+                        font-size: 13px;
+                        font-weight: 900;
+                        color: #0f172a;
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                        margin-bottom: 12px;
+                        border-left: 4px solid ${primaryColor};
+                        padding-left: 8px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 35px;
+                    }
+                    th {
+                        background: #f1f5f9;
+                        color: #475569;
+                        font-size: 10px;
+                        font-weight: 800;
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                        padding: 10px;
+                        border-bottom: 2px solid #e2e8f0;
+                    }
+                    td {
+                        padding: 8px 10px;
+                    }
+                    .footer-section {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-end;
+                        margin-top: 40px;
+                        page-break-inside: avoid;
+                    }
+                    .sign-off-block {
+                        display: flex;
+                        gap: 40px;
+                    }
+                    .sign-line {
+                        width: 180px;
+                        border-top: 1px solid #94a3b8;
+                        margin-top: 45px;
+                        text-align: center;
+                        font-size: 10px;
+                        font-weight: 700;
+                        color: #64748b;
+                        text-transform: uppercase;
+                    }
+                    .qr-block {
+                        text-align: center;
+                        font-size: 9px;
+                        font-weight: 800;
+                        color: #64748b;
+                        text-transform: uppercase;
+                    }
+                    .qr-img {
+                        width: 90px;
+                        height: 90px;
+                        margin-bottom: 6px;
+                        border: 1px solid #cbd5e1;
+                        padding: 4px;
+                        border-radius: 8px;
+                        background: white;
+                    }
+                    .audit-stamp {
+                        font-size: 8px;
+                        font-weight: 700;
+                        color: #94a3b8;
+                        text-transform: uppercase;
+                        letter-spacing: 0.1em;
+                        margin-top: 30px;
+                        text-align: center;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="header-container">
+                    <div class="company-logo-container">
+                        ${companySettings.logo_url 
+                            ? `<img src="${companySettings.logo_url}" class="logo-img" />`
+                            : `<div class="company-initial-badge">${companySettings.company_name.charAt(0)}</div>
+                               <div class="company-name">${companySettings.company_name}</div>`
+                        }
+                    </div>
+                    <div class="report-title-container">
+                        <h1 class="report-title">Logistics Transit Report</h1>
+                        <div class="report-subtitle">Official Audit Document</div>
+                    </div>
+                </div>
+
+                <div class="grid-details">
+                    <div class="detail-card">
+                        <div class="detail-label">Trip Purpose / Route</div>
+                        <div class="detail-value detail-value-highlight">${trip.purpose}</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-label">Transit Origin</div>
+                        <div class="detail-value">${trip.origin}</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-label">Transit Destination</div>
+                        <div class="detail-value">${trip.destination}</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-label">Assigned Vehicle</div>
+                        <div class="detail-value">${trip.vehicle.plate_number} (${trip.vehicle.make} ${trip.vehicle.model})</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-label">Assigned Driver</div>
+                        <div class="detail-value">${report.driver_name} (${report.driver_contact})</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-label">Trip Lead Coordinator</div>
+                        <div class="detail-value">${report.trip_lead_name} (${report.trip_lead_contact})</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-label">Departure Time</div>
+                        <div class="detail-value">${trip.actual_departure ? new Date(trip.actual_departure).toLocaleString() : (trip.scheduled_departure ? new Date(trip.scheduled_departure).toLocaleString() : 'N/A')}</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-label">Arrival Time</div>
+                        <div class="detail-value">${trip.actual_arrival ? new Date(trip.actual_arrival).toLocaleString() : (trip.status === 'ongoing' ? 'In Transit (Ongoing)' : 'N/A')}</div>
+                    </div>
+                    <div class="detail-card">
+                        <div class="detail-label">Trip Status</div>
+                        <div class="detail-value" style="text-transform: uppercase; color: ${trip.status === 'completed' ? '#16a34a' : (trip.status === 'ongoing' ? '#3b82f6' : '#d97706')}">${trip.status}</div>
+                    </div>
+                </div>
+
+                <div class="stats-banner">
+                    <div class="stat-card">
+                        <div class="detail-label">Total Registered</div>
+                        <div class="stat-value">${totalPassCount}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="detail-label">Successfully Boarded</div>
+                        <div class="stat-value">${checkedInCount}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="detail-label">Boarding Rate</div>
+                        <div class="stat-value">${attendanceRate}%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="detail-label">Distance / Cost</div>
+                        <div class="stat-value" style="font-size: 14px; margin-top: 6px; font-weight: 800;">
+                            ${report.distance_km || 0} KM / KES ${report.fuel_cost || 0}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-title">Passenger Boarding Manifest</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 15%; text-align: left;">Admission No</th>
+                            <th style="width: 30%; text-align: left;">Passenger Name</th>
+                            <th style="width: 15%; text-align: left;">Phone Number</th>
+                            <th style="width: 15%; text-align: left;">Pickup Point</th>
+                            <th style="width: 15%; text-align: left;">Dropoff Point</th>
+                            <th style="width: 10%; text-align: center;">Status</th>
+                            <th style="width: 10%; text-align: right;">Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${passengerRows}
+                    </tbody>
+                </table>
+
+                <div class="footer-section">
+                    <div class="sign-off-block">
+                        <div class="sign-line">Checked By (Lead Guard)</div>
+                        <div class="sign-line">Approved By (Transit Lead)</div>
+                    </div>
+                    <div class="qr-block">
+                        <img src="${qrCodeUrl}" class="qr-img" />
+                        <div>Scan to Verify Trip</div>
+                    </div>
+                </div>
+
+                <div class="audit-stamp">
+                    Verified Official Gatepass Logistics Audit • Printed on ${new Date().toLocaleString()}
+                </div>
+
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        setTimeout(function() { window.close(); }, 500);
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+    };
+
     useEffect(() => {
         fetchDetails();
     }, [tripId]);
@@ -1230,7 +1598,7 @@ function TripManifestViewer({ tripId, vehicles, onClose, onUpdate }: any) {
                                 <div className="flex justify-between items-start">
                                     <span className="px-2.5 py-1 rounded bg-primary-100 text-primary-800 dark:bg-primary-950/20 dark:text-primary-400 text-[9px] font-black uppercase tracking-wider">Executive Transit Summary</span>
                                     <button 
-                                        onClick={() => window.print()}
+                                        onClick={handlePrintReport}
                                         className="text-xs font-black text-primary-600 hover:underline flex items-center gap-1"
                                     >
                                         <Printer size={12} /> Print Summary Report
