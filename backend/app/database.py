@@ -38,6 +38,7 @@ async def init_db():
     await migrate_notice_board()
     await migrate_gate_exits()
     await migrate_assets()
+    await migrate_self_service()
 async def get_session() -> AsyncSession:
     async_session = sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
@@ -392,4 +393,38 @@ async def migrate_assets():
             print("Assets and asset_logs tables checked/created successfully.")
     except Exception as e:
         print(f"Assets table migration skipped/failed: {e}")
+
+async def migrate_self_service():
+    """Manual migration to add columns for dynamic self-service visitor features."""
+    print("Checking visitors table schema...")
+    new_cols = {
+        "plate_number": "VARCHAR(255) DEFAULT NULL",
+        "passengers": "INT DEFAULT NULL",
+        "dropoff_user_id": "CHAR(36) DEFAULT NULL",
+        "dropoff_name": "VARCHAR(255) DEFAULT NULL",
+        "dropoff_admission_number": "VARCHAR(255) DEFAULT NULL",
+        "check_in_student": "BOOLEAN DEFAULT FALSE",
+        "delivery_image_package": "VARCHAR(512) DEFAULT NULL",
+        "delivery_image_receipt": "VARCHAR(512) DEFAULT NULL"
+    }
+    try:
+        async with engine.begin() as conn:
+            def get_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                if not inspector.has_table('visitors'): return []
+                return [c['name'] for c in inspector.get_columns('visitors')]
+            
+            columns = await conn.run_sync(get_cols)
+            if not columns:
+                return
+            
+            for col, type_ in new_cols.items():
+                if col not in columns:
+                    print(f"Adding column {col} to visitors table...")
+                    await conn.execute(text(f"ALTER TABLE visitors ADD COLUMN `{col}` {type_}"))
+            
+            print("Visitors self-service schema migration checked/applied.")
+    except Exception as e:
+        print(f"Visitors self-service migration failed: {e}")
 

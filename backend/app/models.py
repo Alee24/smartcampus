@@ -556,13 +556,23 @@ class Visitor(UUIDModel, table=True):
     id_number: str = Field(index=True)
     
     visit_details: str 
-    visitor_type: str = "visitor" # visitor, taxi, delivery
+    visitor_type: str = "visitor" # visitor, taxi, delivery, vehicle_registration
     
     time_in: datetime = Field(default_factory=get_eat_time)
     time_out: Optional[datetime] = None
     
     gate_id: Optional[UUID] = Field(foreign_key="gates.id", nullable=True) # Link to Gate
-    status: str = "checked_in"
+    status: str = "checked_in" # pending, checked_in, checked_out, rejected
+
+    # New fields for self-service portal updates
+    plate_number: Optional[str] = None
+    passengers: Optional[int] = None
+    dropoff_user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", nullable=True)
+    dropoff_name: Optional[str] = None
+    dropoff_admission_number: Optional[str] = None
+    check_in_student: bool = Field(default=False)
+    delivery_image_package: Optional[str] = None
+    delivery_image_receipt: Optional[str] = None
 
 # Event Management Models
 class Event(UUIDModel, table=True):

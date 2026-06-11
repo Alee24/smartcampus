@@ -1495,6 +1495,192 @@ async def check_out_visitor(
 
     return visitor
 
+@router.post("/visitors/{visitor_id}/approve")
+async def approve_visitor_request(
+    visitor_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session)
+):
+    try:
+        if isinstance(visitor_id, str):
+            visitor_id = uuid.UUID(visitor_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request ID format")
+
+    visitor = await session.get(Visitor, visitor_id)
+    if not visitor:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    if visitor.status != "pending":
+        raise HTTPException(status_code=400, detail="Request is already processed")
+
+    # 1. Update status to checked_in
+    visitor.status = "checked_in"
+    visitor.time_in = get_eat_time()
+    session.add(visitor)
+
+    # 2. If it's a vehicle registration, activate vehicle and log entry
+    if visitor.visitor_type == "vehicle_registration":
+        if visitor.plate_number:
+            plate = visitor.plate_number.strip().upper()
+            clean_plate = plate.replace(" ", "")
+            from sqlalchemy import func
+            vehicle = (await session.exec(
+                select(Vehicle).where(func.replace(Vehicle.plate_number, ' ', '') == clean_plate)
+            )).first()
+
+            if not vehicle:
+                vehicle = Vehicle(
+                    plate_number=plate,
+                    make="Self-Reg",
+                    model="User Registered",
+                    color="Unknown"
+                )
+            
+            # Update driver details
+            vehicle.driver_name = f"{visitor.first_name} {visitor.last_name}"
+            vehicle.driver_contact = visitor.phone_number
+            vehicle.driver_id_number = visitor.id_number
+            
+            # Determine role from visitor details
+            # e.g., "Vehicle Registration for student"
+            v_role = "visitor"
+            if "student" in (visitor.visit_details or "").lower():
+                v_role = "student"
+            elif "staff" in (visitor.visit_details or "").lower():
+                v_role = "staff"
+            vehicle.vehicle_type = v_role
+            vehicle.status = "active"
+
+            # Link owner
+            owner = (await session.exec(
+                select(User).where(User.admission_number == visitor.id_number)
+            )).first()
+            if not owner and visitor.phone_number:
+                owner = (await session.exec(
+                    select(User).where(User.phone_number == visitor.phone_number)
+                )).first()
+            if owner:
+                vehicle.owner_id = owner.id
+
+            session.add(vehicle)
+            await session.commit()
+            await session.refresh(vehicle)
+
+            # Log Vehicle Entry
+            v_log = VehicleLog(
+                vehicle_id=vehicle.id,
+                gate_id=visitor.gate_id,
+                entry_time=get_eat_time(),
+                vehicle_images={},
+                manual_override=True,
+                detected_passengers=1
+            )
+            session.add(v_log)
+
+    # 3. If it's a taxi with a plate number, register vehicle and log entry
+    elif visitor.visitor_type in ["taxi", "cab"]:
+        if visitor.plate_number:
+            plate = visitor.plate_number.strip().upper()
+            clean_plate = plate.replace(" ", "")
+            from sqlalchemy import func
+            vehicle = (await session.exec(
+                select(Vehicle).where(func.replace(Vehicle.plate_number, ' ', '') == clean_plate)
+            )).first()
+
+            if not vehicle:
+                vehicle = Vehicle(
+                    plate_number=plate,
+                    driver_name="Taxi Driver",
+                    driver_contact=visitor.phone_number,
+                    driver_id_number=visitor.id_number,
+                    make="Self-Reg",
+                    model="Taxi/Cab",
+                    color="Unknown",
+                    vehicle_type="visitor",
+                    status="active"
+                )
+                session.add(vehicle)
+                await session.commit()
+                await session.refresh(vehicle)
+            
+            v_log = VehicleLog(
+                vehicle_id=vehicle.id,
+                gate_id=visitor.gate_id,
+                entry_time=get_eat_time(),
+                vehicle_images={},
+                manual_override=True,
+                detected_passengers=visitor.passengers or 1
+            )
+            session.add(v_log)
+
+        # 4. If check_in_student is True, also check in the student being dropped off
+        if visitor.check_in_student and visitor.dropoff_admission_number:
+            student = (await session.exec(
+                select(User).where(User.admission_number == visitor.dropoff_admission_number)
+            )).first()
+            if student:
+                student_log = EntryLog(
+                    user_id=student.id,
+                    gate_id=visitor.gate_id,
+                    entry_time=get_eat_time(),
+                    method="self_service_dropoff",
+                    status="allowed"
+                )
+                session.add(student_log)
+
+    await session.commit()
+    await session.refresh(visitor)
+
+    # Log action
+    await log_action(
+        session=session,
+        action_type="update",
+        table_name="visitors",
+        record_id=str(visitor.id),
+        description=f"Approved and checked in {visitor.visitor_type} {visitor.first_name} {visitor.last_name}",
+        request=request
+    )
+
+    return {"status": "success", "message": "Checked in successfully", "visitor": visitor}
+
+@router.post("/visitors/{visitor_id}/decline")
+async def decline_visitor_request(
+    visitor_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session)
+):
+    try:
+        if isinstance(visitor_id, str):
+            visitor_id = uuid.UUID(visitor_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid request ID format")
+
+    visitor = await session.get(Visitor, visitor_id)
+    if not visitor:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    if visitor.status != "pending":
+        raise HTTPException(status_code=400, detail="Request is already processed")
+
+    visitor.status = "rejected"
+    visitor.time_out = get_eat_time()
+    session.add(visitor)
+    await session.commit()
+    await session.refresh(visitor)
+
+    # Log action
+    await log_action(
+        session=session,
+        action_type="update",
+        table_name="visitors",
+        record_id=str(visitor.id),
+        description=f"Declined {visitor.visitor_type} request for {visitor.first_name} {visitor.last_name}",
+        request=request
+    )
+
+    return {"status": "success", "message": "Request declined successfully", "visitor": visitor}
+
 @router.get("/visitor-stats")
 async def get_visitor_stats(
     gate_id: Optional[str] = Query(None),
@@ -1739,57 +1925,72 @@ async def public_access_request(
             await session.commit()
             await session.refresh(gate)
 
-    # Handle Logic based on Role
-    if role in ["taxi", "cab", "delivery", "visitor"]:
-         # Register Visitor / Vehicle
-         # 1. Vehicle if applicable
-         vehicle = None
-         if data.get("plate_number"):
-             # Normalize Plate
-             plate = data["plate_number"].strip().upper()
-             vehicle = (await session.exec(select(Vehicle).where(Vehicle.plate_number == plate))).first()
-             if not vehicle:
-                 vehicle = Vehicle(
-                     plate_number=plate,
-                     driver_name=data.get("name"),
-                     driver_id_number=data.get("id_number"),
-                     driver_contact=data.get("mobile"),
-                     make="Self-Reg",
-                     model=role.title(),
-                     color="Unknown"
-                 )
-                 session.add(vehicle)
-                 await session.commit()
-                 await session.refresh(vehicle)
-             
-             # Log Vehicle Entry
-             v_log = VehicleLog(
-                 vehicle_id=vehicle.id,
-                 gate_id=gate.id,
-                 entry_time=get_eat_time(),
-                 vehicle_images={},
-                 manual_override=True, # Flag as manual/self-service
-                 detected_passengers=int(data.get("passengers", 1))
-             )
-             session.add(v_log)
+    if role in ["taxi", "cab", "delivery", "visitor", "vehicle_registration"]:
+         import base64
+         import uuid as uuid_lib
+         import os
          
-         # 2. Register Visitor Person (if no vehicle or driver details distinct)
-         if not vehicle:
-             visitor = Visitor(
-                 first_name=data.get("name", "").split(" ")[0],
-                 last_name=data.get("name", "").split(" ")[-1] if " " in data.get("name", "") else "",
-                 phone_number=data.get("mobile"),
-                 id_number=data.get("id_number"),
-                 visit_details=f"{role.title()}: {data.get('purpose') or data.get('delivery_details')}",
-                 status="checked_in",
-                 time_in=get_eat_time(),
-                 gate_id=gate.id, # LINK TO GATE
-                 visitor_type=role  # RECORD TYPE
-             )
-             session.add(visitor)
+         # Helper to save base64 image
+         def save_base64_image(b64_str, prefix):
+             if not b64_str:
+                 return None
+             try:
+                 if "base64," in b64_str:
+                     header, encoded = b64_str.split("base64,", 1)
+                 else:
+                     encoded = b64_str
+                 img_bytes = base64.b64decode(encoded)
+                 filename = f"{prefix}_{str(uuid_lib.uuid4())[:12]}.jpg"
+                 save_dir = "static/deliveries"
+                 os.makedirs(save_dir, exist_ok=True)
+                 saved_path = f"{save_dir}/{filename}"
+                 with open(saved_path, "wb") as f:
+                     f.write(img_bytes)
+                 return f"/static/deliveries/{filename}"
+             except Exception as e:
+                 print(f"Failed to save image {prefix}: {e}")
+                 return None
 
+         pkg_img = save_base64_image(data.get("delivery_image_package"), "package")
+         rcpt_img = save_base64_image(data.get("delivery_image_receipt"), "receipt")
+
+         # Map name details
+         full_name = data.get("name") or data.get("driver_name") or "Taxi Driver"
+         f_name = full_name.split(" ")[0]
+         l_name = full_name.split(" ")[-1] if " " in full_name else ""
+
+         # Create Visitor record with status = "pending"
+         visitor = Visitor(
+             first_name=f_name,
+             last_name=l_name,
+             phone_number=data.get("mobile") or data.get("driver_contact") or "",
+             id_number=data.get("id_number") or data.get("driver_id_number") or "",
+             visit_details=data.get("purpose") or data.get("delivery_details") or f"Vehicle Registration for {data.get('vehicle_role') or 'visitor'}",
+             visitor_type=role,
+             status="pending",
+             time_in=get_eat_time(),
+             gate_id=gate.id if gate else None,
+             plate_number=data.get("plate_number") or data.get("driver_plate") or None,
+             passengers=int(data.get("passengers")) if data.get("passengers") else None,
+             dropoff_name=data.get("dropoff_name"),
+             dropoff_admission_number=data.get("dropoff_admission_number"),
+             check_in_student=bool(data.get("check_in_student", False)),
+             delivery_image_package=pkg_img,
+             delivery_image_receipt=rcpt_img
+         )
+
+         # Look up drop-off user if admission number is provided
+         if data.get("dropoff_admission_number"):
+             from sqlmodel import select
+             student = (await session.exec(select(User).where(User.admission_number == data.get("dropoff_admission_number")))).first()
+             if student:
+                 visitor.dropoff_user_id = student.id
+
+         session.add(visitor)
          await session.commit()
-         return {"status": "success", "message": "Check-in Successful. You may proceed."}
+         await session.refresh(visitor)
+
+         return {"status": "success", "message": "Request submitted successfully. Please wait for guard verification and check-in approval."}
 
     elif role in ["student", "staff"]:
         # Check IP Address

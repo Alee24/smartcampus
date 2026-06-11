@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Car, User, Truck, CheckCircle, ArrowRight, UserCheck, Shield, Camera, AlertCircle, RefreshCcw } from 'lucide-react'
+import { Car, User, Truck, CheckCircle, ArrowRight, UserCheck, Shield, Camera, AlertCircle, RefreshCcw, Upload, FileText } from 'lucide-react'
 
 export default function SelfServiceEntry() {
     const [step, setStep] = useState(1) // 1: Role, 2: Form, 3: Success
@@ -11,6 +11,19 @@ export default function SelfServiceEntry() {
     const [error, setError] = useState<string | null>(null)
 
     const [userData, setUserData] = useState<any>(null)
+
+    // Delivery Images
+    const [deliveryPackageImage, setDeliveryPackageImage] = useState<string | null>(null)
+    const [deliveryReceiptImage, setDeliveryReceiptImage] = useState<string | null>(null)
+
+    // Taxi Drop-off details
+    const [dropoffType, setDropoffType] = useState('student') // 'student', 'staff', 'new'
+    const [dropoffAdmission, setDropoffAdmission] = useState('')
+    const [dropoffUser, setDropoffUser] = useState<any>(null)
+    const [dropoffName, setDropoffName] = useState('')
+    const [checkInStudent, setCheckInStudent] = useState(false)
+    const [loadingStudent, setLoadingStudent] = useState(false)
+    const [systemUsers, setSystemUsers] = useState<any[]>([])
 
     const [companyColors, setCompanyColors] = useState<any>({
         primary_color: '#2563eb',
@@ -37,6 +50,28 @@ export default function SelfServiceEntry() {
         }
         fetchCompanyColors()
     }, [])
+
+    // Fetch system users for drop-off lookup (staff/other)
+    useEffect(() => {
+        if (role === 'taxi' && dropoffType === 'staff') {
+            const fetchUsers = async () => {
+                try {
+                    const token = localStorage.getItem('token')
+                    const res = await fetch('/api/users', {
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                    })
+                    if (res.ok) {
+                        const data = await res.json()
+                        // Filter out students since student drop-off has admission lookup
+                        setSystemUsers(data.filter((u: any) => u.role !== 'Student'))
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch users:', e)
+                }
+            }
+            fetchUsers()
+        }
+    }, [role, dropoffType])
 
     // Apply company colors dynamically
     useEffect(() => {
@@ -73,7 +108,7 @@ export default function SelfServiceEntry() {
         root.style.setProperty('--gradient-primary', `linear-gradient(135deg, ${primary} 0%, ${secondary} 100%)`);
     }, [companyColors])
 
-    // Camera Refs & State
+    // Camera Refs & State (For Student self-check-in presence)
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [image, setImage] = useState<string | null>(null)
@@ -122,6 +157,29 @@ export default function SelfServiceEntry() {
                 if (stream) stream.getTracks().forEach(track => track.stop())
                 setCameraActive(false)
             }
+        }
+    }
+
+    // Lookup Student for Taxi Drop-off
+    const lookupStudent = async () => {
+        if (!dropoffAdmission) return
+        setLoadingStudent(true)
+        setDropoffUser(null)
+        setError(null)
+        try {
+            const res = await fetch(`/api/users/verify/${encodeURIComponent(dropoffAdmission)}`)
+            if (res.ok) {
+                const data = await res.json()
+                setDropoffUser(data)
+            } else {
+                setDropoffUser(null)
+                setError("Student not found. Please verify the admission number.")
+            }
+        } catch (err) {
+            console.error(err)
+            setError("Failed to look up student details. Ensure connection is online.")
+        } finally {
+            setLoadingStudent(false)
         }
     }
 
@@ -183,15 +241,20 @@ export default function SelfServiceEntry() {
         setSubmitting(true)
         setError(null)
         try {
-            const res = await fetch('/api/gate/public/register-vehicle', {
+            // Register Vehicle details but store in pending Visitor state for guard approval
+            const res = await fetch('/api/gate/public/access-request', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    driver_name: formData.driver_name,
-                    driver_id_number: formData.driver_id_number,
-                    driver_contact: formData.driver_contact,
-                    plate_number: formData.plate_number,
-                    role: formData.role || 'student'
+                    gate_id: gateId,
+                    role: 'vehicle_registration',
+                    data: {
+                        driver_name: formData.driver_name,
+                        driver_id_number: formData.driver_id_number,
+                        driver_contact: formData.driver_contact,
+                        plate_number: formData.plate_number,
+                        vehicle_role: formData.role || 'student'
+                    }
                 })
             })
             const data = await res.json()
@@ -221,6 +284,38 @@ export default function SelfServiceEntry() {
         e.preventDefault()
         setSubmitting(true)
         setError(null)
+
+        // Construct role-specific payload
+        let payloadData: any = {}
+        if (role === 'visitor') {
+            payloadData = {
+                name: formData.name,
+                mobile: formData.mobile,
+                id_number: formData.id_number,
+                purpose: formData.purpose
+            }
+        } else if (role === 'taxi') {
+            payloadData = {
+                mobile: formData.mobile,
+                id_number: formData.id_number,
+                plate_number: formData.plate_number,
+                passengers: formData.passengers || 1,
+                purpose: `Drop off: ${dropoffType === 'student' ? 'Student ' + (dropoffUser?.full_name || dropoffAdmission) : dropoffType === 'staff' ? 'Staff ' + dropoffName : 'New User ' + dropoffName}`,
+                dropoff_admission_number: dropoffType === 'student' ? dropoffAdmission : undefined,
+                dropoff_name: dropoffType !== 'student' ? dropoffName : undefined,
+                check_in_student: dropoffType === 'student' ? checkInStudent : false
+            }
+        } else if (role === 'delivery') {
+            payloadData = {
+                name: formData.name,
+                mobile: formData.mobile,
+                id_number: formData.id_number,
+                delivery_details: formData.delivery_details,
+                delivery_image_package: deliveryPackageImage,
+                delivery_image_receipt: deliveryReceiptImage
+            }
+        }
+
         try {
             const res = await fetch('/api/gate/public/access-request', {
                 method: 'POST',
@@ -228,7 +323,7 @@ export default function SelfServiceEntry() {
                 body: JSON.stringify({
                     gate_id: gateId,
                     role: role,
-                    data: formData
+                    data: payloadData
                 })
             })
             const data = await res.json()
@@ -254,6 +349,21 @@ export default function SelfServiceEntry() {
         }
     }
 
+    const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'package' | 'receipt') => {
+        const file = e.target.files?.[0]
+        if (file) {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                if (type === 'package') {
+                    setDeliveryPackageImage(reader.result as string)
+                } else {
+                    setDeliveryReceiptImage(reader.result as string)
+                }
+            }
+            reader.readAsDataURL(file)
+        }
+    }
+
     if (step === 3) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-slate-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/20 flex items-center justify-center p-4">
@@ -262,7 +372,7 @@ export default function SelfServiceEntry() {
                         <CheckCircle className="text-emerald-600 dark:text-emerald-400 animate-pulse" size={40} />
                     </div>
                     <h2 className="text-2xl font-black mb-2 text-slate-900 dark:text-white">
-                        {result?.status === 'success' ? 'Access Granted' : 'Request Sent'}
+                        {result?.message && result.message.includes("wait") ? 'Request Submitted' : result?.status === 'success' ? 'Access Granted' : 'Request Sent'}
                     </h2>
                     <p className="text-slate-600 dark:text-slate-400 text-sm mb-8 leading-relaxed font-bold">
                         {result?.message}
@@ -279,7 +389,7 @@ export default function SelfServiceEntry() {
                     >
                         Back to Homepage
                     </button>
-                    {result?.status === 'success' && (
+                    {result?.status === 'success' && !result?.message?.includes("wait") && (
                         <div className="mt-4 text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider">
                             Gate opened automatically
                         </div>
@@ -309,12 +419,31 @@ export default function SelfServiceEntry() {
                 }} 
                 className="hidden" 
             />
+
+            {/* Hidden uploads for Deliveries */}
+            <input 
+                type="file" 
+                id="delivery-package-input" 
+                accept="image/*" 
+                capture="environment" 
+                onChange={(e) => handleImageFileChange(e, 'package')}
+                className="hidden" 
+            />
+            <input 
+                type="file" 
+                id="delivery-receipt-input" 
+                accept="image/*" 
+                capture="environment" 
+                onChange={(e) => handleImageFileChange(e, 'receipt')}
+                className="hidden" 
+            />
+
             <div className="max-w-md mx-auto relative">
                 {/* Back to Homepage Button */}
                 <div className="flex justify-start mb-4 pt-4">
                     <button 
                         onClick={() => window.location.href = '/'}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl text-xs font-black shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-905 border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-xl text-xs font-black shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer focus:ring-2 focus:ring-indigo-500/20 outline-none"
                     >
                         &larr; Back to Homepage
                     </button>
@@ -345,7 +474,7 @@ export default function SelfServiceEntry() {
                         </p>
 
                         <RoleCard icon={User} label="Visitor" desc="Personal visits, enquiries, or guests" onClick={() => { setRole('visitor'); setStep(2); setError(null); setFormData({}) }} />
-                        <RoleCard icon={Car} label="Taxi / Cab" desc="Drop-offs, pick-ups, or taxi services" onClick={() => { setRole('taxi'); setStep(2); setError(null); setFormData({}) }} />
+                        <RoleCard icon={Car} label="Taxi / Cab" desc="Drop-offs, pick-ups, or taxi services" onClick={() => { setRole('taxi'); setStep(2); setError(null); setFormData({ passengers: 1 }) }} />
                         <RoleCard icon={Truck} label="Delivery" desc="Goods, parcels, couriers, or food deliveries" onClick={() => { setRole('delivery'); setStep(2); setError(null); setFormData({}) }} />
                         <RoleCard icon={UserCheck} label="Student / Staff" desc="Campus verification check-in/out" onClick={() => { setRole('student'); setStep(2); setError(null); setFormData({}) }} color="indigo" />
                         <RoleCard icon={Car} label="Vehicle Registration" desc="Register your vehicle details" onClick={() => { setRole('vehicle_registration'); setStep(2); setError(null); setFormData({ role: 'student' }) }} color="indigo" />
@@ -411,7 +540,7 @@ export default function SelfServiceEntry() {
                                     <div className="flex gap-3 pt-2">
                                         <button 
                                             onClick={() => { setStep(1); setError(null); }} 
-                                            className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-2xl font-black text-xs active:scale-95 transition-all"
+                                            className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-355 rounded-2xl font-black text-xs active:scale-95 transition-all"
                                         >
                                             Back
                                         </button>
@@ -462,7 +591,7 @@ export default function SelfServiceEntry() {
                                     <button 
                                         type="button" 
                                         onClick={() => { setStep(1); setError(null); }} 
-                                        className="w-full py-3.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-350 text-xs font-black"
+                                        className="w-full py-3.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-355 text-xs font-black"
                                     >
                                         Back to Categories
                                     </button>
@@ -471,7 +600,7 @@ export default function SelfServiceEntry() {
                         ) : role === 'vehicle_registration' ? (
                             <form className="space-y-4" onSubmit={handleVehicleRegisterSubmit}>
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Full Name</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Full Name</label>
                                     <input 
                                         required 
                                         placeholder="e.g. John Doe"
@@ -482,7 +611,7 @@ export default function SelfServiceEntry() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Phone Number</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
                                         <input 
                                             required 
                                             type="tel"
@@ -493,7 +622,7 @@ export default function SelfServiceEntry() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">ID / Passport No</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport No</label>
                                         <input 
                                             required 
                                             placeholder="ID Number"
@@ -505,7 +634,7 @@ export default function SelfServiceEntry() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-4">
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Vehicle Plate</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Vehicle Plate</label>
                                         <input 
                                             required
                                             placeholder="KCA 123A"
@@ -515,7 +644,7 @@ export default function SelfServiceEntry() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Your Role</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Your Role</label>
                                         <select
                                             required
                                             className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
@@ -541,25 +670,28 @@ export default function SelfServiceEntry() {
                                         disabled={submitting} 
                                         className="flex-[2] py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-95"
                                     >
-                                        {submitting ? 'Registering...' : <>Register Vehicle <ArrowRight size={14} /></>}
+                                        {submitting ? 'Submitting...' : <>Submit Request <ArrowRight size={14} /></>}
                                     </button>
                                 </div>
                             </form>
                         ) : (
                             <form className="space-y-4" onSubmit={handleSubmit}>
-                                {/* Common Fields */}
-                                <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Full Name</label>
-                                    <input 
-                                        required 
-                                        placeholder="e.g. John Doe"
-                                        className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                        onChange={e => setFormData({ ...formData, name: e.target.value })} 
-                                    />
-                                </div>
+                                {/* Full Name: Hide for taxi driver */}
+                                {role !== 'taxi' && (
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Full Name</label>
+                                        <input 
+                                            required 
+                                            placeholder="e.g. John Doe"
+                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                            onChange={e => setFormData({ ...formData, name: e.target.value })} 
+                                        />
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Phone Number</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
                                         <input 
                                             required 
                                             type="tel"
@@ -569,7 +701,7 @@ export default function SelfServiceEntry() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">ID / Passport No</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport No</label>
                                         <input 
                                             required 
                                             placeholder="ID Number"
@@ -579,22 +711,24 @@ export default function SelfServiceEntry() {
                                     </div>
                                 </div>
 
-                                {/* Vehicle Fields */}
-                                {(role === 'taxi' || role === 'visitor') && (
+                                {/* Vehicle Fields for Taxi ONLY (Visitor plate is now completely hidden) */}
+                                {role === 'taxi' && (
                                     <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-4">
                                         <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Vehicle Plate (Optional)</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Vehicle Plate</label>
                                             <input 
+                                                required
                                                 placeholder="KCA 123A"
                                                 className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white font-mono uppercase"
                                                 onChange={e => setFormData({ ...formData, plate_number: e.target.value })} 
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Passengers</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Passengers</label>
                                             <input 
                                                 type="number" 
                                                 min="1" 
+                                                required
                                                 placeholder="1"
                                                 className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
                                                 onChange={e => setFormData({ ...formData, passengers: e.target.value })} 
@@ -603,21 +737,200 @@ export default function SelfServiceEntry() {
                                     </div>
                                 )}
 
-                                {/* Specifics */}
+                                {/* Specifics for Delivery */}
                                 {role === 'delivery' && (
-                                    <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Delivery Details</label>
-                                        <input 
-                                            required 
-                                            placeholder="e.g. DHL Package for Admin Office" 
-                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                            onChange={e => setFormData({ ...formData, delivery_details: e.target.value })} 
-                                        />
+                                    <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3 space-y-4">
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Delivery Details</label>
+                                            <input 
+                                                required 
+                                                placeholder="e.g. DHL Package for Admin Office" 
+                                                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                                onChange={e => setFormData({ ...formData, delivery_details: e.target.value })} 
+                                            />
+                                        </div>
+
+                                        {/* Pictures of Package & Receipt */}
+                                        <div className="grid grid-cols-2 gap-3 pt-2">
+                                            {/* Package Image Card */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-[9px] font-bold text-slate-400 uppercase block">Delivery Package Photo</label>
+                                                {!deliveryPackageImage ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => document.getElementById('delivery-package-input')?.click()}
+                                                        className="w-full aspect-video border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-650 hover:border-indigo-500/30 transition-all bg-slate-50/50 dark:bg-slate-905"
+                                                    >
+                                                        <Camera size={18} />
+                                                        <span className="text-[9px] font-bold mt-1">Capture</span>
+                                                    </button>
+                                                ) : (
+                                                    <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 dark:border-slate-850">
+                                                        <img src={deliveryPackageImage} className="w-full h-full object-cover" />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDeliveryPackageImage(null)}
+                                                            className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[9px] font-bold opacity-0 hover:opacity-100 transition-opacity"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Receipt Image Card */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-[9px] font-bold text-slate-400 uppercase block">Receipt / Note Photo</label>
+                                                {!deliveryReceiptImage ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => document.getElementById('delivery-receipt-input')?.click()}
+                                                        className="w-full aspect-video border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-650 hover:border-indigo-500/30 transition-all bg-slate-50/50 dark:bg-slate-905"
+                                                    >
+                                                        <FileText size={18} />
+                                                        <span className="text-[9px] font-bold mt-1">Capture</span>
+                                                    </button>
+                                                ) : (
+                                                    <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 dark:border-slate-850">
+                                                        <img src={deliveryReceiptImage} className="w-full h-full object-cover" />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDeliveryReceiptImage(null)}
+                                                            className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[9px] font-bold opacity-0 hover:opacity-100 transition-opacity"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
-                                {role !== 'delivery' && (
+
+                                {/* Drop off Destination for Taxi */}
+                                {role === 'taxi' && (
+                                    <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4 space-y-4">
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Drop Off Category</label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {['student', 'staff', 'new'].map((type) => (
+                                                    <button
+                                                        key={type}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setDropoffType(type);
+                                                            setDropoffUser(null);
+                                                            setDropoffAdmission('');
+                                                            setDropoffName('');
+                                                            setError(null);
+                                                        }}
+                                                        className={`py-2 px-3 text-[10px] font-black rounded-lg capitalize border active:scale-95 transition-all ${
+                                                            dropoffType === type
+                                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                                                                : 'bg-white border-slate-200 text-slate-650 dark:bg-slate-900 dark:border-slate-800'
+                                                        }`}
+                                                    >
+                                                        {type === 'new' ? 'New User' : type}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Drop off student lookup */}
+                                        {dropoffType === 'student' && (
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Student Admission Number</label>
+                                                    <div className="flex gap-2">
+                                                        <input 
+                                                            placeholder="e.g. S12/34567/18"
+                                                            value={dropoffAdmission}
+                                                            onChange={e => setDropoffAdmission(e.target.value)}
+                                                            className="flex-1 p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white font-mono uppercase"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={lookupStudent}
+                                                            disabled={loadingStudent || !dropoffAdmission}
+                                                            className="px-4 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all active:scale-95 disabled:opacity-50"
+                                                        >
+                                                            {loadingStudent ? 'Searching...' : 'Lookup'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Pop up student details if found */}
+                                                {dropoffUser && (
+                                                    <div className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-900 dark:to-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl flex items-center gap-4 animate-scale-in">
+                                                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-200 border border-white dark:border-slate-800 shadow-sm shrink-0">
+                                                            {dropoffUser.profile_image ? (
+                                                                <img src={dropoffUser.profile_image} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-700 font-black text-lg">
+                                                                    {dropoffUser.full_name[0]}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-bold text-slate-800 dark:text-white text-xs truncate">{dropoffUser.full_name}</div>
+                                                            <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono mt-0.5">{dropoffUser.admission_number}</div>
+                                                            
+                                                            {/* Check in option */}
+                                                            <label className="mt-2.5 flex items-center gap-2 cursor-pointer select-none">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={checkInStudent}
+                                                                    onChange={e => setCheckInStudent(e.target.checked)}
+                                                                    className="rounded border-slate-300 dark:border-slate-800 text-indigo-600 focus:ring-indigo-500/20 w-3.5 h-3.5"
+                                                                />
+                                                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Check student in to campus</span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Drop off staff selection */}
+                                        {dropoffType === 'staff' && (
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Select Staff Host</label>
+                                                <select
+                                                    required
+                                                    className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                                    value={dropoffName}
+                                                    onChange={e => setDropoffName(e.target.value)}
+                                                >
+                                                    <option value="">-- Choose Host --</option>
+                                                    {systemUsers.map(user => (
+                                                        <option key={user.id} value={`${user.full_name} (${user.role})`}>
+                                                            {user.full_name} - {user.role}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+
+                                        {/* Drop off new user details */}
+                                        {dropoffType === 'new' && (
+                                            <div>
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">New User Details</label>
+                                                <input 
+                                                    required 
+                                                    placeholder="Enter Full Name & Host Details" 
+                                                    className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                                    value={dropoffName}
+                                                    onChange={e => setDropoffName(e.target.value)}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Purpose of Visit: Visitor ONLY */}
+                                {role === 'visitor' && (
                                     <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Purpose of Visit</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Purpose of Visit</label>
                                         <input 
                                             required 
                                             placeholder="e.g. Meeting with Registrar, General Inquiry"
@@ -668,7 +981,7 @@ function RoleCard({ icon: Icon, label, desc, onClick, color = "blue" }: any) {
     return (
         <button 
             onClick={onClick} 
-            className="w-full bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-4.5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center gap-4 hover:shadow-md hover:border-indigo-500/30 transition-all text-left group active:scale-[0.99]"
+            className="w-full bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl p-4.5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800/80 flex items-center gap-4 hover:shadow-md hover:border-indigo-500/30 transition-all text-left group active:scale-[0.99] cursor-pointer"
         >
             <div className={`w-12 h-12 rounded-2xl ${activeColor.bg} ${activeColor.text} flex items-center justify-center shadow-inner`}>
                 <Icon size={22} />
