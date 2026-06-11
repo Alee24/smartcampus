@@ -543,6 +543,7 @@ export default function Users() {
                             <option value="stores">Stores</option>
                             <option value="guardian">Guardians</option>
                             <option value="driver">Drivers</option>
+                            <option value="visitor">Visitors</option>
                         </select>
                     </div>
 

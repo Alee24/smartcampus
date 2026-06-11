@@ -1519,6 +1519,43 @@ async def approve_visitor_request(
     visitor.time_in = get_eat_time()
     session.add(visitor)
 
+    # 1.5 If standard visitor, register as a User under Visitor role
+    if visitor.visitor_type == "visitor":
+        from sqlmodel import or_
+        from app.models import Role
+        visitor_adm = f"VISITOR-{visitor.id_number}"
+        user_query = select(User).where(or_(
+            User.admission_number == visitor_adm,
+            User.admission_number == visitor.id_number
+        ))
+        existing_user = (await session.exec(user_query)).first()
+        if not existing_user and visitor.phone_number and visitor.phone_number != "N/A":
+            existing_user = (await session.exec(select(User).where(User.phone_number == visitor.phone_number))).first()
+            
+        if not existing_user:
+            visitor_role = (await session.exec(select(Role).where(Role.name == "Visitor"))).first()
+            if not visitor_role:
+                visitor_role = Role(name="Visitor", description="Visitor")
+                session.add(visitor_role)
+                await session.commit()
+                await session.refresh(visitor_role)
+                
+            from app.auth import get_password_hash
+            hashed_pwd = get_password_hash(f"visitor-{visitor.id_number}")
+            new_visitor_user = User(
+                admission_number=visitor_adm,
+                full_name=f"{visitor.first_name} {visitor.last_name}",
+                school="Visitor Center",
+                hashed_password=hashed_pwd,
+                role_id=visitor_role.id,
+                status="Active",
+                phone_number=visitor.phone_number,
+                first_name=visitor.first_name,
+                last_name=visitor.last_name
+            )
+            session.add(new_visitor_user)
+            await session.commit()
+
     # 2. If it's a vehicle registration, activate vehicle and log entry
     if visitor.visitor_type == "vehicle_registration":
         if visitor.plate_number:
@@ -1614,20 +1651,34 @@ async def approve_visitor_request(
             )
             session.add(v_log)
 
-        # 4. If check_in_student is True, also check in the student being dropped off
-        if visitor.check_in_student and visitor.dropoff_admission_number:
+        # 4. Check in or Check out student/staff based on pick-up or drop-off
+        if visitor.dropoff_admission_number:
             student = (await session.exec(
                 select(User).where(User.admission_number == visitor.dropoff_admission_number)
             )).first()
             if student:
-                student_log = EntryLog(
-                    user_id=student.id,
-                    gate_id=visitor.gate_id,
-                    entry_time=get_eat_time(),
-                    method="self_service_dropoff",
-                    status="allowed"
-                )
-                session.add(student_log)
+                if getattr(visitor, "is_pickup", False):
+                    # Check Out: Find open EntryLog and close it
+                    open_log = (await session.exec(
+                        select(EntryLog)
+                        .where(EntryLog.user_id == student.id)
+                        .where(EntryLog.exit_time == None)
+                        .order_by(EntryLog.entry_time.desc())
+                    )).first()
+                    if open_log:
+                        open_log.exit_time = get_eat_time()
+                        open_log.exit_gate_id = visitor.gate_id
+                        session.add(open_log)
+                else:
+                    # Check In: Create new EntryLog
+                    student_log = EntryLog(
+                        user_id=student.id,
+                        gate_id=visitor.gate_id,
+                        entry_time=get_eat_time(),
+                        method="self_service_dropoff",
+                        status="allowed"
+                    )
+                    session.add(student_log)
 
     await session.commit()
     await session.refresh(visitor)
@@ -1963,8 +2014,8 @@ async def public_access_request(
          visitor = Visitor(
              first_name=f_name,
              last_name=l_name,
-             phone_number=data.get("mobile") or data.get("driver_contact") or "",
-             id_number=data.get("id_number") or data.get("driver_id_number") or "",
+             phone_number=data.get("mobile") or data.get("driver_contact") or "N/A",
+             id_number=data.get("id_number") or data.get("driver_id_number") or "N/A",
              visit_details=data.get("purpose") or data.get("delivery_details") or f"Vehicle Registration for {data.get('vehicle_role') or 'visitor'}",
              visitor_type=role,
              status="pending",
@@ -1977,7 +2028,8 @@ async def public_access_request(
              check_in_student=bool(data.get("check_in_student", False)),
              delivery_image_package=pkg_img,
              delivery_image_receipt=rcpt_img,
-             auto_delete_24h=bool(data.get("auto_delete_24h", False))
+             auto_delete_24h=bool(data.get("auto_delete_24h", False)),
+             is_pickup=bool(data.get("is_pickup", False))
          )
 
          # Look up drop-off user if admission number is provided

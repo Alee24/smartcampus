@@ -574,6 +574,7 @@ class Visitor(UUIDModel, table=True):
     delivery_image_package: Optional[str] = None
     delivery_image_receipt: Optional[str] = None
     auto_delete_24h: bool = Field(default=False)
+    is_pickup: bool = Field(default=False)
 
 # Event Management Models
 class Event(UUIDModel, table=True):

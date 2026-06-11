@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request, Form, BackgroundTasks
 from datetime import datetime
 from app.utils.timezone import get_eat_time
-from sqlmodel import select
+from sqlmodel import select, or_
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import AsyncSession as SAAsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -58,8 +58,11 @@ async def get_all_users(
 async def search_users(q: str, session: AsyncSession = Depends(get_session)):
     """Autocomplete search for users by admission number or name"""
     if len(q) < 2: return []
-    # Search by admission number (case insensitive)
-    query = select(User).where(User.admission_number.contains(q.upper())).limit(10)
+    # Search by admission number or full name (case insensitive)
+    query = select(User).where(or_(
+        User.admission_number.contains(q.upper()),
+        User.full_name.contains(q)
+    )).limit(10)
     results = await session.exec(query)
     
     users_list = []
@@ -851,6 +854,11 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
     # 2. Exact admission number match
     if not user:
         query = select(User).where(User.admission_number == admission_number)
+        user = (await session.exec(query)).first()
+
+    # 2.5 Visitor ID / Passport prefix match
+    if not user:
+        query = select(User).where(User.admission_number == f"VISITOR-{admission_number}")
         user = (await session.exec(query)).first()
     
     # 3. Suffix Match (for "last 6 digits" search)

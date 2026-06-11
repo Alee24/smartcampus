@@ -32,6 +32,13 @@ export default function SelfServiceEntry() {
     const [showPrivacyModal, setShowPrivacyModal] = useState(false)
     const [showCookieModal, setShowCookieModal] = useState(false)
 
+    // Taxi & Visitor autocomplete states
+    const [taxiServiceType, setTaxiServiceType] = useState<'pickup' | 'dropoff'>('dropoff')
+    const [userSearchQuery, setUserSearchQuery] = useState('')
+    const [userSearchResults, setUserSearchResults] = useState<any[]>([])
+    const [selectedUserObj, setSelectedUserObj] = useState<any>(null)
+    const [loadingVisitor, setLoadingVisitor] = useState(false)
+
     const [companyColors, setCompanyColors] = useState<any>({
         primary_color: '#2563eb',
         secondary_color: '#0284c7',
@@ -192,6 +199,52 @@ export default function SelfServiceEntry() {
         }
     }
 
+    // Lookup Visitor/User by ID number for auto-populating
+    const lookupVisitor = async (idNum: string) => {
+        if (!idNum) return
+        setLoadingVisitor(true)
+        setError(null)
+        try {
+            const res = await fetch(`/api/users/verify/${encodeURIComponent(idNum)}`)
+            if (res.ok) {
+                const data = await res.json()
+                setFormData({
+                    ...formData,
+                    id_number: idNum,
+                    name: data.full_name,
+                    mobile: data.phone_number || ''
+                })
+            } else {
+                setError("User not found in system. Please input details manually.")
+            }
+        } catch (err) {
+            console.error(err)
+            setError("Failed to look up user details. Ensure connection is online.")
+        } finally {
+            setLoadingVisitor(false)
+        }
+    }
+
+    // Autocomplete query for Taxi passengers
+    useEffect(() => {
+        if (userSearchQuery.trim().length >= 2 && !selectedUserObj) {
+            const delayDebounce = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/api/users/search?q=${encodeURIComponent(userSearchQuery)}`)
+                    if (res.ok) {
+                        const data = await res.json()
+                        setUserSearchResults(data)
+                    }
+                } catch (e) {
+                    console.error("User autocomplete search failed:", e)
+                }
+            }, 300)
+            return () => clearTimeout(delayDebounce)
+        } else {
+            setUserSearchResults([])
+        }
+    }, [userSearchQuery, selectedUserObj])
+
     useEffect(() => {
         const path = window.location.pathname
         const id = path.split('/gate-pass/')[1]
@@ -306,14 +359,13 @@ export default function SelfServiceEntry() {
             }
         } else if (role === 'taxi') {
             payloadData = {
-                mobile: formData.mobile,
-                id_number: formData.id_number,
                 plate_number: formData.plate_number,
                 passengers: formData.passengers || 1,
-                purpose: `Drop off: ${dropoffType === 'student' ? 'Student ' + (dropoffUser?.full_name || dropoffAdmission) : dropoffType === 'staff' ? 'Staff ' + dropoffName : 'New User ' + dropoffName}`,
-                dropoff_admission_number: dropoffType === 'student' ? dropoffAdmission : undefined,
-                dropoff_name: dropoffType !== 'student' ? dropoffName : undefined,
-                check_in_student: dropoffType === 'student' ? checkInStudent : false,
+                purpose: `${taxiServiceType === 'pickup' ? 'Pick Up' : 'Drop Off'}: ${dropoffName || userSearchQuery}`,
+                dropoff_admission_number: dropoffAdmission || undefined,
+                dropoff_name: dropoffName || undefined,
+                is_pickup: taxiServiceType === 'pickup',
+                check_in_student: taxiServiceType === 'dropoff',
                 auto_delete_24h: autoDelete24h
             }
         } else if (role === 'delivery') {
@@ -730,32 +782,47 @@ export default function SelfServiceEntry() {
                                             required 
                                             placeholder="e.g. John Doe"
                                             className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                            value={formData.name || ''}
                                             onChange={e => setFormData({ ...formData, name: e.target.value })} 
                                         />
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
-                                        <input 
-                                            required 
-                                            type="tel"
-                                            placeholder="e.g. 0712345678"
-                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                            onChange={e => setFormData({ ...formData, mobile: e.target.value })} 
-                                        />
+                                {role !== 'taxi' && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
+                                            <input 
+                                                required 
+                                                type="tel"
+                                                placeholder="e.g. 0712345678"
+                                                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                                value={formData.mobile || ''}
+                                                onChange={e => setFormData({ ...formData, mobile: e.target.value })} 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport No</label>
+                                            <div className="flex gap-2">
+                                                <input 
+                                                    required 
+                                                    placeholder="ID Number"
+                                                    className="flex-1 p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                                    value={formData.id_number || ''}
+                                                    onChange={e => setFormData({ ...formData, id_number: e.target.value })} 
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => lookupVisitor(formData.id_number)}
+                                                    disabled={loadingVisitor || !formData.id_number}
+                                                    className="px-4 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                                                >
+                                                    {loadingVisitor ? 'Searching...' : 'Lookup'}
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport No</label>
-                                        <input 
-                                            required 
-                                            placeholder="ID Number"
-                                            className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                            onChange={e => setFormData({ ...formData, id_number: e.target.value })} 
-                                        />
-                                    </div>
-                                </div>
+                                )}
 
                                 {/* Vehicle Fields for Taxi ONLY */}
                                 {role === 'taxi' && (
@@ -853,121 +920,122 @@ export default function SelfServiceEntry() {
                                     </div>
                                 )}
 
-                                {/* Drop off Destination for Taxi */}
+                                {/* Pick Up / Drop Off & User search for Taxi */}
                                 {role === 'taxi' && (
                                     <div className="border-t border-slate-100 dark:border-slate-800/80 pt-4 space-y-4">
                                         <div>
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Drop Off Category</label>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                {['student', 'staff', 'new'].map((type) => (
-                                                    <button
-                                                        key={type}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setDropoffType(type);
-                                                            setDropoffUser(null);
-                                                            setDropoffAdmission('');
-                                                            setDropoffName('');
-                                                            setError(null);
-                                                        }}
-                                                        className={`py-2 px-3 text-[10px] font-black rounded-lg capitalize border active:scale-95 transition-all cursor-pointer ${
-                                                            dropoffType === type
-                                                                ? 'bg-indigo-605 border-indigo-600 text-white shadow-md'
-                                                                : 'bg-white border-slate-200 text-slate-650 dark:bg-slate-900 dark:border-slate-800'
-                                                        }`}
-                                                    >
-                                                        {type === 'new' ? 'New User' : type}
-                                                    </button>
-                                                ))}
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Service Type</label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTaxiServiceType('dropoff');
+                                                        setSelectedUserObj(null);
+                                                        setDropoffAdmission('');
+                                                        setDropoffName('');
+                                                        setUserSearchQuery('');
+                                                        setError(null);
+                                                    }}
+                                                    className={`py-3 px-4 rounded-xl text-xs font-black border transition-all active:scale-95 cursor-pointer ${
+                                                        taxiServiceType === 'dropoff'
+                                                            ? 'bg-indigo-600 text-white border-indigo-650 shadow-lg shadow-indigo-600/20'
+                                                            : 'bg-slate-50 dark:bg-slate-850 border-slate-150 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                                                    }`}
+                                                >
+                                                    Drop Off
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTaxiServiceType('pickup');
+                                                        setSelectedUserObj(null);
+                                                        setDropoffAdmission('');
+                                                        setDropoffName('');
+                                                        setUserSearchQuery('');
+                                                        setError(null);
+                                                    }}
+                                                    className={`py-3 px-4 rounded-xl text-xs font-black border transition-all active:scale-95 cursor-pointer ${
+                                                        taxiServiceType === 'pickup'
+                                                            ? 'bg-indigo-600 text-white border-indigo-650 shadow-lg shadow-indigo-600/20'
+                                                            : 'bg-slate-50 dark:bg-slate-850 border-slate-150 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                                                    }`}
+                                                >
+                                                    Pick Up
+                                                </button>
                                             </div>
                                         </div>
 
-                                        {/* Drop off student lookup */}
-                                        {dropoffType === 'student' && (
-                                            <div className="space-y-3">
-                                                <div>
-                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Student Admission Number</label>
-                                                    <div className="flex gap-2">
-                                                        <input 
-                                                            placeholder="e.g. S12/34567/18"
-                                                            value={dropoffAdmission}
-                                                            onChange={e => setDropoffAdmission(e.target.value)}
-                                                            className="flex-1 p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white font-mono uppercase"
-                                                        />
+                                        <div className="relative">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold font-bold">
+                                                Search Student / Staff (Name or Admission/ID)
+                                            </label>
+                                            <input
+                                                required
+                                                type="text"
+                                                placeholder="Start typing name, admission number..."
+                                                className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
+                                                value={userSearchQuery}
+                                                onChange={(e) => {
+                                                    setUserSearchQuery(e.target.value);
+                                                    if (selectedUserObj) {
+                                                        setSelectedUserObj(null);
+                                                        setDropoffAdmission('');
+                                                        setDropoffName('');
+                                                    }
+                                                }}
+                                            />
+                                            {/* Autocomplete dropdown suggestions */}
+                                            {userSearchResults.length > 0 && (
+                                                <div className="absolute left-0 right-0 z-[60] mt-1 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+                                                    {userSearchResults.map((user) => (
                                                         <button
+                                                            key={user.id}
                                                             type="button"
-                                                            onClick={lookupStudent}
-                                                            disabled={loadingStudent || !dropoffAdmission}
-                                                            className="px-4 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                                                            onClick={() => {
+                                                                setSelectedUserObj(user);
+                                                                setDropoffAdmission(user.admission_number);
+                                                                setDropoffName(user.full_name);
+                                                                setUserSearchQuery(`${user.full_name} (${user.admission_number})`);
+                                                                setUserSearchResults([]);
+                                                            }}
+                                                            className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-850 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-slate-850/50 last:border-none cursor-pointer"
                                                         >
-                                                            {loadingStudent ? 'Searching...' : 'Lookup'}
+                                                            <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-100 border shrink-0">
+                                                                {user.profile_image ? (
+                                                                    <img src={user.profile_image} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-605 font-bold text-xs">
+                                                                        {user.full_name[0]}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="text-xs font-bold text-slate-800 dark:text-white truncate">{user.full_name}</div>
+                                                                <div className="text-[9px] text-slate-400 font-mono mt-0.5 truncate">{user.admission_number} | {user.school || 'Campus'}</div>
+                                                            </div>
                                                         </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* Pop up student details if found */}
-                                                {dropoffUser && (
-                                                    <div className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-900 dark:to-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl flex items-center gap-4 animate-scale-in">
-                                                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-200 border border-white dark:border-slate-800 shadow-sm shrink-0">
-                                                            {dropoffUser.profile_image ? (
-                                                                <img src={dropoffUser.profile_image} className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <div className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-705 font-black text-lg">
-                                                                    {dropoffUser.full_name[0]}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="font-bold text-slate-800 dark:text-white text-xs truncate">{dropoffUser.full_name}</div>
-                                                            <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono mt-0.5">{dropoffUser.admission_number}</div>
-                                                            
-                                                            {/* Check in option */}
-                                                            <label className="mt-2.5 flex items-center gap-2 cursor-pointer select-none">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={checkInStudent}
-                                                                    onChange={e => setCheckInStudent(e.target.checked)}
-                                                                    className="rounded border-slate-300 dark:border-slate-800 text-indigo-605 focus:ring-indigo-505/20 w-3.5 h-3.5 cursor-pointer"
-                                                                />
-                                                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">Check student in to campus</span>
-                                                            </label>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* Drop off staff selection */}
-                                        {dropoffType === 'staff' && (
-                                            <div>
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">Select Staff Host</label>
-                                                <select
-                                                    required
-                                                    className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                                    value={dropoffName}
-                                                    onChange={e => setDropoffName(e.target.value)}
-                                                >
-                                                    <option value="">-- Choose Host --</option>
-                                                    {systemUsers.map(user => (
-                                                        <option key={user.id} value={`${user.full_name} (${user.role})`}>
-                                                            {user.full_name} - {user.role}
-                                                        </option>
                                                     ))}
-                                                </select>
-                                            </div>
-                                        )}
+                                                </div>
+                                            )}
+                                        </div>
 
-                                        {/* Drop off new user details */}
-                                        {dropoffType === 'new' && (
-                                            <div>
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 font-bold">New User Details</label>
-                                                <input 
-                                                    required 
-                                                    placeholder="Enter Full Name & Host Details" 
-                                                    className="w-full p-3.5 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-150/80 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white"
-                                                    value={dropoffName}
-                                                    onChange={e => setDropoffName(e.target.value)}
-                                                />
+                                        {/* Selected User Details Card */}
+                                        {selectedUserObj && (
+                                            <div className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-900 dark:to-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl flex items-center gap-4 animate-scale-in">
+                                                <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-200 border border-white dark:border-slate-800 shadow-sm shrink-0">
+                                                    {selectedUserObj.profile_image ? (
+                                                        <img src={selectedUserObj.profile_image} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center bg-indigo-100 text-indigo-700 font-black text-lg">
+                                                            {selectedUserObj.full_name[0]}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="font-bold text-slate-800 dark:text-white text-xs truncate">{selectedUserObj.full_name}</div>
+                                                    <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono mt-0.5">{selectedUserObj.admission_number}</div>
+                                                    <div className="text-[9px] text-slate-405 mt-0.5 capitalize">{selectedUserObj.school || 'Campus'}</div>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
