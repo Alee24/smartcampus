@@ -39,6 +39,7 @@ async def init_db():
     await migrate_gate_exits()
     await migrate_assets()
     await migrate_self_service()
+    await migrate_events()
 async def get_session() -> AsyncSession:
     async_session = sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
@@ -429,4 +430,36 @@ async def migrate_self_service():
             print("Visitors self-service schema migration checked/applied.")
     except Exception as e:
         print(f"Visitors self-service migration failed: {e}")
+
+async def migrate_events():
+    """Manual migration to add columns for dynamic event check-in/registration features."""
+    print("Checking events and event_visitors tables schema...")
+    try:
+        async with engine.begin() as conn:
+            def get_events_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                if not inspector.has_table('events'): return []
+                return [c['name'] for c in inspector.get_columns('events')]
+                
+            def get_visitors_cols(connection):
+                from sqlalchemy import inspect
+                inspector = inspect(connection)
+                if not inspector.has_table('event_visitors'): return []
+                return [c['name'] for c in inspector.get_columns('event_visitors')]
+
+            events_cols = await conn.run_sync(get_events_cols)
+            if events_cols and "scan_mode" not in events_cols:
+                print("Adding column scan_mode to events table...")
+                await conn.execute(text("ALTER TABLE events ADD COLUMN scan_mode VARCHAR(50) DEFAULT 'auto'"))
+                
+            visitors_cols = await conn.run_sync(get_visitors_cols)
+            if visitors_cols and "auto_delete_24h" not in visitors_cols:
+                print("Adding column auto_delete_24h to event_visitors table...")
+                await conn.execute(text("ALTER TABLE event_visitors ADD COLUMN auto_delete_24h BOOLEAN DEFAULT FALSE"))
+
+            print("Events schema migration checked/applied.")
+    except Exception as e:
+        print(f"Events migration failed: {e}")
+
 

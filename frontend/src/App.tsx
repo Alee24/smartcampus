@@ -46,6 +46,7 @@ const VisitorManagement = lazy(() => import('./VisitorManagement'))
 const ScanLogs = lazy(() => import('./ScanLogs'))
 const GatesDashboard = lazy(() => import('./GatesDashboard'))
 const StudentDashboard = lazy(() => import('./StudentDashboard'))
+const PublicEventRegistration = lazy(() => import('./PublicEventRegistration'))
 const SelfServiceEntry = lazy(() => import('./SelfServiceEntry'))
 const Reports = lazy(() => import('./Reports'))
 const CampusCalendar = lazy(() => import('./CampusCalendar'))
@@ -190,6 +191,14 @@ function App() {
         return (
             <Suspense fallback={<div className="h-screen flex items-center justify-center">Loading...</div>}>
                 <SelfServiceEntry />
+            </Suspense>
+        )
+    }
+
+    if (path.startsWith('/event-register/')) {
+        return (
+            <Suspense fallback={<div className="h-screen flex items-center justify-center">Loading...</div>}>
+                <PublicEventRegistration />
             </Suspense>
         )
     }

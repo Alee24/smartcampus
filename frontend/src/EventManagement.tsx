@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Calendar, Users, MapPin, QrCode, Download, X, Search, FileText, Upload, Mail, Send, Check, Loader, Trash2, Eye } from 'lucide-react'
+import { Plus, Calendar, Users, MapPin, QrCode, Download, X, Search, FileText, Upload, Mail, Send, Check, Loader, Trash2, Eye, Megaphone } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { useNotification } from './components/Notification'
 
@@ -21,6 +21,14 @@ export default function EventManagement() {
     const [sending, setSending] = useState(false)
     const [selectedVisitor, setSelectedVisitor] = useState<any>(null)
 
+    // Broadcast and Mode States
+    const [showEmailModal, setShowEmailModal] = useState(false)
+    const [showSmsModal, setShowSmsModal] = useState(false)
+    const [emailSubject, setEmailSubject] = useState('')
+    const [emailBody, setEmailBody] = useState('')
+    const [smsMessage, setSmsMessage] = useState('')
+    const [sendingBroadcast, setSendingBroadcast] = useState(false)
+
     const qrRef = useRef<HTMLDivElement>(null)
     const visitorQrRef = useRef<HTMLDivElement>(null)
 
@@ -41,6 +49,87 @@ export default function EventManagement() {
             console.error(error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleUpdateScanMode = async (eventId: string, mode: 'auto' | 'check_in' | 'register') => {
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/events/${eventId}/scan-mode`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ scan_mode: mode })
+            })
+            if (res.ok) {
+                showNotification(`Event scan mode updated to ${mode}`, "success")
+                fetchEvents()
+            } else {
+                showNotification("Failed to update scan mode", "error")
+            }
+        } catch (e) {
+            showNotification("Error updating scan mode", "error")
+        }
+    }
+
+    const handleBroadcastEmail = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!emailSubject || !emailBody || !selectedEvent) return
+        setSendingBroadcast(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/events/${selectedEvent.id}/visitors/email-all`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ subject: emailSubject, body: emailBody })
+            })
+            if (res.ok) {
+                const data = await res.json()
+                showNotification(data.message || "Email broadcast sent!", "success")
+                setShowEmailModal(false)
+                setEmailSubject('')
+                setEmailBody('')
+            } else {
+                showNotification("Failed to send email broadcast", "error")
+            }
+        } catch (err) {
+            showNotification("Error sending email broadcast", "error")
+        } finally {
+            setSendingBroadcast(false)
+        }
+    }
+
+    const handleBroadcastSMS = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!smsMessage || !selectedEvent) return
+        setSendingBroadcast(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/events/${selectedEvent.id}/visitors/sms-all`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ message: smsMessage })
+            })
+            if (res.ok) {
+                const data = await res.json()
+                showNotification(data.message || "SMS broadcast sent!", "success")
+                setShowSmsModal(false)
+                setSmsMessage('')
+            } else {
+                showNotification("Failed to send SMS broadcast", "error")
+            }
+        } catch (err) {
+            showNotification("Error sending SMS broadcast", "error")
+        } finally {
+            setSendingBroadcast(false)
         }
     }
 
@@ -266,6 +355,37 @@ export default function EventManagement() {
                                 <MapPin size={16} />
                                 <span>Visitors: {event.expected_visitors}</span>
                             </div>
+
+                            {isAdmin && (
+                                <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex flex-col gap-2">
+                                    <div className="flex justify-between items-center text-xs">
+                                        <span className="font-bold text-[var(--text-secondary)]">Scan Mode:</span>
+                                        <span className="font-black text-purple-600 dark:text-purple-400 uppercase bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded text-[10px]">
+                                            {event.scan_mode || 'auto'}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <button 
+                                            onClick={() => handleUpdateScanMode(event.id, 'auto')}
+                                            className={`py-1 text-[9px] font-bold rounded border transition-all ${(!event.scan_mode || event.scan_mode === 'auto') ? 'bg-purple-600 text-white border-purple-600' : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                                        >
+                                            Auto
+                                        </button>
+                                        <button 
+                                            onClick={() => handleUpdateScanMode(event.id, 'register')}
+                                            className={`py-1 text-[9px] font-bold rounded border transition-all ${(event.scan_mode === 'register') ? 'bg-purple-600 text-white border-purple-600' : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                                        >
+                                            Register
+                                        </button>
+                                        <button 
+                                            onClick={() => handleUpdateScanMode(event.id, 'check_in')}
+                                            className={`py-1 text-[9px] font-bold rounded border transition-all ${(event.scan_mode === 'check_in') ? 'bg-purple-600 text-white border-purple-600' : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                                        >
+                                            Check-In
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="pt-4 border-t border-[var(--border-color)] flex justify-between items-center">
@@ -365,14 +485,14 @@ export default function EventManagement() {
 
                         <div className="bg-white p-4 rounded-2xl border-2 border-dashed border-gray-200 inline-block mb-6 shadow-sm" ref={qrRef}>
                             <QRCodeCanvas
-                                value={`EVENT:${selectedEvent.qr_code_token}`}
+                                value={`${window.location.origin}/event-register/${selectedEvent.qr_code_token}`}
                                 size={200}
                                 level="H"
                             />
                         </div>
 
                         <p className="text-xs text-gray-400 mb-6 px-4">
-                            Share this QR code with visitors. Guards will scan this code to register entries at the gate.
+                            Scan this QR code to register or check in to the event, or show it to security guards at the gate.
                         </p>
 
                         <button
@@ -426,6 +546,22 @@ export default function EventManagement() {
                                     >
                                         {sending ? <Loader size={16} className="animate-spin" /> : <Mail size={16} />}
                                         {sending ? 'Sending...' : 'Send Emails'}
+                                    </button>
+
+                                    {/* Email Broadcast */}
+                                    <button
+                                        onClick={() => setShowEmailModal(true)}
+                                        className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-bold text-sm hover:bg-indigo-100 transition-colors"
+                                    >
+                                        <Send size={16} /> Email Broadcast
+                                    </button>
+
+                                    {/* SMS Broadcast */}
+                                    <button
+                                        onClick={() => setShowSmsModal(true)}
+                                        className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-lg font-bold text-sm hover:bg-amber-100 transition-colors"
+                                    >
+                                        <Megaphone size={16} /> SMS Broadcast
                                     </button>
                                 </>
                             )}
@@ -522,6 +658,85 @@ export default function EventManagement() {
                         >
                             <Download size={20} /> Download Pass
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Email Broadcast Modal */}
+            {showEmailModal && selectedEvent && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-lg rounded-2xl shadow-2xl animate-fade-in">
+                        <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-indigo-600 text-white rounded-t-2xl">
+                            <h3 className="text-xl font-bold flex items-center gap-2">
+                                <Send size={20} /> Email Broadcast to Guests
+                            </h3>
+                            <button onClick={() => setShowEmailModal(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleBroadcastEmail} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Subject</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={emailSubject}
+                                    onChange={(e) => setEmailSubject(e.target.value)}
+                                    placeholder="e.g. Important update regarding the Event"
+                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Message Body</label>
+                                <textarea 
+                                    required
+                                    value={emailBody}
+                                    onChange={(e) => setEmailBody(e.target.value)}
+                                    placeholder="Write your email body here..."
+                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] h-36 outline-none"
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
+                                <button type="button" onClick={() => setShowEmailModal(false)} className="px-6 py-2 rounded-xl text-[var(--text-secondary)] font-bold hover:bg-[var(--bg-primary)]">Cancel</button>
+                                <button type="submit" disabled={sendingBroadcast} className="px-8 py-2 rounded-xl bg-indigo-600 text-white font-bold flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-50">
+                                    {sendingBroadcast && <Loader size={16} className="animate-spin" />} Send Broadcast
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* SMS Broadcast Modal */}
+            {showSmsModal && selectedEvent && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-lg rounded-2xl shadow-2xl animate-fade-in">
+                        <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-amber-600 text-white rounded-t-2xl">
+                            <h3 className="text-xl font-bold flex items-center gap-2">
+                                <Megaphone size={20} /> SMS Broadcast to Guests
+                            </h3>
+                            <button onClick={() => setShowSmsModal(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleBroadcastSMS} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">SMS Message</label>
+                                <textarea 
+                                    required
+                                    value={smsMessage}
+                                    onChange={(e) => setSmsMessage(e.target.value)}
+                                    maxLength={160}
+                                    placeholder="Write your SMS content (max 160 characters)..."
+                                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] h-28 outline-none"
+                                />
+                                <div className="text-right text-xs text-gray-400 mt-1">
+                                    {smsMessage.length}/160 characters
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-color)]">
+                                <button type="button" onClick={() => setShowSmsModal(false)} className="px-6 py-2 rounded-xl text-[var(--text-secondary)] font-bold hover:bg-[var(--bg-primary)]">Cancel</button>
+                                <button type="submit" disabled={sendingBroadcast} className="px-8 py-2 rounded-xl bg-amber-600 text-white font-bold flex items-center gap-2 hover:bg-amber-700 disabled:opacity-50">
+                                    {sendingBroadcast && <Loader size={16} className="animate-spin" />} Send SMS
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

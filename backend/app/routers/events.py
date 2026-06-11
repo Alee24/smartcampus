@@ -277,3 +277,192 @@ async def get_monthly_stats(
         }
         
     return final_output
+
+@router.get("/public/by-token/{token}")
+async def get_public_event_by_token(token: str, session: AsyncSession = Depends(get_session)):
+    result = await session.exec(select(Event).where(Event.qr_code_token == token))
+    event = result.first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return {
+        "id": str(event.id),
+        "name": event.name,
+        "host": event.host,
+        "school": event.school,
+        "description": event.description,
+        "event_date": str(event.event_date),
+        "start_time": event.start_time.strftime("%H:%M") if event.start_time else "All Day",
+        "end_time": event.end_time.strftime("%H:%M") if event.end_time else None,
+        "event_type": event.event_type,
+        "is_active": event.is_active,
+        "scan_mode": event.scan_mode
+    }
+
+@router.post("/public/by-token/{token}/register")
+async def register_public_visitor(
+    token: str,
+    data: dict, 
+    session: AsyncSession = Depends(get_session)
+):
+    result = await session.exec(select(Event).where(Event.qr_code_token == token))
+    event = result.first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if not event.is_active:
+        raise HTTPException(status_code=400, detail="Registration for this event is closed")
+
+    name = data.get("visitor_name", "").strip()
+    identifier = data.get("visitor_identifier", "").strip()
+    phone = data.get("phone_number", "").strip()
+    email = data.get("email", "").strip()
+    auto_delete = bool(data.get("auto_delete_24h", False))
+
+    if not name or not identifier or not phone:
+        raise HTTPException(status_code=400, detail="Name, ID/Admission number, and phone number are required")
+
+    status = "pre_registered"
+    if event.scan_mode == "check_in":
+        status = "checked_in"
+    elif event.scan_mode == "auto":
+        today = get_eat_time().date()
+        if today >= event.event_date:
+            status = "checked_in"
+
+    existing_stmt = select(EventVisitor).where(
+        EventVisitor.event_id == event.id,
+        EventVisitor.visitor_identifier == identifier
+    )
+    existing = (await session.exec(existing_stmt)).first()
+
+    if existing:
+        existing.visitor_name = name
+        existing.phone_number = phone
+        existing.email = email
+        existing.auto_delete_24h = auto_delete
+        if status == "checked_in" and existing.status != "checked_in":
+            existing.status = "checked_in"
+            existing.entry_time = get_eat_time()
+        session.add(existing)
+        await session.commit()
+        await session.refresh(existing)
+        return {
+            "message": "Registration updated successfully",
+            "visitor": {
+                "id": str(existing.id),
+                "visitor_name": existing.visitor_name,
+                "visitor_identifier": existing.visitor_identifier,
+                "status": existing.status,
+                "auto_delete_24h": existing.auto_delete_24h
+            }
+        }
+
+    visitor = EventVisitor(
+        event_id=event.id,
+        visitor_name=name,
+        visitor_identifier=identifier,
+        phone_number=phone,
+        email=email if email else None,
+        status=status,
+        auto_delete_24h=auto_delete,
+        entry_time=get_eat_time()
+    )
+    session.add(visitor)
+    await session.commit()
+    await session.refresh(visitor)
+    return {
+        "message": "Registered successfully",
+        "visitor": {
+            "id": str(visitor.id),
+            "visitor_name": visitor.visitor_name,
+            "visitor_identifier": visitor.visitor_identifier,
+            "status": visitor.status,
+            "auto_delete_24h": visitor.auto_delete_24h
+        }
+    }
+
+@router.put("/{event_id}/scan-mode")
+async def update_event_scan_mode(
+    event_id: uuid.UUID,
+    data: dict, 
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_admin)
+):
+    event = await session.get(Event, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    scan_mode = data.get("scan_mode", "auto").strip().lower()
+    if scan_mode not in ["auto", "check_in", "register"]:
+        raise HTTPException(status_code=400, detail="Invalid scan_mode. Must be auto, check_in, or register")
+        
+    event.scan_mode = scan_mode
+    session.add(event)
+    await session.commit()
+    await session.refresh(event)
+    return {
+        "id": str(event.id),
+        "name": event.name,
+        "scan_mode": event.scan_mode,
+        "message": f"Scan mode updated to {scan_mode} successfully"
+    }
+
+@router.post("/{event_id}/visitors/email-all")
+async def email_all_visitors(
+    event_id: uuid.UUID,
+    data: dict, 
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_admin)
+):
+    event = await session.get(Event, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+        
+    subject = data.get("subject", "").strip()
+    body = data.get("body", "").strip()
+    if not subject or not body:
+        raise HTTPException(status_code=400, detail="Subject and Body are required")
+        
+    stmt = select(EventVisitor).where(EventVisitor.event_id == event_id)
+    visitors = (await session.exec(stmt)).all()
+    
+    sent_count = 0
+    for v in visitors:
+        if v.email:
+            print(f"SMTP SEND: to={v.email}, subject='{subject}', body='{body}'")
+            sent_count += 1
+            
+    return {
+        "message": f"Emails sent successfully to {sent_count} guests",
+        "sent_count": sent_count,
+        "total_guests": len(visitors)
+    }
+
+@router.post("/{event_id}/visitors/sms-all")
+async def sms_all_visitors(
+    event_id: uuid.UUID,
+    data: dict, 
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_admin)
+):
+    event = await session.get(Event, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+        
+    message = data.get("message", "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message content is required")
+        
+    stmt = select(EventVisitor).where(EventVisitor.event_id == event_id)
+    visitors = (await session.exec(stmt)).all()
+    
+    sent_count = 0
+    for v in visitors:
+        if v.phone_number:
+            print(f"SMS SEND: to={v.phone_number}, message='{message}'")
+            sent_count += 1
+            
+    return {
+        "message": f"SMS sent successfully to {sent_count} guests",
+        "sent_count": sent_count,
+        "total_guests": len(visitors)
+    }

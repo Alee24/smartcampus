@@ -582,6 +582,14 @@ async def scan_entry(
             .where(EventVisitor.visitor_identifier == current_user.admission_number)
         )).first()
         
+        status = "pre_registered"
+        if ev.scan_mode == "check_in":
+            status = "checked_in"
+        elif ev.scan_mode == "auto":
+            today = get_eat_time().date()
+            if today >= ev.event_date:
+                status = "checked_in"
+
         if not visitor:
             visitor = EventVisitor(
                 event_id=ev.id,
@@ -589,12 +597,19 @@ async def scan_entry(
                 visitor_identifier=current_user.admission_number,
                 phone_number=current_user.phone_number or "N/A",
                 email=current_user.email,
-                status="checked_in",
+                status=status,
                 entry_time=get_eat_time(),
                 scanned_by=current_user.id
             )
             session.add(visitor)
             await session.commit()
+        else:
+            if status == "checked_in" and visitor.status != "checked_in":
+                visitor.status = "checked_in"
+                visitor.entry_time = get_eat_time()
+                visitor.scanned_by = current_user.id
+                session.add(visitor)
+                await session.commit()
             
         return {
             "status": "allowed",

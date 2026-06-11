@@ -590,6 +590,7 @@ class Event(UUIDModel, table=True):
     end_time: Optional[time] = None
     qr_code_token: str = Field(unique=True, index=True)
     is_active: bool = Field(default=True)
+    scan_mode: str = Field(default="auto") # auto, check_in, register
     created_at: datetime = Field(default_factory=get_eat_time)
     
     visitors: List["EventVisitor"] = Relationship(back_populates="event")
@@ -603,6 +604,7 @@ class EventVisitor(UUIDModel, table=True):
     email: Optional[str] = None
     status: str = "pre_registered" # pre_registered, checked_in
     bio_data: Optional[dict] = Field(default={}, sa_column=Column(JSON)) 
+    auto_delete_24h: bool = Field(default=False)
     entry_time: datetime = Field(default_factory=get_eat_time)
     scanned_by: Optional[UUID] = Field(foreign_key="users.id", nullable=True)
 
