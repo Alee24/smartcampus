@@ -33,18 +33,18 @@ export default function SecurityDashboard({ onNavigate }: { onNavigate?: (tab: s
                     <h1 className="text-2xl font-black tracking-tight text-gray-900">Security Command Center</h1>
                     <p className="text-xs text-gray-500 font-medium">Main Entrance Portal • Active Session</p>
                 </div>
-                <div className="flex gap-3">
-                    <button className="p-2.5 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-all shadow-sm">
-                        <Bell size={20} />
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                    <button className="p-2 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 transition-all shadow-sm shrink-0">
+                        <Bell size={18} />
                     </button>
-                    <div className={`flex items-center gap-3 px-4 py-2 rounded-xl border-2 transition-all ${
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 transition-all shrink-0 ${
                         gateStatus === 'locked' ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-green-50 border-green-200 text-green-700'
                     }`}>
-                        {gateStatus === 'locked' ? <Lock size={18} /> : <Unlock size={18} />}
-                        <span className="font-bold text-sm">Gate: {gateStatus.toUpperCase()}</span>
+                        {gateStatus === 'locked' ? <Lock size={16} /> : <Unlock size={16} />}
+                        <span className="font-bold text-xs">Gate: {gateStatus.toUpperCase()}</span>
                         <button 
                             onClick={toggleGate}
-                            className={`ml-2 px-3 py-1 rounded-lg font-bold text-[10px] uppercase shadow-sm ${
+                            className={`ml-1.5 px-2.5 py-0.5 rounded-lg font-bold text-[9px] uppercase shadow-sm ${
                                 gateStatus === 'locked' ? 'bg-orange-600 text-white' : 'bg-green-600 text-white'
                             }`}
                         >

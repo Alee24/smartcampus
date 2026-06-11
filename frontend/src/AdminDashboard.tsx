@@ -78,21 +78,21 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
                     <h2 className="text-2xl font-black text-gray-900 dark:text-white">Executive Dashboard</h2>
                     <p className="text-sm text-gray-500">Real-time overview of campus security, traffic, and academics.</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <button 
                         onClick={handleSyncAD}
                         disabled={syncingAD}
-                        className="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-bold flex items-center gap-2 transition-all text-sm"
+                        className="flex-1 sm:flex-initial px-3 py-1.5 sm:px-4 sm:py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-bold flex items-center justify-center gap-1.5 transition-all text-xs sm:text-sm"
                     >
-                        <Database size={16} className={syncingAD ? "animate-spin" : ""} />
+                        <Database size={14} className={syncingAD ? "animate-spin" : ""} />
                         {syncingAD ? "Syncing..." : "Sync AD"}
                     </button>
                     <button 
                         onClick={() => onNavigate('reports')}
-                        className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/30 transition-all text-sm hover:scale-105"
+                        className="flex-1 sm:flex-initial px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-500/30 transition-all text-xs sm:text-sm hover:scale-105"
                     >
-                        <FileText size={16} />
-                        View Full Reports
+                        <FileText size={14} />
+                        View Reports
                     </button>
                 </div>
             </div>

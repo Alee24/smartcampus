@@ -745,54 +745,54 @@ export default function StudentVerification() {
                 <div className="max-w-2xl mx-auto mb-8">
                     <div className="relative group">
                         <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl blur-xl opacity-30 group-hover:opacity-50 transition-opacity"></div>
-                        <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-2 flex gap-2">
+                        <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-1.5 sm:p-2 flex gap-1.5 sm:gap-2 items-center">
                             <div className="flex-1 relative">
-                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                                <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                                 <input
                                     type="text"
                                     value={query}
                                     onChange={(e) => handleQueryChange(e.target.value)}
                                     onKeyPress={(e) => e.key === 'Enter' && handleVerify()}
-                                    placeholder="Enter Admission Number..."
-                                    className="w-full pl-12 pr-4 py-4 bg-transparent text-lg font-medium focus:outline-none uppercase"
+                                    placeholder="Enter ID / Admission..."
+                                    className="w-full pl-9 sm:pl-12 pr-2 sm:pr-4 py-2 sm:py-4 bg-transparent text-xs sm:text-lg font-medium focus:outline-none uppercase text-slate-800 dark:text-white"
                                 />
                                 {showSuggestions && suggestions.length > 0 && (
                                     <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
                                         {suggestions.map((s, idx) => (
                                             <button 
                                                 key={idx}
-                                                className="w-full text-left px-4 py-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 border-b border-gray-50 dark:border-gray-700/50 flex items-center gap-3 transition-colors last:border-none"
+                                                className="w-full text-left px-3 py-2 sm:px-4 sm:py-3 hover:bg-purple-50 dark:hover:bg-purple-900/20 border-b border-gray-50 dark:border-gray-700/50 flex items-center gap-2 sm:gap-3 transition-colors last:border-none"
                                                 onClick={() => {
                                                     setQuery(s.admission_number)
                                                     setShowSuggestions(false)
                                                     handleVerify(s.admission_number)
                                                 }}
                                             >
-                                                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900 overflow-hidden shrink-0">
-                                                    {s.profile_image ? <img src={s.profile_image} className="w-full h-full object-cover" /> : <User size={20} className="m-auto mt-2.5 text-purple-600" />}
+                                                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-100 dark:bg-purple-900 overflow-hidden shrink-0">
+                                                    {s.profile_image ? <img src={s.profile_image} className="w-full h-full object-cover" /> : <User size={16} className="m-auto mt-2 text-purple-600" />}
                                                 </div>
                                                 <div>
-                                                    <div className="font-black text-gray-900 dark:text-white font-mono">{s.admission_number}</div>
-                                                    <div className="text-xs font-bold text-gray-500">{s.full_name}</div>
+                                                    <div className="font-black text-gray-900 dark:text-white font-mono text-xs sm:text-base">{s.admission_number}</div>
+                                                    <div className="text-[10px] sm:text-xs font-bold text-gray-500">{s.full_name}</div>
                                                 </div>
                                             </button>
                                         ))}
                                     </div>
                                 )}
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-1.5 sm:gap-2 shrink-0">
                                 <button
                                     onClick={handleVerify}
                                     disabled={loading || !query.trim()}
-                                    className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl shadow-lg hover:opacity-90 transition-all disabled:opacity-50"
+                                    className="px-4 py-2.5 sm:px-8 sm:py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl shadow-lg hover:opacity-90 transition-all disabled:opacity-50 text-xs sm:text-base"
                                 >
-                                    {loading ? <Loader2 className="animate-spin" /> : 'Verify'}
+                                    {loading ? <Loader2 className="animate-spin" size={14} /> : 'Verify'}
                                 </button>
                                 <button
                                     onClick={startScanner}
-                                    className="px-4 py-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl"
+                                    className="p-2.5 sm:p-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl flex items-center justify-center"
                                 >
-                                    <QrCode size={24} />
+                                    <QrCode size={18} />
                                 </button>
                             </div>
                         </div>
@@ -810,22 +810,37 @@ export default function StudentVerification() {
 
                 {result && !result.error && !result.ad_found && (
                     <div className={`max-w-4xl mx-auto transition-all duration-500 ${showCard ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-                        <div className="mb-6 flex flex-wrap gap-4 items-center justify-between">
-                            <div className="flex gap-3">
+                        <div className="mb-6 flex flex-col sm:flex-row gap-3 items-center justify-between w-full">
+                            <div className="grid grid-cols-2 sm:flex gap-2 sm:gap-3 w-full sm:w-auto">
                                 {result.gate_status === 'In' ? (
-                                    <button onClick={() => handleGateAction('check-out')} disabled={!!actionLoading} className="py-4 px-8 bg-red-600 text-white rounded-2xl font-black shadow-lg flex items-center gap-2">
-                                        {actionLoading === 'check-out' ? <Loader2 className="animate-spin" /> : <LogOut />} CHECK OUT
+                                    <button 
+                                        onClick={() => handleGateAction('check-out')} 
+                                        disabled={!!actionLoading} 
+                                        className="col-span-2 sm:col-span-1 py-3 px-4 sm:py-4 sm:px-8 bg-red-600 hover:bg-red-700 text-white rounded-xl sm:rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 text-xs sm:text-sm transition-all active:scale-95"
+                                    >
+                                        {actionLoading === 'check-out' ? <Loader2 className="animate-spin" size={16} /> : <LogOut size={16} />} CHECK OUT
                                     </button>
                                 ) : (
-                                    <button onClick={() => handleGateAction('check-in')} disabled={!!actionLoading} className="py-4 px-8 bg-green-600 text-white rounded-2xl font-black shadow-lg flex items-center gap-2">
-                                        {actionLoading === 'check-in' ? <Loader2 className="animate-spin" /> : <LogIn />} CHECK IN
+                                    <button 
+                                        onClick={() => handleGateAction('check-in')} 
+                                        disabled={!!actionLoading} 
+                                        className="col-span-2 sm:col-span-1 py-3 px-4 sm:py-4 sm:px-8 bg-green-600 hover:bg-green-700 text-white rounded-xl sm:rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 text-xs sm:text-sm transition-all active:scale-95"
+                                    >
+                                        {actionLoading === 'check-in' ? <Loader2 className="animate-spin" size={16} /> : <LogIn size={16} />} CHECK IN
                                     </button>
                                 )}
-                                <button onClick={handlePrint} disabled={isPrinting} className="py-4 px-6 bg-slate-100 rounded-2xl font-bold flex items-center gap-2">
-                                    {isPrinting ? <Loader2 className="animate-spin" /> : <Printer />} Print ID
+                                <button 
+                                    onClick={handlePrint} 
+                                    disabled={isPrinting} 
+                                    className="py-3 px-4 sm:py-4 sm:px-6 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-xl sm:rounded-2xl font-bold flex items-center justify-center gap-2 text-xs sm:text-sm transition-all active:scale-95"
+                                >
+                                    {isPrinting ? <Loader2 className="animate-spin" size={16} /> : <Printer size={16} />} Print ID
                                 </button>
-                                <button onClick={() => setIsFlipped(!isFlipped)} className="py-4 px-6 bg-purple-600 text-white rounded-2xl font-bold flex items-center gap-2">
-                                    <RefreshCcw /> Flip Card
+                                <button 
+                                    onClick={() => setIsFlipped(!isFlipped)} 
+                                    className="py-3 px-4 sm:py-4 sm:px-6 bg-[#7A1975] hover:bg-[#60145c] text-white rounded-xl sm:rounded-2xl font-bold flex items-center justify-center gap-2 text-xs sm:text-sm transition-all active:scale-95"
+                                >
+                                    <RefreshCcw size={16} /> Flip Card
                                 </button>
                             </div>
                         </div>

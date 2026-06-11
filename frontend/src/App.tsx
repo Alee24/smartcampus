@@ -1666,7 +1666,7 @@ function App() {
                 </Suspense>
 
                 {/* ── Floating Action Buttons – top-right stacked, no overlap ── */}
-                <div className="fixed top-16 right-3 z-[50] flex flex-col items-end gap-2 pointer-events-none">
+                <div className="fixed top-16 right-3 z-[95] flex flex-col items-end gap-2 pointer-events-none opacity-10 hover:opacity-100 transition-opacity duration-300 ease-in-out">
 
                     {/* Gate Pass – Admin/Guard only */}
                     {isAuthenticated && ['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
@@ -1677,6 +1677,44 @@ function App() {
                         >
                             <QrCode size={16} />
                             Gate Pass
+                        </button>
+                    )}
+
+                    {/* Notice Board shortcut */}
+                    {isAuthenticated && (
+                        <button
+                            onClick={() => setActiveTab('notice-board')}
+                            className="pointer-events-auto bg-indigo-500 hover:bg-indigo-600 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
+                            style={{ boxShadow: '0 8px 24px -4px rgba(99,102,241,0.4)' }}
+                        >
+                            <Megaphone size={16} />
+                            Notice Board
+                        </button>
+                    )}
+
+                    {/* Incident Alert */}
+                    {unreadIncidents > 0 && (
+                        <button
+                            onClick={() => setActiveTab('incidents')}
+                            className="pointer-events-auto animate-pulse bg-red-600 hover:bg-red-700 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
+                            style={{ boxShadow: '0 8px 24px -4px rgba(220,38,38,0.55)' }}
+                        >
+                            <AlertTriangle size={16} />
+                            Incident
+                            <span className="bg-white text-red-600 px-1.5 py-0.5 rounded-full text-[10px] font-black">{unreadIncidents}</span>
+                        </button>
+                    )}
+
+                    {/* Lost & Found Alert */}
+                    {unreadLostFound > 0 && (
+                        <button
+                            onClick={() => setActiveTab('lost-found')}
+                            className="pointer-events-auto animate-pulse bg-amber-500 hover:bg-amber-600 text-white pl-4 pr-5 py-2.5 rounded-full shadow-2xl flex items-center gap-2 font-bold text-xs transition-all hover:scale-105 active:scale-95"
+                            style={{ boxShadow: '0 8px 24px -4px rgba(245,158,11,0.55)' }}
+                        >
+                            <Search size={16} />
+                            Lost &amp; Found
+                            <span className="bg-white text-amber-600 px-1.5 py-0.5 rounded-full text-[10px] font-black">{unreadLostFound}</span>
                         </button>
                     )}
 
