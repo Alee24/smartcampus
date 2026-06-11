@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import {
     LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut,
     Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode, Megaphone, Trash2, Plus,
-    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, X, Activity, BarChart3, Play, History, Printer, Download, Inbox, Search, ScanFace, DoorOpen, List, Menu
+    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, UserCheck, X, Activity, BarChart3, Play, History, Printer, Download, Inbox, Search, ScanFace, DoorOpen, List, Menu
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
@@ -88,7 +88,8 @@ const SIDEBAR_GROUPS = [
             { id: 'live', label: 'Live Monitor', permissionKey: 'live' },
             { id: 'cameras', label: 'Surveillance', permissionKey: 'cameras' },
             { id: 'incidents', label: 'Incident Reports', permissionKey: 'incidents' },
-            { id: 'lost-found', label: 'Lost & Found', permissionKey: 'lost-found' }
+            { id: 'lost-found', label: 'Lost & Found', permissionKey: 'lost-found' },
+            { id: 'self-service', label: 'Self-Service Portal', permissionKey: 'self-service' }
         ]
     },
     {
@@ -670,7 +671,7 @@ function App() {
                 'asset-handovers': true,
                 'asset-reports': true
             },
-            'Security Lead': {
+             'Security Lead': {
                 'dashboard': true,
                 'users': false,
                 'verification': true,
@@ -686,7 +687,8 @@ function App() {
                 'fleet-tracking': true,
                 'fleet-trips': true,
                 'incidents': true,
-                'lost-found': true
+                'lost-found': true,
+                'self-service': true
             },
             'Guard': {
                 'dashboard': true,
@@ -704,7 +706,8 @@ function App() {
                 'fleet-tracking': true,
                 'fleet-trips': true,
                 'incidents': true,
-                'lost-found': true
+                'lost-found': true,
+                'self-service': true
             },
             'Lecturer': {
                 'dashboard': true,
@@ -770,7 +773,8 @@ function App() {
                 'settings': false,
                 'integrations': false,
                 'incidents': true,
-                'lost-found': true
+                'lost-found': true,
+                'self-service': true
             },
             'Admin': {
                 'dashboard': true,
@@ -792,7 +796,8 @@ function App() {
                 'asset-handovers': true,
                 'asset-reports': true,
                 'incidents': true,
-                'lost-found': true
+                'lost-found': true,
+                'self-service': true
             },
             'SuperAdmin': {
                 'dashboard': true,
@@ -814,7 +819,8 @@ function App() {
                 'asset-handovers': true,
                 'asset-reports': true,
                 'incidents': true,
-                'lost-found': true
+                'lost-found': true,
+                'self-service': true
             }
         }
     }
@@ -1128,7 +1134,7 @@ function App() {
                 </SidebarGroup>
 
                 {/* Gate & Security Operations - Core Functionality */}
-                {(isMenuEnabled('verification') || isMenuEnabled('gate') || isMenuEnabled('vehicles') || isMenuEnabled('live') || isMenuEnabled('cameras') || isMenuEnabled('incidents') || isMenuEnabled('lost-found')) && (
+                {(isMenuEnabled('verification') || isMenuEnabled('gate') || isMenuEnabled('vehicles') || isMenuEnabled('live') || isMenuEnabled('cameras') || isMenuEnabled('incidents') || isMenuEnabled('lost-found') || isMenuEnabled('self-service')) && (
                     <SidebarGroup title="Gate & Security Ops" isOpen={true} onToggle={() => {}} isSidebarCollapsed={isSidebarCollapsed}>
                         {isMenuEnabled('verification') && (
                             <NavItem
@@ -1238,6 +1244,14 @@ function App() {
                                         {unreadLostFound}
                                     </span>
                                 ) : undefined}
+                            />
+                        )}
+                        {isMenuEnabled('self-service') && (
+                            <NavItem
+                                icon={<UserCheck size={18} />}
+                                label="Self-Service Portal"
+                                active={activeTab === 'self-service'}
+                                onClick={() => { setActiveTab('self-service'); setSidebarOpen(false); }}
                             />
                         )}
                     </SidebarGroup>
@@ -1725,6 +1739,7 @@ function App() {
                     {activeTab === 'dashboard' && role === 'Stores' && <StoresDashboard currentUser={currentUser} onNavigate={setActiveTab} />}
                     {activeTab === 'dashboard' && role === 'Driver' && <DriverDashboard currentUser={currentUser} onNavigate={setActiveTab} />}
                     {activeTab === 'visitors' && <VisitorManagement />}
+                    {activeTab === 'self-service' && <SelfServiceEntry />}
                     {activeTab === 'calendar' && <CampusCalendar />}
                     {activeTab === 'dashboard' && role !== 'Guardian' && role !== 'Security' && role !== 'Security Lead' && role !== 'Guard' && role !== 'Student' && role !== 'Lecturer' && role !== 'Staff' && role !== 'Guest' && role !== 'Management' && role !== 'Stores' && role !== 'Driver' && (
                         <AdminDashboard onNavigate={setActiveTab} />

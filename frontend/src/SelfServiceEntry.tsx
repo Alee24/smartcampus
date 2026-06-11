@@ -44,7 +44,8 @@ export default function SelfServiceEntry() {
         primary_color: '#2563eb',
         secondary_color: '#0284c7',
         accent_color: '#10b981',
-        company_name: 'Smart Campus'
+        company_name: 'Smart Campus',
+        logo_url: ''
     })
 
     // Fetch company settings for branding colors & name
@@ -58,7 +59,8 @@ export default function SelfServiceEntry() {
                         primary_color: data.primary_color || '#2563eb',
                         secondary_color: data.secondary_color || '#0284c7',
                         accent_color: data.accent_color || '#10b981',
-                        company_name: data.company_name || 'Smart Campus'
+                        company_name: data.company_name || 'Smart Campus',
+                        logo_url: data.logo_url || ''
                     })
                 }
             } catch (e) {
@@ -536,8 +538,12 @@ export default function SelfServiceEntry() {
         return (
             <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-slate-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/20 flex items-center justify-center p-4">
                 <div className="max-w-xl w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 p-8 text-center animate-scale-in">
-                    <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
-                        <Shield className="text-indigo-650 dark:text-indigo-400" size={32} />
+                    <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm overflow-hidden p-2">
+                        {companyColors.logo_url ? (
+                            <img src={companyColors.logo_url} className="w-full h-full object-contain" alt="Logo" />
+                        ) : (
+                            <Shield className="text-indigo-650 dark:text-indigo-400" size={32} />
+                        )}
                     </div>
                     
                     <span className="text-[10px] bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 font-black uppercase tracking-widest px-3 py-1 rounded-full border border-indigo-200/50 dark:border-indigo-900/50">
@@ -747,7 +753,11 @@ export default function SelfServiceEntry() {
                         &larr; Back to Homepage
                     </button>
                     <div className="flex items-center gap-2 text-slate-800 dark:text-white">
-                        <Shield className="text-indigo-600" size={20} />
+                        {companyColors.logo_url ? (
+                            <img src={companyColors.logo_url} className="w-5 h-5 object-contain" alt="Logo" />
+                        ) : (
+                            <Shield className="text-indigo-600" size={20} />
+                        )}
                         <span className="font-black text-sm tracking-wider uppercase">{companyColors.company_name}</span>
                     </div>
                 </div>
@@ -755,8 +765,15 @@ export default function SelfServiceEntry() {
                 {step === 1 && (
                     <div className="space-y-8 animate-fade-in flex-1 flex flex-col justify-center my-auto">
                         <div className="text-center max-w-2xl mx-auto mb-4">
+                            {companyColors.logo_url ? (
+                                <img src={companyColors.logo_url} className="h-16 w-auto mx-auto mb-4 object-contain" alt="Logo" />
+                            ) : (
+                                <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                                    <Shield className="text-indigo-650" size={32} />
+                                </div>
+                            )}
                             <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-none bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-3">
-                                Smart Gate Pass
+                                {companyColors.company_name}
                             </h1>
                             <p className="text-sm font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest pl-1 mb-4">
                                 Self-Service Registration Portal
@@ -835,17 +852,21 @@ export default function SelfServiceEntry() {
                             <div className="lg:col-span-5 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 text-white rounded-3xl p-8 flex flex-col justify-between shadow-xl min-h-[400px] order-2 lg:order-1">
                                 <div className="space-y-6">
                                     <div className="flex justify-between items-start">
-                                        <div className="p-3 bg-white/10 rounded-2xl">
-                                            <Shield className="text-white" size={28} />
+                                        <div className="p-1.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 shadow-inner flex items-center justify-center w-14 h-14 overflow-hidden shrink-0">
+                                            {companyColors.logo_url ? (
+                                                <img src={companyColors.logo_url} className="w-full h-full object-contain" alt="Logo" />
+                                            ) : (
+                                                <Shield className="text-white" size={26} />
+                                            )}
                                         </div>
-                                        <span className="text-[10px] bg-white/20 text-white font-black uppercase tracking-widest px-3 py-1 rounded-full border border-white/10">
+                                        <span className="text-[10px] bg-white/20 text-white font-black uppercase tracking-widest px-3.5 py-1.5 rounded-full border border-white/10 backdrop-blur-sm">
                                             Step 2 of 2
                                         </span>
                                     </div>
                                     
                                     <div>
-                                        <span className="text-[10px] text-indigo-200 font-black uppercase tracking-wider">
-                                    Gatepass Portal
+                                        <span className="text-[10px] text-indigo-200 font-black uppercase tracking-wider block">
+                                            {companyColors.company_name}
                                         </span>
                                         <h2 className="text-3xl font-black mt-1 capitalize leading-snug">
                                             {role === 'student' ? 'Verify Identity' : role === 'vehicle_registration' ? 'Vehicle Details' : `${role} Registration`}
@@ -857,6 +878,68 @@ export default function SelfServiceEntry() {
                                             {role === 'student' && "Confirm your pre-loaded student/staff profile and take a quick selfie to verify your physical presence at the gate."}
                                             {role === 'vehicle_registration' && "Self-register your vehicle details under your campus role (Student, Staff, or Visitor) for parking and gate audit records."}
                                         </p>
+                                    </div>
+
+                                    {/* Form Info and Required Fields Card */}
+                                    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4.5 border border-white/10 space-y-3">
+                                        <div className="flex items-center gap-2 text-white font-black uppercase tracking-wider text-[10px]">
+                                            <Info size={14} className="text-indigo-300" /> Form Information
+                                        </div>
+                                        <div className="space-y-1.5 text-xs text-indigo-150">
+                                            <div>
+                                                <span className="text-white font-extrabold uppercase tracking-wide text-[9px] block">Form Name:</span>
+                                                <span className="text-indigo-100 font-bold capitalize">
+                                                    {role === 'visitor' && 'Visitor Entry Form'}
+                                                    {role === 'taxi' && `Taxi ${taxiServiceType === 'pickup' ? 'Pickup' : 'Dropoff'} Form`}
+                                                    {role === 'delivery' && 'Delivery Agent Log'}
+                                                    {role === 'student' && 'Student / Staff Check-In selfie'}
+                                                    {role === 'vehicle_registration' && 'Vehicle Details Registry'}
+                                                </span>
+                                            </div>
+                                            <div className="pt-2 border-t border-white/5">
+                                                <span className="text-white font-extrabold uppercase tracking-wide text-[9px] block">Required Fields:</span>
+                                                <ul className="list-disc pl-4 space-y-1 mt-1 text-[11px] font-semibold text-indigo-150">
+                                                    {role === 'visitor' && (
+                                                        <>
+                                                            <li>Full Name</li>
+                                                            <li>Phone Number</li>
+                                                            <li>ID / Passport Number</li>
+                                                            <li>Purpose of Visit</li>
+                                                        </>
+                                                    )}
+                                                    {role === 'taxi' && (
+                                                        <>
+                                                            <li>Vehicle Plate</li>
+                                                            <li>Passengers count</li>
+                                                            <li>Student / Staff search lookup</li>
+                                                        </>
+                                                    )}
+                                                    {role === 'delivery' && (
+                                                        <>
+                                                            <li>Full Name</li>
+                                                            <li>Phone Number</li>
+                                                            <li>ID / Passport Number</li>
+                                                            <li>Delivery Details</li>
+                                                            <li>Package & Receipt Photos (Optional)</li>
+                                                        </>
+                                                    )}
+                                                    {role === 'student' && (
+                                                        <>
+                                                            <li>Verify presence selfie</li>
+                                                        </>
+                                                    )}
+                                                    {role === 'vehicle_registration' && (
+                                                        <>
+                                                            <li>Full Name</li>
+                                                            <li>Phone Number</li>
+                                                            <li>ID / Passport Number</li>
+                                                            <li>Vehicle Plate</li>
+                                                            <li>Your Campus Role</li>
+                                                        </>
+                                                    )}
+                                                </ul>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
