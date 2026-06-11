@@ -38,6 +38,7 @@ export default function SelfServiceEntry() {
     const [userSearchResults, setUserSearchResults] = useState<any[]>([])
     const [selectedUserObj, setSelectedUserObj] = useState<any>(null)
     const [loadingVisitor, setLoadingVisitor] = useState(false)
+    const [isCheckingInOut, setIsCheckingInOut] = useState(false)
 
     const [companyColors, setCompanyColors] = useState<any>({
         primary_color: '#2563eb',
@@ -258,9 +259,18 @@ export default function SelfServiceEntry() {
         }
     }, [])
 
-    const handleStudentSubmit = async () => {
-        if (!userData?.id) return
-        setSubmitting(true)
+    const handleStudentSubmit = () => {
+        if (!userData?.id) return;
+        setResult({
+            id_number: userData.admission_number,
+            name: userData.full_name,
+            visitor_type: 'student'
+        });
+        setStep(3); // Go to verification stage
+    }
+
+    const executeStudentAction = async (action: 'checkin' | 'checkout') => {
+        setIsCheckingInOut(true)
         setError(null)
         try {
             const res = await fetch('/api/gate/public/access-request', {
@@ -269,6 +279,7 @@ export default function SelfServiceEntry() {
                 body: JSON.stringify({
                     gate_id: gateId,
                     role: 'student',
+                    action: action,
                     data: {
                         user_id: userData.id,
                         image: image
@@ -278,23 +289,77 @@ export default function SelfServiceEntry() {
             const data = await res.json()
             if (res.ok) {
                 setResult(data)
-                setStep(3)
+                setStep(4) // Go to success stage
                 if ('vibrate' in navigator) {
                     try { navigator.vibrate(200); } catch (e) {}
                 }
             } else {
-                setError(data.detail || "Request failed. Please verify the QR scanner device is active.")
-                if ('vibrate' in navigator) {
-                    try { navigator.vibrate([200, 100, 200]); } catch (e) {}
-                }
+                setError(data.detail || `Request failed: student could not be checked ${action === 'checkout' ? 'out' : 'in'}.`)
             }
         } catch (err) {
             setError("Connection failed. Please ensure the campus server network is online.")
-            if ('vibrate' in navigator) {
-                try { navigator.vibrate([200, 100, 200]); } catch (e) {}
-            }
         } finally {
-            setSubmitting(false)
+            setIsCheckingInOut(false)
+        }
+    }
+
+    const executeVisitorAction = async (action: 'checkin' | 'checkout') => {
+        if (!result?.visitor_id) return
+        setIsCheckingInOut(true)
+        setError(null)
+        try {
+            let res
+            if (action === 'checkout') {
+                res = await fetch('/api/gate/visitors/check-out', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ visitor_id: result.visitor_id })
+                })
+            } else {
+                res = await fetch(`/api/gate/visitors/${result.visitor_id}/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+            }
+            const data = await res.json()
+            if (res.ok) {
+                setResult({ status: 'success', message: `Successfully checked ${action === 'checkout' ? 'out' : 'in'} visitor.` })
+                setStep(4)
+                if ('vibrate' in navigator) {
+                    try { navigator.vibrate(200); } catch (e) {}
+                }
+            } else {
+                setError(data.detail || `Approval failed: visitor could not be checked ${action === 'checkout' ? 'out' : 'in'}.`)
+            }
+        } catch (err) {
+            setError("Connection failed. Please ensure the campus server network is online.")
+        } finally {
+            setIsCheckingInOut(false)
+        }
+    }
+
+    const executeVisitorDecline = async () => {
+        if (!result?.visitor_id) {
+            window.location.reload()
+            return
+        }
+        setIsCheckingInOut(true)
+        setError(null)
+        try {
+            const res = await fetch(`/api/gate/visitors/${result.visitor_id}/decline`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            if (res.ok) {
+                setResult({ status: 'declined', message: "Request declined and deleted from active verification queue." })
+                setStep(4)
+            } else {
+                setError("Failed to decline request.")
+            }
+        } catch (err) {
+            setError("Connection failed.")
+        } finally {
+            setIsCheckingInOut(false)
         }
     }
 
@@ -321,7 +386,7 @@ export default function SelfServiceEntry() {
             })
             const data = await res.json()
             if (res.ok) {
-                setResult({ status: 'success', message: data.message })
+                setResult(data)
                 setStep(3)
                 if ('vibrate' in navigator) {
                     try { navigator.vibrate(200); } catch (e) {}
@@ -429,6 +494,137 @@ export default function SelfServiceEntry() {
     }
 
     if (step === 3) {
+        // Find user name to show
+        let displayUserName = '';
+        let displayIdNumber = '';
+        let roleLabel = '';
+        let subDetails = '';
+
+        if (role === 'student') {
+            displayUserName = userData?.full_name || '';
+            displayIdNumber = userData?.admission_number || '';
+            roleLabel = 'Student / Staff';
+        } else if (role === 'vehicle_registration') {
+            displayUserName = formData.driver_name || '';
+            displayIdNumber = formData.driver_id_number || '';
+            roleLabel = 'Vehicle Registration';
+            subDetails = `Plate: ${formData.plate_number || 'N/A'}`;
+        } else if (role === 'visitor') {
+            displayUserName = formData.name || '';
+            displayIdNumber = formData.id_number || '';
+            roleLabel = 'Visitor Check-In';
+        } else if (role === 'delivery') {
+            displayUserName = formData.name || '';
+            displayIdNumber = formData.id_number || '';
+            roleLabel = 'Delivery Agent';
+            subDetails = formData.delivery_details || '';
+        } else if (role === 'taxi') {
+            displayUserName = dropoffName || userSearchQuery || 'Taxi Host';
+            displayIdNumber = dropoffAdmission || 'N/A';
+            roleLabel = `Taxi ${taxiServiceType === 'pickup' ? 'Pick Up' : 'Drop Off'}`;
+            subDetails = `Plate: ${formData.plate_number || 'N/A'} | Passengers: ${formData.passengers || 1}`;
+        }
+
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-slate-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/20 flex items-center justify-center p-4">
+                <div className="max-w-xl w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 p-8 text-center animate-scale-in">
+                    <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+                        <Shield className="text-indigo-650 dark:text-indigo-400" size={32} />
+                    </div>
+                    
+                    <span className="text-[10px] bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 font-black uppercase tracking-widest px-3 py-1 rounded-full border border-indigo-200/50 dark:border-indigo-900/50">
+                        {roleLabel} Verification Stage
+                    </span>
+
+                    <h2 className="text-2xl font-black mt-4 mb-2 text-slate-850 dark:text-white">
+                        Verify Identification Document
+                    </h2>
+                    
+                    <p className="text-slate-500 dark:text-slate-400 text-xs font-bold leading-relaxed mb-6">
+                        Guard: Please compare the ID/Passport document provided by the visitor with the number shown below.
+                    </p>
+
+                    {/* Prominent ID Number Display */}
+                    <div className="bg-slate-50 dark:bg-slate-905 border border-slate-150 dark:border-slate-850 rounded-2xl p-6 mb-6">
+                        <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                            ID / Passport / Admission Number
+                        </div>
+                        <div className="text-4xl md:text-5xl font-black text-indigo-650 dark:text-indigo-400 font-mono tracking-wider break-words uppercase">
+                            {displayIdNumber}
+                        </div>
+                    </div>
+
+                    {/* Visitor/User Info Details */}
+                    <div className="text-left bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850/40 rounded-2xl p-5 mb-8 space-y-3.5">
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider text-[9px]">Name</span>
+                            <span className="text-slate-800 dark:text-white font-black">{displayUserName}</span>
+                        </div>
+                        {subDetails && (
+                            <div className="flex justify-between items-center text-xs border-t border-slate-100 dark:border-slate-850/30 pt-3">
+                                <span className="text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider text-[9px]">Details</span>
+                                <span className="text-slate-800 dark:text-slate-305 font-bold truncate max-w-[70%]">{subDetails}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {error && (
+                        <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-150 dark:border-red-900/40 text-red-650 dark:text-red-450 text-xs font-bold rounded-2xl flex items-center justify-center gap-2 mb-6">
+                            <AlertCircle size={16} /> {error}
+                        </div>
+                    )}
+
+                    {/* Guard Buttons */}
+                    <div className="flex flex-col gap-3">
+                        {role === 'student' ? (
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => executeStudentAction('checkin')}
+                                    disabled={isCheckingInOut}
+                                    className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/25 active:scale-95 transition-all text-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer border-none outline-none"
+                                >
+                                    {isCheckingInOut ? 'Processing...' : 'Verify & Check In'}
+                                </button>
+                                <button
+                                    onClick={() => executeStudentAction('checkout')}
+                                    disabled={isCheckingInOut}
+                                    className="flex-1 py-4 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black shadow-lg shadow-rose-650/25 active:scale-95 transition-all text-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer border-none outline-none"
+                                >
+                                    {isCheckingInOut ? 'Processing...' : 'Verify & Check Out'}
+                                </button>
+                            </div>
+                        ) : role === 'taxi' && taxiServiceType === 'pickup' ? (
+                            <button
+                                onClick={() => executeVisitorAction('checkout')}
+                                disabled={isCheckingInOut}
+                                className="w-full py-4 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black shadow-lg shadow-rose-600/25 active:scale-95 transition-all text-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer border-none outline-none"
+                            >
+                                {isCheckingInOut ? 'Checking Out...' : 'Verify & Check Out'}
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => executeVisitorAction('checkin')}
+                                disabled={isCheckingInOut}
+                                className="w-full py-4 bg-indigo-600 hover:bg-indigo-750 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/25 active:scale-95 transition-all text-xs disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer border-none outline-none"
+                            >
+                                {isCheckingInOut ? 'Checking In...' : 'Verify & Check In'}
+                            </button>
+                        )}
+
+                        <button 
+                            onClick={role === 'student' ? () => window.location.reload() : executeVisitorDecline} 
+                            disabled={isCheckingInOut}
+                            className="w-full py-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 rounded-2xl font-black text-xs active:scale-95 transition-all disabled:opacity-50 cursor-pointer border-none outline-none"
+                        >
+                            Decline & Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    if (step === 4) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-slate-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-purple-950/20 flex items-center justify-center p-4">
                 <div className="max-w-md w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 text-center animate-scale-in">
@@ -436,28 +632,23 @@ export default function SelfServiceEntry() {
                         <CheckCircle className="text-emerald-600 dark:text-emerald-400 animate-pulse" size={40} />
                     </div>
                     <h2 className="text-2xl font-black mb-2 text-slate-900 dark:text-white">
-                        {result?.message && result.message.includes("wait") ? 'Request Submitted' : result?.status === 'success' ? 'Access Granted' : 'Request Sent'}
+                        {result?.status === 'declined' ? 'Request Declined' : 'Verification Complete'}
                     </h2>
-                    <p className="text-slate-600 dark:text-slate-400 text-sm mb-8 leading-relaxed font-bold">
+                    <p className="text-slate-650 dark:text-slate-400 text-sm mb-8 leading-relaxed font-bold">
                         {result?.message}
                     </p>
                     <button 
                         onClick={() => window.location.reload()} 
-                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 active:scale-95 transition-all mb-3"
+                        className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-lg shadow-indigo-600/20 active:scale-95 transition-all mb-3 cursor-pointer border-none"
                     >
                         New Request
                     </button>
                     <button 
                         onClick={() => window.location.href = '/'}
-                        className="w-full py-4 border border-slate-200 dark:border-slate-850 text-slate-650 dark:text-slate-450 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-2xl font-black text-sm active:scale-95 transition-all"
+                        className="w-full py-4 border border-slate-200 dark:border-slate-850 text-slate-650 dark:text-slate-450 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-2xl font-black text-sm active:scale-95 transition-all cursor-pointer bg-transparent"
                     >
                         Back to Homepage
                     </button>
-                    {result?.status === 'success' && !result?.message?.includes("wait") && (
-                        <div className="mt-4 text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider">
-                            Gate opened automatically
-                        </div>
-                    )}
                 </div>
             </div>
         )

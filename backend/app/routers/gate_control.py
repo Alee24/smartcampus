@@ -2043,7 +2043,13 @@ async def public_access_request(
          await session.commit()
          await session.refresh(visitor)
 
-         return {"status": "success", "message": "Request submitted successfully. Please wait for guard verification and check-in approval."}
+         return {
+              "status": "success",
+              "message": "Request submitted successfully. Please wait for guard verification and check-in approval.",
+              "visitor_id": str(visitor.id),
+              "id_number": visitor.id_number,
+              "visitor_type": visitor.visitor_type
+          }
 
     elif role in ["student", "staff"]:
         # Check IP Address
@@ -2106,27 +2112,56 @@ async def public_access_request(
                      fail_reason.append(f"Account {user.status}")
                  
                  final_status = entry_status
-                 status_msg = f"Welcome back, {user.first_name}"
                  
                  if final_status == "rejected":
                      status_msg = f"Entry Denied: {', '.join(fail_reason)}"
-                 
-                 log = EntryLog(
-                     user_id=user.id,
-                     gate_id=gate.id,
-                     entry_time=get_eat_time(),
-                     method="self_service_verification",
-                     status=final_status,
-                     ip_address=client_ip,
-                     verification_image=saved_image_path
-                 )
-                 session.add(log)
-                 await session.commit()
-                 
-                 if final_status == "rejected":
                      return {"status": "rejected", "message": status_msg}
-                     
-                 return {"status": "success", "message": status_msg}
+
+                 action = payload.get("action") or data.get("action") or "checkin"
+                 if action == "checkout":
+                     # Check out the student
+                     open_log = (await session.exec(
+                         select(EntryLog)
+                         .where(EntryLog.user_id == user.id)
+                         .where(EntryLog.exit_time == None)
+                         .order_by(EntryLog.entry_time.desc())
+                     )).first()
+                     if open_log:
+                         open_log.exit_time = get_eat_time()
+                         open_log.exit_gate_id = gate.id
+                         session.add(open_log)
+                         await session.commit()
+                         return {"status": "success", "message": f"Checked out student {user.full_name} successfully."}
+                     else:
+                         # Create a checkout record directly if no open entry log exists
+                         log = EntryLog(
+                             user_id=user.id,
+                             gate_id=gate.id,
+                             entry_time=get_eat_time(),
+                             exit_time=get_eat_time(),
+                             exit_gate_id=gate.id,
+                             method="self_service_verification",
+                             status=final_status,
+                             ip_address=client_ip,
+                             verification_image=saved_image_path
+                         )
+                         session.add(log)
+                         await session.commit()
+                         return {"status": "success", "message": f"Checked out student {user.full_name} successfully."}
+                 else:
+                     # Check in the student
+                     log = EntryLog(
+                         user_id=user.id,
+                         gate_id=gate.id,
+                         entry_time=get_eat_time(),
+                         method="self_service_verification",
+                         status=final_status,
+                         ip_address=client_ip,
+                         verification_image=saved_image_path
+                     )
+                     session.add(log)
+                     await session.commit()
+                     return {"status": "success", "message": f"Welcome back, {user.first_name}"}
              else:
                   raise HTTPException(404, "User not found")
         else:
