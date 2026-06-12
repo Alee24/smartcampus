@@ -4,14 +4,8 @@ WORKDIR /app
 
 
 
-# Install system dependencies for MySQL and standard libraries
-RUN (apt-get update || apt-get update --fix-missing) && apt-get install -y --no-install-recommends \
-    libmariadb-dev \
-    gcc \
-    curl \
-    tesseract-ocr \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Use pre-compiled Python wheels to bypass apt package downloads and local compilations
+
 
 COPY requirements.txt .
 
