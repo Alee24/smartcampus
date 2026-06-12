@@ -973,12 +973,24 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
                 "school": "Visitor",
                 "status": "Active",
                 "role": "Visitor",
-                "gate_status": "Out",
+                "gate_status": "In" if visitor.status == "checked_in" else "Out",
                 "found_in_visitor_logs": True,
-                "visit_details": visitor.visit_details
+                "visit_details": visitor.visit_details,
+                
+                # New fields for visitor card details:
+                "first_name": visitor.first_name,
+                "last_name": visitor.last_name,
+                "visitor_type": visitor.visitor_type,
+                "time_in": visitor.time_in.isoformat() if visitor.time_in else None,
+                "time_out": visitor.time_out.isoformat() if visitor.time_out else None,
+                "plate_number": visitor.plate_number,
+                "passengers": visitor.passengers,
+                "dropoff_name": visitor.dropoff_name,
+                "dropoff_admission_number": visitor.dropoff_admission_number,
+                "check_in_student": visitor.check_in_student
             }
             
-            # Fallback 2: check EventVisitor table
+        # Fallback 2: check EventVisitor table
         from app.models import EventVisitor, Event
         event_visitor_query = select(EventVisitor).where(EventVisitor.visitor_identifier == admission_number).order_by(EventVisitor.entry_time.desc())
         event_visitor = (await session.exec(event_visitor_query)).first()
@@ -994,9 +1006,15 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
                 "school": "Event Guest",
                 "status": "Active",
                 "role": "Event Guest",
-                "gate_status": "Out",
+                "gate_status": "In" if event_visitor.status == "checked_in" else "Out",
                 "visit_details": f"Attending Event: {event_name}",
-                "found_in_event_visitors": True
+                "found_in_event_visitors": True,
+                
+                # New fields:
+                "event_name": event_name,
+                "visitor_name": event_visitor.visitor_name,
+                "visitor_identifier": event_visitor.visitor_identifier,
+                "time_in": event_visitor.entry_time.isoformat() if event_visitor.entry_time else None
             }
             
         # Fallback 3: check Vehicle table (by plate number)
@@ -1027,7 +1045,21 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
                 "role": "Vehicle",
                 "gate_status": gate_status,
                 "visit_details": f"Driver: {vehicle.driver_name or 'N/A'} | Plate: {vehicle.plate_number}",
-                "found_in_vehicles": True
+                "found_in_vehicles": True,
+                
+                # New fields:
+                "plate_number": vehicle.plate_number,
+                "make": vehicle.make,
+                "model": vehicle.model,
+                "color": vehicle.color,
+                "vehicle_type": vehicle.vehicle_type,
+                "driver_name": vehicle.driver_name,
+                "driver_contact": vehicle.driver_contact,
+                "driver_id_number": vehicle.driver_id_number,
+                "entry_time": active_log.entry_time.isoformat() if active_log else None,
+                "passengers": active_log.detected_passengers if active_log else 1,
+                "purpose": active_log.purpose if active_log else None,
+                "destination": active_log.destination if active_log else None
             }
         raise HTTPException(status_code=404, detail="Student/Visitor/Guest/Vehicle not found")
     
