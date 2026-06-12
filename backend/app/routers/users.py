@@ -1959,3 +1959,31 @@ async def revoke_nfc_tag(
     return {"status": "success", "message": "NFC tag revoked successfully"}
 
 
+@router.get("/{user_id}/logs")
+async def get_user_entry_logs(
+    user_id: uuid_lib.UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Get all check-in/check-out entry logs for a user, sorted by entry_time descending"""
+    from app.models import EntryLog, Gate
+    # Query logs
+    query = select(EntryLog).where(EntryLog.user_id == user_id).order_by(EntryLog.entry_time.desc())
+    logs = (await session.exec(query)).all()
+    
+    results = []
+    for log in logs:
+        gate = await session.get(Gate, log.gate_id)
+        exit_gate = await session.get(Gate, log.exit_gate_id) if log.exit_gate_id else None
+        results.append({
+            "id": str(log.id),
+            "entry_time": log.entry_time.isoformat() if log.entry_time else None,
+            "exit_time": log.exit_time.isoformat() if log.exit_time else None,
+            "method": log.method,
+            "status": log.status,
+            "gate_name": gate.name if gate else "Main Gate",
+            "exit_gate_name": exit_gate.name if exit_gate else None
+        })
+    return results
+
+

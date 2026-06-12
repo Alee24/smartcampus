@@ -12,7 +12,8 @@ import {
     XAxis,
     YAxis,
     CartesianGrid,
-    Tooltip as RechartsTooltip
+    Tooltip as RechartsTooltip,
+    Legend
 } from 'recharts'
 
 export default function VisitorManagement() {
@@ -26,6 +27,13 @@ export default function VisitorManagement() {
         active_now: number;
         exited_today: number;
         hourly: number[];
+        hourly_breakdown?: {
+            students: number[];
+            visitors: number[];
+            staff: number[];
+            clients: number[];
+            cars: number[];
+        };
     }>({ total_today: 0, active_now: 0, exited_today: 0, hourly: [] })
     const [showAddModal, setShowAddModal] = useState(false)
     const [formData, setFormData] = useState({
@@ -401,16 +409,40 @@ export default function VisitorManagement() {
                 <div className="h-64 w-full">
                     <ResponsiveContainer width="105%" height="100%">
                         <AreaChart
-                            data={(stats.hourly || []).map((count, hour) => ({
-                                time: `${hour.toString().padStart(2, '0')}:00`,
-                                count: count
-                            })).filter((_, h) => h >= 6 && h <= 22)}
+                            data={Array.from({ length: 24 }).map((_, hour) => {
+                                const hStr = `${hour.toString().padStart(2, '0')}:00`;
+                                const bd = stats.hourly_breakdown || {};
+                                return {
+                                    time: hStr,
+                                    visitors: bd.visitors ? bd.visitors[hour] : (stats.hourly ? stats.hourly[hour] : 0),
+                                    students: bd.students ? bd.students[hour] : 0,
+                                    staff: bd.staff ? bd.staff[hour] : 0,
+                                    clients: bd.clients ? bd.clients[hour] : 0,
+                                    cars: bd.cars ? bd.cars[hour] : 0
+                                };
+                            }).filter((_, h) => h >= 6 && h <= 22)}
                             margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                         >
                             <defs>
-                                <linearGradient id="visitorCount" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="var(--primary-color, #4f46e5)" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="var(--primary-color, #4f46e5)" stopOpacity={0}/>
+                                <linearGradient id="colorStudents" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id="colorStaff" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id="colorClients" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#ec4899" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="#ec4899" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id="colorVisitors" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id="colorCars" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" opacity={0.5} />
@@ -433,14 +465,51 @@ export default function VisitorManagement() {
                                     color: 'var(--text-primary)'
                                 }}
                             />
+                            <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '11px', fontWeight: 600, paddingBottom: '10px' }} />
                             <Area 
                                 type="monotone" 
-                                dataKey="count" 
-                                name="Visitors"
-                                stroke="var(--primary-color, #4f46e5)" 
+                                dataKey="students" 
+                                name="Students"
+                                stroke="#8b5cf6" 
                                 strokeWidth={2}
                                 fillOpacity={1} 
-                                fill="url(#visitorCount)" 
+                                fill="url(#colorStudents)" 
+                            />
+                            <Area 
+                                type="monotone" 
+                                dataKey="staff" 
+                                name="Staff"
+                                stroke="#f59e0b" 
+                                strokeWidth={2}
+                                fillOpacity={1} 
+                                fill="url(#colorStaff)" 
+                            />
+                            <Area 
+                                type="monotone" 
+                                dataKey="clients" 
+                                name="Clients"
+                                stroke="#ec4899" 
+                                strokeWidth={2}
+                                fillOpacity={1} 
+                                fill="url(#colorClients)" 
+                            />
+                            <Area 
+                                type="monotone" 
+                                dataKey="visitors" 
+                                name="Visitors"
+                                stroke="#10b981" 
+                                strokeWidth={2}
+                                fillOpacity={1} 
+                                fill="url(#colorVisitors)" 
+                            />
+                            <Area 
+                                type="monotone" 
+                                dataKey="cars" 
+                                name="Cars (Vehicles)"
+                                stroke="#0ea5e9" 
+                                strokeWidth={2}
+                                fillOpacity={1} 
+                                fill="url(#colorCars)" 
                             />
                         </AreaChart>
                     </ResponsiveContainer>

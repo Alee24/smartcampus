@@ -2834,6 +2834,7 @@ async def get_visitor_stats(
     today = get_eat_time().date()
     start_of_day = datetime.combine(today, datetime.min.time())
     
+    # 1. Query Visitors
     query = select(Visitor).where(Visitor.time_in >= start_of_day)
     if gate_id:
         try:
@@ -2847,17 +2848,67 @@ async def get_visitor_stats(
     active = len([v for v in visitors if v.status == 'checked_in'])
     exited = len([v for v in visitors if v.status == 'checked_out'])
     
-    # Hourly Distribution
-    hourly = [0] * 24
+    hourly_visitors = [0] * 24
     for v in visitors:
         if v.time_in:
-            hourly[v.time_in.hour] += 1
+            hourly_visitors[v.time_in.hour] += 1
+
+    # 2. Query EntryLog (with User and Role)
+    from app.models import EntryLog, User, Role, VehicleLog
+    
+    entry_logs_query = select(EntryLog, User, Role).join(User, EntryLog.user_id == User.id).join(Role, User.role_id == Role.id).where(EntryLog.entry_time >= start_of_day)
+    if gate_id:
+        try:
+            import uuid
+            entry_logs_query = entry_logs_query.where(EntryLog.gate_id == uuid.UUID(gate_id))
+        except Exception:
+            pass
+            
+    entry_logs_res = (await session.exec(entry_logs_query)).all()
+    
+    hourly_students = [0] * 24
+    hourly_staff = [0] * 24
+    hourly_clients = [0] * 24
+    
+    staff_roles = {"superadmin", "security", "lecturer", "fleetmanager", "driver", "staff"}
+    
+    for log, user, role in entry_logs_res:
+        hour = log.entry_time.hour
+        role_name_lower = role.name.lower()
+        if role_name_lower == "student":
+            hourly_students[hour] += 1
+        elif role_name_lower == "client":
+            hourly_clients[hour] += 1
+        elif role_name_lower in staff_roles:
+            hourly_staff[hour] += 1
+
+    # 3. Query Vehicles (VehicleLog)
+    vehicle_query = select(VehicleLog).where(VehicleLog.entry_time >= start_of_day)
+    if gate_id:
+        try:
+            import uuid
+            vehicle_query = vehicle_query.where(VehicleLog.gate_id == uuid.UUID(gate_id))
+        except Exception:
+            pass
+    vehicles = (await session.exec(vehicle_query)).all()
+    
+    hourly_vehicles = [0] * 24
+    for vl in vehicles:
+        if vl.entry_time:
+            hourly_vehicles[vl.entry_time.hour] += 1
 
     return {
         "total_today": total,
         "active_now": active,
         "exited_today": exited,
-        "hourly": hourly
+        "hourly": hourly_visitors,
+        "hourly_breakdown": {
+            "students": hourly_students,
+            "visitors": hourly_visitors,
+            "staff": hourly_staff,
+            "clients": hourly_clients,
+            "cars": hourly_vehicles
+        }
     }
 
 @router.get("/stats")

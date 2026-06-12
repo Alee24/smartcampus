@@ -222,6 +222,14 @@ async def seed_data(session: AsyncSession):
         await session.commit()
         await session.refresh(driver_role)
 
+    # 5b. Client
+    client_role = (await session.exec(select(Role).where(Role.name == "Client"))).first()
+    if not client_role:
+        client_role = Role(name="Client", description="External Client")
+        session.add(client_role)
+        await session.commit()
+        await session.refresh(client_role)
+
     stud_user = (await session.exec(select(User).where((User.admission_number == "STD001") | (User.email == "student@test.com")))).first()
     if not stud_user:
         stud_user = User(

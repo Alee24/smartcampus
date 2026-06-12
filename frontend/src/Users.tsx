@@ -3,7 +3,8 @@ import {
     UserPlus, Search, Filter, X, Edit, Trash2, Mail, Phone,
     Building, GraduationCap, Shield, ChevronLeft, ChevronRight,
     MoreVertical, CheckCircle, XCircle, AlertCircle, Camera, Key, LayoutGrid, Users as UsersIcon,
-    Ban, Power, Lock, RefreshCw, Calendar, Terminal, Download, Copy, Check, RotateCw, Zap
+    Ban, Power, Lock, RefreshCw, Calendar, Terminal, Download, Copy, Check, RotateCw, Zap,
+    Clock, Loader2
 } from 'lucide-react'
 import { useNotification } from './components/Notification'
 
@@ -994,6 +995,29 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
         setEditForm(user)
     }, [user])
 
+    const [logs, setLogs] = useState<any[]>([])
+    const [loadingLogs, setLoadingLogs] = useState(false)
+
+    useEffect(() => {
+        const fetchLogs = async () => {
+            setLoadingLogs(true)
+            try {
+                const token = localStorage.getItem('token')
+                const res = await fetch(`/api/users/${user.id}/logs`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (res.ok) {
+                    setLogs(await res.json())
+                }
+            } catch (e) {
+                console.error("Failed to fetch user logs", e)
+            } finally {
+                setLoadingLogs(false)
+            }
+        }
+        fetchLogs()
+    }, [user])
+
     const handleRotatePhoto = async () => {
         if (!editForm.profile_image) return
         try {
@@ -1418,6 +1442,7 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                                     <option value="Student">Student</option>
                                     <option value="Staff">Staff</option>
                                     <option value="Admin">Admin</option>
+                                    <option value="Client">Client</option>
                                     <option value="Security Lead">Security Lead</option>
                                     <option value="Guard">Guard</option>
                                     <option value="Guest">Guest</option>
@@ -1503,6 +1528,73 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                                 </div>
                             </div>
 
+                            {/* Verification & Access History Table */}
+                            <div className="col-span-1 md:col-span-2 bg-gray-50 dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800/50 space-y-4 max-h-[300px] overflow-y-auto">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Clock size={12} /> Verification & Access History
+                                </h4>
+                                {loadingLogs ? (
+                                    <div className="flex items-center justify-center py-6 text-sm text-gray-400">
+                                        <Loader2 className="animate-spin mr-2" size={16} /> Loading access records...
+                                    </div>
+                                ) : logs.length === 0 ? (
+                                    <div className="text-center py-6 text-sm text-gray-400 font-medium">
+                                        No check-in or check-out records found for this user.
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="border-b border-gray-100 dark:border-gray-800 text-[10px] text-gray-400 uppercase font-black tracking-wider">
+                                                    <th className="py-2.5">Date</th>
+                                                    <th className="py-2.5">Gate / Entry</th>
+                                                    <th className="py-2.5">Exit Time</th>
+                                                    <th className="py-2.5">Method</th>
+                                                    <th className="py-2.5">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-150 dark:divide-gray-850 text-xs font-semibold text-gray-800 dark:text-gray-200">
+                                                {logs.map((log) => {
+                                                    const dateStr = log.entry_time ? new Date(log.entry_time).toLocaleDateString() : 'N/A';
+                                                    const entryTimeStr = log.entry_time ? new Date(log.entry_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+                                                    const exitTimeStr = log.exit_time ? new Date(log.exit_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+                                                    return (
+                                                        <tr key={log.id} className="hover:bg-gray-100/30 dark:hover:bg-gray-800/10">
+                                                            <td className="py-3 font-mono">{dateStr}</td>
+                                                            <td className="py-3">
+                                                                <div>{log.gate_name}</div>
+                                                                <div className="text-[10px] text-gray-450 dark:text-gray-400 font-bold uppercase mt-0.5">{entryTimeStr}</div>
+                                                            </td>
+                                                            <td className="py-3 font-mono">
+                                                                {exitTimeStr ? (
+                                                                    <div>
+                                                                        <div>{log.exit_gate_name || log.gate_name}</div>
+                                                                        <div className="text-[10px] text-gray-450 dark:text-gray-400 font-bold uppercase mt-0.5">{exitTimeStr}</div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 border border-emerald-200/50">
+                                                                        Active Inside
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="py-3 uppercase font-mono text-[10px]">{log.method}</td>
+                                                            <td className="py-3">
+                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                                                                    log.status === 'allowed'
+                                                                        ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 border-emerald-250/50'
+                                                                        : 'bg-rose-50 dark:bg-rose-950/30 text-rose-600 border-rose-200/50'
+                                                                }`}>
+                                                                    {log.status === 'allowed' ? 'Access Granted' : 'Access Denied'}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1705,6 +1797,7 @@ function AddUserModal({ onClose, onRefresh }: any) {
                                     <option value="Admin">Admin</option>
                                     <option value="Security">Security</option>
                                     <option value="Driver">Driver</option>
+                                    <option value="Client">Client</option>
                                 </select>
                             </div>
                         </div>
