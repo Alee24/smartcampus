@@ -1159,7 +1159,7 @@ async def scan_entry(
     session: AsyncSession = Depends(get_session)
 ):
     import urllib.parse
-    from sqlalchemy import select, func
+    from sqlalchemy import func
     from app.models import ScanLog, User, Classroom, ClassSession
     from app.utils.timezone import get_eat_time
 

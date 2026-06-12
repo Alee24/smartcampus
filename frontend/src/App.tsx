@@ -381,7 +381,14 @@ function App() {
                 body: JSON.stringify({ admission_number: code })
             })
             
-            const data = await response.json()
+            const textResponse = await response.text();
+            let data: any;
+            try {
+                data = JSON.parse(textResponse);
+            } catch (jsonErr) {
+                throw new Error(`Server returned status ${response.status}: ${textResponse || 'Internal Server Error'}`);
+            }
+            
             if (response.ok && (data.status === 'allowed' || data.status === 'event_pass')) {
                 playSuccessSound()
                 setSelfScanResponse(data)
@@ -1922,6 +1929,16 @@ function App() {
 
                             {/* Right: Notifications & Profile */}
                             <div className="flex items-center gap-3 relative shrink-0">
+                                {isAuthenticated && (
+                                    <button
+                                        onClick={() => setShowSelfScanModal(true)}
+                                        className="p-2 rounded-lg relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                                        title="Scan QR Code"
+                                    >
+                                        <QrCode size={20} />
+                                        <span className="hidden md:inline text-xs font-bold">Scan QR</span>
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => setActiveTab('notice-board')}
                                     className={`p-2 rounded-lg relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all ${
