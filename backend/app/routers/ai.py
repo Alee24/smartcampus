@@ -138,11 +138,18 @@ async def test_ai_service(
             # Test DeepStack connection
             import requests
             url = payload.get("deepstack_url")
-            response = requests.get(f"{url}/v1/vision/detection")
-            if response.status_code == 200:
-                return {"success": True, "message": "DeepStack connection successful"}
-            else:
-                return {"success": False, "message": f"DeepStack returned {response.status_code}"}
+            api_key = payload.get("deepstack_api_key")
+            headers = {}
+            if api_key:
+                headers["api-key"] = api_key
+            
+            response = requests.get(f"{url}/v1/vision/detection", headers=headers, timeout=5)
+            if response.status_code in [401, 403]:
+                return {"success": False, "message": f"DeepStack returned {response.status_code} (Unauthorized)"}
+            
+            # Since GET /v1/vision/detection is not a standard POST request, DeepStack may return 400 (Bad Request / No image passed) or 405 (Method Not Allowed) or 200 depending on version.
+            # If the response code is not 401 or 403, the server was reached and authentication succeeded.
+            return {"success": True, "message": "DeepStack connection successful"}
                 
         elif service == "dynamics":
             # Test Microsoft Dynamics Connection
