@@ -581,6 +581,7 @@ class Visitor(UUIDModel, table=True):
     delivery_image_receipt: Optional[str] = None
     auto_delete_24h: bool = Field(default=False)
     is_pickup: bool = Field(default=False)
+    profile_image: Optional[str] = None
 
 # Event Management Models
 class Event(UUIDModel, table=True):
@@ -597,6 +598,7 @@ class Event(UUIDModel, table=True):
     qr_code_token: str = Field(unique=True, index=True)
     is_active: bool = Field(default=True)
     scan_mode: str = Field(default="auto") # auto, check_in, register
+    require_profile_pic: bool = Field(default=False)
     created_at: datetime = Field(default_factory=get_eat_time)
     
     visitors: List["EventVisitor"] = Relationship(back_populates="event")
@@ -611,6 +613,7 @@ class EventVisitor(UUIDModel, table=True):
     status: str = "pre_registered" # pre_registered, checked_in
     bio_data: Optional[dict] = Field(default={}, sa_column=Column(JSON)) 
     auto_delete_24h: bool = Field(default=False)
+    profile_image: Optional[str] = None
     entry_time: datetime = Field(default_factory=get_eat_time)
     scanned_by: Optional[UUID] = Field(foreign_key="users.id", nullable=True)
 

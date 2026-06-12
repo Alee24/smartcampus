@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, Calendar, Users, MapPin, QrCode, Download, X, Search, FileText, Upload, Mail, Send, Check, Loader, Trash2, Eye, Megaphone, Printer } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { useNotification } from './components/Notification'
@@ -171,7 +172,8 @@ export default function EventManagement() {
             event_date: formData.get('event_date'),
             description: formData.get('description'),
             start_time: formData.get('start_time'),
-            end_time: formData.get('end_time')
+            end_time: formData.get('end_time'),
+            require_profile_pic: formData.get('require_profile_pic') === 'true'
         }
 
         try {
@@ -450,8 +452,8 @@ export default function EventManagement() {
             </div>
 
             {/* Create Modal */}
-            {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            {showModal && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-2xl rounded-2xl shadow-2xl animate-fade-in max-h-[90vh] overflow-y-auto">
                         <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-[image:var(--gradient-primary)] text-white rounded-t-2xl">
                             <h3 className="text-2xl font-bold">Create New Event</h3>
@@ -496,6 +498,13 @@ export default function EventManagement() {
                                         <option value="Other">Other</option>
                                     </select>
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-[var(--text-primary)] mb-2">Visitor Photo Setting</label>
+                                    <select name="require_profile_pic" className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)]">
+                                        <option value="false">Profile Photo Optional</option>
+                                        <option value="true">Profile Photo Required</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div>
@@ -509,12 +518,13 @@ export default function EventManagement() {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* QR Code Modal */}
-            {showQRModal && selectedEvent && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+            {showQRModal && selectedEvent && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
                     <div className="bg-white rounded-3xl p-8 w-full max-w-sm text-center shadow-2xl animate-zoom-in relative">
                         <button onClick={() => setShowQRModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={24} /></button>
 
@@ -542,11 +552,12 @@ export default function EventManagement() {
                             <Download size={20} /> Download Gate Pass
                         </button>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
             {/* Visitor Management Modal */}
-            {showVisitorModal && selectedEvent && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            {showVisitorModal && selectedEvent && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-4xl rounded-2xl shadow-2xl animate-fade-in h-[85vh] flex flex-col">
                         {/* Header */}
                         <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-primary)] rounded-t-2xl">
@@ -662,12 +673,13 @@ export default function EventManagement() {
                             </table>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Individual Visitor Pass Modal */}
-            {selectedVisitor && selectedEvent && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+            {selectedVisitor && selectedEvent && createPortal(
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
                     <div className="bg-white rounded-3xl p-8 w-full max-w-sm text-center shadow-2xl animate-zoom-in relative">
                         <button onClick={() => setSelectedVisitor(null)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={24} /></button>
 
@@ -699,12 +711,13 @@ export default function EventManagement() {
                             <Download size={20} /> Download Pass
                         </button>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Email Broadcast Modal */}
-            {showEmailModal && selectedEvent && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            {showEmailModal && selectedEvent && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-lg rounded-2xl shadow-2xl animate-fade-in">
                         <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-indigo-600 text-white rounded-t-2xl">
                             <h3 className="text-xl font-bold flex items-center gap-2">
@@ -742,12 +755,13 @@ export default function EventManagement() {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* SMS Broadcast Modal */}
-            {showSmsModal && selectedEvent && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            {showSmsModal && selectedEvent && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-lg rounded-2xl shadow-2xl animate-fade-in">
                         <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-amber-600 text-white rounded-t-2xl">
                             <h3 className="text-xl font-bold flex items-center gap-2">
@@ -778,12 +792,13 @@ export default function EventManagement() {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Event Description Modal */}
-            {showDescModal && selectedEvent && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            {showDescModal && selectedEvent && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-xl rounded-2xl shadow-2xl animate-fade-in flex flex-col max-h-[85vh]">
                         <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-[image:var(--gradient-primary)] text-white rounded-t-2xl">
                             <h3 className="text-xl font-bold">Event Details</h3>
@@ -830,12 +845,13 @@ export default function EventManagement() {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Event Reports Modal */}
-            {showReportModal && selectedEvent && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+            {showReportModal && selectedEvent && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
                     <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-5xl rounded-2xl shadow-2xl animate-fade-in flex flex-col my-8">
                         {/* Style for printing */}
                         <style dangerouslySetInnerHTML={{ __html: `
@@ -1097,7 +1113,8 @@ export default function EventManagement() {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     )

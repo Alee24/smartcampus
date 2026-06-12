@@ -412,7 +412,8 @@ async def migrate_self_service():
         "delivery_image_package": "VARCHAR(512) DEFAULT NULL",
         "delivery_image_receipt": "VARCHAR(512) DEFAULT NULL",
         "auto_delete_24h": "BOOLEAN DEFAULT FALSE",
-        "is_pickup": "BOOLEAN DEFAULT FALSE"
+        "is_pickup": "BOOLEAN DEFAULT FALSE",
+        "profile_image": "TEXT DEFAULT NULL"
     }
     try:
         async with engine.begin() as conn:
@@ -453,14 +454,22 @@ async def migrate_events():
                 return [c['name'] for c in inspector.get_columns('event_visitors')]
 
             events_cols = await conn.run_sync(get_events_cols)
-            if events_cols and "scan_mode" not in events_cols:
-                print("Adding column scan_mode to events table...")
-                await conn.execute(text("ALTER TABLE events ADD COLUMN scan_mode VARCHAR(50) DEFAULT 'auto'"))
+            if events_cols:
+                if "scan_mode" not in events_cols:
+                    print("Adding column scan_mode to events table...")
+                    await conn.execute(text("ALTER TABLE events ADD COLUMN scan_mode VARCHAR(50) DEFAULT 'auto'"))
+                if "require_profile_pic" not in events_cols:
+                    print("Adding column require_profile_pic to events table...")
+                    await conn.execute(text("ALTER TABLE events ADD COLUMN require_profile_pic BOOLEAN DEFAULT FALSE"))
                 
             visitors_cols = await conn.run_sync(get_visitors_cols)
-            if visitors_cols and "auto_delete_24h" not in visitors_cols:
-                print("Adding column auto_delete_24h to event_visitors table...")
-                await conn.execute(text("ALTER TABLE event_visitors ADD COLUMN auto_delete_24h BOOLEAN DEFAULT FALSE"))
+            if visitors_cols:
+                if "auto_delete_24h" not in visitors_cols:
+                    print("Adding column auto_delete_24h to event_visitors table...")
+                    await conn.execute(text("ALTER TABLE event_visitors ADD COLUMN auto_delete_24h BOOLEAN DEFAULT FALSE"))
+                if "profile_image" not in visitors_cols:
+                    print("Adding column profile_image to event_visitors table...")
+                    await conn.execute(text("ALTER TABLE event_visitors ADD COLUMN profile_image TEXT NULL"))
 
             print("Events schema migration checked/applied.")
     except Exception as e:

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Calendar, Users, MapPin, Shield, Check, Info, Loader2, X, Download, AlertTriangle } from 'lucide-react'
+import { Calendar, Users, MapPin, Shield, Check, Info, Loader2, X, Download, AlertTriangle, Camera, Upload, Trash2 } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import html2canvas from 'html2canvas'
 import { PrivacyPolicy } from './privacy/PrivacyPolicy'
@@ -18,6 +18,82 @@ export default function PublicEventRegistration() {
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [successData, setSuccessData] = useState<any>(null)
+    
+    // Camera & Upload States
+    const [profilePic, setProfilePic] = useState<string | null>(null)
+    const [showCamera, setShowCamera] = useState(false)
+    const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
+    const videoRef = useRef<HTMLVideoElement | null>(null)
+
+    const startCamera = async () => {
+        setError(null)
+        setShowCamera(true)
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } 
+            })
+            setCameraStream(stream)
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream
+            }
+        } catch (err: any) {
+            console.error("Camera access error:", err)
+            setError("Could not access camera. Please allow permission or upload from gallery.")
+            setShowCamera(false)
+            playErrorSound()
+        }
+    }
+
+    const stopCamera = () => {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop())
+            setCameraStream(null)
+        }
+        setShowCamera(false)
+    }
+
+    const capturePhoto = () => {
+        if (videoRef.current && cameraStream) {
+            const video = videoRef.current
+            const canvas = document.createElement('canvas')
+            canvas.width = video.videoWidth || 640
+            canvas.height = video.videoHeight || 480
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+                // Mirror image for natural selfie
+                ctx.translate(canvas.width, 0)
+                ctx.scale(-1, 1)
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+                setProfilePic(dataUrl)
+            }
+            stopCamera()
+        }
+    }
+
+    const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                setError("Image is too large. Max size allowed is 5MB.")
+                playErrorSound()
+                return
+            }
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setProfilePic(reader.result as string)
+            }
+            reader.readAsDataURL(file)
+        }
+    }
+
+    useEffect(() => {
+        return () => {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop())
+            }
+        }
+    }, [cameraStream])
     
     // Company settings & colors
     const [companySettings, setCompanySettings] = useState<any>({
@@ -131,6 +207,11 @@ export default function PublicEventRegistration() {
             playErrorSound()
             return
         }
+        if (event?.require_profile_pic && !profilePic) {
+            setError("Profile photo is required for this event registration.")
+            playErrorSound()
+            return
+        }
         if (!consent) {
             setError("You must consent to the data protection terms to register.")
             playErrorSound()
@@ -145,7 +226,8 @@ export default function PublicEventRegistration() {
             visitor_identifier: idNumber,
             phone_number: phone,
             email: email || null,
-            auto_delete_24h: autoDelete24h
+            auto_delete_24h: autoDelete24h,
+            profile_image: profilePic
         }
 
         try {
@@ -489,6 +571,57 @@ export default function PublicEventRegistration() {
                                 </div>
                             </div>
 
+                            {/* Profile Photo Section */}
+                            <div className="border-t border-gray-100 dark:border-gray-800 pt-6">
+                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                                    Profile Photo {event?.require_profile_pic ? '*' : '(Optional)'}
+                                </label>
+                                <p className="text-xs text-gray-500 mb-4 font-semibold">
+                                    {event?.require_profile_pic 
+                                        ? "The host of this event requires a profile picture for access verification." 
+                                        : "Provide a photo to display on your visitor pass for faster gate verification."}
+                                </p>
+                                
+                                {profilePic ? (
+                                    <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-805/50 rounded-2xl border border-gray-200 dark:border-gray-700 w-fit">
+                                        <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-purple-500 shadow-md shrink-0">
+                                            <img src={profilePic} className="w-full h-full object-cover" alt="Captured Selfie" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="text-xs font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                                <Check size={14} /> Photo Attached
+                                            </div>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setProfilePic(null)}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-105 dark:bg-rose-950/30 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-450 rounded-lg text-xs font-bold transition-all border-none cursor-pointer"
+                                            >
+                                                <Trash2 size={12} /> Remove Photo
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col sm:flex-row gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={startCamera}
+                                            className="flex-1 py-3.5 px-4 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/20 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-xl font-bold flex items-center justify-center gap-2 border border-purple-205/50 dark:border-purple-800/30 transition-all cursor-pointer text-xs"
+                                        >
+                                            <Camera size={16} /> Take Selfie
+                                        </button>
+                                        <label className="flex-1 py-3.5 px-4 bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-350 rounded-xl font-bold flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer text-xs text-center">
+                                            <Upload size={16} /> Upload Photo
+                                            <input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                onChange={handleGalleryUpload} 
+                                                className="hidden" 
+                                            />
+                                        </label>
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="border-t border-gray-100 dark:border-gray-800 pt-6 space-y-4">
                                 <label className="flex items-start gap-3 cursor-pointer">
                                     <input 
@@ -554,6 +687,56 @@ export default function PublicEventRegistration() {
                         </div>
                         <div className="flex-1 overflow-y-auto p-6">
                             <CookiePolicy companyName="Smart Campus System" />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Camera Overlay Modal */}
+            {showCamera && (
+                <div className="fixed inset-0 z-[250] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4">
+                    <div className="w-full max-w-md bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-gray-800 flex flex-col relative">
+                        <button 
+                            type="button"
+                            onClick={stopCamera} 
+                            className="absolute top-4 right-4 z-50 bg-black/60 text-white p-2 rounded-full hover:bg-black/80 transition-all border-none cursor-pointer"
+                        >
+                            <X size={20} />
+                        </button>
+                        
+                        <div className="p-6 border-b border-gray-800">
+                            <h4 className="text-base font-black text-white">Capture Selfie</h4>
+                            <p className="text-xs text-gray-400 mt-1">Center your face in the camera viewport and capture</p>
+                        </div>
+                        
+                        <div className="bg-black aspect-video relative flex items-center justify-center overflow-hidden">
+                            <video 
+                                ref={videoRef} 
+                                autoPlay 
+                                playsInline 
+                                className="w-full h-full object-cover scale-x-[-1]" 
+                            />
+                            {/* Overlay Circle Frame */}
+                            <div className="absolute inset-0 border-[30px] border-black/40 flex items-center justify-center pointer-events-none">
+                                <div className="w-48 h-48 rounded-full border-2 border-dashed border-white/60 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]" />
+                            </div>
+                        </div>
+                        
+                        <div className="p-6 bg-gray-950 flex gap-3">
+                            <button
+                                type="button"
+                                onClick={capturePhoto}
+                                className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-650 text-white rounded-xl font-black text-xs transition-all active:scale-[0.98] cursor-pointer border-none flex items-center justify-center gap-1.5"
+                            >
+                                <Camera size={16} /> Capture Photo
+                            </button>
+                            <button
+                                type="button"
+                                onClick={stopCamera}
+                                className="py-3.5 px-6 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold text-xs transition-all cursor-pointer border-none"
+                            >
+                                Cancel
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import {
     Radio, CreditCard, Search, Users, ShieldAlert,
     Trash2, Plus, X, Check, Loader2, Sliders,
-    Clock, RefreshCw, Smartphone, CheckCircle, AlertTriangle
+    Clock, RefreshCw, Smartphone, CheckCircle, AlertTriangle,
+    ChevronLeft, ChevronRight
 } from 'lucide-react'
 
 interface User {
@@ -27,6 +28,8 @@ export default function NFCHub() {
     const [selectedNfcStatus, setSelectedNfcStatus] = useState<string>('all') // all, tagged, untagged
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
     const [writingUser, setWritingUser] = useState<User | null>(null)
+    const [currentPage, setCurrentPage] = useState(1)
+    const itemsPerPage = 8
     
     // Web NFC States
     const [isNfcWriting, setIsNfcWriting] = useState(false)
@@ -57,6 +60,10 @@ export default function NFCHub() {
             }
         }
     }, [])
+
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [searchQuery, selectedRole, selectedNfcStatus])
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
         setToast({ msg, type })
@@ -323,6 +330,10 @@ export default function NFCHub() {
         return matchesSearch && matchesRole && matchesNfcStatus
     })
 
+    const totalPages = Math.ceil(filteredUsers.length / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage)
+
     const taggedCount = users.filter(u => u.nfc_card_uid).length
     const untaggedCount = users.length - taggedCount
 
@@ -462,7 +473,7 @@ export default function NFCHub() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredUsers.map((user) => (
+                                    paginatedUsers.map((user) => (
                                         <tr key={user.id} className="hover:bg-slate-50/50 transition">
                                             <td className="py-4 px-6 flex items-center gap-3">
                                                 <img 
@@ -530,6 +541,54 @@ export default function NFCHub() {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+                            <div className="text-xs text-slate-500">
+                                Showing <span className="font-bold text-slate-900">{startIndex + 1}</span> to <span className="font-bold text-slate-900">{Math.min(startIndex + itemsPerPage, filteredUsers.length)}</span> of <span className="font-bold text-slate-900">{filteredUsers.length}</span> records
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+                                
+                                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                    .filter(pageNum => pageNum === 1 || pageNum === totalPages || Math.abs(pageNum - currentPage) <= 1)
+                                    .map((pageNum, index, arr) => {
+                                        const showEllipsis = index > 0 && pageNum - arr[index - 1] > 1;
+                                        return (
+                                            <div key={pageNum} className="flex items-center gap-1.5">
+                                                {showEllipsis && <span className="text-slate-400 text-xs">...</span>}
+                                                <button
+                                                    onClick={() => setCurrentPage(pageNum)}
+                                                    className={`w-8 h-8 rounded-lg text-xs font-bold transition ${
+                                                        currentPage === pageNum
+                                                            ? 'bg-purple-600 text-white shadow-md'
+                                                            : 'hover:bg-slate-100 border border-slate-200 text-slate-700 bg-white'
+                                                    }`}
+                                                >
+                                                    {pageNum}
+                                                </button>
+                                            </div>
+                                        );
+                                    })
+                                }
+
+                                <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent text-slate-600 transition"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Quick Verify Component */}

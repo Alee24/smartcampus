@@ -3189,6 +3189,7 @@ async def public_access_request(
 
          pkg_img = save_base64_image(data.get("delivery_image_package"), "package")
          rcpt_img = save_base64_image(data.get("delivery_image_receipt"), "receipt")
+         prof_img = save_base64_image(data.get("profile_image"), "profile")
 
          # Map name details
          first_name = data.get("first_name", "").strip()
@@ -3220,7 +3221,8 @@ async def public_access_request(
              delivery_image_package=pkg_img,
              delivery_image_receipt=rcpt_img,
              auto_delete_24h=bool(data.get("auto_delete_24h", False)),
-             is_pickup=bool(data.get("is_pickup", False))
+             is_pickup=bool(data.get("is_pickup", False)),
+             profile_image=prof_img
          )
 
          # Look up drop-off user if admission number is provided
@@ -3478,3 +3480,190 @@ async def create_scan_log(session: AsyncSession, gate_id: Optional[uuid.UUID], s
         await session.commit()
     except Exception as e:
         print(f"Failed to log scan: {e}")
+
+@router.get("/visitor-center/stats")
+async def get_visitor_center_stats(session: AsyncSession = Depends(get_session)):
+    """
+    Returns aggregated metrics for non-students and non-staff:
+    - Today's visitor count
+    - Today's vehicle/car count (non-student/non-staff)
+    - Today's taxi count
+    - Today's delivery count
+    - Total events in system
+    - Last event details (registered vs checked in)
+    """
+    try:
+        from datetime import datetime, time
+        from sqlmodel import select, func
+        from app.models import Visitor, Event, EventVisitor, User, GateScanLog
+        from sqlalchemy.orm import selectinload
+
+        now = get_eat_time()
+        today_start = datetime.combine(now.date(), time.min)
+        today_end = datetime.combine(now.date(), time.max)
+
+        # Get core system users (students/staff/lecturer/admin)
+        users_stmt = select(User).options(selectinload(User.role))
+        all_users = (await session.exec(users_stmt)).all()
+        core_identifiers = set()
+        core_emails = set()
+        for u in all_users:
+            role_name = (u.role.name.lower() if u.role else "").strip()
+            if any(r in role_name for r in ["student", "staff", "lecturer", "admin"]):
+                if u.admission_number:
+                    core_identifiers.add(u.admission_number.strip())
+                if u.email:
+                    core_emails.add(u.email.strip().lower())
+
+        # Today's self-service visitors
+        visitors_stmt = select(Visitor).where(Visitor.time_in >= today_start, Visitor.time_in <= today_end)
+        today_visitors = (await session.exec(visitors_stmt)).all()
+
+        taxis = sum(1 for v in today_visitors if v.visitor_type == 'taxi')
+        deliveries = sum(1 for v in today_visitors if v.visitor_type == 'delivery')
+        
+        # Today's vehicles in self-service (has a plate number)
+        vehicles = sum(1 for v in today_visitors if v.plate_number)
+
+        # Today's event visitors who checked in and are not students/staff
+        ev_stmt = select(EventVisitor).where(
+            EventVisitor.status == 'checked_in', 
+            EventVisitor.entry_time >= today_start, 
+            EventVisitor.entry_time <= today_end
+        )
+        today_ev = (await session.exec(ev_stmt)).all()
+        external_ev_count = 0
+        for ev in today_ev:
+            if ev.visitor_identifier not in core_identifiers and (not ev.email or ev.email.lower() not in core_emails):
+                external_ev_count += 1
+
+        total_visitors_today = len(today_visitors) + external_ev_count
+
+        # Total Events count
+        events_stmt = select(Event)
+        events = (await session.exec(events_stmt)).all()
+        events_count = len(events)
+
+        # Last Event details
+        last_event_info = None
+        if events:
+            # Sort events by date and time desc
+            sorted_events = sorted(events, key=lambda e: (e.event_date, e.start_time or time.min), reverse=True)
+            le = sorted_events[0]
+            
+            # Count registered and checked in for this event
+            le_visitors_stmt = select(EventVisitor).where(EventVisitor.event_id == le.id)
+            le_visitors = (await session.exec(le_visitors_stmt)).all()
+            
+            reg_count = len(le_visitors)
+            checkin_count = sum(1 for lv in le_visitors if lv.status == 'checked_in')
+            
+            last_event_info = {
+                "name": le.name,
+                "date": str(le.event_date),
+                "expected": le.expected_visitors,
+                "registered": reg_count,
+                "checked_in": checkin_count
+            }
+
+        return {
+            "visitors_today": total_visitors_today,
+            "vehicles_today": vehicles,
+            "taxis_today": taxis,
+            "deliveries_today": deliveries,
+            "events_count": events_count,
+            "last_event": last_event_info
+        }
+    except Exception as e:
+        print(f"Error getting visitor center stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch statistics: {str(e)}")
+
+@router.get("/visitor-center/logs")
+async def get_visitor_center_logs(session: AsyncSession = Depends(get_session)):
+    """
+    Returns a unified logs list of all non-student and non-staff logs.
+    """
+    try:
+        from sqlmodel import select
+        from app.models import Visitor, EventVisitor, Event, User, Gate
+        from sqlalchemy.orm import selectinload
+
+        # Get core system users (students/staff/lecturer/admin)
+        users_stmt = select(User).options(selectinload(User.role))
+        all_users = (await session.exec(users_stmt)).all()
+        core_identifiers = set()
+        core_emails = set()
+        for u in all_users:
+            role_name = (u.role.name.lower() if u.role else "").strip()
+            if any(r in role_name for r in ["student", "staff", "lecturer", "admin"]):
+                if u.admission_number:
+                    core_identifiers.add(u.admission_number.strip())
+                if u.email:
+                    core_emails.add(u.email.strip().lower())
+
+        # 1. Fetch self-service visitors
+        visitors = (await session.exec(select(Visitor).order_by(Visitor.time_in.desc()))).all()
+        
+        # Load all gates to map names
+        gates = (await session.exec(select(Gate))).all()
+        gate_map = {g.id: g.name for g in gates}
+
+        combined_logs = []
+
+        for v in visitors:
+            combined_logs.append({
+                "id": f"v_{v.id}",
+                "source": "self_service",
+                "visitor_type": v.visitor_type or "visitor",
+                "name": f"{v.first_name} {v.last_name}".strip(),
+                "phone_number": v.phone_number,
+                "email": "N/A",
+                "identifier": v.id_number,
+                "plate_number": v.plate_number or "N/A",
+                "passengers": v.passengers or 1,
+                "timestamp": v.time_in.isoformat(),
+                "time_out": v.time_out.isoformat() if v.time_out else None,
+                "status": v.status,
+                "details": v.visit_details,
+                "profile_image": v.profile_image or "",
+                "location": gate_map.get(v.gate_id, "Main Gate"),
+                "auto_delete_24h": v.auto_delete_24h
+            })
+
+        # 2. Fetch event visitors who are external guests
+        ev_stmt = select(EventVisitor).options(selectinload(EventVisitor.event))
+        event_visitors = (await session.exec(ev_stmt)).all()
+
+        for ev in event_visitors:
+            # Check if student/staff
+            if ev.visitor_identifier in core_identifiers or (ev.email and ev.email.lower() in core_emails):
+                continue  # skip system users
+
+            event_name = ev.event.name if ev.event else "Event"
+            event_loc = ev.event.school if ev.event else "Campus"
+            
+            combined_logs.append({
+                "id": f"ev_{ev.id}",
+                "source": "event",
+                "visitor_type": "event_guest",
+                "name": ev.visitor_name,
+                "phone_number": ev.phone_number,
+                "email": ev.email or "N/A",
+                "identifier": ev.visitor_identifier,
+                "plate_number": "N/A",
+                "passengers": 1,
+                "timestamp": ev.entry_time.isoformat(),
+                "time_out": None,
+                "status": ev.status,
+                "details": f"Registered for event: {event_name}",
+                "profile_image": ev.profile_image or "",
+                "location": event_loc,
+                "auto_delete_24h": ev.auto_delete_24h
+            })
+
+        # Sort combined logs chronologically (descending)
+        combined_logs.sort(key=lambda x: x["timestamp"], reverse=True)
+        return combined_logs
+    except Exception as e:
+        print(f"Error getting visitor center logs: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch visitor logs: {str(e)}")

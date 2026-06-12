@@ -96,12 +96,12 @@ async def get_event_visitors(event_id: uuid.UUID, session: AsyncSession = Depend
     out = []
     for v in visitors:
         info = user_map.get(v.visitor_identifier) or user_map.get(v.email) or {
-            "profile_image": "",
+            "profile_image": v.profile_image or "",
             "has_face": False,
             "role": "External Guest"
         }
         v_dict = v.model_dump()
-        v_dict["profile_image"] = info["profile_image"]
+        v_dict["profile_image"] = info["profile_image"] or v.profile_image or ""
         v_dict["has_face"] = info["has_face"]
         v_dict["user_role"] = info["role"]
         out.append(v_dict)
@@ -363,7 +363,8 @@ async def get_public_event_by_token(token: str, session: AsyncSession = Depends(
         "end_time": event.end_time.strftime("%H:%M") if event.end_time else None,
         "event_type": event.event_type,
         "is_active": event.is_active,
-        "scan_mode": event.scan_mode
+        "scan_mode": event.scan_mode,
+        "require_profile_pic": event.require_profile_pic
     }
 
 @router.post("/public/by-token/{token}/register")
@@ -384,6 +385,27 @@ async def register_public_visitor(
     phone = data.get("phone_number", "").strip()
     email = data.get("email", "").strip()
     auto_delete = bool(data.get("auto_delete_24h", False))
+    profile_pic_b64 = data.get("profile_image", "").strip()
+
+    saved_profile_image = None
+    if profile_pic_b64:
+        import base64
+        import uuid as uuid_lib
+        try:
+            if "base64," in profile_pic_b64:
+                header, encoded = profile_pic_b64.split("base64,", 1)
+            else:
+                encoded = profile_pic_b64
+            img_bytes = base64.b64decode(encoded)
+            filename = f"event_guest_{str(uuid_lib.uuid4())[:12]}.jpg"
+            save_dir = "static/profiles"
+            os.makedirs(save_dir, exist_ok=True)
+            saved_path = f"{save_dir}/{filename}"
+            with open(saved_path, "wb") as f:
+                f.write(img_bytes)
+            saved_profile_image = f"/static/profiles/{filename}"
+        except Exception as e:
+            print(f"Failed to save event guest profile photo: {e}")
 
     if not name or not identifier or not phone:
         raise HTTPException(status_code=400, detail="Name, ID/Admission number, and phone number are required")
@@ -407,6 +429,8 @@ async def register_public_visitor(
         existing.phone_number = phone
         existing.email = email
         existing.auto_delete_24h = auto_delete
+        if saved_profile_image:
+            existing.profile_image = saved_profile_image
         if status == "checked_in" and existing.status != "checked_in":
             existing.status = "checked_in"
             existing.entry_time = get_eat_time()
@@ -432,6 +456,7 @@ async def register_public_visitor(
         email=email if email else None,
         status=status,
         auto_delete_24h=auto_delete,
+        profile_image=saved_profile_image,
         entry_time=get_eat_time()
     )
     session.add(visitor)

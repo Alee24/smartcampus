@@ -330,7 +330,6 @@ function App() {
                 if (verifyTarget) {
                     playSuccessSound()
                     setSelfNfcActive(false)
-                    setShowSelfNfcModal(false)
                     handleSelfVerify(verifyTarget)
                 } else {
                     playErrorSound()
@@ -1256,7 +1255,7 @@ function App() {
 
     useEffect(() => {
         if (isAuthenticated) {
-            const hasChecked = sessionStorage.getItem('security_checked')
+            const hasChecked = localStorage.getItem('security_checked')
             if (!hasChecked) {
                 setShowSecurityCheck(true)
             }
@@ -1277,7 +1276,7 @@ function App() {
         } catch (e) {
             console.error(e)
         } finally {
-            sessionStorage.setItem('security_checked', 'true')
+            localStorage.setItem('security_checked', 'true')
             setShowSecurityCheck(false)
         }
     }
