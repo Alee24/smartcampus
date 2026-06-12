@@ -257,7 +257,7 @@ async def scan_entry_inner(
 
     scanned_type = None
 
-    # 1. Parse URL query parameters if code is a URL (e.g. from QR Asset Hub)
+    # 1. Parse URL query parameters or paths if code is a URL (e.g. from QR Asset Hub)
     if "://" in code or "?" in code:
         try:
             parsed_url = urllib.parse.urlparse(code)
@@ -286,6 +286,33 @@ async def scan_entry_inner(
             elif "trip" in params:
                 code = params["trip"][0].strip()
                 scanned_type = "trip"
+
+            # Fallback: parse URL path components if no query parameter matched
+            if not scanned_type:
+                path_parts = [p for p in parsed_url.path.split("/") if p]
+                for part in path_parts:
+                    if part.startswith("EVT_"):
+                        code = part
+                        scanned_type = "event"
+                        break
+                    elif part.startswith("STUDENT:") or part.startswith("STAFF:"):
+                        code = part.split(":", 1)[1]
+                        scanned_type = "user"
+                        break
+                    elif part.startswith("VEHICLE:") or part.startswith("BUS:"):
+                        code = part.split(":", 1)[1]
+                        scanned_type = "vehicle"
+                        break
+                    elif part.startswith("TRIP:"):
+                        code = part.split(":", 1)[1]
+                        scanned_type = "trip"
+                        break
+                
+                if not scanned_type:
+                    if "event-register" in parsed_url.path or "event-pass" in parsed_url.path:
+                        if path_parts:
+                            code = path_parts[-1].strip()
+                            scanned_type = "event"
         except Exception as e:
             print(f"Error parsing scan URL: {e}")
             pass
@@ -330,6 +357,8 @@ async def scan_entry_inner(
         elif upper_code.startswith("VISITOR:"):
             scanned_type = "visitor"
             code = code[8:].strip()
+        elif upper_code.startswith("EVT_"):
+            scanned_type = "event"
         elif upper_code.startswith("STUDENT:") or upper_code.startswith("STAFF:"):
             scanned_type = "user"
             code = code.split(":", 1)[1].strip()
@@ -369,6 +398,11 @@ async def scan_entry_inner(
                                     except Exception:
                                         pass
                                         
+                                    if not scanned_type:
+                                        ev = (await session.exec(select(Event).where(Event.qr_code_token == code))).first()
+                                        if ev:
+                                            scanned_type = "event"
+                                            
                                     if not scanned_type:
                                         scanned_type = "user"
 
@@ -1212,6 +1246,33 @@ async def scan_entry(
             elif "trip" in params:
                 temp_code = params["trip"][0].strip()
                 scanned_type = "trip"
+
+            # Fallback: parse URL path components if no query parameter matched
+            if not scanned_type:
+                path_parts = [p for p in parsed_url.path.split("/") if p]
+                for part in path_parts:
+                    if part.startswith("EVT_"):
+                        temp_code = part
+                        scanned_type = "event"
+                        break
+                    elif part.startswith("STUDENT:") or part.startswith("STAFF:"):
+                        temp_code = part.split(":", 1)[1]
+                        scanned_type = "user"
+                        break
+                    elif part.startswith("VEHICLE:") or part.startswith("BUS:"):
+                        temp_code = part.split(":", 1)[1]
+                        scanned_type = "vehicle"
+                        break
+                    elif part.startswith("TRIP:"):
+                        temp_code = part.split(":", 1)[1]
+                        scanned_type = "trip"
+                        break
+                
+                if not scanned_type:
+                    if "event-register" in parsed_url.path or "event-pass" in parsed_url.path:
+                        if path_parts:
+                            temp_code = path_parts[-1].strip()
+                            scanned_type = "event"
         except Exception:
             pass
 
@@ -1236,6 +1297,8 @@ async def scan_entry(
         elif upper_code.startswith("VISITOR:"):
             scanned_type = "visitor"
             temp_code = temp_code[8:].strip()
+        elif upper_code.startswith("EVT_"):
+            scanned_type = "event"
         elif upper_code.startswith("STUDENT:") or upper_code.startswith("STAFF:"):
             scanned_type = "user"
             temp_code = temp_code.split(":", 1)[1].strip()
@@ -1282,6 +1345,13 @@ async def scan_entry(
                                                 scanned_type = "trip"
                                     except Exception:
                                         pass
+                                        
+                                    if not scanned_type:
+                                        from app.models import Event
+                                        ev = (await session.exec(select(Event).where(Event.qr_code_token == temp_code))).first()
+                                        if ev:
+                                            scanned_type = "event"
+                                            
                                     if not scanned_type:
                                         scanned_type = "user"
 
