@@ -383,32 +383,32 @@ async def scan_entry_inner(
                             user = (await session.exec(select(User).where(func.lower(User.admission_number) == func.lower(code)))).first()
                             if user:
                                 scanned_type = "user"
-                        else:
-                            clean_plate = code.replace(" ", "").lower()
-                            vehicle = (await session.exec(select(Vehicle).where(func.lower(func.replace(Vehicle.plate_number, ' ', '')) == clean_plate))).first()
-                            if vehicle:
-                                scanned_type = "vehicle"
                             else:
-                                visitor = (await session.exec(select(Visitor).where(func.lower(Visitor.id_number) == func.lower(code)))).first()
-                                if visitor:
-                                    scanned_type = "visitor"
+                                clean_plate = code.replace(" ", "").lower()
+                                vehicle = (await session.exec(select(Vehicle).where(func.lower(func.replace(Vehicle.plate_number, ' ', '')) == clean_plate))).first()
+                                if vehicle:
+                                    scanned_type = "vehicle"
                                 else:
-                                    try:
-                                        import uuid
-                                        val_uuid = uuid.UUID(code)
-                                        ev = await session.get(Event, val_uuid)
-                                        if ev:
-                                            scanned_type = "event"
-                                    except Exception:
-                                        pass
-                                        
-                                    if not scanned_type:
-                                        ev = (await session.exec(select(Event).where(Event.qr_code_token == code))).first()
-                                        if ev:
-                                            scanned_type = "event"
+                                    visitor = (await session.exec(select(Visitor).where(func.lower(Visitor.id_number) == func.lower(code)))).first()
+                                    if visitor:
+                                        scanned_type = "visitor"
+                                    else:
+                                        try:
+                                            import uuid
+                                            val_uuid = uuid.UUID(code)
+                                            ev = await session.get(Event, val_uuid)
+                                            if ev:
+                                                scanned_type = "event"
+                                        except Exception:
+                                            pass
                                             
-                                    if not scanned_type:
-                                        scanned_type = "user"
+                                        if not scanned_type:
+                                            ev = (await session.exec(select(Event).where(Event.qr_code_token == code))).first()
+                                            if ev:
+                                                scanned_type = "event"
+                                                
+                                        if not scanned_type:
+                                            scanned_type = "user"
 
     # Define parsed_code to prevent NameError in user and visitor blocks
     parsed_code = code
