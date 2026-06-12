@@ -1326,7 +1326,10 @@ async def scan_entry(
                     if asset:
                         scanned_type = "asset"
                     else:
-                        user = (await session.exec(select(User).where(func.lower(User.admission_number) == func.lower(temp_code)))).first()
+                        user = (await session.exec(select(User).where(
+                            (func.lower(User.admission_number) == func.lower(temp_code)) |
+                            (User.nfc_card_uid == temp_code)
+                        ))).first()
                         if user:
                             scanned_type = "user"
                         else:
@@ -1406,7 +1409,10 @@ async def scan_entry(
             
             # 1. If scanned code corresponds to a student/user, resolve that user first to preserve logging accuracy
             if scanned_type == "user" or not scanned_type:
-                user_obj = (await session.exec(select(User).where(func.lower(User.admission_number) == func.lower(temp_code)))).first()
+                user_obj = (await session.exec(select(User).where(
+                    (func.lower(User.admission_number) == func.lower(temp_code)) |
+                    (User.nfc_card_uid == temp_code)
+                ))).first()
                 if user_obj:
                     log_student_id = user_obj.id
 

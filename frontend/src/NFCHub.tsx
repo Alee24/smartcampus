@@ -70,12 +70,23 @@ export default function NFCHub() {
             const res = await fetch('/api/users', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
+            const contentType = res.headers.get("content-type")
             if (res.ok) {
-                const data = await res.json()
-                setUsers(data)
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const data = await res.json()
+                    setUsers(data)
+                } else {
+                    showToast('Server returned non-JSON response', 'error')
+                }
             } else {
-                const err = await res.json()
-                showToast(err.detail || 'Failed to fetch users', 'error')
+                let detail = 'Failed to fetch users'
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const err = await res.json()
+                    detail = err.detail || detail
+                } else {
+                    detail = await res.text() || detail
+                }
+                showToast(detail, 'error')
             }
         } catch (e: any) {
             showToast(e.message || 'Network error fetching users', 'error')
@@ -97,9 +108,17 @@ export default function NFCHub() {
                 body: JSON.stringify({ nfc_card_uid: nfcUid, nfc_status: 'Active' })
             })
 
-            const data = await res.json()
+            let data: any = {}
+            const contentType = res.headers.get("content-type")
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                data = await res.json()
+            } else {
+                const text = await res.text()
+                data = { detail: text || `Server error: ${res.status} ${res.statusText}` }
+            }
+
             if (res.ok) {
-                showToast(`NFC Tag assigned to ${data.user.full_name}!`, 'success')
+                showToast(`NFC Tag assigned to ${data.user?.full_name || 'user'}!`, 'success')
                 setWritingUser(null)
                 setNfcWriteSuccess(true)
                 setTimeout(() => setNfcWriteSuccess(false), 2000)
@@ -131,8 +150,15 @@ export default function NFCHub() {
                     setVerifiedUser(null)
                 }
             } else {
-                const err = await res.json()
-                showToast(err.detail || 'Failed to revoke NFC tag', 'error')
+                let detail = 'Failed to revoke NFC tag'
+                const contentType = res.headers.get("content-type")
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const err = await res.json()
+                    detail = err.detail || detail
+                } else {
+                    detail = await res.text() || detail
+                }
+                showToast(detail, 'error')
             }
         } catch (e: any) {
             showToast(e.message, 'error')
@@ -209,12 +235,26 @@ export default function NFCHub() {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             if (res.ok) {
-                const data = await res.json()
+                let data: any = {}
+                const contentType = res.headers.get("content-type")
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    data = await res.json()
+                } else {
+                    const text = await res.text()
+                    data = { full_name: 'Unknown', detail: text }
+                }
                 setVerifiedUser(data)
                 showToast(`NFC Tag verified: ${data.full_name}`, 'success')
             } else {
-                const err = await res.json()
-                setVerifyError(err.detail || 'Card not registered or suspended.')
+                let detail = 'Card not registered or suspended.'
+                const contentType = res.headers.get("content-type")
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const err = await res.json()
+                    detail = err.detail || detail
+                } else {
+                    detail = await res.text() || detail
+                }
+                setVerifyError(detail)
             }
         } catch (e: any) {
             setVerifyError(e.message || 'Failed to verify card.')

@@ -1915,10 +1915,12 @@ async def assign_nfc_tag(
     # Audit logging
     await log_action(
         session=session,
-        user_id=current_user.id,
-        action="nfc_assign",
-        details=f"Assigned NFC tag {nfc_uid} to user {user.full_name} ({user.admission_number})",
-        ip_address=None
+        action_type="nfc_assign",
+        user=current_user,
+        table_name="users",
+        record_id=str(user.id),
+        description=f"Assigned NFC tag {nfc_uid} to user {user.full_name} ({user.admission_number})",
+        request=None
     )
     
     return {"status": "success", "message": "NFC tag assigned successfully", "user": user.dict(exclude={"hashed_password"})}
@@ -1946,10 +1948,12 @@ async def revoke_nfc_tag(
     # Audit logging
     await log_action(
         session=session,
-        user_id=current_user.id,
-        action="nfc_revoke",
-        details=f"Revoked NFC tag {old_uid} from user {user.full_name} ({user.admission_number})",
-        ip_address=None
+        action_type="nfc_revoke",
+        user=current_user,
+        table_name="users",
+        record_id=str(user.id),
+        description=f"Revoked NFC tag {old_uid} from user {user.full_name} ({user.admission_number})",
+        request=None
     )
     
     return {"status": "success", "message": "NFC tag revoked successfully"}

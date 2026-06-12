@@ -222,7 +222,14 @@ export default function GateControl() {
                 body: JSON.stringify({ admission_number: cleanQRData(admissionNumber), gate_id: selectedGateId })
             })
 
-            const result = await res.json()
+            let result: any = {}
+            const contentType = res.headers.get("content-type")
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                result = await res.json()
+            } else {
+                const text = await res.text()
+                result = { status: "rejected", message: text || `Server error: ${res.status} ${res.statusText}`, data: null }
+            }
 
             if (result.status === 'allowed') {
                 setScanStatus('success')
@@ -682,7 +689,14 @@ export default function GateControl() {
                 body: JSON.stringify({ admission_number: nfcUid, gate_id: selectedGateId })
             })
 
-            const result = await res.json()
+            let result: any = {}
+            const contentType = res.headers.get("content-type")
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                result = await res.json()
+            } else {
+                const text = await res.text()
+                result = { status: "rejected", message: text || `Server error: ${res.status} ${res.statusText}`, data: null }
+            }
             if (result.status === 'allowed') {
                 setScanStatus('success')
                 setLastScan(result.data)
