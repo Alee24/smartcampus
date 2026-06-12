@@ -50,7 +50,7 @@ if __name__ == "__main__":
     if sys.platform == 'win32':
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         
-    if "backend" not in os.getcwd():
+    if "backend" not in os.getcwd() and os.path.exists("backend"):
         os.chdir("backend")
         
     asyncio.run(migrate_nfc_features())
