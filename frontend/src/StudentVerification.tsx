@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNotification } from './components/Notification'
-import { Search, CheckCircle, XCircle, Shield, Calendar, User, Building, Sparkles, UploadCloud, Loader2, Camera, QrCode, LogIn, LogOut, RefreshCcw, Printer, AlertTriangle, Car } from 'lucide-react'
+import { Search, CheckCircle, XCircle, Shield, Calendar, User, Building, Sparkles, UploadCloud, Loader2, Camera, QrCode, LogIn, LogOut, RefreshCcw, Printer, AlertTriangle, Car, Radio } from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { QRCodeSVG } from 'qrcode.react'
 import html2canvas from 'html2canvas'
@@ -23,6 +23,8 @@ export default function StudentVerification() {
     const [uploadingImage, setUploadingImage] = useState(false)
     const [isScanning, setIsScanning] = useState(false)
     const [actionLoading, setActionLoading] = useState<'check-in' | 'check-out' | null>(null)
+    const [isNfcActive, setIsNfcActive] = useState(false)
+    const nfcAbortControllerRef = useRef<AbortController | null>(null)
     const [pinModal, setPinModal] = useState<{show: boolean, pin: string, file: File | null}>({
         show: false,
         pin: '',
@@ -264,7 +266,8 @@ export default function StudentVerification() {
         if (online) {
             try {
                 const token = localStorage.getItem('token')
-                const res = await fetch(`/api/gate/${action}/${admissionNumber}?gate_id=${selectedGateId || ''}`, {
+                const activeGateId = selectedGateId || localStorage.getItem('active_gate_id') || ''
+                const res = await fetch(`/api/gate/${action}/${admissionNumber}?gate_id=${activeGateId}`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
@@ -295,6 +298,19 @@ export default function StudentVerification() {
                         }
                         return prev
                     })
+                    setActionLoading(null)
+                    return;
+                } else {
+                    let detail = `Server error during ${action}`
+                    const contentType = res.headers.get("content-type")
+                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                        const err = await res.json()
+                        detail = err.detail || detail
+                    } else {
+                        detail = await res.text() || detail
+                    }
+                    playWarningSound()
+                    showNotification(detail, 'error')
                     setActionLoading(null)
                     return;
                 }
@@ -410,7 +426,14 @@ export default function StudentVerification() {
                     },
                     body: JSON.stringify({ admission_number: searchQuery })
                 })
-                const data = await res.json()
+                let data: any = {}
+                const contentType = res.headers.get("content-type")
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    data = await res.json()
+                } else {
+                    const text = await res.text()
+                    data = { status: "rejected", message: text || `Server error: ${res.status} ${res.statusText}`, data: null }
+                }
                 if (res.ok && (data.status === 'allowed' || data.status === 'event_pass')) {
                     showNotification(data.message || 'Verification successful', 'success')
                     playSuccessSound()
@@ -487,6 +510,19 @@ export default function StudentVerification() {
                     }
                     setLoading(false)
                     return;
+                } else {
+                    let detail = 'Verification failed'
+                    const contentType = res.headers.get("content-type")
+                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                        const err = await res.json()
+                        detail = err.detail || detail
+                    } else {
+                        detail = await res.text() || detail
+                    }
+                    setResult({ error: detail })
+                    playErrorSound()
+                    setLoading(false)
+                    return;
                 }
             } catch (e) {
                 online = false
@@ -535,6 +571,104 @@ export default function StudentVerification() {
             playErrorSound()
         }
         setLoading(false)
+    }
+    // Cleanup Web NFC scanner on unmount
+    useEffect(() => {
+        return () => {
+            if (nfcAbortControllerRef.current) {
+                nfcAbortControllerRef.current.abort()
+            }
+        }
+    }, [])
+
+    // Check URL query parameters for automatic verification on page mount
+    useEffect(() => {
+        const checkUrlParams = async () => {
+            const params = new URLSearchParams(window.location.search)
+            const userParam = params.get('user') || params.get('admission_number')
+            if (userParam) {
+                setQuery(userParam)
+                handleVerify(userParam, true)
+                
+                try {
+                    const newUrl = window.location.pathname
+                    window.history.replaceState({}, document.title, newUrl)
+                } catch (e) {}
+            }
+        }
+        checkUrlParams()
+    }, [])
+
+    const startNfcScan = async () => {
+        if (!('NDEFReader' in window)) {
+            showNotification("Web NFC is not supported on this browser or device. Please use Chrome on Android.", "error")
+            return
+        }
+
+        try {
+            if (nfcAbortControllerRef.current) {
+                nfcAbortControllerRef.current.abort()
+            }
+            nfcAbortControllerRef.current = new AbortController()
+            
+            // @ts-ignore
+            const ndef = new NDEFReader()
+            await ndef.scan({ signal: nfcAbortControllerRef.current.signal })
+            setIsNfcActive(true)
+            showNotification("NFC scanning activated. Tap a smart card to verify.", "success")
+            
+            ndef.onreading = (event: any) => {
+                const serial = event.serialNumber
+                let parsedUser = ""
+                if (event.message && event.message.records) {
+                    for (const record of event.message.records) {
+                        if (record.recordType === "url") {
+                            try {
+                                const decoder = new TextDecoder("utf-8")
+                                const url = decoder.decode(record.data)
+                                const parsedUrl = new URL(url)
+                                const u = parsedUrl.searchParams.get("user") || parsedUrl.searchParams.get("admission_number")
+                                if (u) parsedUser = u
+                            } catch (err) {}
+                        }
+                    }
+                }
+                
+                const verifyTarget = parsedUser || serial
+                if (verifyTarget) {
+                    handleVerify(verifyTarget, true)
+                    showNotification(`NFC Card scanned: ${verifyTarget}`, 'success')
+                } else {
+                    showNotification("Scanned NFC card is empty or unrecognized", "warning")
+                }
+            }
+            
+            ndef.onreadingerror = () => {
+                showNotification("Error reading NFC tag. Try again.", "error")
+            }
+
+        } catch (err: any) {
+            console.error("NFC start failed:", err)
+            showNotification(`Failed to start NFC scanning: ${err.message || err}`, "error")
+            setIsNfcActive(false)
+        }
+    }
+
+    const stopNfcScan = () => {
+        if (nfcAbortControllerRef.current) {
+            nfcAbortControllerRef.current.abort()
+            nfcAbortControllerRef.current = null
+        }
+        setIsNfcActive(false)
+        showNotification("NFC scanning deactivated.", "info")
+    }
+
+    const toggleNfcScan = () => {
+        if (isNfcActive) {
+            stopNfcScan()
+        } else {
+            startNfcScan()
+        }
     }
 
     const handleQueryChange = async (val: string) => {
@@ -801,6 +935,12 @@ export default function StudentVerification() {
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 dark:bg-purple-950/30 text-purple-600 border border-purple-200/50">
                                 {cachedCount} Cached Records
                             </span>
+                            {isNfcActive && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-600 text-white border border-purple-500 animate-pulse shadow-sm">
+                                    <Radio className="w-3.5 h-3.5 animate-pulse text-white" />
+                                    NFC Scanner Active
+                                </span>
+                            )}
                         </div>
                         
                         <button
@@ -883,9 +1023,21 @@ export default function StudentVerification() {
                                 </button>
                                 <button
                                     onClick={startScanner}
-                                    className="p-2.5 sm:p-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl flex items-center justify-center"
+                                    className="p-2.5 sm:p-4 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-600 transition-all"
+                                    title="Scan QR Code"
                                 >
                                     <QrCode size={18} />
+                                </button>
+                                <button
+                                    onClick={toggleNfcScan}
+                                    className={`p-2.5 sm:p-4 font-bold rounded-xl flex items-center justify-center transition-all ${
+                                        isNfcActive 
+                                            ? 'bg-purple-600 text-white animate-pulse shadow-md' 
+                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600'
+                                    }`}
+                                    title={isNfcActive ? "NFC Active (Click to turn off)" : "Turn on NFC Scanning"}
+                                >
+                                    <Radio size={18} className={isNfcActive ? 'animate-pulse' : ''} />
                                 </button>
                             </div>
                         </div>
