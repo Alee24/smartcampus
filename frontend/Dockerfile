@@ -6,8 +6,7 @@ ENV NODE_ENV=development
 WORKDIR /app
 
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm install --include=dev
+RUN npm install --production=false
 
 COPY . .
 RUN npm run build
