@@ -14,6 +14,8 @@ coverage
 # Gatepass specific ignores
 backend/static/profiles/*
 !backend/static/profiles/.gitkeep
+backend/static/downloads/*
+!backend/static/downloads/.gitkeep
 backend/uploads/*
 !backend/uploads/.gitkeep
 backend/*.sqlite
