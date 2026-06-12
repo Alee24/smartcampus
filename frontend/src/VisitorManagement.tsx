@@ -2,9 +2,18 @@ import React, { useState, useEffect } from 'react'
 import {
     Search, Plus, Filter, Download, User, Clock,
     CheckCircle, XCircle, LogOut, Phone, CreditCard, Building, MapPin,
-    Car, Truck, Shield, AlertCircle, Eye, Check, X
+    Car, Truck, Shield, AlertCircle, Eye, Check, X, LogIn
 } from 'lucide-react'
 import { useNotification } from './components/Notification'
+import {
+    ResponsiveContainer,
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip as RechartsTooltip
+} from 'recharts'
 
 export default function VisitorManagement() {
     const { showConfirm } = useNotification()
@@ -29,6 +38,27 @@ export default function VisitorManagement() {
     const [submitting, setSubmitting] = useState(false)
     const [previewImage, setPreviewImage] = useState<string | null>(null)
     const [selectedDetailVisitor, setSelectedDetailVisitor] = useState<any | null>(null)
+
+    // Quick check-in/out states
+    const [showQuickModal, setShowQuickModal] = useState(false)
+    const [quickSearch, setQuickSearch] = useState('')
+    const [quickSearchResult, setQuickSearchResult] = useState<any | null>(null)
+    const [quickLookupAttempted, setQuickLookupAttempted] = useState(false)
+    const [loadingQuick, setLoadingQuick] = useState(false)
+    const [quickFormData, setQuickFormData] = useState({
+        first_name: '',
+        last_name: '',
+        phone_number: '',
+        id_number: '',
+        visit_details: '',
+        visitor_type: 'visitor',
+        plate_number: '',
+        passengers: 1,
+        dropoff_name: '',
+        dropoff_admission_number: '',
+        is_pickup: false,
+        check_in_student: false
+    })
 
     useEffect(() => {
         fetchVisitors()
@@ -168,6 +198,130 @@ export default function VisitorManagement() {
         }
     }
 
+    const handleQuickLookup = async () => {
+        if (!quickSearch.trim()) return
+        setLoadingQuick(true)
+        setQuickLookupAttempted(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/users/verify/${encodeURIComponent(quickSearch.trim())}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setQuickSearchResult(data)
+                
+                // Pre-populate quickFormData
+                const names = (data.full_name || '').split(' ')
+                const fName = data.first_name || names[0] || ''
+                const lName = data.last_name || names.slice(1).join(' ') || ''
+                
+                setQuickFormData({
+                    first_name: fName,
+                    last_name: lName,
+                    phone_number: data.phone_number || '',
+                    id_number: data.admission_number || data.id_number || quickSearch.trim(),
+                    visit_details: data.visit_details || '',
+                    visitor_type: data.visitor_type || 'visitor',
+                    plate_number: data.plate_number || '',
+                    passengers: data.passengers || 1,
+                    dropoff_name: data.dropoff_name || '',
+                    dropoff_admission_number: data.dropoff_admission_number || '',
+                    is_pickup: data.is_pickup || false,
+                    check_in_student: data.check_in_student || false
+                })
+            } else {
+                // Not found - let user fill
+                const term = quickSearch.trim()
+                const isPlateGuess = /^[a-zA-Z]{3}\s*\d{3,4}[a-zA-Z]?$/.test(term.replace(/\s+/g, ''))
+                const defaultForm = {
+                    first_name: '',
+                    last_name: '',
+                    phone_number: '',
+                    id_number: isPlateGuess ? '' : term,
+                    visit_details: '',
+                    visitor_type: isPlateGuess ? 'vehicle_registration' : 'visitor',
+                    plate_number: isPlateGuess ? term.toUpperCase() : '',
+                    passengers: 1,
+                    dropoff_name: '',
+                    dropoff_admission_number: '',
+                    is_pickup: false,
+                    check_in_student: false
+                }
+                setQuickSearchResult({ not_found: true, ...defaultForm })
+                setQuickFormData(defaultForm)
+            }
+        } catch (err) {
+            console.error(err)
+            const term = quickSearch.trim()
+            const isPlateGuess = /^[a-zA-Z]{3}\s*\d{3,4}[a-zA-Z]?$/.test(term.replace(/\s+/g, ''))
+            const defaultForm = {
+                first_name: '',
+                last_name: '',
+                phone_number: '',
+                id_number: isPlateGuess ? '' : term,
+                visit_details: '',
+                visitor_type: isPlateGuess ? 'vehicle_registration' : 'visitor',
+                plate_number: isPlateGuess ? term.toUpperCase() : '',
+                passengers: 1,
+                dropoff_name: '',
+                dropoff_admission_number: '',
+                is_pickup: false,
+                check_in_student: false
+            }
+            setQuickSearchResult({ not_found: true, error: true, ...defaultForm })
+            setQuickFormData(defaultForm)
+        } finally {
+            setLoadingQuick(false)
+        }
+    }
+
+    const handleQuickCheckInSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setSubmitting(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/gate/visitors/check-in', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(quickFormData)
+            })
+
+            if (res.ok) {
+                setShowQuickModal(false)
+                setQuickSearch('')
+                setQuickSearchResult(null)
+                setQuickLookupAttempted(false)
+                setQuickFormData({
+                    first_name: '',
+                    last_name: '',
+                    phone_number: '',
+                    id_number: '',
+                    visit_details: '',
+                    visitor_type: 'visitor',
+                    plate_number: '',
+                    passengers: 1,
+                    dropoff_name: '',
+                    dropoff_admission_number: '',
+                    is_pickup: false,
+                    check_in_student: false
+                })
+                fetchVisitors()
+            } else {
+                const data = await res.json()
+                alert(data.detail || "Failed to check in visitor")
+            }
+        } catch (error: any) {
+            console.error(error)
+            alert(error.message || "Network error occurred")
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
     // Filter by tab status
     const tabFilteredVisitors = visitors.filter(v => {
         if (activeTab === 'pending') return v.status === 'pending';
@@ -201,6 +355,17 @@ export default function VisitorManagement() {
                         Refresh
                     </button>
                     <button
+                        onClick={() => {
+                            setQuickSearch('');
+                            setQuickSearchResult(null);
+                            setQuickLookupAttempted(false);
+                            setShowQuickModal(true);
+                        }}
+                        className="px-4 py-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-900/40 rounded-xl hover:opacity-90 transition-all font-semibold flex items-center gap-2 text-sm cursor-pointer"
+                    >
+                        <Shield size={18} /> Quick Check-In/Out
+                    </button>
+                    <button
                         onClick={() => setShowAddModal(true)}
                         className="px-4 py-2 bg-[var(--primary-color)] text-white rounded-xl shadow-lg shadow-indigo-500/20 hover:opacity-90 transition-all font-semibold flex items-center gap-2 text-sm cursor-pointer"
                     >
@@ -225,6 +390,60 @@ export default function VisitorManagement() {
                     <h3 className="text-[var(--text-secondary)] font-medium mb-2 text-xs uppercase tracking-wider">Checked Out</h3>
                     <div className="text-3xl font-bold text-slate-500">{stats.exited_today}</div>
                     <div className="text-xs text-[var(--text-secondary)] mt-1 font-medium">Completed Visits</div>
+                </div>
+            </div>
+
+            {/* Analytics Graph */}
+            <div className="p-6 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)]">
+                <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+                    <Clock size={16} className="text-indigo-500" /> Visitor Traffic & Hourly Entries
+                </h3>
+                <div className="h-64 w-full">
+                    <ResponsiveContainer width="105%" height="100%">
+                        <AreaChart
+                            data={(stats.hourly || []).map((count, hour) => ({
+                                time: `${hour.toString().padStart(2, '0')}:00`,
+                                count: count
+                            })).filter((_, h) => h >= 6 && h <= 22)}
+                            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                        >
+                            <defs>
+                                <linearGradient id="visitorCount" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--primary-color, #4f46e5)" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="var(--primary-color, #4f46e5)" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" opacity={0.5} />
+                            <XAxis 
+                                dataKey="time" 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tick={{ fill: 'var(--text-secondary)', fontSize: 10, fontWeight: 600 }}
+                            />
+                            <YAxis 
+                                tickLine={false} 
+                                axisLine={false} 
+                                tick={{ fill: 'var(--text-secondary)', fontSize: 10, fontWeight: 600 }}
+                            />
+                            <RechartsTooltip
+                                contentStyle={{ 
+                                    backgroundColor: 'var(--bg-surface)', 
+                                    borderColor: 'var(--border-color)',
+                                    borderRadius: '12px',
+                                    color: 'var(--text-primary)'
+                                }}
+                            />
+                            <Area 
+                                type="monotone" 
+                                dataKey="count" 
+                                name="Visitors"
+                                stroke="var(--primary-color, #4f46e5)" 
+                                strokeWidth={2}
+                                fillOpacity={1} 
+                                fill="url(#visitorCount)" 
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
                 </div>
             </div>
 
@@ -535,9 +754,16 @@ export default function VisitorManagement() {
                                             </td>
                                             <td className="p-4 font-mono font-bold text-xs">
                                                 {visitor.plate_number ? (
-                                                    <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-800 dark:text-slate-200">
-                                                        {visitor.plate_number}
-                                                    </span>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="bg-slate-105 dark:bg-slate-800 px-2 py-1 rounded text-slate-800 dark:text-slate-200 w-fit font-bold">
+                                                            {visitor.plate_number}
+                                                        </span>
+                                                        {visitor.passengers > 0 && (
+                                                            <span className="text-[10px] text-slate-400 font-sans font-medium block">
+                                                                {visitor.passengers} passenger{visitor.passengers > 1 ? 's' : ''}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 ) : (
                                                     <span className="text-slate-400">-</span>
                                                 )}
@@ -585,6 +811,192 @@ export default function VisitorManagement() {
                                 )}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Quick Check-In / Check-Out Modal */}
+            {showQuickModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in text-[var(--text-primary)]">
+                    <div className="bg-[var(--bg-surface)] w-full max-w-xl rounded-2xl shadow-2xl border border-[var(--border-color)] overflow-hidden animate-scale-in max-h-[90vh] flex flex-col animate-scale-in">
+                        <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center shrink-0">
+                            <div>
+                                <h2 className="text-xl font-bold flex items-center gap-2">
+                                    <Shield className="text-indigo-500" size={22} /> Quick Check-In / Check-Out
+                                </h2>
+                                <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">Verify credentials and instantly log entry or exit.</p>
+                            </div>
+                            <button onClick={() => { setShowQuickModal(false); setQuickSearch(''); setQuickSearchResult(null); setQuickLookupAttempted(false); }} className="text-[var(--text-secondary)] hover:text-red-500 cursor-pointer border-none bg-transparent">
+                                <XCircle size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto space-y-6 text-xs flex-1">
+                            {/* Search Input Bar */}
+                            <div className="space-y-2">
+                                <label className="block font-bold text-[var(--text-secondary)] uppercase tracking-wider text-[10px]">Verify ID / Passport or Plate Number</label>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={16} />
+                                        <input
+                                            type="text"
+                                            placeholder="Enter National ID, Passport or Vehicle Plate..."
+                                            value={quickSearch}
+                                            onChange={(e) => setQuickSearch(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleQuickLookup(); } }}
+                                            className="w-full pl-10 pr-4 py-2.5 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 text-xs font-semibold"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleQuickLookup}
+                                        disabled={loadingQuick}
+                                        className="px-5 py-2.5 bg-[var(--primary-color)] text-white rounded-xl font-bold shadow-md hover:opacity-90 active:scale-95 transition-all text-xs cursor-pointer border-none"
+                                    >
+                                        {loadingQuick ? 'Searching...' : 'Lookup & Verify'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Result Area */}
+                            {loadingQuick && (
+                                <div className="py-12 text-center text-[var(--text-secondary)] font-bold">Verifying credentials...</div>
+                            )}
+
+                            {!loadingQuick && quickLookupAttempted && quickSearchResult && (
+                                <div className="space-y-4 animate-fade-in">
+                                    {/* Found in Active Check-ins: Quick Checkout! */}
+                                    {quickSearchResult.gate_status === 'In' || quickSearchResult.status === 'checked_in' ? (
+                                        <div className="p-5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-4">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <span className="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded font-black uppercase tracking-wider block w-fit mb-1">
+                                                        Active Check-In
+                                                    </span>
+                                                    <h3 className="text-sm font-black text-slate-800 dark:text-white">
+                                                        {quickSearchResult.full_name || `${quickSearchResult.first_name} ${quickSearchResult.last_name}`}
+                                                    </h3>
+                                                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">ID/Passport: {quickSearchResult.admission_number || quickSearchResult.id_number}</p>
+                                                </div>
+                                                <span className="text-xs text-[var(--text-secondary)] font-mono font-medium">
+                                                    In: {new Date(quickSearchResult.time_in).toLocaleTimeString()}
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3 text-xs bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800/80">
+                                                <div>
+                                                    <span className="text-slate-400 block text-[9px] font-bold">CONTACT</span>
+                                                    <span className="font-semibold">{quickSearchResult.phone_number || 'N/A'}</span>
+                                                </div>
+                                                {quickSearchResult.plate_number && (
+                                                    <div>
+                                                        <span className="text-slate-400 block text-[9px] font-bold">PLATE NUMBER</span>
+                                                        <span className="font-mono font-bold uppercase">{quickSearchResult.plate_number}</span>
+                                                    </div>
+                                                )}
+                                                <div className="col-span-2">
+                                                    <span className="text-slate-400 block text-[9px] font-bold">PURPOSE / DESTINATION</span>
+                                                    <span className="font-medium">{quickSearchResult.visit_details || 'No details provided'}</span>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    handleCheckOut(quickSearchResult.id);
+                                                    setShowQuickModal(false);
+                                                }}
+                                                className="w-full py-3 bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-500/25 hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer border-none text-xs"
+                                            >
+                                                <LogOut size={16} /> Log Exit & Check Out
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        /* Not checked in: Show check-in form, pre-populated! */
+                                        <form onSubmit={handleQuickCheckInSubmit} className="space-y-4">
+                                            <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                                                <p className="font-bold text-indigo-700 dark:text-indigo-400 text-xs">
+                                                    {quickSearchResult.not_found 
+                                                        ? "No active log found. Fill the form to check in:" 
+                                                        : "Visitor record verified! Confirm details and check in:"}
+                                                </p>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block font-medium mb-1">First Name</label>
+                                                    <input required type="text" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                        value={quickFormData.first_name} onChange={e => setQuickFormData({ ...quickFormData, first_name: e.target.value })} />
+                                                </div>
+                                                <div>
+                                                    <label className="block font-medium mb-1">Last Name</label>
+                                                    <input required type="text" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                        value={quickFormData.last_name} onChange={e => setQuickFormData({ ...quickFormData, last_name: e.target.value })} />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block font-medium mb-1">National ID / Passport</label>
+                                                    <input required type="text" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                        value={quickFormData.id_number} onChange={e => setQuickFormData({ ...quickFormData, id_number: e.target.value })} />
+                                                </div>
+                                                <div>
+                                                    <label className="block font-medium mb-1">Phone Number</label>
+                                                    <input required type="tel" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                        value={quickFormData.phone_number} onChange={e => setQuickFormData({ ...quickFormData, phone_number: e.target.value })} />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <div className="col-span-2">
+                                                    <label className="block font-medium mb-1">Plate Number (Optional)</label>
+                                                    <input type="text" placeholder="e.g. KAA 123A" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold uppercase"
+                                                        value={quickFormData.plate_number} onChange={e => setQuickFormData({ ...quickFormData, plate_number: e.target.value })} />
+                                                </div>
+                                                <div>
+                                                    <label className="block font-medium mb-1">Passengers</label>
+                                                    <input type="number" min={1} className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                        value={quickFormData.passengers} onChange={e => setQuickFormData({ ...quickFormData, passengers: parseInt(e.target.value) || 1 })} />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block font-medium mb-1">Visitor Type</label>
+                                                <select className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                    value={quickFormData.visitor_type} onChange={e => setQuickFormData({ ...quickFormData, visitor_type: e.target.value })}>
+                                                    <option value="visitor">Regular Visitor</option>
+                                                    <option value="taxi">Taxi Driver</option>
+                                                    <option value="delivery">Delivery Personnel</option>
+                                                    <option value="vehicle_registration">Registered Vehicle Entry</option>
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="block font-medium mb-1">Visit Purpose / Host</label>
+                                                <textarea required className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold" rows={2}
+                                                    placeholder="Reason for visit / who they are meeting..."
+                                                    value={quickFormData.visit_details} onChange={e => setQuickFormData({ ...quickFormData, visit_details: e.target.value })} />
+                                            </div>
+
+                                            <div className="pt-2 flex gap-3">
+                                                <button type="button" onClick={() => { setShowQuickModal(false); setQuickSearch(''); setQuickSearchResult(null); setQuickLookupAttempted(false); }} className="flex-1 py-3 bg-[var(--bg-primary)] rounded-xl font-bold text-[var(--text-secondary)] border border-[var(--border-color)] cursor-pointer">Cancel</button>
+                                                <button type="submit" disabled={submitting} className="flex-2 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 cursor-pointer border-none text-xs">
+                                                    <LogIn size={16} /> {submitting ? 'Checking In...' : 'Verify ID & Check In'}
+                                                </button>
+                                            </div>
+                                        </form>
+                                    )}
+                                </div>
+                            )}
+
+                            {!quickLookupAttempted && (
+                                <div className="py-12 text-center text-[var(--text-secondary)] font-medium flex flex-col items-center justify-center gap-2">
+                                    <Shield className="text-slate-300 dark:text-slate-700" size={48} />
+                                    <span>Scan or type credentials above to retrieve check-in status.</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

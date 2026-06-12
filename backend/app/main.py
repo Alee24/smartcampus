@@ -838,6 +838,8 @@ app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(gate_control.router, prefix="/api/gate", tags=["gate"])
 app.include_router(attendance.router, prefix="/api/attendance", tags=["attendance"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+from app.routers import ai
+app.include_router(ai.router, prefix="/api/admin", tags=["admin"])
 from app.routers import system
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 # Import and include fleet router

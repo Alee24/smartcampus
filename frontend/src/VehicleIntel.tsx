@@ -1,27 +1,62 @@
 import { useState, useEffect } from 'react'
-import { Car, AlertTriangle, RefreshCw, Search, ArrowDownCircle, ArrowUpCircle, Clock, LogIn, LogOut, MoreHorizontal, CheckCircle } from 'lucide-react'
+import { Car, AlertTriangle, RefreshCw, Search, ArrowDownCircle, ArrowUpCircle, Clock, LogIn, LogOut, MoreHorizontal, CheckCircle, Eye, Shield, User, Info, FileText } from 'lucide-react'
 import { useNotification } from './components/Notification'
+import {
+    ResponsiveContainer,
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip as RechartsTooltip,
+    BarChart,
+    Bar,
+    Legend
+} from 'recharts'
 
 export default function VehicleIntel() {
     const { showConfirm } = useNotification()
     const [vehicles, setVehicles] = useState<any[]>([]) // Registered Vehicles
     const [logs, setLogs] = useState<any[]>([])         // Activity Logs
+    const [stats, setStats] = useState<any>(null)       // Vehicle Stats
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
     const [viewMode, setViewMode] = useState<'fleet' | 'logs'>('fleet')
+    
+    // Quick check-in/out states
+    const [showQuickModal, setShowQuickModal] = useState(false)
+    const [quickSearch, setQuickSearch] = useState('')
+    const [quickSearchResult, setQuickSearchResult] = useState<any | null>(null)
+    const [quickLookupAttempted, setQuickLookupAttempted] = useState(false)
+    const [loadingQuick, setLoadingQuick] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+    const [quickFormData, setQuickFormData] = useState({
+        plate_number: '',
+        driver_name: '',
+        driver_contact: '',
+        driver_id_number: '',
+        passengers: 1,
+        purpose: '',
+        destination: ''
+    })
+
+    // Selected vehicle log details modal
+    const [selectedLog, setSelectedLog] = useState<any | null>(null)
 
     const fetchData = async () => {
         const token = localStorage.getItem('token')
         const headers = { 'Authorization': `Bearer ${token}` }
 
         try {
-            const [vehRes, logRes] = await Promise.all([
+            const [vehRes, logRes, statsRes] = await Promise.all([
                 fetch('/api/gate/vehicles', { headers }),
-                fetch('/api/gate/vehicle-logs', { headers })
+                fetch('/api/gate/vehicle-logs', { headers }),
+                fetch('/api/gate/vehicle-stats', { headers })
             ])
 
             if (vehRes.ok) setVehicles(await vehRes.json())
             if (logRes.ok) setLogs(await logRes.json())
+            if (statsRes.ok) setStats(await statsRes.json())
 
             setLoading(false)
         } catch (err) {
@@ -71,6 +106,79 @@ export default function VehicleIntel() {
         }
     }
 
+    const handleQuickLookup = async () => {
+        if (!quickSearch.trim()) return
+        setLoadingQuick(true)
+        setQuickLookupAttempted(true)
+        try {
+            const term = quickSearch.trim().toUpperCase().replace(/\s+/g, '')
+            const activeLog = logs.find(l => l.plate.toUpperCase().replace(/\s+/g, '') === term && !l.exit_time)
+            
+            if (activeLog) {
+                setQuickSearchResult({
+                    checked_in: true,
+                    plate_number: activeLog.plate,
+                    driver_name: activeLog.driver_name || 'Unknown',
+                    driver_contact: activeLog.driver_contact || 'N/A',
+                    driver_id_number: activeLog.driver_id_number || 'N/A',
+                    passengers: activeLog.passengers || 1,
+                    entry_time: activeLog.entry_time || activeLog.time,
+                    entry_gate_name: activeLog.entry_gate_name || 'Main Gate',
+                    purpose: activeLog.purpose || 'Campus visit'
+                })
+            } else {
+                const regVehicle = vehicles.find(v => v.plate_number.toUpperCase().replace(/\s+/g, '') === term)
+                
+                const defaultForm = {
+                    checked_in: false,
+                    plate_number: regVehicle ? regVehicle.plate_number : quickSearch.trim().toUpperCase(),
+                    driver_name: regVehicle ? regVehicle.driver_name || '' : '',
+                    driver_contact: regVehicle ? regVehicle.driver_contact || '' : '',
+                    driver_id_number: regVehicle ? regVehicle.driver_id_number || '' : '',
+                    passengers: 1,
+                    purpose: '',
+                    destination: ''
+                }
+                setQuickSearchResult(defaultForm)
+                setQuickFormData(defaultForm)
+            }
+        } catch (err) {
+            console.error(err)
+        } finally {
+            setLoadingQuick(false)
+        }
+    }
+
+    const handleQuickCheckInSubmit = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setSubmitting(true)
+        try {
+            const token = localStorage.getItem('token')
+            const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+            const res = await fetch('/api/gate/manual-vehicle-entry', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(quickFormData)
+            })
+
+            if (res.ok) {
+                setShowQuickModal(false)
+                setQuickSearch('')
+                setQuickSearchResult(null)
+                setQuickLookupAttempted(false)
+                fetchData()
+            } else {
+                const data = await res.json()
+                alert(data.detail || "Failed to log vehicle entry")
+            }
+        } catch (error) {
+            console.error(error)
+            alert("Network Error")
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
     // Merge Data for Fleet View
     const fleetList = vehicles.map(v => {
         // Find latest log
@@ -106,6 +214,17 @@ export default function VehicleIntel() {
                     <p className="text-[var(--text-secondary)]">Fleet Management & Activity Logs</p>
                 </div>
                 <div className="flex gap-2">
+                    <button
+                        onClick={() => {
+                            setQuickSearch('');
+                            setQuickSearchResult(null);
+                            setQuickLookupAttempted(false);
+                            setShowQuickModal(true);
+                        }}
+                        className="bg-indigo-650 text-white px-4 py-2 rounded-lg font-bold text-sm hover:opacity-90 transition-opacity flex items-center gap-1 cursor-pointer"
+                    >
+                        <Shield size={16} /> Quick Check-In/Out
+                    </button>
                     <button
                         onClick={() => setViewMode(viewMode === 'fleet' ? 'logs' : 'fleet')}
                         className="bg-white border border-[var(--border-color)] px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-50 transition-colors"
@@ -148,6 +267,73 @@ export default function VehicleIntel() {
                     </div>
                 </div>
             </div>
+
+            {/* Vehicle Traffic Graph */}
+            {stats && stats.hourly_traffic && (
+                <div className="glass-card p-6 mb-6 border border-[var(--border-color)]">
+                    <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+                        <Clock size={16} className="text-indigo-500" /> Vehicle Traffic Analytics (Entries & Exits)
+                    </h3>
+                    <div className="h-60 w-full">
+                        <ResponsiveContainer width="105%" height="100%">
+                            <AreaChart
+                                data={stats.hourly_traffic}
+                                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                            >
+                                <defs>
+                                    <linearGradient id="entryColor" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
+                                    </linearGradient>
+                                    <linearGradient id="exitColor" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#6b7280" stopOpacity={0.3}/>
+                                        <stop offset="95%" stopColor="#6b7280" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" opacity={0.5} />
+                                <XAxis 
+                                    dataKey="time" 
+                                    tickLine={false} 
+                                    axisLine={false} 
+                                    tick={{ fill: 'var(--text-secondary)', fontSize: 10, fontWeight: 600 }}
+                                />
+                                <YAxis 
+                                    tickLine={false} 
+                                    axisLine={false} 
+                                    tick={{ fill: 'var(--text-secondary)', fontSize: 10, fontWeight: 600 }}
+                                />
+                                <RechartsTooltip
+                                    contentStyle={{ 
+                                        backgroundColor: 'var(--bg-surface)', 
+                                        borderColor: 'var(--border-color)',
+                                        borderRadius: '12px',
+                                        color: 'var(--text-primary)'
+                                    }}
+                                />
+                                <Legend verticalAlign="top" height={36} iconType="circle" />
+                                <Area 
+                                    type="monotone" 
+                                    dataKey="entries" 
+                                    name="Entries" 
+                                    stroke="#22c55e" 
+                                    strokeWidth={2} 
+                                    fillOpacity={1} 
+                                    fill="url(#entryColor)" 
+                                />
+                                <Area 
+                                    type="monotone" 
+                                    dataKey="exits" 
+                                    name="Exits" 
+                                    stroke="#6b7280" 
+                                    strokeWidth={2} 
+                                    fillOpacity={1} 
+                                    fill="url(#exitColor)" 
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 <div className="col-span-2 glass-card p-0 overflow-hidden flex flex-col h-[600px]">
@@ -254,14 +440,24 @@ export default function VehicleIntel() {
                                                         </span>
                                                     </td>
                                                     <td className="p-4 text-center">
-                                                        {isParked && (
-                                                            <button
-                                                                onClick={() => handleAction('exit', { plate_number: v.plate })}
-                                                                className="text-red-500 hover:text-red-700 mx-auto"
-                                                            >
-                                                                <LogOut size={16} />
-                                                            </button>
-                                                        )}
+                                                         <div className="flex gap-2 justify-center">
+                                                             <button
+                                                                 onClick={() => setSelectedLog(v)}
+                                                                 className="text-slate-500 hover:text-indigo-650 p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border-none bg-transparent"
+                                                                 title="View Log Details"
+                                                             >
+                                                                 <Eye size={16} />
+                                                             </button>
+                                                             {isParked && (
+                                                                 <button
+                                                                     onClick={() => handleAction('exit', { plate_number: v.plate })}
+                                                                     className="text-red-500 hover:text-red-755 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer border-none bg-transparent"
+                                                                     title="Mark Exit"
+                                                                 >
+                                                                     <LogOut size={16} />
+                                                                 </button>
+                                                             )}
+                                                         </div>
                                                     </td>
                                                 </tr>
                                             )
@@ -297,6 +493,308 @@ export default function VehicleIntel() {
                     </div>
                 </div>
             </div>
+
+            {/* Quick Check-In / Check-Out Modal */}
+            {showQuickModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in text-[var(--text-primary)]">
+                    <div className="bg-[var(--bg-surface)] w-full max-w-xl rounded-2xl shadow-2xl border border-[var(--border-color)] overflow-hidden animate-scale-in max-h-[90vh] flex flex-col animate-scale-in">
+                        <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center shrink-0">
+                            <div>
+                                <h2 className="text-xl font-bold flex items-center gap-2">
+                                    <Shield className="text-indigo-500" size={22} /> Quick Vehicle Check-In / Check-Out
+                                </h2>
+                                <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">Verify plate number and instantly log entry or exit.</p>
+                            </div>
+                            <button onClick={() => { setShowQuickModal(false); setQuickSearch(''); setQuickSearchResult(null); setQuickLookupAttempted(false); }} className="text-[var(--text-secondary)] hover:text-red-500 cursor-pointer border-none bg-transparent">
+                                <XCircle size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto space-y-6 text-xs flex-1">
+                            {/* Search Input Bar */}
+                            <div className="space-y-2">
+                                <label className="block font-bold text-[var(--text-secondary)] uppercase tracking-wider text-[10px]">Verify Vehicle License Plate</label>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={16} />
+                                        <input
+                                            type="text"
+                                            placeholder="Enter License Plate Number (e.g. KAA 123A)..."
+                                            value={quickSearch}
+                                            onChange={(e) => setQuickSearch(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleQuickLookup(); } }}
+                                            className="w-full pl-10 pr-4 py-2.5 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 text-xs font-semibold uppercase"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleQuickLookup}
+                                        disabled={loadingQuick}
+                                        className="px-5 py-2.5 bg-[var(--primary-color)] text-white rounded-xl font-bold shadow-md hover:opacity-90 active:scale-95 transition-all text-xs cursor-pointer border-none"
+                                    >
+                                        {loadingQuick ? 'Searching...' : 'Lookup & Verify'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Result Area */}
+                            {loadingQuick && (
+                                <div className="py-12 text-center text-[var(--text-secondary)] font-bold">Verifying logs...</div>
+                            )}
+
+                            {!loadingQuick && quickLookupAttempted && quickSearchResult && (
+                                <div className="space-y-4 animate-fade-in">
+                                    {/* Found in Active check-ins: Quick Checkout! */}
+                                    {quickSearchResult.checked_in ? (
+                                        <div className="p-5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-4">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <span className="text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded font-black uppercase tracking-wider block w-fit mb-1">
+                                                        Currently Parked
+                                                    </span>
+                                                    <h3 className="text-lg font-black text-slate-800 dark:text-white font-mono uppercase">
+                                                        {quickSearchResult.plate_number}
+                                                    </h3>
+                                                    <p className="text-[10px] text-slate-400 font-sans mt-0.5">Driver: {quickSearchResult.driver_name}</p>
+                                                </div>
+                                                <span className="text-xs text-[var(--text-secondary)] font-mono font-medium">
+                                                    In: {formatTime(quickSearchResult.entry_time)}
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3 text-xs bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800/80">
+                                                <div>
+                                                    <span className="text-slate-400 block text-[9px] font-bold">CONTACT</span>
+                                                    <span className="font-semibold">{quickSearchResult.driver_contact || 'N/A'}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-400 block text-[9px] font-bold">PASSENGERS</span>
+                                                    <span className="font-semibold">{quickSearchResult.passengers || 1}</span>
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <span className="text-slate-400 block text-[9px] font-bold">PURPOSE / DESTINATION</span>
+                                                    <span className="font-medium">{quickSearchResult.purpose || 'Campus visit'}</span>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    handleAction('exit', { plate_number: quickSearchResult.plate_number });
+                                                    setShowQuickModal(false);
+                                                }}
+                                                className="w-full py-3 bg-red-650 text-white rounded-xl font-bold shadow-lg shadow-red-500/25 hover:bg-red-700 transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer border-none text-xs"
+                                            >
+                                                <LogOut size={16} /> Log Exit & Check Out
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        /* Not checked in: Show check-in form, pre-populated! */
+                                        <form onSubmit={handleQuickCheckInSubmit} className="space-y-4">
+                                            <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                                                <p className="font-bold text-indigo-700 dark:text-indigo-400 text-xs">
+                                                    Vehicle not inside. Fill out details to log Entry Check-In:
+                                                </p>
+                                            </div>
+
+                                            <div>
+                                                <label className="block font-medium mb-1">License Plate Number</label>
+                                                <input required type="text" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-mono font-bold uppercase"
+                                                    value={quickFormData.plate_number} onChange={e => setQuickFormData({ ...quickFormData, plate_number: e.target.value.toUpperCase() })} />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block font-medium mb-1">Driver Name</label>
+                                                    <input required type="text" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                        value={quickFormData.driver_name} onChange={e => setQuickFormData({ ...quickFormData, driver_name: e.target.value })} />
+                                                </div>
+                                                <div>
+                                                    <label className="block font-medium mb-1">Driver Contact (Mobile)</label>
+                                                    <input required type="text" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                        value={quickFormData.driver_contact} onChange={e => setQuickFormData({ ...quickFormData, driver_contact: e.target.value })} />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block font-medium mb-1">Driver National ID</label>
+                                                    <input required type="text" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                        value={quickFormData.driver_id_number} onChange={e => setQuickFormData({ ...quickFormData, driver_id_number: e.target.value })} />
+                                                </div>
+                                                <div>
+                                                    <label className="block font-medium mb-1">Passenger Count</label>
+                                                    <input required type="number" min={1} className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                        value={quickFormData.passengers} onChange={e => setQuickFormData({ ...quickFormData, passengers: parseInt(e.target.value) || 1 })} />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block font-medium mb-1">Visit Purpose</label>
+                                                    <input required type="text" placeholder="e.g. Utility delivery" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                        value={quickFormData.purpose} onChange={e => setQuickFormData({ ...quickFormData, purpose: e.target.value })} />
+                                                </div>
+                                                <div>
+                                                    <label className="block font-medium mb-1">Destination Location</label>
+                                                    <input required type="text" placeholder="e.g. Block B Parking" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
+                                                        value={quickFormData.destination} onChange={e => setQuickFormData({ ...quickFormData, destination: e.target.value })} />
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-2 flex gap-3">
+                                                <button type="button" onClick={() => { setShowQuickModal(false); setQuickSearch(''); setQuickSearchResult(null); setQuickLookupAttempted(false); }} className="flex-1 py-3 bg-[var(--bg-primary)] rounded-xl font-bold text-[var(--text-secondary)] border border-[var(--border-color)] cursor-pointer">Cancel</button>
+                                                <button type="submit" disabled={submitting} className="flex-2 py-3 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 cursor-pointer border-none text-xs">
+                                                    <LogIn size={16} /> Log Entry & Check In
+                                                </button>
+                                            </div>
+                                        </form>
+                                    )}
+                                </div>
+                            )}
+
+                            {!quickLookupAttempted && (
+                                <div className="py-12 text-center text-[var(--text-secondary)] font-medium flex flex-col items-center justify-center gap-2">
+                                    <Shield className="text-slate-300 dark:text-slate-700" size={48} />
+                                    <span>Type a vehicle license plate above to verify status.</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Vehicle Log Details Modal */}
+            {selectedLog && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in text-[var(--text-primary)]">
+                    <div className="bg-[var(--bg-surface)] w-full max-w-lg rounded-2xl shadow-2xl border border-[var(--border-color)] overflow-hidden animate-scale-in max-h-[90vh] flex flex-col animate-scale-in">
+                        <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center shrink-0">
+                            <div>
+                                <h2 className="text-xl font-bold flex items-center gap-2">
+                                    <Car className="text-indigo-500" size={22} /> Vehicle Log Details
+                                </h2>
+                                <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">Full historical capture details for this activity log entry.</p>
+                            </div>
+                            <button onClick={() => setSelectedLog(null)} className="text-[var(--text-secondary)] hover:text-red-500 cursor-pointer border-none bg-transparent">
+                                <XCircle size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
+                            {/* License Plate Banner */}
+                            <div className="p-4 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)] flex items-center justify-between">
+                                <div>
+                                    <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">License Plate</span>
+                                    <h3 className="text-lg font-black font-mono uppercase">{selectedLog.plate}</h3>
+                                </div>
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-black border uppercase tracking-wider ${
+                                    !selectedLog.exit_time
+                                        ? 'bg-green-150 text-green-700 border-green-200'
+                                        : 'bg-slate-105 text-slate-650 border-slate-200'
+                                }`}>
+                                    {!selectedLog.exit_time ? 'PARKED' : 'EXITED'}
+                                </span>
+                            </div>
+
+                            {/* Driver Information */}
+                            <div>
+                                <h4 className="font-bold text-[10px] uppercase text-slate-400 tracking-wider mb-2">Driver Details</h4>
+                                <div className="grid grid-cols-2 gap-3 bg-[var(--bg-primary)] p-4 rounded-xl border border-[var(--border-color)]">
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[9px]">FULL NAME</span>
+                                        <span className="font-semibold">{selectedLog.driver_name || 'Unknown'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[9px]">ID NUMBER</span>
+                                        <span className="font-mono font-semibold">{selectedLog.driver_id_number || 'N/A'}</span>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <span className="text-slate-400 font-bold block text-[9px]">CONTACT MOBILE</span>
+                                        <span className="font-semibold">{selectedLog.driver_contact || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Visit Details */}
+                            <div>
+                                <h4 className="font-bold text-[10px] uppercase text-slate-400 tracking-wider mb-2">Visit Details</h4>
+                                <div className="grid grid-cols-2 gap-3 bg-[var(--bg-primary)] p-4 rounded-xl border border-[var(--border-color)]">
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[9px]">PURPOSE</span>
+                                        <span className="font-semibold">{selectedLog.purpose || 'Campus entry'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[9px]">DESTINATION</span>
+                                        <span className="font-semibold">{selectedLog.destination || 'Campus parking'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[9px]">PASSENGERS COUNT</span>
+                                        <span className="font-semibold">{selectedLog.passengers || 1}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[9px]">LOG TYPE</span>
+                                        <span className="font-semibold">{selectedLog.manual_override ? 'Manual Log' : 'Automated Cam Scan'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Timestamps & Gates */}
+                            <div>
+                                <h4 className="font-bold text-[10px] uppercase text-slate-405 tracking-wider mb-2">Check-In / Out History</h4>
+                                <div className="grid grid-cols-2 gap-4 bg-[var(--bg-primary)] p-4 rounded-xl border border-[var(--border-color)]">
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[9px]">ENTRY TIME</span>
+                                        <span className="font-mono font-semibold">
+                                            {selectedLog.entry_time ? new Date(selectedLog.entry_time).toLocaleString() : new Date(selectedLog.time).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[9px]">ENTRY GATE</span>
+                                        <span className="font-semibold">{selectedLog.entry_gate_name || 'Main Gate'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[9px]">EXIT TIME</span>
+                                        <span className="font-mono font-semibold">
+                                            {selectedLog.exit_time ? new Date(selectedLog.exit_time).toLocaleString() : '-'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[9px]">EXIT GATE</span>
+                                        <span className="font-semibold">{selectedLog.exit_gate_name || '-'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Vehicle Image */}
+                            {selectedLog.image && (
+                                <div>
+                                    <h4 className="font-bold text-[10px] uppercase text-slate-400 tracking-wider mb-2">Detected Camera Image</h4>
+                                    <div className="aspect-video rounded-xl overflow-hidden border border-[var(--border-color)] group shadow-inner">
+                                        <img src={selectedLog.image} className="w-full h-full object-cover" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="p-6 border-t border-[var(--border-color)] flex justify-end gap-3 shrink-0">
+                            <button onClick={() => setSelectedLog(null)} className="px-5 py-3 bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-secondary)] rounded-xl font-bold hover:bg-[var(--bg-surface)] cursor-pointer">
+                                Close
+                            </button>
+                            {selectedLog.exit_time == null && (
+                                <button
+                                    onClick={() => {
+                                        handleAction('exit', { plate_number: selectedLog.plate });
+                                        setSelectedLog(null);
+                                    }}
+                                    className="px-5 py-3 bg-red-650 text-white rounded-xl font-bold shadow-lg shadow-red-500/25 hover:opacity-90 cursor-pointer border-none"
+                                >
+                                    Check Out Vehicle
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

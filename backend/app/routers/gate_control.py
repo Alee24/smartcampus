@@ -2243,6 +2243,9 @@ async def get_vehicle_logs(session: AsyncSession = Depends(get_session)):
         results = (await session.exec(query)).all()
         print(f"DEBUG: Found {len(results)} logs via ORM")
         
+        gates = (await session.exec(select(Gate))).all()
+        gate_map = {gate.id: gate.name for gate in gates}
+        
         logs = []
         for log, vehicle in results:
             # Handle timestamps details
@@ -2264,7 +2267,12 @@ async def get_vehicle_logs(session: AsyncSession = Depends(get_session)):
                 "exit_time": t_exit,
                 "status": "allowed" if (vehicle.make != "Unknown") else "flagged",
                 "image": log.vehicle_images.get("front") if log.vehicle_images else None,
-                "passengers": log.detected_passengers or 1
+                "passengers": log.detected_passengers or 1,
+                "purpose": log.purpose,
+                "destination": log.destination,
+                "entry_gate_name": gate_map.get(log.gate_id, "Unknown Gate"),
+                "exit_gate_name": gate_map.get(log.exit_gate_id) if log.exit_gate_id else None,
+                "manual_override": log.manual_override
             })
         return logs
     except Exception as e:
@@ -2350,6 +2358,13 @@ async def check_in_visitor(
             phone_number=str(phone_number).strip(),
             id_number=payload.get("id_number"),
             visit_details=payload.get("visit_details"),
+            visitor_type=payload.get("visitor_type", "visitor"),
+            plate_number=payload.get("plate_number"),
+            passengers=payload.get("passengers", 1),
+            dropoff_name=payload.get("dropoff_name"),
+            dropoff_admission_number=payload.get("dropoff_admission_number"),
+            is_pickup=payload.get("is_pickup", False),
+            check_in_student=payload.get("check_in_student", False),
             status="checked_in",
             gate_id=gate_uuid,
             time_in=get_eat_time()
@@ -2357,6 +2372,39 @@ async def check_in_visitor(
         session.add(visitor)
         await session.commit()
         await session.refresh(visitor)
+
+        # Log vehicle if plate number exists
+        if visitor.plate_number:
+            from app.models import Vehicle, VehicleLog
+            clean_plate = visitor.plate_number.replace(" ", "").upper()
+            vehicle = (await session.exec(
+                select(Vehicle).where(func.replace(Vehicle.plate_number, ' ', '') == clean_plate)
+            )).first()
+            if not vehicle:
+                vehicle = Vehicle(
+                    plate_number=visitor.plate_number,
+                    make="Unknown",
+                    model="Visitor Vehicle",
+                    color="Unknown",
+                    vehicle_type="visitor",
+                    status="active"
+                )
+                session.add(vehicle)
+                await session.commit()
+                await session.refresh(vehicle)
+            
+            v_log = VehicleLog(
+                vehicle_id=vehicle.id,
+                gate_id=visitor.gate_id or gate_uuid,
+                entry_time=get_eat_time(),
+                vehicle_images={},
+                manual_override=True,
+                detected_passengers=visitor.passengers or 1,
+                purpose=visitor.visit_details,
+                destination=visitor.dropoff_name or "Campus"
+            )
+            session.add(v_log)
+            await session.commit()
 
         # Check if visitor ID matches student admission number and auto-check-in student
         if visitor.id_number:
