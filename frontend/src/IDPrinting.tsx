@@ -482,12 +482,12 @@ function IDCardFront({ student, companySettings }: any) {
                     </div>
                     <div className="flex gap-1 mt-0.5 items-baseline">
                         <span className="text-[#7A1975] font-bold text-[7.5px] tracking-wider min-w-[52px] uppercase shrink-0">COURSE:</span>
-                        <span className="font-extrabold text-slate-800 break-words text-[8.5px]">{student.program || "DBM/May 2026"}</span>
+                        <span className="font-extrabold text-slate-800 break-words text-[8.5px]">{student.program || ""}</span>
                     </div>
                     <div className="flex gap-1 mt-0.5 items-baseline">
                         <span className="text-[#7A1975] font-bold text-[7.5px] tracking-wider min-w-[52px] uppercase shrink-0">VALIDITY:</span>
                         <span className="font-extrabold text-slate-800 break-words text-[8.5px]">
-                            {student.expiry_date ? new Date(student.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
+                            {student.expiry_date ? new Date(student.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ""}
                         </span>
                     </div>
                 </div>

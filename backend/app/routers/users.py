@@ -545,6 +545,15 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                             program_val = str(raw_map[key] or '').strip() or None
                             break
 
+                    validity_val = None
+                    for key in ['validity', 'expiry_date', 'expiry']:
+                        if key in raw_map:
+                            validity_val = str(raw_map[key] or '').strip() or None
+                            break
+
+                    from app.routers.admin import parse_validity_date
+                    expiry_date = parse_validity_date(validity_val) if validity_val else None
+
                     profile_val = None
                     for key in ['profile_image', 'profile_pic', 'image', 'photo']:
                         if key in raw_map:
@@ -563,6 +572,7 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                             "email": email_val,
                             "gender": gender_val,
                             "program": program_val,
+                            "expiry_date": expiry_date,
                             "profile_image": existing_img or profile_val
                         })
                         updated_count += 1
@@ -579,6 +589,7 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                             "email": email_val,
                             "gender": gender_val,
                             "program": program_val,
+                            "expiry_date": expiry_date,
                             "pwd": default_hashed_pwd,
                             "role_id": role_id_val,
                             "profile_image": profile_val,
@@ -598,24 +609,24 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                 try:
                     for rec in batch:
                         await session.execute(sa_text("""
-                            INSERT INTO users
-                                (id, admission_number, full_name, first_name, last_name,
-                                 phone_number, school, email, gender, program,
-                                 hashed_password, role_id, status, profile_image,
-                                 has_smartphone, pin, pin_setup_required, created_at)
-                            VALUES
-                                (:new_id, :adm, :full_name, :first_name, :last_name,
-                                 :phone, :school, :email, :gender, :program,
-                                 :pwd, :role_id, 'active', :profile_image,
-                                 0, '2424', 1, :created_at)
-                            ON DUPLICATE KEY UPDATE
-                                full_name        = VALUES(full_name),
-                                first_name       = VALUES(first_name),
-                                last_name        = VALUES(last_name),
-                                phone_number     = COALESCE(VALUES(phone_number), phone_number),
-                                school           = VALUES(school),
-                                email            = COALESCE(VALUES(email), email),
-                                status           = 'active'
+                             INSERT INTO users
+                                 (id, admission_number, full_name, first_name, last_name,
+                                  phone_number, school, email, gender, program, expiry_date,
+                                  hashed_password, role_id, status, profile_image,
+                                  has_smartphone, pin, pin_setup_required, created_at)
+                             VALUES
+                                 (:new_id, :adm, :full_name, :first_name, :last_name,
+                                  :phone, :school, :email, :gender, :program, :expiry_date,
+                                  :pwd, :role_id, 'active', :profile_image,
+                                  0, '2424', 1, :created_at)
+                             ON DUPLICATE KEY UPDATE
+                                 full_name        = VALUES(full_name),
+                                 first_name       = VALUES(first_name),
+                                 last_name        = VALUES(last_name),
+                                 phone_number     = COALESCE(VALUES(phone_number), phone_number),
+                                 school           = VALUES(school),
+                                 email            = COALESCE(VALUES(email), email),
+                                 status           = 'active'
                         """), rec)
                     await session.commit()
                 except Exception as e:
@@ -629,18 +640,19 @@ async def _process_bulk_upload_task(content: bytes, job_id: str):
                 try:
                     for rec in batch:
                         await session.execute(sa_text("""
-                            UPDATE users SET
-                                full_name     = :full_name,
-                                first_name    = :first_name,
-                                last_name     = :last_name,
-                                phone_number  = :phone,
-                                school        = :school,
-                                email         = :email,
-                                gender        = :gender,
-                                program       = :program,
-                                profile_image = :profile_image,
-                                status        = 'active'
-                            WHERE id = :existing_id
+                             UPDATE users SET
+                                 full_name     = :full_name,
+                                 first_name    = :first_name,
+                                 last_name     = :last_name,
+                                 phone_number  = :phone,
+                                 school        = :school,
+                                 email         = :email,
+                                 gender        = :gender,
+                                 program       = :program,
+                                 expiry_date   = :expiry_date,
+                                 profile_image = :profile_image,
+                                 status        = 'active'
+                             WHERE id = :existing_id
                         """), rec)
                     await session.commit()
                 except Exception as e:

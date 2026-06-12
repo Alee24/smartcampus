@@ -1277,8 +1277,9 @@ async def scan_entry(
     try:
         res = await scan_entry_inner(request, scan_data, session)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         res = {"status": "rejected", "message": f"Scan error: {str(e)}", "data": None}
-        raise e
     finally:
         # Log the scan!
         if res:

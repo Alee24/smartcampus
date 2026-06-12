@@ -1022,12 +1022,12 @@ export default function StudentVerification() {
                                                             </div>
                                                             <div className="flex gap-2 mt-2 items-baseline">
                                                                 <span className="text-[#7A1975] dark:text-purple-400 font-bold text-[13px] tracking-wider min-w-[100px] uppercase shrink-0">COURSE:</span>
-                                                                <span className="font-extrabold text-slate-800 dark:text-gray-100 break-words text-[15px]">{result.program || "DBM/May 2026"}</span>
+                                                                <span className="font-extrabold text-slate-800 dark:text-gray-100 break-words text-[15px]">{result.program || ""}</span>
                                                             </div>
                                                             <div className="flex gap-2 mt-2 items-baseline">
                                                                 <span className="text-[#7A1975] dark:text-purple-400 font-bold text-[13px] tracking-wider min-w-[100px] uppercase shrink-0">VALIDITY:</span>
                                                                 <span className="font-extrabold text-slate-800 dark:text-gray-100 break-words text-[15px]">
-                                                                    {result.expiry_date ? new Date(result.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
+                                                                    {result.expiry_date ? new Date(result.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ""}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -1252,12 +1252,12 @@ export default function StudentVerification() {
                                          </div>
                                          <div className="flex gap-3 mt-2 items-baseline">
                                              <span className="text-[#7A1975] font-bold text-[19px] tracking-wider min-w-[155px] uppercase shrink-0">COURSE:</span>
-                                             <span className="font-extrabold text-slate-800 break-words text-[22px]">{result.program || "DBM/May 2026"}</span>
+                                             <span className="font-extrabold text-slate-800 break-words text-[22px]">{result.program || ""}</span>
                                          </div>
                                          <div className="flex gap-3 mt-2 items-baseline">
                                              <span className="text-[#7A1975] font-bold text-[19px] tracking-wider min-w-[155px] uppercase shrink-0">VALIDITY:</span>
                                              <span className="font-extrabold text-slate-800 break-words text-[22px]">
-                                                 {result.expiry_date ? new Date(result.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "Dec 2029"}
+                                                 {result.expiry_date ? new Date(result.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ""}
                                              </span>
                                          </div>
                                      </div>

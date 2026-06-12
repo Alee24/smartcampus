@@ -28,7 +28,7 @@ export default function BulkUpload() {
             endpoint: 'lecturers',
             icon: <UserCheck size={24} />,
             color: 'bg-purple-500',
-            example: 'full_name,email,admission_number,school,phone_number,profile_image\nDr. Smith,smith@demo.com,LEC001,Computing,+254700123456,https://example.com/photo.jpg',
+            example: 'full_name,email,admission_number,school,phone_number,profile_image,course,validity\nDr. Smith,smith@demo.com,LEC001,Computing,+254700123456,https://example.com/photo.jpg,DBM/May 2026,Dec 2029',
             status: 'pending'
         },
         {
@@ -68,7 +68,7 @@ export default function BulkUpload() {
             endpoint: 'students',
             icon: <Users size={24} />,
             color: 'bg-blue-500',
-            example: 'admission_number,full_name,first_name,last_name,email,school,status,phone_number,role,gender,program,profile_image\nSTD202,Jane Doe,Jane,Doe,jane@example.com,ICT,Active,+254711223344,Student,female,B.Sc Computer Science,/static/profiles/jane.jpg\n\n--- FIELD GUIDE ---\nadmission_number : Unique ID (auto-generated if blank)\nfull_name        : Full name (or use first_name + last_name)\nemail            : Optional, must be unique\nschool           : Department/Faculty (default: General)\nstatus           : Active | Graduated | Suspended | Registered | Deferred\nrole             : Student | Lecturer | Admin (default: Student)\ngender           : male | female | other\nprogram          : e.g. B.Sc Computer Science',
+            example: 'admission_number,full_name,first_name,last_name,email,school,status,phone_number,role,gender,program,validity,profile_image\nSTD202,Jane Doe,Jane,Doe,jane@example.com,ICT,Active,+254711223344,Student,female,DBM/May 2026,Dec 2029,/static/profiles/jane.jpg\n\n--- FIELD GUIDE ---\nadmission_number : Unique ID (auto-generated if blank)\nfull_name        : Full name (or use first_name + last_name)\nemail            : Optional, must be unique\nschool           : Department/Faculty (default: General)\nstatus           : Active | Graduated | Suspended | Registered | Deferred\nrole             : Student | Lecturer | Admin (default: Student)\ngender           : male | female | other\nprogram          : Course (e.g. DBM/May 2026)\nvalidity         : Expiry date (e.g. Dec 2029)',
             status: 'pending'
         },
         {

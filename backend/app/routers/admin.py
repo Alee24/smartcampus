@@ -286,6 +286,23 @@ async def upload_logo(
     
     return {"logo_url": logo_url}
 
+def parse_validity_date(date_str: str):
+    if not date_str:
+        return None
+    from datetime import datetime
+    import dateutil.parser
+    date_str = date_str.strip()
+    try:
+        return dateutil.parser.parse(date_str).date()
+    except Exception:
+        pass
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%b %Y", "%B %Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+    return None
+
 # --- Robust Bulk Uploads ---
 
 @router.post("/bulk/lecturers")
@@ -334,6 +351,9 @@ async def bulk_upload_lecturers(
                 school = (row.get('school') or 'General').strip()
                 phone_number = (row.get('phone_number') or '').strip() or None
                 profile_image = (row.get('profile_image') or '').strip() or None
+                program = (row.get('program') or row.get('course') or '').strip() or None
+                validity_val = (row.get('validity') or row.get('expiry_date') or '').strip() or None
+                expiry_date = parse_validity_date(validity_val) if validity_val else None
                 
                 if not email or not name:
                     error_count += 1
@@ -351,6 +371,9 @@ async def bulk_upload_lecturers(
                     existing.role_id = lecturer_role.id
                     existing.status = "active"
                     existing.phone_number = phone_number
+                    existing.program = program
+                    if expiry_date:
+                        existing.expiry_date = expiry_date
                     if profile_image and not existing.profile_image:
                         existing.profile_image = profile_image
                     session.add(existing)
@@ -371,7 +394,9 @@ async def bulk_upload_lecturers(
                         role_id=lecturer_role.id,
                         status="active",
                         phone_number=phone_number,
-                        profile_image=profile_image
+                        profile_image=profile_image,
+                        program=program,
+                        expiry_date=expiry_date
                     )
                     session.add(new_user)
                     try:
@@ -448,7 +473,9 @@ async def bulk_upload_students(
                 email = (row.get('email') or '').strip()
                 school = (row.get('school') or 'General').strip()
                 gender = (row.get('gender') or '').strip() or None
-                program = (row.get('program') or '').strip() or None
+                program = (row.get('program') or row.get('course') or '').strip() or None
+                validity_val = (row.get('validity') or row.get('expiry_date') or '').strip() or None
+                expiry_date = parse_validity_date(validity_val) if validity_val else None
                 status_val = (row.get('status') or 'active').strip() or 'active'
                 
                 phone_number = (row.get('phone_number') or '').strip() or None
@@ -485,6 +512,8 @@ async def bulk_upload_students(
                     existing.email = email
                     existing.gender = gender
                     existing.program = program
+                    if expiry_date:
+                        existing.expiry_date = expiry_date
                     existing.phone_number = phone_number
                     if profile_image and not existing.profile_image:
                         existing.profile_image = profile_image
@@ -509,6 +538,7 @@ async def bulk_upload_students(
                         status=status_val,
                         gender=gender,
                         program=program,
+                        expiry_date=expiry_date,
                         phone_number=phone_number,
                         profile_image=profile_image
                     )
@@ -1222,51 +1252,272 @@ async def bulk_upload_photos(
 
 @router.get("/scan-logs")
 async def get_scan_logs(limit: int = 100, session: AsyncSession = Depends(get_session)):
-    # Join ScanLog with User and optionally Classroom
-    # ScanLog.room_code maps to Classroom.room_code
-    query = (
-        select(ScanLog, User, Classroom)
-        .join(User, ScanLog.student_id == User.id)
-        .outerjoin(Classroom, ScanLog.room_code == Classroom.room_code)
-        .order_by(ScanLog.timestamp.desc())
-        .limit(limit)
+    from app.models import (
+        ScanLog, User, Classroom, ClassSession, IncidentReport,
+        VehicleLog, Vehicle, Gate, AssetLog, Asset, GateScanLog, Visitor
     )
-    results = (await session.exec(query)).all()
-    
-    # Collect all user IDs to batch-check flagged status
-    user_ids = [user.id for log, user, classroom in results]
+    from sqlalchemy import func
+    import uuid
+
+    unified_logs = []
+    user_ids = set()
+
+    # 1. Fetch classroom / trip / general ScanLogs
+    try:
+        query = (
+            select(ScanLog, User, Classroom)
+            .join(User, ScanLog.student_id == User.id)
+            .outerjoin(Classroom, ScanLog.room_code == Classroom.room_code)
+            .order_by(ScanLog.timestamp.desc())
+            .limit(limit)
+        )
+        scan_results = (await session.exec(query)).all()
+        for log, user, classroom in scan_results:
+            user_ids.add(user.id)
+            
+            # Construct location string
+            loc_str = log.detected_location
+            if not loc_str and classroom:
+                parts = []
+                if classroom.room_name: parts.append(classroom.room_name)
+                if classroom.building: parts.append(classroom.building)
+                if parts: loc_str = ", ".join(parts)
+
+            status_msg = log.status_message or ""
+            room_code = log.room_code or ""
+
+            # Check if this represents a vehicle, trip or asset scan
+            display_name = user.full_name
+            display_id = user.admission_number
+            display_room = room_code
+
+            if "TRIP" in status_msg.upper() or room_code.startswith("TRIP:"):
+                display_room = "FLEET TRIP"
+                if not loc_str:
+                    loc_str = "Trip Boarding Scanner"
+            elif "VEHICLE" in status_msg.upper() or room_code.startswith("VEHICLE:") or room_code.startswith("BUS:"):
+                clean_plate = room_code
+                if ":" in clean_plate:
+                    clean_plate = clean_plate.split(":", 1)[1].strip()
+                display_room = clean_plate
+                if not loc_str:
+                    loc_str = "Gate Entry"
+            elif "ASSET" in status_msg.upper() or room_code.startswith("ASSET:"):
+                display_room = "ASSET"
+                if not loc_str:
+                    loc_str = "Asset Hub"
+
+            unified_logs.append({
+                "id": f"scan_log_{log.id}",
+                "timestamp": log.timestamp,
+                "student_name": display_name,
+                "admission_number": display_id,
+                "room_code": display_room,
+                "is_successful": log.is_successful,
+                "detected_location": loc_str or "Location unmapped",
+                "status_message": status_msg,
+                "user_id": user.id,
+            })
+    except Exception as e:
+        print(f"Error fetching ScanLog: {e}")
+
+    # 2. Fetch Vehicle gate entries/exits (VehicleLog)
+    try:
+        vehicle_query = (
+            select(VehicleLog, Vehicle, Gate)
+            .join(Vehicle, VehicleLog.vehicle_id == Vehicle.id)
+            .join(Gate, VehicleLog.gate_id == Gate.id)
+            .order_by(VehicleLog.entry_time.desc())
+            .limit(limit)
+        )
+        vehicle_results = (await session.exec(vehicle_query)).all()
+        for log, vehicle, gate in vehicle_results:
+            # Entry event
+            if log.entry_time:
+                desc = f"Vehicle Checked IN. Make: {vehicle.make or 'N/A'}, Model: {vehicle.model or 'N/A'}, Color: {vehicle.color or 'N/A'}"
+                if log.purpose:
+                    desc += f" | Purpose: {log.purpose}"
+                if log.detected_passengers:
+                    desc += f" | Passengers: {log.detected_passengers}"
+                
+                unified_logs.append({
+                    "id": f"vehicle_entry_{log.id}",
+                    "timestamp": log.entry_time,
+                    "student_name": f"Vehicle: {vehicle.plate_number}",
+                    "admission_number": "VEHICLE CHECK-IN",
+                    "room_code": vehicle.plate_number,
+                    "is_successful": True,
+                    "detected_location": gate.name if gate else "Gate",
+                    "status_message": desc,
+                    "user_id": None,
+                })
+            # Exit event
+            if log.exit_time:
+                exit_gate_name = "Unknown Gate"
+                if log.exit_gate_id:
+                    exit_gate = await session.get(Gate, log.exit_gate_id)
+                    if exit_gate:
+                        exit_gate_name = exit_gate.name
+                
+                desc = f"Vehicle Checked OUT. Make: {vehicle.make or 'N/A'}, Model: {vehicle.model or 'N/A'}"
+                unified_logs.append({
+                    "id": f"vehicle_exit_{log.id}",
+                    "timestamp": log.exit_time,
+                    "student_name": f"Vehicle: {vehicle.plate_number}",
+                    "admission_number": "VEHICLE CHECK-OUT",
+                    "room_code": vehicle.plate_number,
+                    "is_successful": True,
+                    "detected_location": exit_gate_name,
+                    "status_message": desc,
+                    "user_id": None,
+                })
+    except Exception as e:
+        print(f"Error fetching VehicleLog: {e}")
+
+    # 3. Fetch Asset check-ins / check-outs (AssetLog)
+    try:
+        asset_query = (
+            select(AssetLog, Asset, User)
+            .join(Asset, AssetLog.asset_id == Asset.id)
+            .outerjoin(User, AssetLog.user_id == User.id)
+            .order_by(AssetLog.timestamp.desc())
+            .limit(limit)
+        )
+        asset_results = (await session.exec(asset_query)).all()
+        for log, asset, user in asset_results:
+            action_user = user.full_name if user else log.handover_name or "N/A"
+            action_id = user.admission_number if user else log.handover_no or "N/A"
+            if user:
+                user_ids.add(user.id)
+                
+            desc = f"Asset {log.action.upper()}: {asset.name}."
+            if log.notes:
+                desc += f" Notes: {log.notes}"
+
+            unified_logs.append({
+                "id": f"asset_log_{log.id}",
+                "timestamp": log.timestamp,
+                "student_name": f"{action_user} (Asset {log.action.replace('_', ' ')})",
+                "admission_number": action_id,
+                "room_code": asset.tag_number,
+                "is_successful": True,
+                "detected_location": asset.location or "Asset Desk",
+                "status_message": desc,
+                "user_id": user.id if user else None,
+            })
+    except Exception as e:
+        print(f"Error fetching AssetLog: {e}")
+
+    # 4. Fetch Visitor check-ins / check-outs (Visitor)
+    try:
+        visitor_query = (
+            select(Visitor, Gate)
+            .join(Gate, Visitor.gate_id == Gate.id, isouter=True)
+            .order_by(Visitor.time_in.desc())
+            .limit(limit)
+        )
+        visitor_results = (await session.exec(visitor_query)).all()
+        for visitor, gate in visitor_results:
+            if visitor.time_in:
+                desc = f"Visitor Checked IN. Type: {visitor.visitor_type or 'visitor'} | Purpose: {visitor.visit_details or 'N/A'}"
+                if visitor.plate_number:
+                    desc += f" | Plate: {visitor.plate_number}"
+                if visitor.passengers:
+                    desc += f" | Passengers: {visitor.passengers}"
+                    
+                unified_logs.append({
+                    "id": f"visitor_in_{visitor.id}",
+                    "timestamp": visitor.time_in,
+                    "student_name": f"Visitor: {visitor.first_name} {visitor.last_name}",
+                    "admission_number": visitor.id_number or "VISITOR",
+                    "room_code": visitor.plate_number or "VISITOR PASS",
+                    "is_successful": visitor.status != "rejected",
+                    "detected_location": gate.name if gate else "Gate",
+                    "status_message": desc,
+                    "user_id": None,
+                })
+            if visitor.time_out:
+                desc = f"Visitor Checked OUT. Type: {visitor.visitor_type or 'visitor'}"
+                unified_logs.append({
+                    "id": f"visitor_out_{visitor.id}",
+                    "timestamp": visitor.time_out,
+                    "student_name": f"Visitor: {visitor.first_name} {visitor.last_name}",
+                    "admission_number": visitor.id_number or "VISITOR",
+                    "room_code": visitor.plate_number or "VISITOR PASS",
+                    "is_successful": True,
+                    "detected_location": gate.name if gate else "Gate",
+                    "status_message": desc,
+                    "user_id": None,
+                })
+    except Exception as e:
+        print(f"Error fetching VisitorLog: {e}")
+
+    # 5. Fetch GateScanLog (Raw Scan Attempts, e.g. for failed scans or guest passes)
+    try:
+        gate_scan_query = (
+            select(GateScanLog, Gate)
+            .join(Gate, GateScanLog.gate_id == Gate.id, isouter=True)
+            .order_by(GateScanLog.timestamp.desc())
+            .limit(limit)
+        )
+        gate_scan_results = (await session.exec(gate_scan_query)).all()
+        for log, gate in gate_scan_results:
+            if log.status != "allowed" or log.scan_type not in ["user", "vehicle"]:
+                display_name = f"Raw Scan: {log.scanned_value or 'Unknown'}"
+                display_id = log.scan_type.upper() if log.scan_type else "GATE"
+                
+                if log.scan_type == "user" and log.scanned_value:
+                    user_obj = (await session.exec(select(User).where(func.lower(User.admission_number) == func.lower(log.scanned_value)))).first()
+                    if user_obj:
+                        display_name = user_obj.full_name
+                        display_id = user_obj.admission_number
+                        user_ids.add(user_obj.id)
+                elif log.scan_type == "vehicle" and log.scanned_value:
+                    clean_plate = log.scanned_value.upper().replace("-", " ")
+                    veh_obj = (await session.exec(select(Vehicle).where(Vehicle.plate_number == clean_plate))).first()
+                    if veh_obj:
+                        display_name = f"Vehicle: {veh_obj.plate_number} ({veh_obj.make or ''})"
+                        display_id = "VEHICLE"
+
+                desc = f"Gate Scanner [{log.status or 'processed'}]: {log.details or ''}"
+                unified_logs.append({
+                    "id": f"gate_scan_{log.id}",
+                    "timestamp": log.timestamp,
+                    "student_name": display_name,
+                    "admission_number": display_id,
+                    "room_code": log.scanned_value or "GATE",
+                    "is_successful": log.status in ["allowed", "success", "event_pass"],
+                    "detected_location": gate.name if gate else "Gate",
+                    "status_message": desc,
+                    "user_id": None,
+                })
+    except Exception as e:
+        print(f"Error fetching GateScanLog: {e}")
+
+    # Check flagged users
     flagged_user_ids = set()
     if user_ids:
-        incident_stmt = select(IncidentReport.target_user_id).where(
-            (IncidentReport.target_user_id.in_(user_ids)) &
-            (IncidentReport.status.notin_(["resolved"]))
-        )
-        flagged_results = (await session.exec(incident_stmt)).all()
-        flagged_user_ids = {str(uid) for uid in flagged_results if uid is not None}
+        try:
+            incident_stmt = select(IncidentReport.target_user_id).where(
+                (IncidentReport.target_user_id.in_(list(user_ids))) &
+                (IncidentReport.status.notin_(["resolved"]))
+            )
+            flagged_results = (await session.exec(incident_stmt)).all()
+            flagged_user_ids = {str(uid) for uid in flagged_results if uid is not None}
+        except Exception as e:
+            print(f"Error checking IncidentReports: {e}")
 
-    data = []
-    for log, user, classroom in results:
-        # Construct pleasant location string
-        loc_str = log.detected_location
-        if not loc_str and classroom:
-            parts = []
-            if classroom.room_name: parts.append(classroom.room_name)
-            if classroom.building: parts.append(classroom.building)
-            if parts: loc_str = ", ".join(parts)
+    # Set flagged flag on unified logs & clean temporary keys
+    response_logs = []
+    for log in unified_logs:
+        uid = log.pop("user_id", None)
+        log["is_flagged"] = str(uid) in flagged_user_ids if uid else False
+        response_logs.append(log)
 
-        is_flagged = str(user.id) in flagged_user_ids
-        data.append({
-            "id": str(log.id),
-            "timestamp": log.timestamp,
-            "student_name": user.full_name,
-            "admission_number": user.admission_number,
-            "room_code": log.room_code,
-            "is_successful": log.is_successful,
-            "detected_location": loc_str,
-            "status_message": log.status_message if hasattr(log, 'status_message') else None,
-            "is_flagged": is_flagged,
-        })
-    return data
+    # Sort all by timestamp descending
+    response_logs.sort(key=lambda x: x["timestamp"], reverse=True)
+
+    return response_logs[:limit]
 
 @router.get("/scan-stats")
 async def get_scan_stats(session: AsyncSession = Depends(get_session)):
