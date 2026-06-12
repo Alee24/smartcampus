@@ -31,12 +31,17 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session), curr
     students_in_school_query = select(func.count(func.distinct(EntryLog.user_id))).where(EntryLog.exit_time == None)
     students_in_school = (await session.exec(students_in_school_query)).one()
 
+    # NFC Tagged count
+    nfc_tagged_query = select(func.count(User.id)).where(User.nfc_card_uid != None)
+    nfc_tagged = (await session.exec(nfc_tagged_query)).one()
+
     return {
         "active_students": total_users,
         "gate_entries_today": total_entries, 
         "security_alerts": rejected_entries,
         "vehicles_parked": vehicles_parked,
-        "students_in_school": students_in_school
+        "students_in_school": students_in_school,
+        "nfc_tagged_users": nfc_tagged
     }
 
 @router.get("/kpi")

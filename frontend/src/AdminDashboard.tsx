@@ -3,7 +3,7 @@ import {
     Users, Car, Shield, Activity, Calendar, LayoutDashboard, 
     ArrowUpRight, ArrowDownRight, FileText, Database, 
     TrendingUp, ShieldCheck, AlertTriangle, ChevronRight, Bus,
-    CheckCircle2, Clock, MapPin, Search, Phone, X
+    CheckCircle2, Clock, MapPin, Search, Phone, X, Radio
 } from 'lucide-react';
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
@@ -99,7 +99,7 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
 
             {/* Primary KPI Row */}
             {liveStats && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                     <div className="glass-card p-5 border-l-4 border-indigo-500">
                         <div className="flex justify-between items-start mb-2">
                             <div>
@@ -175,6 +175,19 @@ export default function AdminDashboard({ onNavigate }: { onNavigate: (tab: strin
                                 <p className="text-2xl font-black text-red-600 mt-1">{stats.security_alerts || 0}</p>
                             </div>
                             <div className="p-2 bg-red-50 rounded-lg text-red-600"><Shield size={20} /></div>
+                        </div>
+                    </div>
+                    <div 
+                        onClick={() => onNavigate('nfc-hub')}
+                        className="glass-card p-5 border-l-4 border-fuchsia-500 cursor-pointer hover:shadow-xl hover:scale-[1.02] transition-all bg-gradient-to-br from-white to-fuchsia-50/10"
+                    >
+                        <div className="flex justify-between items-start mb-2">
+                            <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">NFC Smart Cards</p>
+                                <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{stats.nfc_tagged_users || 0}</p>
+                                <p className="text-[10px] font-bold text-fuchsia-600 mt-0.5">Manage & write tags</p>
+                            </div>
+                            <div className="p-2 bg-fuchsia-50 rounded-lg text-fuchsia-600"><Radio size={20} /></div>
                         </div>
                     </div>
                 </div>
