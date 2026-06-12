@@ -1379,8 +1379,6 @@ async def check_in_user(
     session: AsyncSession = Depends(get_session)
 ):
     user = (await session.exec(select(User).where(User.admission_number == admission_number))).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
     
     # 2. Get Gate
     gate = None
@@ -1398,7 +1396,83 @@ async def check_in_user(
             await session.commit()
             await session.refresh(gate)
 
-    # 1. Close any open sessions
+    if not user:
+        # Fallback 1: check Vehicle (by plate number)
+        from sqlalchemy import func
+        clean_plate = admission_number.replace(" ", "").upper()
+        vehicle = (await session.exec(
+            select(Vehicle).where(func.replace(Vehicle.plate_number, ' ', '') == clean_plate)
+        )).first()
+        if vehicle:
+            active_log = (await session.exec(
+                select(VehicleLog)
+                .where(VehicleLog.vehicle_id == vehicle.id)
+                .where(VehicleLog.exit_time == None)
+                .order_by(VehicleLog.entry_time.desc())
+            )).first()
+            if not active_log:
+                log = VehicleLog(
+                    vehicle_id=vehicle.id,
+                    gate_id=gate.id,
+                    entry_time=get_eat_time(),
+                    manual_override=True,
+                    detected_passengers=1
+                )
+                session.add(log)
+                await session.commit()
+                await session.refresh(log)
+                await log_action(
+                    session=session,
+                    action_type="vehicle_scan_in",
+                    table_name="vehicle_logs",
+                    record_id=str(log.id),
+                    description=f"Manual vehicle entry logged for {vehicle.plate_number}",
+                    request=request
+                )
+                return {"message": "Check-in successful", "time": log.entry_time.strftime("%I:%M %p")}
+            else:
+                return {"message": "Vehicle already checked in", "time": active_log.entry_time.strftime("%I:%M %p")}
+
+        # Fallback 2: check Visitor (by ID number)
+        visitor = (await session.exec(select(Visitor).where(Visitor.id_number == admission_number).order_by(Visitor.time_in.desc()))).first()
+        if visitor:
+            visitor.time_in = get_eat_time()
+            visitor.time_out = None
+            visitor.status = "checked_in"
+            visitor.gate_id = gate.id
+            session.add(visitor)
+            await session.commit()
+            await log_action(
+                session=session,
+                action_type="visitor_scan_in",
+                table_name="visitors",
+                record_id=str(visitor.id),
+                description=f"Manual visitor checkin for {visitor.first_name} {visitor.last_name}",
+                request=request
+            )
+            return {"message": "Check-in successful", "time": visitor.time_in.strftime("%I:%M %p")}
+
+        # Fallback 3: check EventVisitor (by identifier)
+        from app.models import EventVisitor
+        event_visitor = (await session.exec(select(EventVisitor).where(EventVisitor.visitor_identifier == admission_number).order_by(EventVisitor.entry_time.desc()))).first()
+        if event_visitor:
+            event_visitor.status = "checked_in"
+            event_visitor.entry_time = get_eat_time()
+            session.add(event_visitor)
+            await session.commit()
+            await log_action(
+                session=session,
+                action_type="event_visitor_checkin",
+                table_name="event_visitors",
+                record_id=str(event_visitor.id),
+                description=f"Manual event guest checkin for {event_visitor.visitor_name}",
+                request=request
+            )
+            return {"message": "Check-in successful", "time": event_visitor.entry_time.strftime("%I:%M %p")}
+
+        raise HTTPException(status_code=404, detail="Student/Visitor/Guest/Vehicle not found")
+
+    # 1. Close any open sessions for user
     open_logs = (await session.exec(select(EntryLog).where(EntryLog.user_id == user.id).where(EntryLog.exit_time == None))).all()
     for log in open_logs:
         log.exit_time = get_eat_time()
@@ -1425,7 +1499,7 @@ async def check_in_user(
         request=request
     )
 
-    return {"message": "Check-in successful", "time": new_log.entry_time.strftime("%H:%M %p")}
+    return {"message": "Check-in successful", "time": new_log.entry_time.strftime("%I:%M %p")}
 
 @router.post("/check-out/{admission_number}")
 async def check_out_user(
@@ -1435,8 +1509,6 @@ async def check_out_user(
     session: AsyncSession = Depends(get_session)
 ):
     user = (await session.exec(select(User).where(User.admission_number == admission_number))).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
     
     # Get Gate
     gate = None
@@ -1453,6 +1525,96 @@ async def check_out_user(
             session.add(gate)
             await session.commit()
             await session.refresh(gate)
+
+    if not user:
+        # Fallback 1: check Vehicle
+        from sqlalchemy import func
+        clean_plate = admission_number.replace(" ", "").upper()
+        vehicle = (await session.exec(
+            select(Vehicle).where(func.replace(Vehicle.plate_number, ' ', '') == clean_plate)
+        )).first()
+        if vehicle:
+            active_log = (await session.exec(
+                select(VehicleLog)
+                .where(VehicleLog.vehicle_id == vehicle.id)
+                .where(VehicleLog.exit_time == None)
+                .order_by(VehicleLog.entry_time.desc())
+            )).first()
+            if active_log:
+                active_log.exit_time = get_eat_time()
+                active_log.exit_gate_id = gate.id
+                session.add(active_log)
+                await session.commit()
+                await session.refresh(active_log)
+                await log_action(
+                    session=session,
+                    action_type="vehicle_scan_out",
+                    table_name="vehicle_logs",
+                    record_id=str(active_log.id),
+                    description=f"Manual vehicle exit logged for {vehicle.plate_number}",
+                    request=request
+                )
+                return {"message": "Check-out successful", "time": active_log.exit_time.strftime("%I:%M %p")}
+            else:
+                # Create a mock entry to checkout
+                log = VehicleLog(
+                    vehicle_id=vehicle.id,
+                    gate_id=gate.id,
+                    entry_time=get_eat_time(),
+                    exit_time=get_eat_time(),
+                    exit_gate_id=gate.id,
+                    manual_override=True,
+                    detected_passengers=1
+                )
+                session.add(log)
+                await session.commit()
+                await session.refresh(log)
+                await log_action(
+                    session=session,
+                    action_type="vehicle_scan_out",
+                    table_name="vehicle_logs",
+                    record_id=str(log.id),
+                    description=f"Manual vehicle exit (no entry log) logged for {vehicle.plate_number}",
+                    request=request
+                )
+                return {"message": "Check-out successful", "time": log.exit_time.strftime("%I:%M %p")}
+
+        # Fallback 2: check Visitor
+        visitor = (await session.exec(select(Visitor).where(Visitor.id_number == admission_number).order_by(Visitor.time_in.desc()))).first()
+        if visitor:
+            visitor.time_out = get_eat_time()
+            visitor.status = "checked_out"
+            visitor.gate_id = gate.id
+            session.add(visitor)
+            await session.commit()
+            await log_action(
+                session=session,
+                action_type="visitor_scan_out",
+                table_name="visitors",
+                record_id=str(visitor.id),
+                description=f"Manual visitor checkout for {visitor.first_name} {visitor.last_name}",
+                request=request
+            )
+            return {"message": "Check-out successful", "time": visitor.time_out.strftime("%I:%M %p")}
+
+        # Fallback 3: check EventVisitor
+        from app.models import EventVisitor
+        event_visitor = (await session.exec(select(EventVisitor).where(EventVisitor.visitor_identifier == admission_number).order_by(EventVisitor.entry_time.desc()))).first()
+        if event_visitor:
+            event_visitor.status = "checked_out"
+            session.add(event_visitor)
+            await session.commit()
+            await log_action(
+                session=session,
+                action_type="event_visitor_checkout",
+                table_name="event_visitors",
+                record_id=str(event_visitor.id),
+                description=f"Manual event guest checkout for {event_visitor.visitor_name}",
+                request=request
+            )
+            return {"message": "Check-out successful", "time": get_eat_time().strftime("%I:%M %p")}
+
+        raise HTTPException(status_code=404, detail="Student/Visitor/Guest/Vehicle not found")
 
     # Find last open entry
     log = (await session.exec(select(EntryLog).where(EntryLog.user_id == user.id).where(EntryLog.exit_time == None).order_by(EntryLog.entry_time.desc()))).first()
@@ -1485,7 +1647,7 @@ async def check_out_user(
         request=request
     )
 
-    return {"message": "Check-out successful", "time": log.exit_time.strftime("%H:%M %p")}
+    return {"message": "Check-out successful", "time": log.exit_time.strftime("%I:%M %p")}
 
 @router.post("/scan-vehicle")
 async def scan_vehicle_plate(

@@ -54,6 +54,7 @@ export default function GateControl() {
     
     // Visitor Form
     const [visitorForm, setVisitorForm] = useState({ name: '', id: '', phone: '', details: '' })
+    const [lookupLoading, setLookupLoading] = useState(false)
     
     // Vehicle Form
     const [manualPlate, setManualPlate] = useState('')
@@ -239,6 +240,35 @@ export default function GateControl() {
             showNotification('Network communication error', 'error')
         } finally {
             setIsSubmitting(false)
+        }
+    }
+
+    const handleVisitorLookup = async () => {
+        const idVal = visitorForm.id.trim()
+        if (!idVal) return
+        setLookupLoading(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`/api/users/verify/${encodeURIComponent(idVal)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setVisitorForm({
+                    ...visitorForm,
+                    name: data.full_name || '',
+                    phone: data.phone_number || '',
+                    details: data.visit_details || ''
+                })
+                showNotification("Details populated successfully!", "success")
+            } else {
+                showNotification("ID not found in database. Please fill in details manually.", "warning")
+            }
+        } catch (e) {
+            console.error(e)
+            showNotification("Database check failed", "error")
+        } finally {
+            setLookupLoading(false)
         }
     }
 
@@ -986,6 +1016,30 @@ export default function GateControl() {
 
                         {activeTab === 'visitor' && (
                             <form onSubmit={handleVisitorCheckIn} className="space-y-3.5 animate-fade-in">
+                                {/* National ID / Passport First */}
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">National ID / Passport</label>
+                                    <input 
+                                        required
+                                        value={visitorForm.id}
+                                        onChange={e => setVisitorForm({...visitorForm, id: e.target.value})}
+                                        placeholder="ID Number"
+                                        className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-teal-500/20"
+                                    />
+                                </div>
+
+                                {/* Lookup Button directly below ID */}
+                                <button
+                                    type="button"
+                                    onClick={handleVisitorLookup}
+                                    disabled={lookupLoading || !visitorForm.id.trim()}
+                                    className="w-full py-2.5 bg-slate-900 hover:bg-black dark:bg-slate-805 dark:hover:bg-slate-700 text-white font-bold rounded-xl text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none"
+                                >
+                                    {lookupLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                                    Lookup ID in Database
+                                </button>
+
+                                {/* Guest Name and Phone */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Guest Full Name</label>
@@ -998,18 +1052,6 @@ export default function GateControl() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">National ID / Passport</label>
-                                        <input 
-                                            required
-                                            value={visitorForm.id}
-                                            onChange={e => setVisitorForm({...visitorForm, id: e.target.value})}
-                                            placeholder="ID Number"
-                                            className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-teal-500/20"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
                                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Phone Number</label>
                                         <input 
                                             required
@@ -1019,24 +1061,37 @@ export default function GateControl() {
                                             className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-teal-500/20"
                                         />
                                     </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Visit Purpose / Host</label>
-                                        <input 
-                                            value={visitorForm.details}
-                                            onChange={e => setVisitorForm({...visitorForm, details: e.target.value})}
-                                            placeholder="Meeting Dr. Smith"
-                                            className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-teal-500/20"
-                                        />
-                                    </div>
                                 </div>
-                                <button 
-                                    type="submit" 
-                                    disabled={isSubmitting}
-                                    className="w-full py-4 mt-2 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-2xl text-xs shadow-lg shadow-teal-600/20 flex items-center justify-center gap-2 transition-all active:scale-95"
-                                >
-                                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                                    Register Guest Entry
-                                </button>
+
+                                {/* Visit Purpose / Host */}
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Visit Purpose / Host</label>
+                                    <input 
+                                        value={visitorForm.details}
+                                        onChange={e => setVisitorForm({...visitorForm, details: e.target.value})}
+                                        placeholder="Meeting Dr. Smith"
+                                        className="w-full p-3 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-teal-500/20"
+                                    />
+                                </div>
+
+                                {/* Actions Grid (Scan QR Pass, and Register Entry) */}
+                                <div className="grid grid-cols-2 gap-3 pt-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => startCamera('qr')}
+                                        className="py-4 bg-teal-50 hover:bg-teal-100 dark:bg-teal-950/30 dark:hover:bg-teal-900/40 text-teal-600 dark:text-teal-400 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer border-none"
+                                    >
+                                        <Scan size={16} /> Scan QR Pass
+                                    </button>
+                                    <button 
+                                        type="submit" 
+                                        disabled={isSubmitting}
+                                        className="py-4 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-2xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-teal-600/20 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none"
+                                    >
+                                        {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                        Register Guest Entry
+                                    </button>
+                                </div>
                             </form>
                         )}
 

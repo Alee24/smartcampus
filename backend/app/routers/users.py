@@ -56,25 +56,80 @@ async def get_all_users(
 
 @router.get("/search")
 async def search_users(q: str, session: AsyncSession = Depends(get_session)):
-    """Autocomplete search for users by admission number or name"""
+    """Autocomplete search for users, vehicles, visitors and event guests"""
     if len(q) < 2: return []
-    # Search by admission number or full name (case insensitive)
-    query = select(User).where(or_(
+    clean_q = q.replace(" ", "").upper()
+    from sqlalchemy import func
+    from app.models import Visitor, Vehicle, EventVisitor
+    
+    # 1. Search Users
+    user_query = select(User).where(or_(
         User.admission_number.contains(q.upper()),
         User.full_name.contains(q)
     )).limit(10)
-    results = await session.exec(query)
+    user_results = await session.exec(user_query)
     
-    users_list = []
-    for user in results.all():
-        users_list.append({
+    output = []
+    for user in user_results.all():
+        output.append({
             "id": str(user.id),
             "admission_number": user.admission_number,
             "full_name": user.full_name,
             "profile_image": user.profile_image,
-            "school": user.school
+            "school": user.school,
+            "category": "user"
         })
-    return users_list
+        
+    # 2. Search Vehicles
+    vehicle_query = select(Vehicle).where(or_(
+        func.replace(Vehicle.plate_number, ' ', '').contains(clean_q),
+        Vehicle.driver_name.contains(q)
+    )).limit(5)
+    vehicle_results = await session.exec(vehicle_query)
+    for v in vehicle_results.all():
+        output.append({
+            "id": str(v.id),
+            "admission_number": v.plate_number,
+            "full_name": f"Vehicle: {v.make or ''} {v.model or ''} (Driver: {v.driver_name or 'N/A'})".strip(),
+            "profile_image": "https://cdn-icons-png.flaticon.com/512/3202/3202926.png",
+            "school": "Vehicle Operations",
+            "category": "vehicle"
+        })
+        
+    # 3. Search Visitors
+    visitor_query = select(Visitor).where(or_(
+        Visitor.id_number.contains(q),
+        Visitor.first_name.contains(q),
+        Visitor.last_name.contains(q)
+    )).limit(5)
+    visitor_results = await session.exec(visitor_query)
+    for vis in visitor_results.all():
+        output.append({
+            "id": str(vis.id),
+            "admission_number": vis.id_number,
+            "full_name": f"Visitor: {vis.first_name} {vis.last_name}",
+            "profile_image": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+            "school": "Visitor Center",
+            "category": "visitor"
+        })
+        
+    # 4. Search Event Guests
+    event_visitor_query = select(EventVisitor).where(or_(
+        EventVisitor.visitor_identifier.contains(q),
+        EventVisitor.visitor_name.contains(q)
+    )).limit(5)
+    event_visitor_results = await session.exec(event_visitor_query)
+    for ev in event_visitor_results.all():
+         output.append({
+             "id": str(ev.id),
+             "admission_number": ev.visitor_identifier,
+             "full_name": f"Event Guest: {ev.visitor_name}",
+             "profile_image": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+             "school": "Event Guest",
+             "category": "event_guest"
+         })
+         
+    return output[:15]
 
 @router.put("/{user_id}")
 async def update_user(
@@ -919,9 +974,62 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
                 "status": "Active",
                 "role": "Visitor",
                 "gate_status": "Out",
-                "found_in_visitor_logs": True
+                "found_in_visitor_logs": True,
+                "visit_details": visitor.visit_details
             }
-        raise HTTPException(status_code=404, detail="Student/Visitor not found")
+            
+            # Fallback 2: check EventVisitor table
+        from app.models import EventVisitor, Event
+        event_visitor_query = select(EventVisitor).where(EventVisitor.visitor_identifier == admission_number).order_by(EventVisitor.entry_time.desc())
+        event_visitor = (await session.exec(event_visitor_query)).first()
+        if event_visitor:
+            event_obj = await session.get(Event, event_visitor.event_id)
+            event_name = event_obj.name if event_obj else "Event"
+            return {
+                "id": str(event_visitor.id),
+                "full_name": event_visitor.visitor_name,
+                "admission_number": event_visitor.visitor_identifier,
+                "phone_number": event_visitor.phone_number,
+                "email": event_visitor.email,
+                "school": "Event Guest",
+                "status": "Active",
+                "role": "Event Guest",
+                "gate_status": "Out",
+                "visit_details": f"Attending Event: {event_name}",
+                "found_in_event_visitors": True
+            }
+            
+        # Fallback 3: check Vehicle table (by plate number)
+        from app.models import Vehicle, VehicleLog
+        clean_plate = admission_number.replace(" ", "").upper()
+        from sqlalchemy import func
+        vehicle = (await session.exec(
+            select(Vehicle).where(func.replace(Vehicle.plate_number, ' ', '') == clean_plate)
+        )).first()
+        if vehicle:
+            # Check check-in status (is_checked_in)
+            active_log = (await session.exec(
+                select(VehicleLog)
+                .where(VehicleLog.vehicle_id == vehicle.id)
+                .where(VehicleLog.exit_time == None)
+                .order_by(VehicleLog.entry_time.desc())
+            )).first()
+            gate_status = "In" if active_log else "Out"
+            
+            return {
+                "id": str(vehicle.id),
+                "full_name": f"Vehicle: {vehicle.make or ''} {vehicle.model or ''}".strip() or "Vehicle",
+                "admission_number": vehicle.plate_number,
+                "phone_number": vehicle.driver_contact or "N/A",
+                "email": None,
+                "school": "Vehicle Operations",
+                "status": "Active",
+                "role": "Vehicle",
+                "gate_status": gate_status,
+                "visit_details": f"Driver: {vehicle.driver_name or 'N/A'} | Plate: {vehicle.plate_number}",
+                "found_in_vehicles": True
+            }
+        raise HTTPException(status_code=404, detail="Student/Visitor/Guest/Vehicle not found")
     
     # Get role information
     role = await session.get(Role, user.role_id)
