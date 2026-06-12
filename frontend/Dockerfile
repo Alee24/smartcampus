@@ -6,7 +6,7 @@ ENV NODE_ENV=development
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --production=false
+RUN echo "Force clean dependencies installation" && npm install --production=false
 
 COPY . .
 RUN npm run build
