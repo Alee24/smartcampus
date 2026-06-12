@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense, useRef } from 'react'
 import {
     LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut, Check,
-    Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode, Megaphone, Trash2, Plus, Radio,
+    Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode, Megaphone, Trash2, Plus, Radio, Nfc,
     Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, UserCheck, X, Activity, BarChart3, Play, History, Printer, Download, Inbox, Search, ScanFace, DoorOpen, List, Menu, BookOpen, Grid, CheckCircle, XCircle, RefreshCw
 } from 'lucide-react'
 import {
@@ -287,6 +287,84 @@ function App() {
     const [selfScanError, setSelfScanError] = useState<string | null>(null)
     const [selfIsScanning, setSelfIsScanning] = useState(false)
     const selfQrScannerRef = useRef<Html5Qrcode | null>(null)
+
+    // Self-Service NFC States
+    const [showSelfNfcModal, setShowSelfNfcModal] = useState(false)
+    const [selfNfcActive, setSelfNfcActive] = useState(false)
+    const selfNfcAbortControllerRef = useRef<AbortController | null>(null)
+
+    const startSelfNfcScanner = async () => {
+        setSelfScanResponse(null)
+        setSelfScanError(null)
+        setSelfNfcActive(true)
+        
+        if (!('NDEFReader' in window)) {
+            setSelfScanError("NFC is not supported on this device/browser. Please use Chrome on Android.")
+            setSelfNfcActive(false)
+            return
+        }
+
+        try {
+            if (selfNfcAbortControllerRef.current) {
+                selfNfcAbortControllerRef.current.abort()
+            }
+            selfNfcAbortControllerRef.current = new AbortController()
+            const ndef = new (window as any).NDEFReader()
+            await ndef.scan({ signal: selfNfcAbortControllerRef.current.signal })
+
+            ndef.onreading = (event: any) => {
+                let verifyTarget = ""
+                if (event.message && event.message.records) {
+                    for (const record of event.message.records) {
+                        if (record.recordType === "text") {
+                            const textDecoder = new TextDecoder(record.encoding || "utf-8")
+                            verifyTarget = textDecoder.decode(record.data).trim()
+                            break
+                        }
+                    }
+                }
+                if (!verifyTarget && event.serialNumber) {
+                    verifyTarget = event.serialNumber.trim()
+                }
+
+                if (verifyTarget) {
+                    playSuccessSound()
+                    setSelfNfcActive(false)
+                    setShowSelfNfcModal(false)
+                    handleSelfVerify(verifyTarget)
+                } else {
+                    playErrorSound()
+                    setSelfScanError("NFC tag is empty or unrecognized.")
+                    setSelfNfcActive(false)
+                }
+            }
+        } catch (err: any) {
+            console.error("NFC error:", err)
+            if (err.name !== 'AbortError') {
+                setSelfScanError(err.message || "Failed to start NFC scanning.")
+                setSelfNfcActive(false)
+            }
+        }
+    }
+
+    const stopSelfNfcScanner = () => {
+        if (selfNfcAbortControllerRef.current) {
+            selfNfcAbortControllerRef.current.abort()
+            selfNfcAbortControllerRef.current = null
+        }
+        setSelfNfcActive(false)
+    }
+
+    useEffect(() => {
+        if (showSelfNfcModal) {
+            startSelfNfcScanner()
+        } else {
+            stopSelfNfcScanner()
+        }
+        return () => {
+            stopSelfNfcScanner()
+        }
+    }, [showSelfNfcModal])
 
     const playSuccessSound = () => {
         if ('vibrate' in navigator) {
@@ -1944,14 +2022,22 @@ function App() {
                             {/* Right: Notifications & Profile */}
                             <div className="flex items-center gap-3 relative shrink-0">
                                 {isAuthenticated && (
-                                    <button
-                                        onClick={() => setShowSelfScanModal(true)}
-                                        className="p-2 rounded-lg relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50 active:scale-95 transition-all flex items-center justify-center gap-1.5"
-                                        title="Scan QR Code"
-                                    >
-                                        <QrCode size={20} />
-                                        <span className="hidden md:inline text-xs font-bold">Scan QR</span>
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={() => setShowSelfScanModal(true)}
+                                            className="p-2 rounded-lg relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50 active:scale-95 transition-all flex items-center justify-center"
+                                            title="Scan QR Code"
+                                        >
+                                            <QrCode size={20} />
+                                        </button>
+                                        <button
+                                            onClick={() => setShowSelfNfcModal(true)}
+                                            className="p-2 rounded-lg relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50 active:scale-95 transition-all flex items-center justify-center"
+                                            title="Scan NFC Tag"
+                                        >
+                                            <Nfc size={20} />
+                                        </button>
+                                    </>
                                 )}
                                 <button
                                     onClick={() => setActiveTab('notice-board')}
@@ -2555,6 +2641,144 @@ function App() {
                                         </button>
                                         <button 
                                             onClick={() => setShowSelfScanModal(false)}
+                                            className="py-3 px-5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-bold transition-all text-sm"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Self-Service NFC Scanner Modal Overlay */}
+            {showSelfNfcModal && (
+                <div 
+                    className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md p-0 sm:p-4 transition-all duration-300"
+                    onClick={() => setShowSelfNfcModal(false)}
+                >
+                    <div 
+                        className="bg-white dark:bg-gray-900 rounded-t-[2rem] sm:rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] w-full sm:max-w-lg overflow-hidden transform transition-all duration-300 max-h-[90vh] sm:max-h-[85vh] flex flex-col relative border border-gray-100 dark:border-gray-800"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Top Gradient bar */}
+                        <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full" />
+                        
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl">
+                                    <Nfc size={22} className="animate-pulse" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-gray-900 dark:text-white">
+                                        Scan NFC Tag
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Scan smart card or NFC tag to verify access
+                                    </p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setShowSelfNfcModal(false)}
+                                className="p-2 rounded-xl bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        
+                        {/* Body */}
+                        <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center min-h-[350px]">
+                            {/* Scanning Viewport */}
+                            {selfNfcActive && (
+                                <div className="w-full flex flex-col items-center">
+                                    <div className="relative w-full max-w-[280px] aspect-square rounded-3xl overflow-hidden bg-slate-50 dark:bg-gray-950 shadow-2xl border-4 border-white dark:border-gray-800 flex items-center justify-center">
+                                        <div className="flex flex-col items-center justify-center text-center p-6 space-y-4">
+                                            <div className="w-24 h-24 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center relative">
+                                                <Nfc size={48} className="animate-pulse" />
+                                                <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full animate-ping" />
+                                            </div>
+                                            <div className="text-sm font-bold text-gray-700 dark:text-gray-200">Ready to Scan</div>
+                                            <div className="text-xs text-gray-400">Tap your NFC card or phone against the reader</div>
+                                        </div>
+                                    </div>
+                                    <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                        <span className="w-2.5 h-2.5 bg-blue-600 rounded-full animate-ping" />
+                                        NFC Scanner Active
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Loading State */}
+                            {selfScanLoading && (
+                                <div className="flex flex-col items-center justify-center p-8 text-center">
+                                    <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
+                                    <h4 className="text-base font-bold text-gray-800 dark:text-white">Processing Scan</h4>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Registering details with the server...</p>
+                                </div>
+                            )}
+
+                            {/* Success State */}
+                            {!selfNfcActive && !selfScanLoading && selfScanResponse && (
+                                <div className="w-full flex flex-col items-center p-4 text-center animate-scale-in">
+                                    <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mb-4 shadow-lg border border-emerald-100 dark:border-emerald-900/50">
+                                        <CheckCircle size={44} className="stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-xl font-black text-gray-900 dark:text-white">Scan Verified</h4>
+                                    <div className="mt-3 px-4 py-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl w-full max-w-sm">
+                                        <p className="text-sm font-black text-emerald-700 dark:text-emerald-450">
+                                            {selfScanResponse.message}
+                                        </p>
+                                        {selfScanResponse.data && (
+                                            <div className="mt-2 text-xs text-gray-650 dark:text-gray-400 space-y-1">
+                                                {selfScanResponse.data.name && <div><span className="font-bold">Name:</span> {selfScanResponse.data.name}</div>}
+                                                {selfScanResponse.data.role && <div><span className="font-bold">Info:</span> {selfScanResponse.data.role}</div>}
+                                                {selfScanResponse.data.time && <div><span className="font-bold">Logged at:</span> {selfScanResponse.data.time}</div>}
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="mt-6 flex gap-3 w-full max-w-xs justify-center">
+                                        <button 
+                                            onClick={startSelfNfcScanner}
+                                            className="flex-1 py-3 px-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-black hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-sm"
+                                        >
+                                            Scan Next
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowSelfNfcModal(false)}
+                                            className="py-3 px-5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-bold transition-all text-sm"
+                                        >
+                                            Done
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Error / Rejected State */}
+                            {!selfNfcActive && !selfScanLoading && selfScanError && (
+                                <div className="w-full flex flex-col items-center p-4 text-center animate-scale-in">
+                                    <div className="w-20 h-20 bg-rose-50 dark:bg-rose-950/40 text-rose-650 dark:text-rose-450 rounded-full flex items-center justify-center mb-4 shadow-lg border border-rose-100 dark:border-rose-900/50">
+                                        <XCircle size={44} className="stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-xl font-black text-gray-900 dark:text-white">Scan Failed</h4>
+                                    <div className="mt-3 px-4 py-3 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-2xl w-full max-w-sm">
+                                        <p className="text-sm font-black text-rose-650 dark:text-rose-450">
+                                            {selfScanError}
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="mt-6 flex gap-3 w-full max-w-xs justify-center">
+                                        <button 
+                                            onClick={startSelfNfcScanner}
+                                            className="flex-1 py-3 px-5 bg-gradient-to-r from-rose-600 to-pink-600 text-white rounded-xl font-black hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-sm"
+                                        >
+                                            Try Again
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowSelfNfcModal(false)}
                                             className="py-3 px-5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-bold transition-all text-sm"
                                         >
                                             Close
