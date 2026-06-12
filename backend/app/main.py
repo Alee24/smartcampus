@@ -787,13 +787,15 @@ class LDAPLoginRequest(BaseModel):
     password: str
 
 @app.post("/api/auth/google")
-async def google_login(req: SSOLoginRequest, session: AsyncSession = Depends(get_session)):
+async def google_login(req: SSOLoginRequest, request: Request, session: AsyncSession = Depends(get_session)):
     user_info = await verify_google_token(req.token, session)
     if not user_info:
         raise HTTPException(status_code=400, detail="Invalid Google Token")
     
     email = user_info['email']
-    user = (await session.exec(select(User).where(User.email == email))).first()
+    from sqlalchemy.orm import selectinload
+    stmt = select(User).where(User.email == email).options(selectinload(User.role))
+    user = (await session.exec(stmt)).first()
 
     if not user:
         # Auto-provision or reject? For now reject if not in system
@@ -812,7 +814,17 @@ async def google_login(req: SSOLoginRequest, session: AsyncSession = Depends(get
         request=request
     )
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role.name.lower() if user.role else "student",
+            "profile_image": user.profile_image or ""
+        }
+    }
 
 @app.post("/api/auth/ldap")
 async def ldap_login(req: LDAPLoginRequest, session: AsyncSession = Depends(get_session)):
@@ -950,10 +962,15 @@ async def get_public_config(request: Request, session: AsyncSession = Depends(ge
     else:
         server_ip_or_domain = server_host
         
+    google_stmt = select(SystemConfig).where(SystemConfig.key == "google_client_id")
+    google_config = (await session.exec(google_stmt)).first()
+    google_client_id = google_config.value if google_config else None
+
     return {
         "demo_mode": is_demo,
         "system_name": "Smart Campus",
-        "server_ip_or_domain": server_ip_or_domain
+        "server_ip_or_domain": server_ip_or_domain,
+        "google_client_id": google_client_id
     }
 
 class DemoLoginRequest(BaseModel):

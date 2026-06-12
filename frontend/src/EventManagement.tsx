@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Calendar, Users, MapPin, QrCode, Download, X, Search, FileText, Upload, Mail, Send, Check, Loader, Trash2, Eye, Megaphone } from 'lucide-react'
+import { Plus, Calendar, Users, MapPin, QrCode, Download, X, Search, FileText, Upload, Mail, Send, Check, Loader, Trash2, Eye, Megaphone, Printer } from 'lucide-react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { useNotification } from './components/Notification'
 
@@ -13,6 +13,14 @@ export default function EventManagement() {
     const [showQRModal, setShowQRModal] = useState(false)
     const [showVisitorModal, setShowVisitorModal] = useState(false)
     const [selectedEvent, setSelectedEvent] = useState<any>(null)
+
+    // Company Settings & Modals State
+    const [companySettings, setCompanySettings] = useState<{ company_name: string, logo_url: string }>({
+        company_name: 'Smart Campus',
+        logo_url: ''
+    })
+    const [showDescModal, setShowDescModal] = useState(false)
+    const [showReportModal, setShowReportModal] = useState(false)
 
     // Visitor Management State
     const [visitors, setVisitors] = useState<any[]>([])
@@ -34,7 +42,24 @@ export default function EventManagement() {
 
     useEffect(() => {
         fetchEvents()
+        
+        // Fetch company settings for reports
+        fetch('/api/users/public-company-settings')
+            .then(res => res.json())
+            .then(data => {
+                setCompanySettings({
+                    company_name: data.company_name || 'Smart Campus',
+                    logo_url: data.logo_url || ''
+                })
+            })
+            .catch(err => console.error("Failed to fetch company settings", err))
     }, [])
+
+    const openReportsModal = (event: any) => {
+        setSelectedEvent(event)
+        setShowReportModal(true)
+        fetchVisitors(event.id)
+    }
 
     const fetchEvents = async () => {
         try {
@@ -326,13 +351,17 @@ export default function EventManagement() {
             {/* Events Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {events.map(event => (
-                    <div key={event.id} className="glass-card p-6 flex flex-col group hover:border-[var(--primary-color)] transition-colors">
+                    <div 
+                        key={event.id} 
+                        onClick={() => { setSelectedEvent(event); setShowDescModal(true); }}
+                        className="glass-card p-6 flex flex-col group hover:border-[var(--primary-color)] hover:shadow-md transition-all cursor-pointer bg-[var(--bg-surface)] text-[var(--text-primary)]"
+                    >
                         <div className="flex justify-between items-start mb-4">
                             <div className="bg-primary-50 text-primary-700 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">
                                 {event.event_type}
                             </div>
                             <button
-                                onClick={() => { setSelectedEvent(event); setShowQRModal(true); }}
+                                onClick={(e) => { e.stopPropagation(); setSelectedEvent(event); setShowQRModal(true); }}
                                 className="text-[var(--text-secondary)] hover:text-[var(--primary-color)] transition-colors"
                                 title="View Gate Pass"
                             >
@@ -340,7 +369,7 @@ export default function EventManagement() {
                             </button>
                         </div>
 
-                        <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2 group-hover:text-primary-600 transition-colors">{event.name}</h3>
+                        <h3 className="text-xl font-bold mb-2 group-hover:text-primary-600 transition-colors">{event.name}</h3>
 
                         <div className="space-y-3 mb-6 flex-1">
                             <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
@@ -357,7 +386,7 @@ export default function EventManagement() {
                             </div>
 
                             {isAdmin && (
-                                <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex flex-col gap-2">
+                                <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
                                     <div className="flex justify-between items-center text-xs">
                                         <span className="font-bold text-[var(--text-secondary)]">Scan Mode:</span>
                                         <span className="font-black text-purple-600 dark:text-purple-400 uppercase bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded text-[10px]">
@@ -366,19 +395,19 @@ export default function EventManagement() {
                                     </div>
                                     <div className="grid grid-cols-3 gap-1">
                                         <button 
-                                            onClick={() => handleUpdateScanMode(event.id, 'auto')}
+                                            onClick={(e) => { e.stopPropagation(); handleUpdateScanMode(event.id, 'auto'); }}
                                             className={`py-1 text-[9px] font-bold rounded border transition-all ${(!event.scan_mode || event.scan_mode === 'auto') ? 'bg-purple-600 text-white border-purple-600' : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                                         >
                                             Auto
                                         </button>
                                         <button 
-                                            onClick={() => handleUpdateScanMode(event.id, 'register')}
+                                            onClick={(e) => { e.stopPropagation(); handleUpdateScanMode(event.id, 'register'); }}
                                             className={`py-1 text-[9px] font-bold rounded border transition-all ${(event.scan_mode === 'register') ? 'bg-purple-600 text-white border-purple-600' : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                                         >
                                             Register
                                         </button>
                                         <button 
-                                            onClick={() => handleUpdateScanMode(event.id, 'check_in')}
+                                            onClick={(e) => { e.stopPropagation(); handleUpdateScanMode(event.id, 'check_in'); }}
                                             className={`py-1 text-[9px] font-bold rounded border transition-all ${(event.scan_mode === 'check_in') ? 'bg-purple-600 text-white border-purple-600' : 'bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                                         >
                                             Check-In
@@ -393,9 +422,20 @@ export default function EventManagement() {
                                 {event.is_active ? 'Active' : 'Closed'}
                             </span>
                             {isAdmin && (
-                                <button onClick={() => openVisitorModal(event)} className="text-sm font-bold text-primary-600 hover:underline">
-                                    Manage Guests
-                                </button>
+                                <div className="flex gap-3">
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); openVisitorModal(event); }} 
+                                        className="text-sm font-bold text-primary-600 hover:underline"
+                                    >
+                                        Manage Event
+                                    </button>
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); openReportsModal(event); }} 
+                                        className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                    >
+                                        <FileText size={14} /> Reports
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -740,6 +780,326 @@ export default function EventManagement() {
                     </div>
                 </div>
             )}
+
+            {/* Event Description Modal */}
+            {showDescModal && selectedEvent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-xl rounded-2xl shadow-2xl animate-fade-in flex flex-col max-h-[85vh]">
+                        <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-[image:var(--gradient-primary)] text-white rounded-t-2xl">
+                            <h3 className="text-xl font-bold">Event Details</h3>
+                            <button onClick={() => setShowDescModal(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors"><X size={20} /></button>
+                        </div>
+                        <div className="p-6 overflow-y-auto space-y-6">
+                            <div>
+                                <span className="bg-primary-50 text-primary-700 px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">
+                                    {selectedEvent.event_type}
+                                </span>
+                                <h2 className="text-2xl font-black text-[var(--text-primary)] mt-3">{selectedEvent.name}</h2>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 bg-[var(--bg-primary)] p-4 rounded-xl border border-[var(--border-color)] text-sm">
+                                <div>
+                                    <div className="text-[var(--text-secondary)] font-bold text-xs uppercase">Host</div>
+                                    <div className="text-[var(--text-primary)] font-semibold mt-0.5">{selectedEvent.host}</div>
+                                    <div className="text-[var(--text-secondary)] text-xs">{selectedEvent.school}</div>
+                                </div>
+                                <div>
+                                    <div className="text-[var(--text-secondary)] font-bold text-xs uppercase">Date</div>
+                                    <div className="text-[var(--text-primary)] font-semibold mt-0.5">{new Date(selectedEvent.event_date).toDateString()}</div>
+                                </div>
+                                <div className="mt-2">
+                                    <div className="text-[var(--text-secondary)] font-bold text-xs uppercase">Expected Visitors</div>
+                                    <div className="text-[var(--text-primary)] font-semibold mt-0.5">{selectedEvent.expected_visitors}</div>
+                                </div>
+                                <div className="mt-2">
+                                    <div className="text-[var(--text-secondary)] font-bold text-xs uppercase">Status</div>
+                                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold mt-1 ${selectedEvent.is_active ? 'text-green-600 bg-green-100' : 'text-gray-500 bg-gray-100'}`}>
+                                        {selectedEvent.is_active ? 'Active' : 'Closed'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider mb-2">Description / Notes</h4>
+                                <p className="text-[var(--text-secondary)] leading-relaxed text-sm whitespace-pre-line bg-gray-50/50 dark:bg-slate-900/50 p-4 rounded-xl border border-[var(--border-color)]">
+                                    {selectedEvent.description || 'No additional description provided for this event.'}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-[var(--border-color)] flex justify-end">
+                            <button onClick={() => setShowDescModal(false)} className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-[var(--text-primary)] rounded-xl font-bold transition-colors">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Event Reports Modal */}
+            {showReportModal && selectedEvent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+                    <div className="bg-[var(--bg-surface)] border border-[var(--border-color)] w-full max-w-5xl rounded-2xl shadow-2xl animate-fade-in flex flex-col my-8">
+                        {/* Style for printing */}
+                        <style dangerouslySetInnerHTML={{ __html: `
+                            @media print {
+                                body * {
+                                    visibility: hidden !important;
+                                }
+                                #print-report-area, #print-report-area * {
+                                    visibility: visible !important;
+                                }
+                                #print-report-area {
+                                    position: absolute;
+                                    left: 0;
+                                    top: 0;
+                                    width: 100%;
+                                    background: white !important;
+                                    color: black !important;
+                                    padding: 24px !important;
+                                    margin: 0 !important;
+                                    box-shadow: none !important;
+                                    border: none !important;
+                                }
+                                .no-print {
+                                    display: none !important;
+                                }
+                            }
+                        `}} />
+
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-primary)] rounded-t-2xl no-print">
+                            <div>
+                                <h3 className="text-2xl font-bold flex items-center gap-2">
+                                    <FileText className="text-blue-500" /> Event Attendance & Registration Report
+                                </h3>
+                                <p className="text-sm text-[var(--text-secondary)]">Generate and download report for <span className="font-bold">{selectedEvent.name}</span></p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => window.print()}
+                                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold shadow-md transition-colors"
+                                >
+                                    <Printer size={16} /> Print / Export PDF
+                                </button>
+                                <button onClick={() => setShowReportModal(false)} className="hover:bg-gray-100 dark:hover:bg-gray-800 p-2 rounded-full transition-colors text-[var(--text-secondary)]"><X size={24} /></button>
+                            </div>
+                        </div>
+
+                        {/* Printable Report Area */}
+                        <div id="print-report-area" className="p-8 space-y-8 overflow-y-auto max-h-[70vh] bg-[var(--bg-surface)]">
+                            {/* Company Branding Header */}
+                            <div className="flex justify-between items-center border-b-2 border-gray-200 pb-6">
+                                <div>
+                                    <h1 className="text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tight">{companySettings.company_name}</h1>
+                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-1">Smart Campus Security & Access Management</p>
+                                    <div className="mt-4 text-xs text-slate-400 font-semibold space-y-0.5">
+                                        <div>Document: Event Registration & Attendance Log</div>
+                                        <div>Generated: {new Date().toLocaleString()}</div>
+                                    </div>
+                                </div>
+                                {companySettings.logo_url ? (
+                                    <img src={companySettings.logo_url} alt="Logo" className="h-16 w-auto object-contain" />
+                                ) : (
+                                    <div className="h-16 w-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-black text-2xl shadow-inner">
+                                        RU
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Event details summary */}
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-3 border-l-4 border-blue-600 pl-3">Event Specifications</h2>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50 dark:bg-slate-900 p-5 rounded-2xl border border-[var(--border-color)] text-sm">
+                                    <div>
+                                        <div className="text-slate-400 font-bold text-[10px] uppercase">Event Name</div>
+                                        <div className="text-slate-800 dark:text-white font-bold mt-0.5">{selectedEvent.name}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-slate-400 font-bold text-[10px] uppercase">Host & School</div>
+                                        <div className="text-slate-800 dark:text-white font-semibold mt-0.5">{selectedEvent.host}</div>
+                                        <div className="text-slate-400 text-xs">{selectedEvent.school}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-slate-400 font-bold text-[10px] uppercase">Event Date</div>
+                                        <div className="text-slate-800 dark:text-white font-semibold mt-0.5">{new Date(selectedEvent.event_date).toDateString()}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-slate-400 font-bold text-[10px] uppercase">Event Type</div>
+                                        <span className="inline-block bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 px-2.5 py-0.5 rounded-md text-xs font-bold uppercase mt-1">
+                                            {selectedEvent.event_type}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Metrics overview */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="bg-slate-50 dark:bg-slate-900 border border-[var(--border-color)] p-5 rounded-2xl text-center">
+                                    <div className="text-xs font-bold text-slate-400 uppercase">Expected Visitors</div>
+                                    <div className="text-3xl font-black text-slate-800 dark:text-white mt-1">{selectedEvent.expected_visitors}</div>
+                                </div>
+                                <div className="bg-slate-50 dark:bg-slate-900 border border-[var(--border-color)] p-5 rounded-2xl text-center">
+                                    <div className="text-xs font-bold text-slate-400 uppercase">Registered Guests</div>
+                                    <div className="text-3xl font-black text-blue-600 mt-1">{visitors.length}</div>
+                                </div>
+                                <div className="bg-slate-50 dark:bg-slate-900 border border-[var(--border-color)] p-5 rounded-2xl text-center">
+                                    <div className="text-xs font-bold text-slate-400 uppercase">Checked In</div>
+                                    <div className="text-3xl font-black text-green-600 mt-1">
+                                        {visitors.filter(v => v.status === 'checked_in').length}
+                                    </div>
+                                </div>
+                                <div className="bg-slate-50 dark:bg-slate-900 border border-[var(--border-color)] p-5 rounded-2xl text-center">
+                                    <div className="text-xs font-bold text-slate-400 uppercase">Attendance Rate</div>
+                                    <div className="text-3xl font-black text-purple-600 mt-1">
+                                        {visitors.length > 0 
+                                            ? `${Math.round((visitors.filter(v => v.status === 'checked_in').length / visitors.length) * 100)}%`
+                                            : '0%'
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Attendance list tables */}
+                            <div className="space-y-8">
+                                {/* Checked-in Guests Table */}
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-3 border-l-4 border-green-600 pl-3">
+                                        Checked-In Guests (Attendance Log)
+                                    </h3>
+                                    <div className="border border-[var(--border-color)] rounded-2xl overflow-hidden bg-[var(--bg-surface)]">
+                                        <table className="w-full text-left border-collapse text-sm">
+                                            <thead>
+                                                <tr className="bg-slate-50 dark:bg-slate-900 text-slate-400 font-bold uppercase text-[10px] border-b border-[var(--border-color)]">
+                                                    <th className="p-4">Biometrics</th>
+                                                    <th className="p-4">Name</th>
+                                                    <th className="p-4">ID/Admission No</th>
+                                                    <th className="p-4">Contact</th>
+                                                    <th className="p-4">Check-In Time</th>
+                                                    <th className="p-4">Verification Mode</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[var(--border-color)]">
+                                                {visitors.filter(v => v.status === 'checked_in').length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={6} className="p-6 text-center text-slate-400">
+                                                            No guests checked in yet.
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    visitors.filter(v => v.status === 'checked_in').map((v, idx) => (
+                                                        <tr key={idx} className="hover:bg-slate-50/50">
+                                                            <td className="p-4">
+                                                                <img 
+                                                                    src={v.profile_image || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"} 
+                                                                    className="w-10 h-10 object-cover rounded-full border border-gray-200 bg-slate-50"
+                                                                    alt="Biometric face avatar"
+                                                                />
+                                                            </td>
+                                                            <td className="p-4 font-bold text-slate-800 dark:text-white">{v.visitor_name}</td>
+                                                            <td className="p-4 font-mono text-slate-600 dark:text-slate-300">{v.visitor_identifier}</td>
+                                                            <td className="p-4 text-slate-600 dark:text-slate-300">
+                                                                <div>{v.phone_number || '-'}</div>
+                                                                <div className="text-xs text-slate-400">{v.email || ''}</div>
+                                                            </td>
+                                                            <td className="p-4 text-slate-600 dark:text-slate-300">{new Date(v.entry_time).toLocaleTimeString()}</td>
+                                                            <td className="p-4">
+                                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${v.has_face ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
+                                                                    {v.has_face ? '✓ Face Registered' : 'Manual Scan / QR'}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                {/* Registered Guests Table */}
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-3 border-l-4 border-blue-600 pl-3">
+                                        All Registered Guests (RSVP List)
+                                    </h3>
+                                    <div className="border border-[var(--border-color)] rounded-2xl overflow-hidden bg-[var(--bg-surface)]">
+                                        <table className="w-full text-left border-collapse text-sm">
+                                            <thead>
+                                                <tr className="bg-slate-50 dark:bg-slate-900 text-slate-400 font-bold uppercase text-[10px] border-b border-[var(--border-color)]">
+                                                    <th className="p-4">Biometrics</th>
+                                                    <th className="p-4">Name</th>
+                                                    <th className="p-4">ID/Admission No</th>
+                                                    <th className="p-4">Contact</th>
+                                                    <th className="p-4">Status</th>
+                                                    <th className="p-4">Face Biometrics</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[var(--border-color)]">
+                                                {visitors.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={6} className="p-6 text-center text-slate-400">
+                                                            No registered guests.
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    visitors.map((v, idx) => (
+                                                        <tr key={idx} className="hover:bg-slate-50/50">
+                                                            <td className="p-4">
+                                                                <img 
+                                                                    src={v.profile_image || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"} 
+                                                                    className="w-10 h-10 object-cover rounded-full border border-gray-200 bg-slate-50"
+                                                                    alt="Biometric face avatar"
+                                                                />
+                                                            </td>
+                                                            <td className="p-4 font-bold text-slate-800 dark:text-white">{v.visitor_name}</td>
+                                                            <td className="p-4 font-mono text-slate-600 dark:text-slate-300">{v.visitor_identifier}</td>
+                                                            <td className="p-4 text-slate-600 dark:text-slate-300">
+                                                                <div>{v.phone_number || '-'}</div>
+                                                                <div className="text-xs text-slate-400">{v.email || ''}</div>
+                                                            </td>
+                                                            <td className="p-4">
+                                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${v.status === 'checked_in' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                                    {v.status === 'checked_in' ? 'Checked In' : 'Registered'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-4 text-xs font-semibold">
+                                                                {v.has_face ? (
+                                                                    <span className="text-green-600 flex items-center gap-1 font-bold">✓ Registered</span>
+                                                                ) : (
+                                                                    <span className="text-slate-400">Not Configured</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Signatures footer */}
+                            <div className="grid grid-cols-2 gap-8 pt-12 border-t border-gray-200 text-xs">
+                                <div>
+                                    <div className="border-t border-slate-400 w-48 pt-2 font-bold text-slate-600">Event Host Signature</div>
+                                    <div className="text-slate-400 mt-1">Date: __________________</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="border-t border-slate-400 w-48 ml-auto pt-2 font-bold text-slate-600">Security Supervisor</div>
+                                    <div className="text-slate-400 mt-1">Date: __________________</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-6 border-t border-[var(--border-color)] flex justify-end gap-3 no-print">
+                            <button
+                                onClick={() => setShowReportModal(false)}
+                                className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-[var(--text-primary)] font-bold rounded-xl transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
+

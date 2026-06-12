@@ -1150,6 +1150,16 @@ async def scan_entry_inner(
                 request=request
             )
             
+            if user.email:
+                from app.email_utils import send_notification_email
+                import asyncio
+                asyncio.create_task(send_notification_email(
+                    email=user.email,
+                    subject="Gate Pass System: Check-Out Notification",
+                    title="Gate Exit Check-Out Success",
+                    message=f"Hello {user.full_name},<br/><br/>You have checked out at <strong>{gate.name}</strong> on {get_eat_time().strftime('%B %d, %Y at %I:%M %p')} via card/QR scan.<br/><br/>If you did not authorize this action, please contact security immediately."
+                ))
+            
             return {
                 "status": "allowed",
                 "message": f"Checked OUT successfully: {user.full_name}",
@@ -1182,6 +1192,16 @@ async def scan_entry_inner(
                 description=f"Auto gate scan checkin for {user.full_name} at {gate.name}",
                 request=request
             )
+            
+            if user.email:
+                from app.email_utils import send_notification_email
+                import asyncio
+                asyncio.create_task(send_notification_email(
+                    email=user.email,
+                    subject="Gate Pass System: Check-In Notification",
+                    title="Gate Entry Check-In Success",
+                    message=f"Hello {user.full_name},<br/><br/>You have checked in at <strong>{gate.name}</strong> on {get_eat_time().strftime('%B %d, %Y at %I:%M %p')} via card/QR scan.<br/><br/>If you did not authorize this action, please contact security immediately."
+                ))
             
             return {
                 "status": "allowed",
@@ -1601,6 +1621,16 @@ async def check_in_user(
         request=request
     )
 
+    if user.email:
+        from app.email_utils import send_notification_email
+        import asyncio
+        asyncio.create_task(send_notification_email(
+            email=user.email,
+            subject="Gate Pass System: Check-In Notification",
+            title="Gate Entry Check-In Success",
+            message=f"Hello {user.full_name},<br/><br/>You have checked in at <strong>{gate.name}</strong> on {get_eat_time().strftime('%B %d, %Y at %I:%M %p')}.<br/><br/>If you did not authorize this action, please contact security immediately."
+        ))
+
     return {"message": "Check-in successful", "time": new_log.entry_time.strftime("%I:%M %p")}
 
 @router.post("/check-out/{admission_number}")
@@ -1748,6 +1778,16 @@ async def check_out_user(
         description=f"Manual check-out for student {user.full_name} ({admission_number}) at {gate.name}",
         request=request
     )
+
+    if user.email:
+        from app.email_utils import send_notification_email
+        import asyncio
+        asyncio.create_task(send_notification_email(
+            email=user.email,
+            subject="Gate Pass System: Check-Out Notification",
+            title="Gate Exit Check-Out Success",
+            message=f"Hello {user.full_name},<br/><br/>You have checked out at <strong>{gate.name}</strong> on {get_eat_time().strftime('%B %d, %Y at %I:%M %p')}.<br/><br/>If you did not authorize this action, please contact security immediately."
+        ))
 
     return {"message": "Check-out successful", "time": log.exit_time.strftime("%I:%M %p")}
 

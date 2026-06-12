@@ -56,10 +56,57 @@ async def register_visitor(
     await session.refresh(visitor)
     return visitor
 
-@router.get("/{event_id}/visitors", response_model=List[EventVisitor])
+@router.get("/{event_id}/visitors")
 async def get_event_visitors(event_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    from sqlalchemy.orm import selectinload
+    from app.models import UserFace
+    
     result = await session.exec(select(EventVisitor).where(EventVisitor.event_id == event_id).order_by(EventVisitor.entry_time.desc()))
-    return result.all()
+    visitors = result.all()
+    
+    identifiers = [v.visitor_identifier for v in visitors if v.visitor_identifier]
+    emails = [v.email for v in visitors if v.email]
+    
+    user_map = {}
+    if identifiers or emails:
+        user_query = select(User).where(
+            (User.admission_number.in_(identifiers)) | 
+            (User.email.in_(emails))
+        ).options(selectinload(User.role))
+        users = (await session.exec(user_query)).all()
+        
+        user_ids = [u.id for u in users]
+        face_user_ids = set()
+        if user_ids:
+            face_query = select(UserFace.user_id).where(UserFace.user_id.in_(user_ids))
+            faces = (await session.exec(face_query)).all()
+            face_user_ids = set(faces)
+            
+        for u in users:
+            info = {
+                "profile_image": u.profile_image or "",
+                "has_face": u.id in face_user_ids,
+                "role": u.role.name if u.role else "Student"
+            }
+            if u.admission_number:
+                user_map[u.admission_number] = info
+            if u.email:
+                user_map[u.email] = info
+                
+    out = []
+    for v in visitors:
+        info = user_map.get(v.visitor_identifier) or user_map.get(v.email) or {
+            "profile_image": "",
+            "has_face": False,
+            "role": "External Guest"
+        }
+        v_dict = v.model_dump()
+        v_dict["profile_image"] = info["profile_image"]
+        v_dict["has_face"] = info["has_face"]
+        v_dict["user_role"] = info["role"]
+        out.append(v_dict)
+    return out
+
 
 @router.post("/{event_id}/visitors/upload")
 async def upload_visitors_csv(
@@ -146,11 +193,31 @@ async def send_passes_email(
     stmt = select(EventVisitor).where(EventVisitor.event_id == event_id)
     visitors = (await session.exec(stmt)).all()
     
+    from app.email_utils import send_attendance_email
+    import asyncio
+    
     sent_count = 0
     for v in visitors:
         if v.email:
-            # Mock Email Sending
-            print(f"Sending Pass to {v.email} for event {event.name}")
+            subject = f"Your Entry Pass for {event.name}"
+            body = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                <h2 style="color: #7A1975; margin-bottom: 8px;">Entry Pass Registered Successfully</h2>
+                <p>Hello <strong>{v.visitor_name}</strong>,</p>
+                <p>You have been registered for the upcoming event. Below are your details:</p>
+                <div style="background-color: #f7fafc; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                    <p style="margin: 4px 0;"><strong>Event:</strong> {event.name}</p>
+                    <p style="margin: 4px 0;"><strong>Date:</strong> {event.event_date}</p>
+                    <p style="margin: 4px 0;"><strong>Type:</strong> {event.event_type}</p>
+                    <p style="margin: 4px 0;"><strong>Host:</strong> {event.host} ({event.school})</p>
+                    <p style="margin: 4px 0;"><strong>Your ID/Admission No:</strong> {v.visitor_identifier}</p>
+                </div>
+                <p>Please present this email or the system pass QR code at the campus gate for check-in.</p>
+                <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                <p style="font-size: 12px; color: #718096; text-align: center;">Smart Campus Gateway Pass System</p>
+            </div>
+            """
+            asyncio.create_task(send_attendance_email(recipients=[v.email], subject=subject, body=body))
             sent_count += 1
             
     return {
@@ -158,6 +225,7 @@ async def send_passes_email(
         "sent_count": sent_count,
         "total_guests": len(visitors)
     }
+
 
 @router.get("/stats/monthly")
 async def get_monthly_stats(
@@ -425,10 +493,13 @@ async def email_all_visitors(
     stmt = select(EventVisitor).where(EventVisitor.event_id == event_id)
     visitors = (await session.exec(stmt)).all()
     
+    from app.email_utils import send_attendance_email
+    import asyncio
+    
     sent_count = 0
     for v in visitors:
         if v.email:
-            print(f"SMTP SEND: to={v.email}, subject='{subject}', body='{body}'")
+            asyncio.create_task(send_attendance_email(recipients=[v.email], subject=subject, body=body))
             sent_count += 1
             
     return {
@@ -436,6 +507,7 @@ async def email_all_visitors(
         "sent_count": sent_count,
         "total_guests": len(visitors)
     }
+
 
 @router.post("/{event_id}/visitors/sms-all")
 async def sms_all_visitors(
