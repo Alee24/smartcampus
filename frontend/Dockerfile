@@ -1,6 +1,8 @@
 # Build stage
 FROM node:20-alpine AS build-stage
 
+ENV NODE_ENV=development
+
 WORKDIR /app
 
 COPY package*.json ./
