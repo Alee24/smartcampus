@@ -846,7 +846,6 @@ async def scan_entry_inner(
         if trip.status in ["completed", "cancelled"]:
             return {"status": "rejected", "message": f"Cannot board. Trip status is {trip.status}", "data": None}
 
-        from app.models import Vehicle
         vehicle = await session.get(Vehicle, trip.vehicle_id)
         vehicle_info = f"{vehicle.make} {vehicle.model} ({vehicle.plate_number})" if vehicle else "Bus"
 
@@ -1259,7 +1258,6 @@ async def scan_entry(
                         if user:
                             scanned_type = "user"
                         else:
-                            from app.models import Vehicle
                             clean_plate = temp_code.replace(" ", "").lower()
                             vehicle = (await session.exec(select(Vehicle).where(func.lower(func.replace(Vehicle.plate_number, ' ', '')) == clean_plate))).first()
                             if vehicle:

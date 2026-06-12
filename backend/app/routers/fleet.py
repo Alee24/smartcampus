@@ -355,6 +355,34 @@ async def get_vehicle_details(vehicle_id: UUID, session: AsyncSession = Depends(
             "status_message": log.status_message,
             "detected_location": log.detected_location
         })
+
+    # Query and aggregate daily scans for the last 30 days (database-agnostic)
+    start_of_30_days = datetime.combine((eat_now - timedelta(days=30)).date(), time.min)
+    all_scans_query = (
+        select(ScanLog.timestamp)
+        .where(
+            (ScanLog.room_code == clean_plate) | 
+            (ScanLog.room_code == v.plate_number)
+        )
+        .where(ScanLog.timestamp >= start_of_30_days)
+    )
+    all_scan_timestamps = (await session.exec(all_scans_query)).all()
+
+    from collections import Counter
+    scans_by_day = Counter()
+    # Populate the last 30 days with 0 counts to prevent chart gaps
+    for i in range(30):
+        day_str = (eat_now - timedelta(days=i)).date().isoformat()
+        scans_by_day[day_str] = 0
+
+    for ts in all_scan_timestamps:
+        day_str = ts.date().isoformat()
+        scans_by_day[day_str] += 1
+
+    formatted_scans_per_day = [
+        {"date": day, "count": count}
+        for day, count in sorted(scans_by_day.items())
+    ]
         
     formatted_trips = []
     for t in trips:
@@ -412,7 +440,8 @@ async def get_vehicle_details(vehicle_id: UUID, session: AsyncSession = Depends(
         "total_distance_trips": total_km_trips,
         "trips": formatted_trips,
         "fuel_logs": formatted_fuel,
-        "today_scans": formatted_scans
+        "today_scans": formatted_scans,
+        "scans_per_day": formatted_scans_per_day
     }
 
 @router.put("/vehicles/{vehicle_id}")

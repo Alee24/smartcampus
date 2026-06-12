@@ -3348,7 +3348,7 @@ function VehicleDetailsView({ vehicleId, onBack, showToast }: VehicleDetailsView
         );
     }
 
-    const { vehicle, total_distance_trips, trips, fuel_logs, today_scans } = details;
+    const { vehicle, total_distance_trips, trips, fuel_logs, today_scans, scans_per_day = [] } = details;
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -3573,37 +3573,113 @@ function VehicleDetailsView({ vehicleId, onBack, showToast }: VehicleDetailsView
                         )}
 
                         {activeSubTab === 'scans' && (
-                            today_scans.length === 0 ? (
-                                <div className="text-center py-12 text-gray-400">
-                                    <QrCode className="mx-auto mb-2 text-gray-300 dark:text-gray-700" size={32} />
-                                    <p className="font-bold">No scans recorded today</p>
-                                </div>
-                            ) : (
-                                today_scans.map((s: any) => (
-                                    <div key={s.id} className="p-4 bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800 rounded-2xl flex justify-between items-center gap-4 hover:shadow-md transition-all">
-                                        <div className="space-y-1">
-                                            <p className="font-extrabold text-sm text-gray-850 dark:text-gray-200">{s.student_name}</p>
-                                            <p className="text-xs text-purple-600 dark:text-purple-400 font-bold font-mono">{s.admission_number}</p>
-                                            <p className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
-                                                <Clock size={10} /> {new Date(s.timestamp).toLocaleTimeString()}
-                                                {s.detected_location && ` • At ${s.detected_location}`}
-                                            </p>
-                                        </div>
-                                        <div className="text-right space-y-1">
-                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 border ${
-                                                s.is_successful 
-                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/35 dark:text-emerald-400 dark:border-emerald-900' 
-                                                : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/35 dark:text-red-400 dark:border-red-900'
-                                            }`}>
-                                                {s.is_successful ? 'Success' : 'Failed'}
-                                            </span>
-                                            <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold max-w-[150px] truncate" title={s.status_message}>
-                                                {s.status_message}
-                                            </p>
+                            <div className="space-y-6">
+                                {/* Scans per Day Activity Chart */}
+                                {scans_per_day && scans_per_day.length > 0 && (
+                                    <div className="bg-gray-50 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-800 p-4 rounded-2xl">
+                                        <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3 flex items-center gap-1.5">
+                                            <Activity size={12} className="text-primary-600" />
+                                            Daily Scan Activity Trend (Last 30 Days)
+                                        </h4>
+                                        <div className="h-44 w-full">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={scans_per_day} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-800" />
+                                                    <XAxis 
+                                                        dataKey="date" 
+                                                        tickLine={false} 
+                                                        axisLine={false} 
+                                                        tick={{ fontSize: 9, fontWeight: 700 }}
+                                                        stroke="#9ca3af"
+                                                        tickFormatter={(date) => {
+                                                            try {
+                                                                const d = new Date(date);
+                                                                return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                                                            } catch (e) {
+                                                                return date;
+                                                            }
+                                                        }}
+                                                    />
+                                                    <YAxis 
+                                                        tickLine={false} 
+                                                        axisLine={false} 
+                                                        tick={{ fontSize: 9, fontWeight: 700 }}
+                                                        stroke="#9ca3af"
+                                                        allowDecimals={false}
+                                                    />
+                                                    <Tooltip 
+                                                        contentStyle={{ 
+                                                            backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                                                            border: 'none', 
+                                                            borderRadius: '12px',
+                                                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                                            fontSize: '10px',
+                                                            color: '#1f2937'
+                                                        }}
+                                                        labelStyle={{ fontWeight: 800, color: '#4b5563' }}
+                                                        labelFormatter={(date) => {
+                                                            try {
+                                                                return new Date(date).toLocaleDateString(undefined, { dateStyle: 'medium' });
+                                                            } catch (e) {
+                                                                return date;
+                                                            }
+                                                        }}
+                                                    />
+                                                    <Bar dataKey="count" fill="url(#colorScans)" radius={[4, 4, 0, 0]}>
+                                                        {scans_per_day.map((entry: any, index: number) => (
+                                                            <Cell key={`cell-${index}`} fill={entry.count > 0 ? '#9333ea' : '#c084fc'} />
+                                                        ))}
+                                                    </Bar>
+                                                    <defs>
+                                                        <linearGradient id="colorScans" x1="0" y1="0" x2="0" y2="1">
+                                                            <stop offset="5%" stopColor="#9333ea" stopOpacity={0.8}/>
+                                                            <stop offset="95%" stopColor="#c084fc" stopOpacity={0.2}/>
+                                                        </linearGradient>
+                                                    </defs>
+                                                </BarChart>
+                                            </ResponsiveContainer>
                                         </div>
                                     </div>
-                                ))
-                            )
+                                )}
+
+                                {/* Today's Scans list */}
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                                        Today's Scan Logs
+                                    </h4>
+                                    {today_scans.length === 0 ? (
+                                        <div className="text-center py-12 text-gray-400 bg-gray-50 dark:bg-gray-800/10 border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl">
+                                            <QrCode className="mx-auto mb-2 text-gray-300 dark:text-gray-700" size={32} />
+                                            <p className="font-bold">No scans recorded today</p>
+                                        </div>
+                                    ) : (
+                                        today_scans.map((s: any) => (
+                                            <div key={s.id} className="p-4 bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800 rounded-2xl flex justify-between items-center gap-4 hover:shadow-md transition-all">
+                                                <div className="space-y-1">
+                                                    <p className="font-extrabold text-sm text-gray-850 dark:text-gray-200">{s.student_name}</p>
+                                                    <p className="text-xs text-purple-600 dark:text-purple-400 font-bold font-mono">{s.admission_number}</p>
+                                                    <p className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
+                                                        <Clock size={10} /> {new Date(s.timestamp).toLocaleTimeString()}
+                                                        {s.detected_location && ` • At ${s.detected_location}`}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right space-y-1">
+                                                    <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 border ${
+                                                        s.is_successful 
+                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/35 dark:text-emerald-400 dark:border-emerald-900' 
+                                                        : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/35 dark:text-red-400 dark:border-red-900'
+                                                    }`}>
+                                                        {s.is_successful ? 'Success' : 'Failed'}
+                                                    </span>
+                                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold max-w-[150px] truncate" title={s.status_message}>
+                                                        {s.status_message}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>
