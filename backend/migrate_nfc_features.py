@@ -44,6 +44,7 @@ async def migrate_nfc_features():
         except Exception as idx_ex:
             print(f"   Index creation skipped/failed (might already exist): {idx_ex}")
                 
+    await engine.dispose()
     print("NFC Features Database Migration Complete.")
 
 if __name__ == "__main__":
