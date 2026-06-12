@@ -1852,3 +1852,106 @@ async def download_qrs_zip(
         filename="student_staff_qrs.zip"
     )
 
+
+class NFCAssignRequest(BaseModel):
+    nfc_card_uid: str
+    nfc_status: Optional[str] = "Active"
+
+@router.get("/nfc/{nfc_card_uid}")
+async def get_user_by_nfc(
+    nfc_card_uid: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Find a user by NFC tag UID"""
+    query = select(User).where(User.nfc_card_uid == nfc_card_uid)
+    result = await session.exec(query)
+    user = result.first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"No user found with NFC Card UID {nfc_card_uid}")
+    
+    # Get role
+    role = await session.get(Role, user.role_id)
+    u_dict = user.dict(exclude={"hashed_password"})
+    u_dict["role"] = role.name if role else "Unknown"
+    return u_dict
+
+@router.post("/{user_id}/nfc")
+async def assign_nfc_tag(
+    user_id: uuid_lib.UUID,
+    payload: NFCAssignRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Assign an NFC tag to a user"""
+    # 1. Fetch user to assign
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    nfc_uid = payload.nfc_card_uid.strip()
+    if not nfc_uid:
+        raise HTTPException(status_code=400, detail="NFC Card UID cannot be empty")
+        
+    # 2. Check if this NFC UID is already assigned to a DIFFERENT user
+    conflict_query = select(User).where(User.nfc_card_uid == nfc_uid).where(User.id != user_id)
+    conflict_res = await session.exec(conflict_query)
+    conflict_user = conflict_res.first()
+    if conflict_user:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"This NFC tag is already assigned to {conflict_user.full_name} ({conflict_user.admission_number})"
+        )
+        
+    # 3. Update user
+    user.nfc_card_uid = nfc_uid
+    user.nfc_written_at = get_eat_time()
+    user.nfc_status = payload.nfc_status or "Active"
+    
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    
+    # Audit logging
+    await log_action(
+        session=session,
+        user_id=current_user.id,
+        action="nfc_assign",
+        details=f"Assigned NFC tag {nfc_uid} to user {user.full_name} ({user.admission_number})",
+        ip_address=None
+    )
+    
+    return {"status": "success", "message": "NFC tag assigned successfully", "user": user.dict(exclude={"hashed_password"})}
+
+@router.delete("/{user_id}/nfc")
+async def revoke_nfc_tag(
+    user_id: uuid_lib.UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Revoke NFC tag of a user"""
+    user = await session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    old_uid = user.nfc_card_uid
+    user.nfc_card_uid = None
+    user.nfc_written_at = None
+    user.nfc_status = None
+    
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    
+    # Audit logging
+    await log_action(
+        session=session,
+        user_id=current_user.id,
+        action="nfc_revoke",
+        details=f"Revoked NFC tag {old_uid} from user {user.full_name} ({user.admission_number})",
+        ip_address=None
+    )
+    
+    return {"status": "success", "message": "NFC tag revoked successfully"}
+
+

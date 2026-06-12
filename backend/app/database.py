@@ -58,8 +58,12 @@ async def migrate_users():
         "last_name": "VARCHAR(255)",
         "phone_number": "VARCHAR(255)",
         "pin": "VARCHAR(255)",
-        "pin_setup_required": "BOOLEAN DEFAULT TRUE"
+        "pin_setup_required": "BOOLEAN DEFAULT TRUE",
+        "nfc_card_uid": "VARCHAR(255)",
+        "nfc_written_at": "DATETIME",
+        "nfc_status": "VARCHAR(255) DEFAULT 'Active'"
     }
+
     
     try:
         async with engine.begin() as conn:

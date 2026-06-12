@@ -376,9 +376,13 @@ async def scan_entry_inner(
                     if asset:
                         scanned_type = "asset"
                     else:
-                        user = (await session.exec(select(User).where(func.lower(User.admission_number) == func.lower(code)))).first()
+                        user = (await session.exec(select(User).where(User.nfc_card_uid == code))).first()
                         if user:
                             scanned_type = "user"
+                        else:
+                            user = (await session.exec(select(User).where(func.lower(User.admission_number) == func.lower(code)))).first()
+                            if user:
+                                scanned_type = "user"
                         else:
                             clean_plate = code.replace(" ", "").lower()
                             vehicle = (await session.exec(select(Vehicle).where(func.lower(func.replace(Vehicle.plate_number, ' ', '')) == clean_plate))).first()
@@ -1094,8 +1098,12 @@ async def scan_entry_inner(
     else: # user
         from sqlalchemy import func
         user = (await session.exec(
-            select(User).where(func.lower(User.admission_number) == func.lower(parsed_code.strip()))
+            select(User).where(User.nfc_card_uid == parsed_code.strip())
         )).first()
+        if not user:
+            user = (await session.exec(
+                select(User).where(func.lower(User.admission_number) == func.lower(parsed_code.strip()))
+            )).first()
         if not user:
             return {
                 "status": "rejected",
@@ -1153,12 +1161,13 @@ async def scan_entry_inner(
                 }
             }
         else:
-            # Check In
+            # Check if NFC was used
+            scan_method = "nfc" if (user.nfc_card_uid and parsed_code.strip() == user.nfc_card_uid) else "qr"
             new_log = EntryLog(
                 user_id=user.id,
                 gate_id=gate.id,
                 entry_time=get_eat_time(),
-                method="qr",
+                method=scan_method,
                 status="allowed"
             )
             session.add(new_log)

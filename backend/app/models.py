@@ -46,6 +46,12 @@ class User(UUIDModel, table=True):
     # Security PIN for authorization (e.g. photo updates)
     pin: str = Field(default="2424")
     pin_setup_required: bool = Field(default=True)
+    
+    # NFC Tag Fields
+    nfc_card_uid: Optional[str] = Field(default=None, index=True, nullable=True, unique=True)
+    nfc_written_at: Optional[datetime] = Field(default=None, nullable=True)
+    nfc_status: Optional[str] = Field(default="Active", nullable=True)
+
 
     role: Role = Relationship(back_populates="users")
     # Self-referential relationship for Guardian

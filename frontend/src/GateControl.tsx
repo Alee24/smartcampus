@@ -669,6 +669,76 @@ export default function GateControl() {
         }
     }
 
+    const processNfcTag = async (nfcUid: string) => {
+        setScanStatus('scanning')
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/gate/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ admission_number: nfcUid, gate_id: selectedGateId })
+            })
+
+            const result = await res.json()
+            if (result.status === 'allowed') {
+                setScanStatus('success')
+                setLastScan(result.data)
+                triggerHapticFeedback(true)
+                showNotification(result.message || `Access granted for ${result.data.name}`, 'success')
+            } else if (result.status === 'event_pass') {
+                setEventData(result.data)
+                setShowEventModal(true)
+                triggerHapticFeedback(true)
+                setScanStatus('idle')
+            } else {
+                setScanStatus('rejected')
+                setLastScan(result.data || {
+                    name: 'Access Denied',
+                    role: result.message || 'Inactive or Unregistered user',
+                    time: new Date().toLocaleTimeString(),
+                    image: 'https://cdn-icons-png.flaticon.com/512/3202/3202926.png'
+                })
+                triggerHapticFeedback(false)
+                showNotification(result.message || 'Verification rejected', 'error')
+            }
+            refreshData()
+        } catch (error: any) {
+            setScanStatus('rejected')
+            triggerHapticFeedback(false)
+            showNotification(error.message || 'Network error during NFC scan', 'error')
+        }
+    }
+
+    useEffect(() => {
+        if (!('NDEFReader' in window)) return
+
+        const controller = new AbortController()
+        const startNfcScanning = async () => {
+            try {
+                // @ts-ignore
+                const ndef = new NDEFReader()
+                await ndef.scan({ signal: controller.signal })
+                ndef.onreading = (event: any) => {
+                    const serial = event.serialNumber
+                    if (serial) {
+                        processNfcTag(serial)
+                    }
+                }
+            } catch (err) {
+                console.error("Web NFC initialization failed in Gate Control:", err)
+            }
+        }
+
+        startNfcScanning()
+
+        return () => {
+            controller.abort()
+        }
+    }, [selectedGateId])
+
     const captureAndProcess = () => {
         if (!videoRef.current || !canvasRef.current) return
         const context = canvasRef.current.getContext('2d')

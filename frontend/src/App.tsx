@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense, useRef } from 'react'
 import {
     LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut, Check,
-    Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode, Megaphone, Trash2, Plus,
+    Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode, Megaphone, Trash2, Plus, Radio,
     Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, UserCheck, X, Activity, BarChart3, Play, History, Printer, Download, Inbox, Search, ScanFace, DoorOpen, List, Menu, BookOpen, Grid, CheckCircle, XCircle, RefreshCw
 } from 'lucide-react'
 import {
@@ -60,6 +60,7 @@ const AdminDashboard = lazy(() => import('./AdminDashboard'))
 const LecturerDashboard = lazy(() => import('./LecturerDashboard'))
 const DriverDashboard = lazy(() => import('./DriverDashboard'))
 const QRRegistry = lazy(() => import('./QRRegistry'))
+const NFCHub = lazy(() => import('./NFCHub'))
 const NoticeBoard = lazy(() => import('./NoticeBoard'))
 const AssetManagement = lazy(() => import('./AssetManagement'))
 const IncidentReporting = lazy(() => import('./IncidentReporting'))
@@ -100,7 +101,8 @@ const SIDEBAR_GROUPS = [
         items: [
             { id: 'users', label: 'Students / Staff', permissionKey: 'users' },
             { id: 'id-printing', label: 'ID Printing', permissionKey: 'id-printing' },
-            { id: 'qr-registry', label: 'QR Asset Hub', permissionKey: 'qr-registry' }
+            { id: 'qr-registry', label: 'QR Asset Hub', permissionKey: 'qr-registry' },
+            { id: 'nfc-hub', label: 'NFC Asset Hub', permissionKey: 'qr-registry' }
         ]
     },
     {
@@ -1157,9 +1159,13 @@ function App() {
     }
 
     // Helper to check if menu is enabled for current role
-    const isMenuEnabled = (menuId: string) => {
+    const isMenuEnabled = (menuId: string): boolean => {
         // Admins and SuperAdmins see everything
         if (role?.toLowerCase() === 'superadmin' || role?.toLowerCase() === 'admin') return true
+
+        if (menuId === 'nfc-hub') {
+            return isMenuEnabled('qr-registry')
+        }
 
         // Get config for current role (use saved config or defaults)
         const defaults: any = getDefaultConfig()
@@ -1630,6 +1636,14 @@ function App() {
                                         label="QR Asset Hub"
                                         active={activeTab === 'qr-registry'}
                                         onClick={() => { setActiveTab('qr-registry'); setSidebarOpen(false); }}
+                                    />
+                                )}
+                                {isMenuEnabled('nfc-hub') && (
+                                    <NavItem
+                                        icon={<Radio size={18} />}
+                                        label="NFC Asset Hub"
+                                        active={activeTab === 'nfc-hub'}
+                                        onClick={() => { setActiveTab('nfc-hub'); setSidebarOpen(false); }}
                                     />
                                 )}
                             </>
@@ -2123,6 +2137,7 @@ function App() {
                     {activeTab === 'geofencing' && <Geofencing />}
                     {activeTab === 'id-printing' && <IDPrinting />}
                     {activeTab === 'qr-registry' && <QRRegistry />}
+                    {activeTab === 'nfc-hub' && <NFCHub />}
                     {activeTab === 'assets' && <AssetManagement initialView="assets" />}
                     {activeTab === 'asset-handovers' && <AssetManagement initialView="handovers" />}
                     {activeTab === 'asset-reports' && <AssetManagement initialView="reports" />}
