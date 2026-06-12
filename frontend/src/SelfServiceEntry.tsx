@@ -211,10 +211,15 @@ export default function SelfServiceEntry() {
             const res = await fetch(`/api/users/verify/${encodeURIComponent(idNum)}`)
             if (res.ok) {
                 const data = await res.json()
+                const parts = data.full_name ? data.full_name.trim().split(/\s+/) : []
+                const fName = parts[0] || ''
+                const lName = parts.slice(1).join(' ') || ''
                 setFormData({
                     ...formData,
                     id_number: idNum,
                     name: data.full_name,
+                    first_name: fName,
+                    last_name: lName,
                     mobile: data.phone_number || ''
                 })
             } else {
@@ -377,7 +382,9 @@ export default function SelfServiceEntry() {
                     gate_id: gateId,
                     role: 'vehicle_registration',
                     data: {
-                        driver_name: formData.driver_name,
+                        first_name: formData.first_name || '',
+                        last_name: formData.last_name || '',
+                        driver_name: `${formData.first_name || ''} ${formData.last_name || ''}`.trim() || formData.driver_name,
                         driver_id_number: formData.driver_id_number,
                         driver_contact: formData.driver_contact,
                         plate_number: formData.plate_number,
@@ -418,7 +425,9 @@ export default function SelfServiceEntry() {
         let payloadData: any = {}
         if (role === 'visitor') {
             payloadData = {
-                name: formData.name,
+                first_name: formData.first_name || '',
+                last_name: formData.last_name || '',
+                name: `${formData.first_name || ''} ${formData.last_name || ''}`.trim() || formData.name,
                 mobile: formData.mobile,
                 id_number: formData.id_number,
                 purpose: formData.purpose,
@@ -437,7 +446,9 @@ export default function SelfServiceEntry() {
             }
         } else if (role === 'delivery') {
             payloadData = {
-                name: formData.name,
+                first_name: formData.first_name || '',
+                last_name: formData.last_name || '',
+                name: `${formData.first_name || ''} ${formData.last_name || ''}`.trim() || formData.name,
                 mobile: formData.mobile,
                 id_number: formData.id_number,
                 delivery_details: formData.delivery_details,
@@ -1010,15 +1021,27 @@ export default function SelfServiceEntry() {
                                         )
                                     ) : role === 'vehicle_registration' ? (
                                         <form className="space-y-4" onSubmit={handleVehicleRegisterSubmit}>
-                                            <div>
-                                                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Full Name</label>
-                                                <input 
-                                                    required 
-                                                    placeholder="e.g. John Doe"
-                                                    className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
-                                                    value={formData.driver_name || ''}
-                                                    onChange={e => setFormData({ ...formData, driver_name: e.target.value })} 
-                                                />
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">First Name</label>
+                                                    <input 
+                                                        required 
+                                                        placeholder="First Name"
+                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                        value={formData.first_name || ''}
+                                                        onChange={e => setFormData({ ...formData, first_name: e.target.value })} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Last Name</label>
+                                                    <input 
+                                                        required 
+                                                        placeholder="Last Name"
+                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                        value={formData.last_name || ''}
+                                                        onChange={e => setFormData({ ...formData, last_name: e.target.value })} 
+                                                    />
+                                                </div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
@@ -1132,17 +1155,29 @@ export default function SelfServiceEntry() {
                                                 </button>
                                             )}
 
-                                            {/* Full Name */}
+                                            {/* Name Fields */}
                                             {role !== 'taxi' && (
-                                                <div>
-                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Full Name</label>
-                                                    <input 
-                                                        required 
-                                                        placeholder="e.g. John Doe"
-                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
-                                                        value={formData.name || ''}
-                                                        onChange={e => setFormData({ ...formData, name: e.target.value })} 
-                                                    />
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">First Name</label>
+                                                        <input 
+                                                            required 
+                                                            placeholder="First Name"
+                                                            className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                            value={formData.first_name || ''}
+                                                            onChange={e => setFormData({ ...formData, first_name: e.target.value })} 
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest block mb-1.5 font-bold">Last Name</label>
+                                                        <input 
+                                                            required 
+                                                            placeholder="Last Name"
+                                                            className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                            value={formData.last_name || ''}
+                                                            onChange={e => setFormData({ ...formData, last_name: e.target.value })} 
+                                                        />
+                                                    </div>
                                                 </div>
                                             )}
 

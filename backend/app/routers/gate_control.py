@@ -2951,9 +2951,15 @@ async def public_access_request(
          rcpt_img = save_base64_image(data.get("delivery_image_receipt"), "receipt")
 
          # Map name details
-         full_name = data.get("name") or data.get("driver_name") or "Taxi Driver"
-         f_name = full_name.split(" ")[0]
-         l_name = full_name.split(" ")[-1] if " " in full_name else ""
+         first_name = data.get("first_name", "").strip()
+         last_name = data.get("last_name", "").strip()
+         if first_name or last_name:
+             f_name = first_name or "Visitor"
+             l_name = last_name or ""
+         else:
+             full_name = data.get("name") or data.get("driver_name") or "Taxi Driver"
+             f_name = full_name.split(" ")[0]
+             l_name = full_name.split(" ")[-1] if " " in full_name else ""
 
          # Create Visitor record with status = "pending"
          visitor = Visitor(
@@ -3129,7 +3135,11 @@ async def public_register_vehicle(
         "role": str
     }
     """
+    first_name = payload.get("first_name", "").strip()
+    last_name = payload.get("last_name", "").strip()
     driver_name = payload.get("driver_name", "").strip()
+    if first_name or last_name:
+        driver_name = f"{first_name} {last_name}".strip()
     driver_id_number = payload.get("driver_id_number", "").strip()
     driver_contact = payload.get("driver_contact", "").strip()
     plate_number = payload.get("plate_number", "").strip().upper()
