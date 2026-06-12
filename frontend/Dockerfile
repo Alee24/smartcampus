@@ -5,14 +5,20 @@ ENV NODE_ENV=development
 
 WORKDIR /app
 
-# Copy all source files first
+# Copy package files first to leverage Docker layer caching
+COPY package.json package-lock.json* ./
+
+# Configure npm to be more resilient to network failures and slow connections
+RUN npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retries 5
+
+# Install all dependencies (including devDependencies) using cache mounts
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci || npm install --production=false
+
+# Copy remaining source code
 COPY . .
-
-# Delete any copied node_modules or lockfiles to guarantee a clean installation
-RUN rm -rf node_modules package-lock.json
-
-# Force a clean install of all dependencies (including devDependencies)
-RUN npm install --production=false
 
 # Build the app
 RUN npm run build
