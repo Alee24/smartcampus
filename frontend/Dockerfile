@@ -5,10 +5,16 @@ ENV NODE_ENV=development
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN echo "Force clean dependencies installation" && npm install --production=false
-
+# Copy all source files first
 COPY . .
+
+# Delete any copied node_modules or lockfiles to guarantee a clean installation
+RUN rm -rf node_modules package-lock.json
+
+# Force a clean install of all dependencies (including devDependencies)
+RUN npm install --production=false
+
+# Build the app
 RUN npm run build
 
 # Production stage
