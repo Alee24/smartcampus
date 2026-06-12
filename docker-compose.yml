@@ -44,6 +44,8 @@ services:
     volumes:
       - ./backend/static:/app/static
       - ./backend/uploads:/app/uploads
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/repo:ro
     ports:
       - "971:8000"
     environment:

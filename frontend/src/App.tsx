@@ -55,6 +55,7 @@ const FleetManagement = lazy(() => import('./FleetManagement'))
 const AuditLogs = lazy(() => import('./AuditLogs'))
 const IDPrinting = lazy(() => import('./IDPrinting'))
 const Geofencing = lazy(() => import('./Geofencing'))
+const SystemUpdate = lazy(() => import('./SystemUpdate'))
 const AdminDashboard = lazy(() => import('./AdminDashboard'))
 const LecturerDashboard = lazy(() => import('./LecturerDashboard'))
 const DriverDashboard = lazy(() => import('./DriverDashboard'))
@@ -1809,6 +1810,7 @@ function App() {
                                 {isMenuEnabled('integrations') && <NavItem icon={<Server size={18} />} label="API Integrations" active={activeTab === 'integrations'} onClick={() => { setActiveTab('integrations'); setSidebarOpen(false); }} />}
                                 {isMenuEnabled('audit') && <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => { setActiveTab('audit'); setSidebarOpen(false); }} />}
                                 {isMenuEnabled('geofencing') && <NavItem icon={<Shield size={18} />} label="IP Geofencing" active={activeTab === 'geofencing'} onClick={() => { setActiveTab('geofencing'); setSidebarOpen(false); }} />}
+                                {isMenuEnabled('settings') && <NavItem icon={<RefreshCw size={18} />} label="System Update" active={activeTab === 'system-update'} onClick={() => { setActiveTab('system-update'); setSidebarOpen(false); }} />}
                             </SidebarGroup>
                         )}
                         
@@ -2100,6 +2102,7 @@ function App() {
                     {activeTab === 'fleet-tracking' && <FleetManagement initialTab="tracking" />}
                     {activeTab === 'fleet-trips' && <FleetManagement initialTab="trips" />}
                     {activeTab === 'audit' && <AuditLogs />}
+                    {activeTab === 'system-update' && <SystemUpdate />}
                     {activeTab === 'geofencing' && <Geofencing />}
                     {activeTab === 'id-printing' && <IDPrinting />}
                     {activeTab === 'qr-registry' && <QRRegistry />}
