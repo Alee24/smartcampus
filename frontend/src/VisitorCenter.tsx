@@ -80,7 +80,7 @@ export default function VisitorCenter() {
     // Filter Logs
     const filteredLogs = logs.filter(log => {
         const matchesSearch = 
-            log.visitor_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            ((log.visitor_name || '').toLowerCase().includes(searchQuery.toLowerCase())) ||
             (log.contact && log.contact.toLowerCase().includes(searchQuery.toLowerCase())) ||
             (log.plate_number && log.plate_number.toLowerCase().includes(searchQuery.toLowerCase())) ||
             (log.purpose && log.purpose.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -351,11 +351,11 @@ export default function VisitorCenter() {
                                                             <img src={log.profile_image} className="w-full h-full object-cover" alt="Profile" />
                                                         ) : (
                                                             <span className="font-black text-xs text-indigo-650 dark:text-indigo-400">
-                                                                {log.visitor_name[0].toUpperCase()}
+                                                                {(log.visitor_name?.[0] || 'V').toUpperCase()}
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <span>{log.visitor_name}</span>
+                                                    <span>{log.visitor_name || 'Unknown Visitor'}</span>
                                                 </div>
                                             </td>
 

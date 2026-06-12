@@ -3615,19 +3615,21 @@ async def get_visitor_center_logs(session: AsyncSession = Depends(get_session)):
                 "id": f"v_{v.id}",
                 "source": "self_service",
                 "visitor_type": v.visitor_type or "visitor",
-                "name": f"{v.first_name} {v.last_name}".strip(),
-                "phone_number": v.phone_number,
-                "email": "N/A",
-                "identifier": v.id_number,
+                "visitor_name": f"{v.first_name} {v.last_name}".strip(),
+                "contact": v.phone_number or "N/A",
+                "id_number": v.id_number or "N/A",
                 "plate_number": v.plate_number or "N/A",
                 "passengers": v.passengers or 1,
-                "timestamp": v.time_in.isoformat(),
+                "time_in": v.time_in.isoformat(),
                 "time_out": v.time_out.isoformat() if v.time_out else None,
                 "status": v.status,
-                "details": v.visit_details,
+                "purpose": v.visit_details or "N/A",
                 "profile_image": v.profile_image or "",
+                "delivery_image_package": v.delivery_image_package or None,
+                "delivery_image_receipt": v.delivery_image_receipt or None,
                 "location": gate_map.get(v.gate_id, "Main Gate"),
-                "auto_delete_24h": v.auto_delete_24h
+                "auto_delete_24h": v.auto_delete_24h,
+                "event_name": None
             })
 
         # 2. Fetch event visitors who are external guests
@@ -3646,23 +3648,25 @@ async def get_visitor_center_logs(session: AsyncSession = Depends(get_session)):
                 "id": f"ev_{ev.id}",
                 "source": "event",
                 "visitor_type": "event_guest",
-                "name": ev.visitor_name,
-                "phone_number": ev.phone_number,
-                "email": ev.email or "N/A",
-                "identifier": ev.visitor_identifier,
+                "visitor_name": ev.visitor_name or "Unknown",
+                "contact": ev.phone_number or ev.email or "N/A",
+                "id_number": ev.visitor_identifier or "N/A",
                 "plate_number": "N/A",
                 "passengers": 1,
-                "timestamp": ev.entry_time.isoformat(),
+                "time_in": ev.entry_time.isoformat(),
                 "time_out": None,
                 "status": ev.status,
-                "details": f"Registered for event: {event_name}",
+                "purpose": f"Registered for event: {event_name}",
                 "profile_image": ev.profile_image or "",
+                "delivery_image_package": None,
+                "delivery_image_receipt": None,
                 "location": event_loc,
-                "auto_delete_24h": ev.auto_delete_24h
+                "auto_delete_24h": ev.auto_delete_24h,
+                "event_name": event_name
             })
 
         # Sort combined logs chronologically (descending)
-        combined_logs.sort(key=lambda x: x["timestamp"], reverse=True)
+        combined_logs.sort(key=lambda x: x["time_in"], reverse=True)
         return combined_logs
     except Exception as e:
         print(f"Error getting visitor center logs: {e}")
