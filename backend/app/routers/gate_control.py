@@ -2443,7 +2443,6 @@ async def check_in_visitor(
 
         # Log vehicle if plate number exists
         if visitor.plate_number:
-            from app.models import Vehicle, VehicleLog
             clean_plate = visitor.plate_number.replace(" ", "").upper()
             vehicle = (await session.exec(
                 select(Vehicle).where(func.replace(Vehicle.plate_number, ' ', '') == clean_plate)
