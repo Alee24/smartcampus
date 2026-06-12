@@ -1106,6 +1106,32 @@ export default function SelfServiceEntry() {
                                         </form>
                                     ) : (
                                         <form className="space-y-4" onSubmit={handleSubmit}>
+                                            {/* ID / Passport / Admission Number first */}
+                                            {role !== 'taxi' && (
+                                                <div>
+                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-505 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport / Admission Number</label>
+                                                    <input 
+                                                        required 
+                                                        placeholder="e.g. ID, Passport or Admission Number"
+                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                        value={formData.id_number || ''}
+                                                        onChange={e => setFormData({ ...formData, id_number: e.target.value })} 
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Lookup Button right below ID */}
+                                            {role !== 'taxi' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => lookupVisitor(formData.id_number)}
+                                                    disabled={loadingVisitor || !formData.id_number}
+                                                    className="w-full py-3.5 bg-slate-900 hover:bg-black dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-2xl text-xs font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none shadow-sm flex items-center justify-center gap-2 mb-2"
+                                                >
+                                                    {loadingVisitor ? 'Searching Records...' : 'Lookup Existing Visitor Details'}
+                                                </button>
+                                            )}
+
                                             {/* Full Name */}
                                             {role !== 'taxi' && (
                                                 <div>
@@ -1120,39 +1146,18 @@ export default function SelfServiceEntry() {
                                                 </div>
                                             )}
 
+                                            {/* Phone Number */}
                                             {role !== 'taxi' && (
-                                                <div className="space-y-4">
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div>
-                                                            <label className="text-[10px] font-black text-slate-400 dark:text-slate-505 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
-                                                            <input 
-                                                                required 
-                                                                type="tel"
-                                                                placeholder="e.g. 0712345678"
-                                                                className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
-                                                                value={formData.mobile || ''}
-                                                                onChange={e => setFormData({ ...formData, mobile: e.target.value })} 
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] font-black text-slate-400 dark:text-slate-505 uppercase tracking-widest block mb-1.5 font-bold">ID / Passport No</label>
-                                                            <input 
-                                                                required 
-                                                                placeholder="ID Number"
-                                                                className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
-                                                                value={formData.id_number || ''}
-                                                                onChange={e => setFormData({ ...formData, id_number: e.target.value })} 
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => lookupVisitor(formData.id_number)}
-                                                        disabled={loadingVisitor || !formData.id_number}
-                                                        className="w-full py-3.5 bg-slate-900 hover:bg-black dark:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-2xl text-xs font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none shadow-sm flex items-center justify-center gap-2"
-                                                    >
-                                                        {loadingVisitor ? 'Searching Records...' : 'Lookup Existing Visitor Details'}
-                                                    </button>
+                                                <div>
+                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-505 uppercase tracking-widest block mb-1.5 font-bold">Phone Number</label>
+                                                    <input 
+                                                        required 
+                                                        type="tel"
+                                                        placeholder="e.g. 0712345678"
+                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                        value={formData.mobile || ''}
+                                                        onChange={e => setFormData({ ...formData, mobile: e.target.value })} 
+                                                    />
                                                 </div>
                                             )}
 

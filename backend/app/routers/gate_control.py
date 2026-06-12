@@ -2134,9 +2134,14 @@ async def get_student_stats(
 
 @router.get("/visitors")
 async def list_visitors(session: AsyncSession = Depends(get_session)):
-    query = select(Visitor).order_by(Visitor.time_in.desc()).limit(100)
+    query = select(Visitor, Gate).join(Gate, isouter=True).order_by(Visitor.time_in.desc()).limit(100)
     results = await session.exec(query)
-    return results.all()
+    visitors_list = []
+    for visitor, gate in results:
+        v_dict = visitor.dict()
+        v_dict["gate_name"] = gate.name if gate else "Unknown Gate"
+        visitors_list.append(v_dict)
+    return visitors_list
 
 @router.post("/visitors/check-in")
 async def check_in_visitor(
@@ -2171,6 +2176,32 @@ async def check_in_visitor(
         session.add(visitor)
         await session.commit()
         await session.refresh(visitor)
+
+        # Check if visitor ID matches student admission number and auto-check-in student
+        if visitor.id_number:
+            student = (await session.exec(select(User).where(User.admission_number == visitor.id_number))).first()
+            if student:
+                # Close any open logs
+                open_logs = (await session.exec(
+                    select(EntryLog)
+                    .where(EntryLog.user_id == student.id)
+                    .where(EntryLog.exit_time == None)
+                )).all()
+                for log in open_logs:
+                    log.exit_time = get_eat_time()
+                    log.exit_gate_id = visitor.gate_id
+                    session.add(log)
+                
+                # Check In student
+                student_log = EntryLog(
+                    user_id=student.id,
+                    gate_id=visitor.gate_id or gate_uuid,
+                    entry_time=get_eat_time(),
+                    method="visitor_check_in",
+                    status="allowed"
+                )
+                session.add(student_log)
+                await session.commit()
 
         # Log visitor check-in
         await log_action(
@@ -2245,6 +2276,31 @@ async def approve_visitor_request(
     visitor.status = "checked_in"
     visitor.time_in = get_eat_time()
     session.add(visitor)
+
+    # If the visitor is a student (id_number matches a student's admission_number), auto check-in the student
+    if visitor.id_number:
+        student = (await session.exec(select(User).where(User.admission_number == visitor.id_number))).first()
+        if student:
+            # Close any open logs
+            open_logs = (await session.exec(
+                select(EntryLog)
+                .where(EntryLog.user_id == student.id)
+                .where(EntryLog.exit_time == None)
+            )).all()
+            for log in open_logs:
+                log.exit_time = get_eat_time()
+                log.exit_gate_id = visitor.gate_id
+                session.add(log)
+            
+            # Check In student
+            student_log = EntryLog(
+                user_id=student.id,
+                gate_id=visitor.gate_id,
+                entry_time=get_eat_time(),
+                method="visitor_check_in",
+                status="allowed"
+            )
+            session.add(student_log)
 
     # 1.5 If standard visitor, register as a User under Visitor role
     if visitor.visitor_type == "visitor":

@@ -904,7 +904,24 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
                 print(f"LDAP Check during verification failed: {e}")
 
     if not user:
-        raise HTTPException(status_code=404, detail="Student not found")
+        # Fallback: check Visitor table
+        from app.models import Visitor
+        visitor_query = select(Visitor).where(Visitor.id_number == admission_number).order_by(Visitor.time_in.desc())
+        visitor = (await session.exec(visitor_query)).first()
+        if visitor:
+            return {
+                "id": str(visitor.id),
+                "full_name": f"{visitor.first_name} {visitor.last_name}".strip(),
+                "admission_number": visitor.id_number,
+                "phone_number": visitor.phone_number,
+                "email": None,
+                "school": "Visitor",
+                "status": "Active",
+                "role": "Visitor",
+                "gate_status": "Out",
+                "found_in_visitor_logs": True
+            }
+        raise HTTPException(status_code=404, detail="Student/Visitor not found")
     
     # Get role information
     role = await session.get(Role, user.role_id)
@@ -930,7 +947,8 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
         "admission_date": user.admission_date.isoformat() if user.admission_date else None,
         "expiry_date": user.expiry_date.isoformat() if user.expiry_date else None,
         "role": role.name if role else "Unknown",
-        "gate_status": gate_status
+        "gate_status": gate_status,
+        "phone_number": user.phone_number
     }
 
 @router.post("/import-ad-student")

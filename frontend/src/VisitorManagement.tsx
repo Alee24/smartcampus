@@ -28,6 +28,7 @@ export default function VisitorManagement() {
     })
     const [submitting, setSubmitting] = useState(false)
     const [previewImage, setPreviewImage] = useState<string | null>(null)
+    const [selectedDetailVisitor, setSelectedDetailVisitor] = useState<any | null>(null)
 
     useEffect(() => {
         fetchVisitors()
@@ -562,14 +563,22 @@ export default function VisitorManagement() {
                                                 </span>
                                             </td>
                                             <td className="p-4 text-right">
-                                                {visitor.status === 'checked_in' && (
+                                                <div className="flex justify-end gap-2">
                                                     <button
-                                                        onClick={() => handleCheckOut(visitor.id)}
-                                                        className="px-3 py-1 bg-red-50 text-red-650 hover:bg-red-100 rounded-lg text-xs font-semibold border border-red-200 transition-colors cursor-pointer"
+                                                        onClick={() => setSelectedDetailVisitor(visitor)}
+                                                        className="px-3 py-1 bg-slate-50 dark:bg-slate-800 text-[var(--text-secondary)] hover:bg-[var(--bg-surface)] rounded-lg text-xs font-semibold border border-[var(--border-color)] transition-colors cursor-pointer flex items-center gap-1"
                                                     >
-                                                        Check Out
+                                                        <Eye size={14} /> Details
                                                     </button>
-                                                )}
+                                                    {visitor.status === 'checked_in' && (
+                                                        <button
+                                                            onClick={() => handleCheckOut(visitor.id)}
+                                                            className="px-3 py-1 bg-red-50 text-red-650 hover:bg-red-100 rounded-lg text-xs font-semibold border border-red-200 transition-colors cursor-pointer"
+                                                        >
+                                                            Check Out
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
@@ -625,6 +634,234 @@ export default function VisitorManagement() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Visitor Detail Modal */}
+            {selectedDetailVisitor && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in text-[var(--text-primary)]">
+                    <div className="bg-[var(--bg-surface)] w-full max-w-2xl rounded-2xl shadow-2xl border border-[var(--border-color)] overflow-hidden animate-scale-in max-h-[90vh] flex flex-col">
+                        <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center shrink-0">
+                            <div>
+                                <h2 className="text-xl font-bold">Visitor Details</h2>
+                                <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">Comprehensive entry and registration history log.</p>
+                            </div>
+                            <button onClick={() => setSelectedDetailVisitor(null)} className="text-[var(--text-secondary)] hover:text-red-500 cursor-pointer border-none bg-transparent">
+                                <XCircle size={24} />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto space-y-6 text-xs">
+                            
+                            {/* Visitor Status Card */}
+                            <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white shadow-sm shrink-0 ${
+                                        selectedDetailVisitor.visitor_type === 'taxi' ? 'bg-amber-500' :
+                                        selectedDetailVisitor.visitor_type === 'delivery' ? 'bg-blue-500' :
+                                        selectedDetailVisitor.visitor_type === 'vehicle_registration' ? 'bg-purple-500' : 'bg-emerald-500'
+                                    }`}>
+                                        {selectedDetailVisitor.visitor_type === 'taxi' ? <Car size={24} /> :
+                                         selectedDetailVisitor.visitor_type === 'delivery' ? <Truck size={24} /> :
+                                         selectedDetailVisitor.visitor_type === 'vehicle_registration' ? <Car size={24} /> : <User size={24} />}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-black">{selectedDetailVisitor.visitor_type === 'taxi' ? 'Taxi / Cab Driver' : `${selectedDetailVisitor.first_name} ${selectedDetailVisitor.last_name}`}</h3>
+                                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded font-black uppercase tracking-wider block w-fit mt-1">
+                                            {selectedDetailVisitor.visitor_type?.replace('_', ' ')}
+                                        </span>
+                                    </div>
+                                </div>
+                                <span className={`px-3 py-1.5 rounded-full text-xs font-black border uppercase tracking-wider ${
+                                    selectedDetailVisitor.status === 'checked_in'
+                                        ? 'bg-green-150 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-450'
+                                        : selectedDetailVisitor.status === 'rejected'
+                                        ? 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-450'
+                                        : 'bg-slate-105 text-slate-650 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                                }`}>
+                                    {selectedDetailVisitor.status === 'checked_in' ? 'Active' : selectedDetailVisitor.status === 'rejected' ? 'Declined' : 'Checked Out'}
+                                </span>
+                            </div>
+
+                            {/* Visitor Metadata Grid */}
+                            <div>
+                                <h4 className="font-bold text-[10px] uppercase text-slate-400 tracking-wider mb-2">Visitor Credentials</h4>
+                                <div className="grid grid-cols-2 gap-4 bg-[var(--bg-primary)] p-4 rounded-xl border border-[var(--border-color)]">
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[10px]">FULL NAME</span>
+                                        <span className="font-semibold">{selectedDetailVisitor.first_name} {selectedDetailVisitor.last_name}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[10px]">ID / PASSPORT / ADMISSION NO</span>
+                                        <span className="font-mono font-semibold">{selectedDetailVisitor.id_number || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[10px]">MOBILE CONTACT</span>
+                                        <span className="font-semibold">{selectedDetailVisitor.phone_number || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[10px]">GATE STATION</span>
+                                        <span className="font-semibold">{selectedDetailVisitor.gate_name || 'Main Gate'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[10px]">CHECKED IN AT</span>
+                                        <span className="font-mono font-semibold">
+                                            {selectedDetailVisitor.time_in ? new Date(selectedDetailVisitor.time_in).toLocaleString() : 'N/A'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 font-bold block text-[10px]">CHECKED OUT AT</span>
+                                        <span className="font-mono font-semibold">
+                                            {selectedDetailVisitor.time_out ? new Date(selectedDetailVisitor.time_out).toLocaleString() : '-'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Purpose and details */}
+                            <div>
+                                <h4 className="font-bold text-[10px] uppercase text-slate-400 tracking-wider mb-2">Visit Purpose / Host Details</h4>
+                                <div className="p-4 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-color)]">
+                                    <p className="font-semibold whitespace-pre-wrap">{selectedDetailVisitor.visit_details || 'No details provided.'}</p>
+                                </div>
+                            </div>
+
+                            {/* Additional Vehicle Registration / Taxi / Delivery fields */}
+                            {(selectedDetailVisitor.plate_number || selectedDetailVisitor.passengers || selectedDetailVisitor.dropoff_admission_number || selectedDetailVisitor.delivery_image_package) && (
+                                <div>
+                                    <h4 className="font-bold text-[10px] uppercase text-slate-400 tracking-wider mb-2">Additional Specifications</h4>
+                                    <div className="space-y-4">
+                                        {/* Plate and Passengers */}
+                                        {(selectedDetailVisitor.plate_number || selectedDetailVisitor.passengers) && (
+                                            <div className="grid grid-cols-2 gap-4 bg-[var(--bg-primary)] p-4 rounded-xl border border-[var(--border-color)]">
+                                                {selectedDetailVisitor.plate_number && (
+                                                    <div>
+                                                        <span className="text-slate-400 font-bold block text-[10px]">PLATE NUMBER</span>
+                                                        <span className="font-mono font-black uppercase">{selectedDetailVisitor.plate_number}</span>
+                                                    </div>
+                                                )}
+                                                {selectedDetailVisitor.passengers && (
+                                                    <div>
+                                                        <span className="text-slate-400 font-bold block text-[10px]">PASSENGERS COUNT</span>
+                                                        <span className="font-semibold">{selectedDetailVisitor.passengers}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Taxi pick-up / drop-off student details */}
+                                        {selectedDetailVisitor.dropoff_admission_number && (
+                                            <div className="p-4 bg-amber-500/5 dark:bg-amber-950/10 border border-amber-500/20 rounded-xl space-y-3">
+                                                <div className="font-bold text-amber-800 dark:text-amber-400 uppercase tracking-widest text-[9px]">
+                                                    {selectedDetailVisitor.is_pickup ? 'Pick-up Passenger Details' : 'Drop-off Student Details'}
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-14 h-14 rounded-xl bg-slate-100 border overflow-hidden shrink-0 relative group">
+                                                        <img 
+                                                            src={`/api/users/verify/${selectedDetailVisitor.dropoff_admission_number}`} 
+                                                            className="w-full h-full object-cover" 
+                                                            onError={(e: any) => {
+                                                                e.target.src = "/static/default_profile.jpg";
+                                                            }}
+                                                        />
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => setPreviewImage(`/api/users/verify/${selectedDetailVisitor.dropoff_admission_number}`)}
+                                                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity border-none cursor-pointer"
+                                                        >
+                                                            <Eye size={14} />
+                                                        </button>
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-black text-xs">{selectedDetailVisitor.dropoff_name || 'Student/Staff Member'}</div>
+                                                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">{selectedDetailVisitor.dropoff_admission_number}</div>
+                                                        {selectedDetailVisitor.check_in_student && (
+                                                            <span className="text-[9px] bg-emerald-100 text-emerald-805 dark:bg-emerald-950/40 dark:text-emerald-400 px-2 py-0.5 rounded font-black tracking-wider uppercase block w-fit mt-1.5">
+                                                                Auto check-in student
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Delivery Details with photos */}
+                                        {(selectedDetailVisitor.delivery_image_package || selectedDetailVisitor.delivery_image_receipt) && (
+                                            <div className="p-4 bg-blue-500/5 dark:bg-blue-950/10 border border-blue-500/20 rounded-xl space-y-3">
+                                                <div className="font-bold text-blue-800 dark:text-blue-400 uppercase tracking-widest text-[9px]">Delivery Images</div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    {selectedDetailVisitor.delivery_image_package ? (
+                                                        <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 group shadow-inner">
+                                                            <img src={selectedDetailVisitor.delivery_image_package} className="w-full h-full object-cover" />
+                                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                                <button
+                                                                    onClick={() => setPreviewImage(selectedDetailVisitor.delivery_image_package)}
+                                                                    className="p-2 bg-white text-slate-900 rounded-full hover:scale-105 transition-transform border-none cursor-pointer"
+                                                                >
+                                                                    <Eye size={14} />
+                                                                </button>
+                                                            </div>
+                                                            <span className="absolute bottom-1.5 left-1.5 bg-black/75 text-white text-[8px] px-1.5 py-0.5 rounded">Package</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="aspect-video bg-slate-105 dark:bg-slate-900 rounded-xl flex items-center justify-center text-[10px] text-slate-400 border border-dashed border-slate-200">
+                                                            No Package Photo
+                                                        </div>
+                                                    )}
+                                                    {selectedDetailVisitor.delivery_image_receipt ? (
+                                                        <div className="relative aspect-video rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 group shadow-inner">
+                                                            <img src={selectedDetailVisitor.delivery_image_receipt} className="w-full h-full object-cover" />
+                                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                                <button
+                                                                    onClick={() => setPreviewImage(selectedDetailVisitor.delivery_image_receipt)}
+                                                                    className="p-2 bg-white text-slate-900 rounded-full hover:scale-105 transition-transform border-none cursor-pointer"
+                                                                >
+                                                                    <Eye size={14} />
+                                                                </button>
+                                                            </div>
+                                                            <span className="absolute bottom-1.5 left-1.5 bg-black/75 text-white text-[8px] px-1.5 py-0.5 rounded">Receipt / Note</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="aspect-video bg-slate-105 dark:bg-slate-900 rounded-xl flex items-center justify-center text-[10px] text-slate-400 border border-dashed border-slate-200">
+                                                            No Receipt Photo
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Data deletion info */}
+                            {selectedDetailVisitor.auto_delete_24h && (
+                                <div className="p-3 bg-rose-500/5 dark:bg-rose-950/10 border border-rose-500/25 rounded-xl flex items-center gap-2">
+                                    <AlertCircle className="text-rose-500 shrink-0" size={16} />
+                                    <span className="text-[10px] text-rose-700 dark:text-rose-450 font-medium">
+                                        Data Privacy: This visitor requested auto-scrub. Personal info is scheduled to delete 24 hours post check-out.
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-6 border-t border-[var(--border-color)] flex justify-end gap-3 shrink-0">
+                            <button
+                                onClick={() => setSelectedDetailVisitor(null)}
+                                className="px-5 py-3 bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-secondary)] rounded-xl font-bold hover:bg-[var(--bg-surface)] cursor-pointer"
+                            >
+                                Close
+                            </button>
+                            {selectedDetailVisitor.status === 'checked_in' && (
+                                <button
+                                    onClick={() => {
+                                        handleCheckOut(selectedDetailVisitor.id);
+                                        setSelectedDetailVisitor(null);
+                                    }}
+                                    className="px-5 py-3 bg-red-650 text-white rounded-xl font-bold shadow-lg shadow-red-500/25 hover:opacity-90 cursor-pointer border-none"
+                                >
+                                    Check Out Visitor
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
