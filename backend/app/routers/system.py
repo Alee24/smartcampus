@@ -268,7 +268,7 @@ async def trigger_system_update(
         "Image": "docker:cli",
         "Cmd": [
             "sh", "-c",
-            f"cd /repo && git clean -fd && git reset --hard && git pull origin {branch} && docker compose down && docker compose up -d --build"
+            f"apk add --no-cache git && cd /repo && git clean -fd && git reset --hard && git pull origin {branch} && DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose down && DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose up -d --build"
         ],
         "HostConfig": {
             "Binds": [

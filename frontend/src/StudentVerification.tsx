@@ -359,6 +359,14 @@ export default function StudentVerification() {
                 if (tripParam) return `TRIP:${tripParam.trim()}`;
                 const vehicleParam = url.searchParams.get("vehicle");
                 if (vehicleParam) return `VEHICLE:${vehicleParam.trim()}`;
+                const roomParam = url.searchParams.get("room");
+                if (roomParam) return `ROOM:${roomParam.trim()}`;
+                const courseParam = url.searchParams.get("course");
+                if (courseParam) return `COURSE:${courseParam.trim()}`;
+                const eventParam = url.searchParams.get("event");
+                if (eventParam) return `EVENT:${eventParam.trim()}`;
+                const visitorParam = url.searchParams.get("visitor");
+                if (visitorParam) return `VISITOR:${visitorParam.trim()}`;
                 const pathSegments = url.pathname.split("/").filter(Boolean);
                 if (pathSegments.length > 0) return pathSegments[pathSegments.length - 1].trim();
             }
@@ -369,6 +377,10 @@ export default function StudentVerification() {
         if (tripMatch && tripMatch[1]) return `TRIP:${tripMatch[1].trim()}`;
         const vehicleMatch = cleanInput.match(/[?&]vehicle=([^&]+)/);
         if (vehicleMatch && vehicleMatch[1]) return `VEHICLE:${vehicleMatch[1].trim()}`;
+        const roomMatch = cleanInput.match(/[?&]room=([^&]+)/);
+        if (roomMatch && roomMatch[1]) return `ROOM:${roomMatch[1].trim()}`;
+        const courseMatch = cleanInput.match(/[?&]course=([^&]+)/);
+        if (courseMatch && courseMatch[1]) return `COURSE:${courseMatch[1].trim()}`;
         return cleanInput;
     };
 
@@ -382,8 +394,12 @@ export default function StudentVerification() {
         setResult(null)
         setShowSuggestions(false)
 
-        // Intercept Trip QR Code scans
-        if (searchQuery.toUpperCase().startsWith("TRIP:") || searchQuery.toUpperCase().includes("VEHICLE:")) {
+        // Intercept Special QR Code scans (Trip, Vehicle, Room, Course, Event, Visitor)
+        const isSpecialScan = ['TRIP:', 'VEHICLE:', 'ROOM:', 'COURSE:', 'EVENT:', 'VISITOR:'].some(prefix => 
+            searchQuery.toUpperCase().startsWith(prefix)
+        ) || searchQuery.toUpperCase().includes('VEHICLE:');
+
+        if (isSpecialScan) {
             try {
                 const token = localStorage.getItem('token')
                 const res = await fetch('/api/gate/scan', {
@@ -395,9 +411,24 @@ export default function StudentVerification() {
                     body: JSON.stringify({ admission_number: searchQuery })
                 })
                 const data = await res.json()
-                if (res.ok && data.status === 'allowed') {
-                    showNotification(data.message, 'success')
+                if (res.ok && (data.status === 'allowed' || data.status === 'event_pass')) {
+                    showNotification(data.message || 'Verification successful', 'success')
                     playSuccessSound()
+                    
+                    if (data.data) {
+                        setResult({
+                            id: data.data.name || searchQuery,
+                            full_name: data.data.name || searchQuery,
+                            admission_number: searchQuery,
+                            role: data.data.role || 'Scanned Log',
+                            status: 'Active',
+                            gate_status: 'In',
+                            profile_image: data.data.image || ''
+                        })
+                        setTimeout(() => {
+                            setShowCard(true)
+                        }, 300)
+                    }
                 } else {
                     showNotification(data.message || 'Verification failed', 'error')
                     playWarningSound()

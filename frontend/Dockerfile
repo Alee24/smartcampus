@@ -4,7 +4,8 @@ FROM node:20-alpine AS build-stage
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --include=dev
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --include=dev
 
 COPY . .
 RUN npm run build

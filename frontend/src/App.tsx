@@ -2120,8 +2120,8 @@ function App() {
                         {/* Floating Sub-buttons (shown with custom animation when menu is open) */}
                         {isQuickMenuOpen && (
                             <div className="flex flex-col items-end gap-3 mb-2 animate-fade-in">
-                                {/* Scan QR Option (for students and lecturers) - First icon on the top */}
-                                {['student', 'lecturer'].includes(role?.toLowerCase()) && (
+                                {/* Scan QR Option (for all authenticated users) - First icon on the top */}
+                                {isAuthenticated && (
                                     <div 
                                         onClick={() => { setShowSelfScanModal(true); setIsQuickMenuOpen(false); }}
                                         className="flex items-center gap-3 cursor-pointer group pointer-events-auto"

@@ -249,9 +249,9 @@ async def scan_entry_inner(
             from jose import jwt
             from app.auth import SECRET_KEY, ALGORITHM
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            email: str = payload.get("sub")
-            if email:
-                current_user = (await session.exec(select(User).where(User.email == email))).first()
+            sub_val: str = payload.get("sub")
+            if sub_val:
+                current_user = (await session.exec(select(User).where((User.email == sub_val) | (User.admission_number == sub_val)))).first()
         except Exception:
             pass
 
@@ -321,6 +321,12 @@ async def scan_entry_inner(
         elif upper_code.startswith("VEHICLE:") or upper_code.startswith("BUS:"):
             scanned_type = "vehicle"
             code = code.split(":", 1)[1].strip()
+        elif upper_code.startswith("ROOM:"):
+            scanned_type = "room"
+            code = code[5:].strip()
+        elif upper_code.startswith("COURSE:"):
+            scanned_type = "course"
+            code = code[7:].strip()
         elif upper_code.startswith("VISITOR:"):
             scanned_type = "visitor"
             code = code[8:].strip()
@@ -1170,9 +1176,9 @@ async def scan_entry(
             from jose import jwt
             from app.auth import SECRET_KEY, ALGORITHM
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            email: str = payload.get("sub")
-            if email:
-                current_user = (await session.exec(select(User).where(User.email == email))).first()
+            sub_val: str = payload.get("sub")
+            if sub_val:
+                current_user = (await session.exec(select(User).where((User.email == sub_val) | (User.admission_number == sub_val)))).first()
         except Exception:
             pass
 
@@ -1204,6 +1210,9 @@ async def scan_entry(
             elif "asset" in params:
                 temp_code = params["asset"][0].strip()
                 scanned_type = "asset"
+            elif "trip" in params:
+                temp_code = params["trip"][0].strip()
+                scanned_type = "trip"
         except Exception:
             pass
 
@@ -1219,6 +1228,12 @@ async def scan_entry(
         elif upper_code.startswith("VEHICLE:") or upper_code.startswith("BUS:"):
             scanned_type = "vehicle"
             temp_code = temp_code.split(":", 1)[1].strip()
+        elif upper_code.startswith("ROOM:"):
+            scanned_type = "room"
+            temp_code = temp_code[5:].strip()
+        elif upper_code.startswith("COURSE:"):
+            scanned_type = "course"
+            temp_code = temp_code[7:].strip()
         elif upper_code.startswith("VISITOR:"):
             scanned_type = "visitor"
             temp_code = temp_code[8:].strip()
@@ -1311,18 +1326,22 @@ async def scan_entry(
 
             # Resolve student_id
             log_student_id = None
-            if current_user:
-                log_student_id = current_user.id
-            else:
-                # Try to find user matching the scanned code
+            
+            # 1. If scanned code corresponds to a student/user, resolve that user first to preserve logging accuracy
+            if scanned_type == "user" or not scanned_type:
                 user_obj = (await session.exec(select(User).where(func.lower(User.admission_number) == func.lower(temp_code)))).first()
                 if user_obj:
                     log_student_id = user_obj.id
-                else:
-                    # Fallback to the first active user
-                    fallback_user = (await session.exec(select(User).limit(1))).first()
-                    if fallback_user:
-                        log_student_id = fallback_user.id
+
+            # 2. Fallback to current authenticated user (who scanned it, e.g. student scanning room/fleet)
+            if not log_student_id and current_user:
+                log_student_id = current_user.id
+
+            # 3. Last fallback: first active user
+            if not log_student_id:
+                fallback_user = (await session.exec(select(User).limit(1))).first()
+                if fallback_user:
+                    log_student_id = fallback_user.id
 
             if log_student_id:
                 # Resolve class session id if we can find one active for today in this room

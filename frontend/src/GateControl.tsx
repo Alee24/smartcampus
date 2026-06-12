@@ -36,6 +36,14 @@ export default function GateControl() {
                 if (tripParam) return `TRIP:${tripParam.trim()}`;
                 const vehicleParam = url.searchParams.get("vehicle");
                 if (vehicleParam) return `VEHICLE:${vehicleParam.trim()}`;
+                const roomParam = url.searchParams.get("room");
+                if (roomParam) return `ROOM:${roomParam.trim()}`;
+                const courseParam = url.searchParams.get("course");
+                if (courseParam) return `COURSE:${courseParam.trim()}`;
+                const eventParam = url.searchParams.get("event");
+                if (eventParam) return `EVENT:${eventParam.trim()}`;
+                const visitorParam = url.searchParams.get("visitor");
+                if (visitorParam) return `VISITOR:${visitorParam.trim()}`;
                 const pathSegments = url.pathname.split("/").filter(Boolean);
                 if (pathSegments.length > 0) return pathSegments[pathSegments.length - 1].trim();
             }
@@ -46,6 +54,10 @@ export default function GateControl() {
         if (tripMatch && tripMatch[1]) return `TRIP:${tripMatch[1].trim()}`;
         const vehicleMatch = cleanInput.match(/[?&]vehicle=([^&]+)/);
         if (vehicleMatch && vehicleMatch[1]) return `VEHICLE:${vehicleMatch[1].trim()}`;
+        const roomMatch = cleanInput.match(/[?&]room=([^&]+)/);
+        if (roomMatch && roomMatch[1]) return `ROOM:${roomMatch[1].trim()}`;
+        const courseMatch = cleanInput.match(/[?&]course=([^&]+)/);
+        if (courseMatch && courseMatch[1]) return `COURSE:${courseMatch[1].trim()}`;
         return cleanInput;
     };
 
