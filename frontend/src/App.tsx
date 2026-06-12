@@ -65,6 +65,7 @@ const NoticeBoard = lazy(() => import('./NoticeBoard'))
 const AssetManagement = lazy(() => import('./AssetManagement'))
 const IncidentReporting = lazy(() => import('./IncidentReporting'))
 const LostAndFound = lazy(() => import('./LostAndFound'))
+const VisitorCenter = lazy(() => import('./VisitorCenter'))
 
 // 3. Non-lazy components (small/critical)
 import InstallPWA, { InstallPWATrigger } from './components/InstallPWA'
@@ -1063,7 +1064,8 @@ function App() {
                 'incidents': true,
                 'lost-found': true,
                 'reports': true,
-                'gates-dashboard': true
+                'gates-dashboard': true,
+                'visitor-center': true
             },
             'Stores': {
                 'dashboard': true,
@@ -1207,7 +1209,8 @@ function App() {
                 'asset-reports': true,
                 'incidents': true,
                 'lost-found': true,
-                'self-service': true
+                'self-service': true,
+                'visitor-center': true
             },
             'SuperAdmin': {
                 'dashboard': true,
@@ -1230,7 +1233,8 @@ function App() {
                 'asset-reports': true,
                 'incidents': true,
                 'lost-found': true,
-                'self-service': true
+                'self-service': true,
+                'visitor-center': true
             }
         }
     }
@@ -1572,6 +1576,14 @@ function App() {
                                 label="Visitor Logs"
                                 active={activeTab === 'visitors'}
                                 onClick={() => { setActiveTab('visitors'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('visitor-center') && (
+                            <NavItem
+                                icon={<Building size={18} />}
+                                label="Visitor Center"
+                                active={activeTab === 'visitor-center'}
+                                onClick={() => { setActiveTab('visitor-center'); setSidebarOpen(false); }}
                             />
                         )}
                         {isMenuEnabled('vehicles') && (
@@ -2180,6 +2192,7 @@ function App() {
                     {activeTab === 'dashboard' && role === 'Stores' && <StoresDashboard currentUser={currentUser} onNavigate={setActiveTab} />}
                     {activeTab === 'dashboard' && role === 'Driver' && <DriverDashboard currentUser={currentUser} onNavigate={setActiveTab} />}
                     {activeTab === 'visitors' && <VisitorManagement />}
+                    {activeTab === 'visitor-center' && <VisitorCenter />}
                     {activeTab === 'self-service' && <SelfServiceEntry />}
                     {activeTab === 'calendar' && <CampusCalendar />}
                     {activeTab === 'dashboard' && role !== 'Guardian' && role !== 'Security' && role !== 'Security Lead' && role !== 'Guard' && role !== 'Student' && role !== 'Lecturer' && role !== 'Staff' && role !== 'Guest' && role !== 'Management' && role !== 'Stores' && role !== 'Driver' && (

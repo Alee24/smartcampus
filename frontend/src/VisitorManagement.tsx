@@ -593,14 +593,20 @@ export default function VisitorManagement() {
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-start">
                                         <div className="flex items-center gap-3">
-                                            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-white shadow-sm ${
-                                                req.visitor_type === 'taxi' ? 'bg-amber-500' :
-                                                req.visitor_type === 'delivery' ? 'bg-blue-500' :
-                                                req.visitor_type === 'vehicle_registration' ? 'bg-purple-500' : 'bg-emerald-500'
-                                            }`}>
-                                                {req.visitor_type === 'taxi' ? <Car size={20} /> :
-                                                 req.visitor_type === 'delivery' ? <Truck size={20} /> :
-                                                 req.visitor_type === 'vehicle_registration' ? <Car size={20} /> : <User size={20} />}
+                                            <div className="w-11 h-11 rounded-2xl overflow-hidden flex items-center justify-center shadow-sm relative bg-slate-100 shrink-0">
+                                                {req.profile_image ? (
+                                                    <img src={req.profile_image} className="w-full h-full object-cover" alt="Visitor" />
+                                                ) : (
+                                                    <div className={`w-full h-full flex items-center justify-center font-bold text-white ${
+                                                        req.visitor_type === 'taxi' ? 'bg-amber-500' :
+                                                        req.visitor_type === 'delivery' ? 'bg-blue-500' :
+                                                        req.visitor_type === 'vehicle_registration' ? 'bg-purple-500' : 'bg-emerald-500'
+                                                    }`}>
+                                                        {req.visitor_type === 'taxi' ? <Car size={20} /> :
+                                                         req.visitor_type === 'delivery' ? <Truck size={20} /> :
+                                                         req.visitor_type === 'vehicle_registration' ? <Car size={20} /> : <User size={20} />}
+                                                    </div>
+                                                )}
                                             </div>
                                             <div>
                                                 <h4 className="font-black text-slate-800 dark:text-white leading-tight">
@@ -799,12 +805,18 @@ export default function VisitorManagement() {
                                         <tr key={visitor.id} className="hover:bg-[var(--bg-surface)] transition-colors text-sm">
                                             <td className="p-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white uppercase ${
-                                                        visitor.visitor_type === 'taxi' ? 'bg-amber-500' :
-                                                        visitor.visitor_type === 'delivery' ? 'bg-blue-500' :
-                                                        visitor.visitor_type === 'vehicle_registration' ? 'bg-purple-500' : 'bg-emerald-500'
-                                                    }`}>
-                                                        {visitor.first_name?.[0] || 'V'}{visitor.last_name?.[0] || ''}
+                                                    <div className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center shadow-inner relative bg-slate-100 shrink-0">
+                                                        {visitor.profile_image ? (
+                                                            <img src={visitor.profile_image} className="w-full h-full object-cover" alt="Visitor" />
+                                                        ) : (
+                                                            <div className={`w-full h-full flex items-center justify-center font-bold text-white uppercase ${
+                                                                visitor.visitor_type === 'taxi' ? 'bg-amber-500' :
+                                                                visitor.visitor_type === 'delivery' ? 'bg-blue-500' :
+                                                                visitor.visitor_type === 'vehicle_registration' ? 'bg-purple-500' : 'bg-emerald-500'
+                                                            }`}>
+                                                                {visitor.first_name?.[0] || 'V'}{visitor.last_name?.[0] || ''}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div>
                                                         <div className="font-semibold text-[var(--text-primary)]">
@@ -1137,14 +1149,20 @@ export default function VisitorManagement() {
                             {/* Visitor Status Card */}
                             <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-color)] flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white shadow-sm shrink-0 ${
-                                        selectedDetailVisitor.visitor_type === 'taxi' ? 'bg-amber-500' :
-                                        selectedDetailVisitor.visitor_type === 'delivery' ? 'bg-blue-500' :
-                                        selectedDetailVisitor.visitor_type === 'vehicle_registration' ? 'bg-purple-500' : 'bg-emerald-500'
-                                    }`}>
-                                        {selectedDetailVisitor.visitor_type === 'taxi' ? <Car size={24} /> :
-                                         selectedDetailVisitor.visitor_type === 'delivery' ? <Truck size={24} /> :
-                                         selectedDetailVisitor.visitor_type === 'vehicle_registration' ? <Car size={24} /> : <User size={24} />}
+                                    <div className="w-12 h-12 rounded-xl overflow-hidden flex items-center justify-center shadow-sm shrink-0 bg-slate-100 relative">
+                                        {selectedDetailVisitor.profile_image ? (
+                                            <img src={selectedDetailVisitor.profile_image} className="w-full h-full object-cover" alt="Visitor" />
+                                        ) : (
+                                            <div className={`w-full h-full flex items-center justify-center font-bold text-white uppercase ${
+                                                selectedDetailVisitor.visitor_type === 'taxi' ? 'bg-amber-500' :
+                                                selectedDetailVisitor.visitor_type === 'delivery' ? 'bg-blue-500' :
+                                                selectedDetailVisitor.visitor_type === 'vehicle_registration' ? 'bg-purple-500' : 'bg-emerald-500'
+                                            }`}>
+                                                {selectedDetailVisitor.visitor_type === 'taxi' ? <Car size={24} /> :
+                                                 selectedDetailVisitor.visitor_type === 'delivery' ? <Truck size={24} /> :
+                                                 selectedDetailVisitor.visitor_type === 'vehicle_registration' ? <Car size={24} /> : <User size={24} />}
+                                            </div>
+                                        )}
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-black">{selectedDetailVisitor.visitor_type === 'taxi' ? 'Taxi / Cab Driver' : `${selectedDetailVisitor.first_name} ${selectedDetailVisitor.last_name}`}</h3>

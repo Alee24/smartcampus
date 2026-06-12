@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Car, User, Truck, CheckCircle, ArrowRight, UserCheck, Shield, Camera, AlertCircle, RefreshCcw, Upload, FileText, X, Info, Check, Clock, ChevronRight, HelpCircle, Lock } from 'lucide-react'
+import { Car, User, Truck, CheckCircle, ArrowRight, UserCheck, Shield, Camera, AlertCircle, RefreshCcw, Upload, FileText, X, Info, Check, Clock, ChevronRight, HelpCircle, Lock, AlertTriangle } from 'lucide-react'
 import { PrivacyPolicy } from './privacy/PrivacyPolicy'
 import { CookiePolicy } from './privacy/CookiePolicy'
 
@@ -13,6 +13,7 @@ export default function SelfServiceEntry() {
     const [error, setError] = useState<string | null>(null)
 
     const [userData, setUserData] = useState<any>(null)
+    const [visitorProfileImage, setVisitorProfileImage] = useState<string | null>(null)
 
     // Delivery Images
     const [deliveryPackageImage, setDeliveryPackageImage] = useState<string | null>(null)
@@ -431,6 +432,7 @@ export default function SelfServiceEntry() {
                 mobile: formData.mobile,
                 id_number: formData.id_number,
                 purpose: formData.purpose,
+                profile_image: visitorProfileImage || undefined,
                 auto_delete_24h: autoDelete24h
             }
         } else if (role === 'taxi') {
@@ -514,6 +516,17 @@ export default function SelfServiceEntry() {
         }
     }
 
+    const handleVisitorImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setVisitorProfileImage(reader.result as string)
+            }
+            reader.readAsDataURL(file)
+        }
+    }
+
     if (step === 3) {
         // Find user name to show
         let displayUserName = '';
@@ -568,6 +581,16 @@ export default function SelfServiceEntry() {
                     <p className="text-slate-500 dark:text-slate-400 text-xs font-bold leading-relaxed mb-6">
                         Please prepare and present your physical ID or Passport to the security guard at the gate for verification. Make sure the ID/Passport number shown below matches your document. Note: providing wrong or incorrect details will lead to access being denied.
                     </p>
+
+                    {role === 'taxi' && (
+                        <div className="w-full bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl p-4 mb-6 text-left flex gap-3 text-amber-800 dark:text-amber-300 text-xs">
+                            <AlertTriangle size={20} className="flex-shrink-0 text-amber-600" />
+                            <div>
+                                <span className="font-extrabold uppercase tracking-wide block text-[10px] text-amber-700 dark:text-amber-400 mb-0.5">Guard Warning Notice</span>
+                                Attention Guard: Please check and confirm that the student shown in the profile picture below is the one being picked up or dropped off from the school before allowing access.
+                            </div>
+                        </div>
+                    )}
 
                     {/* Prominent ID Number or Student/Staff Photo Display */}
                     <div className="bg-slate-50 dark:bg-slate-905 border border-slate-150 dark:border-slate-850 rounded-2xl p-6 mb-6 flex flex-col items-center justify-center">
@@ -751,6 +774,14 @@ export default function SelfServiceEntry() {
                 accept="image/*" 
                 capture="environment" 
                 onChange={(e) => handleImageFileChange(e, 'receipt')}
+                className="hidden" 
+            />
+            <input 
+                type="file" 
+                id="visitor-profile-input" 
+                accept="image/*" 
+                capture="user" 
+                onChange={handleVisitorImageFileChange}
                 className="hidden" 
             />
 
@@ -1417,15 +1448,42 @@ export default function SelfServiceEntry() {
 
                                             {/* Purpose of Visit: Visitor ONLY */}
                                             {role === 'visitor' && (
-                                                <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
-                                                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-505 uppercase tracking-widest block mb-1.5 font-bold font-bold font-bold font-bold font-bold">Purpose of Visit</label>
-                                                    <input 
-                                                        required 
-                                                        placeholder="e.g. Meeting with Registrar, General Inquiry"
-                                                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
-                                                        value={formData.purpose || ''}
-                                                        onChange={e => setFormData({ ...formData, purpose: e.target.value })} 
-                                                    />
+                                                <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-4">
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-505 uppercase tracking-widest block mb-1.5 font-bold">Purpose of Visit</label>
+                                                        <input 
+                                                            required 
+                                                            placeholder="e.g. Meeting with Registrar, General Inquiry"
+                                                            className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
+                                                            value={formData.purpose || ''}
+                                                            onChange={e => setFormData({ ...formData, purpose: e.target.value })} 
+                                                        />
+                                                    </div>
+                                                    
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-505 uppercase tracking-widest block mb-1.5 font-bold">Your Profile Photo (Optional)</label>
+                                                        {!visitorProfileImage ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => document.getElementById('visitor-profile-input')?.click()}
+                                                                className="w-full py-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl flex flex-col items-center justify-center text-slate-450 dark:text-slate-500 hover:text-indigo-650 hover:border-indigo-500/30 transition-all bg-slate-50 dark:bg-slate-850 cursor-pointer"
+                                                            >
+                                                                <Camera size={20} className="text-slate-450" />
+                                                                <span className="text-[10px] font-black mt-1 uppercase tracking-wider">Take Selfie / Upload Photo</span>
+                                                            </button>
+                                                        ) : (
+                                                            <div className="relative w-32 h-32 mx-auto rounded-full overflow-hidden border-2 border-slate-200 dark:border-slate-800 shadow-md">
+                                                                <img src={visitorProfileImage} className="w-full h-full object-cover" alt="Selfie Preview" />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setVisitorProfileImage(null)}
+                                                                    className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-[10px] font-black uppercase tracking-wider opacity-0 hover:opacity-100 transition-opacity cursor-pointer border-none"
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
 
