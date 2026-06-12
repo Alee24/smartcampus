@@ -849,7 +849,7 @@ export default function SelfServiceEntry() {
                     <div className="max-w-5xl mx-auto w-full relative flex-1 animate-slide-in flex flex-col justify-center">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
                             {/* Left Pane (40%): Immersive Branding, role guidelines, and Data Protection Act notices */}
-                            <div className="lg:col-span-5 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 text-white rounded-3xl p-8 flex flex-col justify-between shadow-xl min-h-[400px] order-2 lg:order-1">
+                            <div className="lg:col-span-5 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 text-white rounded-3xl p-8 flex flex-col justify-between shadow-xl min-h-[400px] order-1 lg:order-1">
                                 <div className="space-y-6">
                                     <div className="flex justify-between items-start">
                                         <div className="p-1.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 shadow-inner flex items-center justify-center w-14 h-14 overflow-hidden shrink-0">
@@ -859,9 +859,6 @@ export default function SelfServiceEntry() {
                                                 <Shield className="text-white" size={26} />
                                             )}
                                         </div>
-                                        <span className="text-[10px] bg-white/20 text-white font-black uppercase tracking-widest px-3.5 py-1.5 rounded-full border border-white/10 backdrop-blur-sm">
-                                            Step 2 of 2
-                                        </span>
                                     </div>
                                     
                                     <div>
@@ -872,100 +869,30 @@ export default function SelfServiceEntry() {
                                             {role === 'student' ? 'Verify Identity' : role === 'vehicle_registration' ? 'Vehicle Details' : `${role} Registration`}
                                         </h2>
                                         <p className="text-xs text-indigo-150 font-medium leading-relaxed mt-3">
-                                            {role === 'visitor' && "Welcome! Please enter your details in the form to register for gate entry. Ensure your ID/Passport and phone number are correct, as the security guard will verify them against your physical document. Incorrect details will result in denied access."}
-                                            {role === 'taxi' && "Please provide the taxi license plate number and the number of passengers. Use the search field to look up the student or staff member you are picking up or dropping off."}
-                                            {role === 'delivery' && "Please input your details and delivery description. Capture clear photos of the delivery package and receipt for campus security check-in records."}
-                                            {role === 'student' && "Confirm your pre-loaded student/staff profile and take a quick selfie to verify your physical presence at the gate."}
-                                            {role === 'vehicle_registration' && "Self-register your vehicle details under your campus role (Student, Staff, or Visitor) for parking and gate audit records."}
+                                            {role === 'visitor' && "Welcome! Please enter your details in the form to register for gate entry. Ensure your ID/Passport and phone number are correct, as the security guard will verify them against your physical document. Incorrect details will result in denied access. We collect your personal details (Full Name, Phone Number, and ID/Passport Number) strictly for gate entry verification and safety audit logs."}
+                                            {role === 'taxi' && "Please provide the taxi license plate number and the number of passengers. Use the search field to look up the student or staff member you are picking up or dropping off. We collect taxi and driver details strictly for gate entry verification and safety audit logs."}
+                                            {role === 'delivery' && "Please input your details and delivery description. Capture clear photos of the delivery package and receipt for campus security check-in records. We collect delivery and vehicle details strictly for gate entry verification and safety audit logs."}
+                                            {role === 'student' && "Confirm your pre-loaded student/staff profile and take a quick selfie to verify your physical presence at the gate. We collect validation details strictly for gate entry verification and safety audit logs."}
+                                            {role === 'vehicle_registration' && "Self-register your vehicle details under your campus role (Student, Staff, or Visitor) for parking and gate audit records. We collect vehicle and personal details strictly for gate entry verification and safety audit logs."}
                                         </p>
-                                    </div>
-
-                                    {/* Form Info and Required Fields Card */}
-                                    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4.5 border border-white/10 space-y-3">
-                                        <div className="flex items-center gap-2 text-white font-black uppercase tracking-wider text-[10px]">
-                                            <Info size={14} className="text-indigo-300" /> Form Information
-                                        </div>
-                                        <div className="space-y-1.5 text-xs text-indigo-150">
-                                            <div>
-                                                <span className="text-white font-extrabold uppercase tracking-wide text-[9px] block">Form Name:</span>
-                                                <span className="text-indigo-100 font-bold capitalize">
-                                                    {role === 'visitor' && 'Visitor Entry Form'}
-                                                    {role === 'taxi' && `Taxi ${taxiServiceType === 'pickup' ? 'Pickup' : 'Dropoff'} Form`}
-                                                    {role === 'delivery' && 'Delivery Agent Log'}
-                                                    {role === 'student' && 'Student / Staff Check-In selfie'}
-                                                    {role === 'vehicle_registration' && 'Vehicle Details Registry'}
-                                                </span>
-                                            </div>
-                                            <div className="pt-2 border-t border-white/5">
-                                                <span className="text-white font-extrabold uppercase tracking-wide text-[9px] block">Required Fields:</span>
-                                                <ul className="list-disc pl-4 space-y-1 mt-1 text-[11px] font-semibold text-indigo-150">
-                                                    {role === 'visitor' && (
-                                                        <>
-                                                            <li>Full Name</li>
-                                                            <li>Phone Number</li>
-                                                            <li>ID / Passport Number</li>
-                                                            <li>Purpose of Visit</li>
-                                                        </>
-                                                    )}
-                                                    {role === 'taxi' && (
-                                                        <>
-                                                            <li>Vehicle Plate</li>
-                                                            <li>Passengers count</li>
-                                                            <li>Student / Staff search lookup</li>
-                                                        </>
-                                                    )}
-                                                    {role === 'delivery' && (
-                                                        <>
-                                                            <li>Full Name</li>
-                                                            <li>Phone Number</li>
-                                                            <li>ID / Passport Number</li>
-                                                            <li>Delivery Details</li>
-                                                            <li>Package & Receipt Photos (Optional)</li>
-                                                        </>
-                                                    )}
-                                                    {role === 'student' && (
-                                                        <>
-                                                            <li>Verify presence selfie</li>
-                                                        </>
-                                                    )}
-                                                    {role === 'vehicle_registration' && (
-                                                        <>
-                                                            <li>Full Name</li>
-                                                            <li>Phone Number</li>
-                                                            <li>ID / Passport Number</li>
-                                                            <li>Vehicle Plate</li>
-                                                            <li>Your Campus Role</li>
-                                                        </>
-                                                    )}
-                                                </ul>
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Data Protection Act details */}
-                                {role !== 'student' && (
-                                    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 space-y-3 mt-6">
-                                        <div className="flex items-center gap-2 text-white font-black uppercase tracking-wider text-[10px]">
-                                            <Shield size={14} /> Data Protection Act 2019
-                                        </div>
-                                        <p className="text-[11px] text-indigo-150 leading-relaxed font-bold">
-                                            To comply with data protection regulations, we notify you that this portal collects visitor biodata (Name, ID, Phone) strictly for gate audit logs.
-                                        </p>
-                                        <div className="text-[10px] text-indigo-200 font-medium pt-2 border-t border-white/10">
-                                            View our full <button type="button" onClick={() => setShowPrivacyModal(true)} className="text-white hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">Privacy Policy</button> and <button type="button" onClick={() => setShowCookieModal(true)} className="text-white hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">Cookie Policy</button>.
-                                        </div>
+                                <div className="mt-8 pt-4 border-t border-white/10 flex flex-col gap-3">
+                                    <div className="text-[10px] text-indigo-200 font-bold flex justify-between items-center">
+                                        <span>{companyColors.company_name} | Smart Gate</span>
+                                        <span>v1.2.0</span>
                                     </div>
-                                )}
-
-                                <div className="mt-8 text-[10px] text-indigo-200 font-bold border-t border-white/10 pt-4 flex justify-between items-center">
-                                    <span>{companyColors.company_name} | Smart Gate</span>
-                                    <span>v1.2.0</span>
+                                    <div className="text-[10px] text-indigo-200 font-semibold flex items-center gap-2">
+                                        <button type="button" onClick={() => setShowPrivacyModal(true)} className="text-white hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">Privacy Policy</button>
+                                        <span>•</span>
+                                        <button type="button" onClick={() => setShowCookieModal(true)} className="text-white hover:underline font-bold bg-transparent border-none p-0 cursor-pointer">Cookie Policy</button>
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Right Pane (60%): Interactive Input Form */}
-                            <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-xl flex flex-col justify-between order-1 lg:order-2">
+                            <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-xl flex flex-col justify-between order-2 lg:order-2">
                                 <div className="w-full">
                                     {role === 'student' ? (
                                         userData ? (

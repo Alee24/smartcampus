@@ -1,13 +1,14 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, lazy, Suspense, useRef } from 'react'
 import {
     LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut, Check,
     Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode, Megaphone, Trash2, Plus,
-    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, UserCheck, X, Activity, BarChart3, Play, History, Printer, Download, Inbox, Search, ScanFace, DoorOpen, List, Menu, BookOpen, Grid
+    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, UserCheck, X, Activity, BarChart3, Play, History, Printer, Download, Inbox, Search, ScanFace, DoorOpen, List, Menu, BookOpen, Grid, CheckCircle, XCircle
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts'
 import { useNotification } from './components/Notification'
+import { Html5Qrcode } from 'html5-qrcode'
 
 
 // 1. Critical Components (Load immediately for FCP)
@@ -275,6 +276,136 @@ function App() {
     const [showQuickScanModal, setShowQuickScanModal] = useState(false)
     const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false)
     const [showQuickNotifications, setShowQuickNotifications] = useState(false)
+
+    // Self-Service Scan States (for students and lecturers)
+    const [showSelfScanModal, setShowSelfScanModal] = useState(false)
+    const [selfScanLoading, setSelfScanLoading] = useState(false)
+    const [selfScanResponse, setSelfScanResponse] = useState<any>(null)
+    const [selfScanError, setSelfScanError] = useState<string | null>(null)
+    const [selfIsScanning, setSelfIsScanning] = useState(false)
+    const selfQrScannerRef = useRef<Html5Qrcode | null>(null)
+
+    const playSuccessSound = () => {
+        if ('vibrate' in navigator) {
+            try { navigator.vibrate(200); } catch (e) {}
+        }
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
+        oscillator.frequency.exponentialRampToValueAtTime(600, audioContext.currentTime + 0.1)
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5)
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.5)
+    }
+
+    const playErrorSound = () => {
+        if ('vibrate' in navigator) {
+            try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+        }
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+        oscillator.frequency.setValueAtTime(300, audioContext.currentTime)
+        oscillator.frequency.exponentialRampToValueAtTime(120, audioContext.currentTime + 0.3)
+        gainNode.gain.setValueAtTime(0.4, audioContext.currentTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.6)
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.6)
+    }
+
+    const startSelfScanner = () => {
+        setSelfScanResponse(null)
+        setSelfScanError(null)
+        setSelfIsScanning(true)
+        
+        setTimeout(async () => {
+            try {
+                if (selfQrScannerRef.current) {
+                    await selfQrScannerRef.current.stop().catch(() => {})
+                }
+                const scanner = new Html5Qrcode("self-qr-reader")
+                selfQrScannerRef.current = scanner
+                await scanner.start(
+                    { facingMode: "environment" },
+                    { fps: 15, qrbox: (width, height) => {
+                        const minDim = Math.min(width, height);
+                        const size = Math.floor(minDim * 0.7);
+                        return { width: size, height: size };
+                    }},
+                    (decodedText) => {
+                        stopSelfScanner()
+                        handleSelfVerify(decodedText)
+                    },
+                    () => {}
+                )
+            } catch (err) {
+                console.error(err)
+                setSelfScanError("Could not start camera. Please ensure permissions are granted.")
+                setSelfIsScanning(false)
+            }
+        }, 300)
+    }
+
+    const stopSelfScanner = async () => {
+        if (selfQrScannerRef.current) {
+            try {
+                await selfQrScannerRef.current.stop()
+            } catch (err) {
+                console.error(err)
+            }
+            selfQrScannerRef.current = null
+        }
+        setSelfIsScanning(false)
+    }
+
+    const handleSelfVerify = async (code: string) => {
+        setSelfScanLoading(true)
+        setSelfScanError(null)
+        setSelfScanResponse(null)
+        
+        try {
+            const token = localStorage.getItem('token')
+            const response = await fetch('/api/gate/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify({ admission_number: code })
+            })
+            
+            const data = await response.json()
+            if (response.ok && (data.status === 'allowed' || data.status === 'event_pass')) {
+                playSuccessSound()
+                setSelfScanResponse(data)
+            } else {
+                playErrorSound()
+                setSelfScanError(data.message || 'Verification failed')
+            }
+        } catch (err: any) {
+            playErrorSound()
+            setSelfScanError(err.message || 'An error occurred during verification')
+        } finally {
+            setSelfScanLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        if (showSelfScanModal) {
+            startSelfScanner()
+        } else {
+            stopSelfScanner()
+        }
+        return () => {
+            stopSelfScanner()
+        }
+    }, [showSelfScanModal])
     const [selectedNotificationTab, setSelectedNotificationTab] = useState<'all' | 'announcement' | 'lost_found' | 'system'>('all')
     const [combinedNotifications, setCombinedNotifications] = useState<any[]>([])
     const [readIds, setReadIds] = useState<string[]>(() => {
@@ -1986,6 +2117,21 @@ function App() {
                         {/* Floating Sub-buttons (shown with custom animation when menu is open) */}
                         {isQuickMenuOpen && (
                             <div className="flex flex-col items-end gap-3 mb-2 animate-fade-in">
+                                {/* Scan QR Option (for students and lecturers) - First icon on the top */}
+                                {['student', 'lecturer'].includes(role?.toLowerCase()) && (
+                                    <div 
+                                        onClick={() => { setShowSelfScanModal(true); setIsQuickMenuOpen(false); }}
+                                        className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                    >
+                                        <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
+                                            Scan QR
+                                        </span>
+                                        <button className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
+                                            <QrCode size={18} />
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* Gate Pass Option – Admin/Guard only */}
                                 {['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
                                     <div 
@@ -2240,6 +2386,147 @@ function App() {
                             <Suspense fallback={<PageLoader />}>
                                 <StudentVerification />
                             </Suspense>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Self-Service Scanner Modal Overlay (for students and lecturers) */}
+            {showSelfScanModal && (
+                <div 
+                    className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md p-0 sm:p-4 transition-all duration-300"
+                    onClick={() => setShowSelfScanModal(false)}
+                >
+                    <div 
+                        className="bg-white dark:bg-gray-900 rounded-t-[2rem] sm:rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] w-full sm:max-w-lg overflow-hidden transform transition-all duration-300 max-h-[90vh] sm:max-h-[85vh] flex flex-col relative border border-gray-100 dark:border-gray-800"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Top Gradient bar */}
+                        <div className="h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 w-full" />
+                        
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl">
+                                    <QrCode size={22} className="animate-pulse" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-gray-900 dark:text-white">
+                                        Scan QR Code
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Scan gate, asset, room, fleet, or classroom attendance
+                                    </p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setShowSelfScanModal(false)}
+                                className="p-2 rounded-xl bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        
+                        {/* Body */}
+                        <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center min-h-[350px]">
+                            {/* Scanning Viewport */}
+                            {selfIsScanning && (
+                                <div className="w-full flex flex-col items-center">
+                                    <div className="relative w-full max-w-[280px] aspect-square rounded-3xl overflow-hidden bg-gray-950 shadow-2xl border-4 border-white dark:border-gray-800 group">
+                                        {/* Scanner target frame decoration */}
+                                        <div className="absolute inset-0 z-10 pointer-events-none border-[12px] border-black/40">
+                                            {/* Glowing scanning line */}
+                                            <div className="absolute left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 shadow-[0_0_15px_#4f46e5] animate-scan-line top-0" style={{ animation: 'scan 2.5s linear infinite' }} />
+                                            {/* Corner brackets */}
+                                            <div className="absolute top-2 left-2 w-6 h-6 border-t-4 border-l-4 border-indigo-500 rounded-tl-md" />
+                                            <div className="absolute top-2 right-2 w-6 h-6 border-t-4 border-r-4 border-indigo-500 rounded-tr-md" />
+                                            <div className="absolute bottom-2 left-2 w-6 h-6 border-b-4 border-l-4 border-indigo-500 rounded-bl-md" />
+                                            <div className="absolute bottom-2 right-2 w-6 h-6 border-b-4 border-r-4 border-indigo-500 rounded-br-md" />
+                                        </div>
+                                        <div id="self-qr-reader" className="w-full h-full object-cover [&>video]:object-cover" />
+                                    </div>
+                                    <p className="mt-4 text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                        <span className="w-2.5 h-2.5 bg-indigo-600 rounded-full animate-ping" />
+                                        Align QR code inside the frame to scan
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Loading State */}
+                            {selfScanLoading && (
+                                <div className="flex flex-col items-center justify-center p-8 text-center">
+                                    <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4" />
+                                    <h4 className="text-base font-bold text-gray-800 dark:text-white">Processing Scan</h4>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Registering details with the server...</p>
+                                </div>
+                            )}
+
+                            {/* Success State */}
+                            {!selfIsScanning && !selfScanLoading && selfScanResponse && (
+                                <div className="w-full flex flex-col items-center p-4 text-center animate-scale-in">
+                                    <div className="w-20 h-20 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mb-4 shadow-lg border border-emerald-100 dark:border-emerald-900/50">
+                                        <CheckCircle size={44} className="stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-xl font-black text-gray-900 dark:text-white">Scan Verified</h4>
+                                    <div className="mt-3 px-4 py-3 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl w-full max-w-sm">
+                                        <p className="text-sm font-black text-emerald-700 dark:text-emerald-450">
+                                            {selfScanResponse.message}
+                                        </p>
+                                        {selfScanResponse.data && (
+                                            <div className="mt-2 text-xs text-gray-650 dark:text-gray-400 space-y-1">
+                                                {selfScanResponse.data.name && <div><span className="font-bold">Name:</span> {selfScanResponse.data.name}</div>}
+                                                {selfScanResponse.data.role && <div><span className="font-bold">Info:</span> {selfScanResponse.data.role}</div>}
+                                                {selfScanResponse.data.time && <div><span className="font-bold">Logged at:</span> {selfScanResponse.data.time}</div>}
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="mt-6 flex gap-3 w-full max-w-xs justify-center">
+                                        <button 
+                                            onClick={startSelfScanner}
+                                            className="flex-1 py-3 px-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-black hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-sm"
+                                        >
+                                            Scan Next
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowSelfScanModal(false)}
+                                            className="py-3 px-5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-bold transition-all text-sm"
+                                        >
+                                            Done
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Error / Rejected State */}
+                            {!selfIsScanning && !selfScanLoading && selfScanError && (
+                                <div className="w-full flex flex-col items-center p-4 text-center animate-scale-in">
+                                    <div className="w-20 h-20 bg-rose-50 dark:bg-rose-950/40 text-rose-650 dark:text-rose-450 rounded-full flex items-center justify-center mb-4 shadow-lg border border-rose-100 dark:border-rose-900/50">
+                                        <XCircle size={44} className="stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-xl font-black text-gray-900 dark:text-white">Scan Failed</h4>
+                                    <div className="mt-3 px-4 py-3 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-2xl w-full max-w-sm">
+                                        <p className="text-sm font-black text-rose-650 dark:text-rose-450">
+                                            {selfScanError}
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="mt-6 flex gap-3 w-full max-w-xs justify-center">
+                                        <button 
+                                            onClick={startSelfScanner}
+                                            className="flex-1 py-3 px-5 bg-gradient-to-r from-rose-600 to-pink-600 text-white rounded-xl font-black hover:shadow-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-sm"
+                                        >
+                                            Try Again
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowSelfScanModal(false)}
+                                            className="py-3 px-5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl font-bold transition-all text-sm"
+                                        >
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

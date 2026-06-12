@@ -516,6 +516,38 @@ async def scan_entry_inner(
         if not asset:
             return {"status": "rejected", "message": f"Asset {code} not found", "data": None}
             
+        action_performed = "scanned"
+        if current_user:
+            # Check if this asset is currently checked out to this user
+            if asset.assigned_to_id == current_user.id:
+                # Check it in
+                asset.assigned_to_id = None
+                asset.status = "available"
+                action_performed = "check_in"
+                notes_msg = f"Asset checked in by {current_user.full_name} via scan"
+            else:
+                # Check it out
+                asset.assigned_to_id = current_user.id
+                asset.status = "checked_out"
+                action_performed = "check_out"
+                notes_msg = f"Asset checked out by {current_user.full_name} via scan"
+                
+            session.add(asset)
+            
+            # Log to AssetLog
+            from app.models import AssetLog
+            log_entry = AssetLog(
+                asset_id=asset.id,
+                user_id=current_user.id,
+                action=action_performed,
+                timestamp=get_eat_time(),
+                handled_by_id=current_user.id,
+                notes=notes_msg
+            )
+            session.add(log_entry)
+            await session.commit()
+            await session.refresh(asset)
+            
         assigned_name = None
         if asset.assigned_to_id:
             user = await session.get(User, asset.assigned_to_id)
@@ -526,9 +558,11 @@ async def scan_entry_inner(
         if assigned_name:
             status_label += f" | Assigned to: {assigned_name}"
             
+        action_msg = "Asset checked out successfully via scan" if action_performed == "check_out" else "Asset checked in successfully via scan" if action_performed == "check_in" else f"Asset Found: {asset.name}"
+        
         return {
             "status": "allowed",
-            "message": f"Asset Found: {asset.name}",
+            "message": action_msg,
             "data": {
                 "name": asset.name,
                 "role": status_label,
