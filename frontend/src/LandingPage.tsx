@@ -245,7 +245,13 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                             <div className="space-y-8">
                                 {/* 3D Student ID Card */}
                                 <div>
-                                    <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)] mb-3 text-center">Interactive 3D Student ID Card (Hover to Flip)</p>
+                                    <div className="text-center mb-4">
+                                        <h4 className="text-sm font-bold text-[var(--text-primary)]">Contactless Smart ID Card</h4>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-sm mx-auto leading-relaxed">
+                                            Serves as the primary campus credential. Used by students and faculty at physical gates, library checkouts, and cafeteria payment terminals via standard NFC reader taps or QR scans.
+                                        </p>
+                                        <span className="text-[10px] text-blue-500 font-bold block mt-1.5 uppercase tracking-wider">(Hover to Flip Card)</span>
+                                    </div>
                                     <div className="group w-full max-w-[280px] h-[160px] [perspective:1000px] cursor-pointer mx-auto">
                                         <div className="relative w-full h-full rounded-2xl shadow-xl transition-all duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
                                             {/* Front */}
@@ -284,7 +290,13 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
                                 {/* 3D Smart NFC Ring */}
                                 <div className="border-t border-[var(--border-color)] pt-6">
-                                    <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)] mb-3 text-center">Interactive 3D Smart NFC Ring (Rotating Glow)</p>
+                                    <div className="text-center mb-4">
+                                        <h4 className="text-sm font-bold text-[var(--text-primary)]">Wearable NFC Ring</h4>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-sm mx-auto leading-relaxed">
+                                            A hands-free alternative for rapid authentication. Tap the ring against secure check-in points or shuttle bus readers to log attendance and verify access instantly.
+                                        </p>
+                                        <span className="text-[10px] text-cyan-500 font-bold block mt-1.5 uppercase tracking-wider">(Contactless Tap Simulation)</span>
+                                    </div>
                                     <div className="relative w-full h-28 flex items-center justify-center">
                                         <div className="w-20 h-20 rounded-full border-4 border-dashed border-cyan-400 animate-[spin_12s_linear_infinite] flex items-center justify-center relative shadow-[0_0_25px_rgba(34,211,238,0.3)]">
                                             <div className="w-14 h-14 rounded-full border-2 border-cyan-500 bg-cyan-500/10 flex items-center justify-center animate-pulse">
@@ -297,7 +309,13 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
                                 {/* 3D Dynamic QR Gate Pass */}
                                 <div className="border-t border-[var(--border-color)] pt-6">
-                                    <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-secondary)] mb-3 text-center">Interactive QR Gate Pass (Tilt Hover Effect)</p>
+                                    <div className="text-center mb-4">
+                                        <h4 className="text-sm font-bold text-[var(--text-primary)]">Dynamic QR Gate Pass</h4>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-sm mx-auto leading-relaxed">
+                                            A security-hardened virtual pass generated dynamically on mobile screens. Scanned by security guards to authorize visitor entry and log check-in timestamps in real-time.
+                                        </p>
+                                        <span className="text-[10px] text-indigo-500 font-bold block mt-1.5 uppercase tracking-wider">(Interactive Tilt Effect)</span>
+                                    </div>
                                     <div className="group relative w-full max-w-[280px] h-[150px] bg-gradient-to-tr from-slate-950 to-indigo-950 border border-indigo-500/30 rounded-2xl p-4 flex items-center justify-between shadow-2xl transition-all duration-500 hover:scale-[1.03] hover:-rotate-1 hover:border-indigo-400 cursor-pointer mx-auto">
                                         <div className="flex flex-col justify-between h-full">
                                             <div className="text-[10px] font-black text-indigo-400 tracking-wider uppercase">Temporary Gate Pass</div>

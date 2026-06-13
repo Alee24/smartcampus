@@ -77,7 +77,8 @@ const SIDEBAR_GROUPS = [
         id: 'overview',
         label: 'Overview',
         items: [
-            { id: 'dashboard', label: 'Dashboard' }
+            { id: 'dashboard', label: 'Dashboard' },
+            { id: 'notice-board', label: 'Notice Board', permissionKey: 'notice-board' }
         ]
     },
     {
@@ -87,6 +88,8 @@ const SIDEBAR_GROUPS = [
             { id: 'verification', label: 'ID Verification', permissionKey: 'verification' },
             { id: 'gate', label: 'Gate Control', permissionKey: 'gate' },
             { id: 'visitors', label: 'Visitor Logs', permissionKey: 'gate' },
+            { id: 'visitor-center', label: 'Visitor Center', permissionKey: 'visitor-center' },
+            { id: 'analytics', label: 'Stay Analytics', permissionKey: 'analytics' },
             { id: 'vehicles', label: 'Vehicle Intel', permissionKey: 'vehicles' },
             { id: 'scan-logs', label: 'Scan Logs', permissionKey: 'scan-logs' },
             { id: 'gates-dashboard', label: 'Gates Analytics', permissionKey: 'gates-dashboard' },
@@ -155,7 +158,9 @@ const SIDEBAR_GROUPS = [
             { id: 'dashboard-designer', label: 'Design System', permissionKey: 'dashboard-designer' },
             { id: 'integrations', label: 'API Integrations', permissionKey: 'integrations' },
             { id: 'audit', label: 'Audit Trail', permissionKey: 'audit' },
-            { id: 'geofencing', label: 'IP Geofencing', permissionKey: 'geofencing' }
+            { id: 'geofencing', label: 'IP Geofencing', permissionKey: 'geofencing' },
+            { id: 'system-update', label: 'System Update', permissionKey: 'settings' },
+            { id: 'reports', label: 'System Reports', permissionKey: 'reports' }
         ]
     },
     {
@@ -175,6 +180,36 @@ const PageLoader = () => (
         <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
     </div>
 )
+
+const getGroupIcon = (groupId: string) => {
+    switch (groupId) {
+        case 'overview': return LayoutDashboard;
+        case 'gate_ops': return ShieldCheck;
+        case 'people': return Users;
+        case 'events': return Calendar;
+        case 'academics': return BookOpen;
+        case 'fleet': return Car;
+        case 'assets': return Briefcase;
+        case 'admin': return Settings;
+        case 'legal': return Scale;
+        default: return HelpCircle;
+    }
+}
+
+const getGroupColor = (groupId: string) => {
+    switch (groupId) {
+        case 'overview': return 'from-blue-500 to-indigo-500';
+        case 'gate_ops': return 'from-purple-500 to-indigo-600';
+        case 'people': return 'from-pink-500 to-rose-500';
+        case 'events': return 'from-orange-500 to-red-500';
+        case 'academics': return 'from-blue-500 to-cyan-500';
+        case 'fleet': return 'from-green-500 to-emerald-500';
+        case 'assets': return 'from-teal-500 to-cyan-600';
+        case 'admin': return 'from-slate-600 to-slate-800';
+        case 'legal': return 'from-gray-500 to-slate-600';
+        default: return 'from-emerald-500 to-teal-500';
+    }
+}
 
 interface DashboardStats {
     active_students: number
@@ -212,6 +247,15 @@ function App() {
 
     const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'))
     const [showLanding, setShowLanding] = useState(!localStorage.getItem('token')) // Show landing if not logged in
+    const [isMobileApp, setIsMobileApp] = useState(false)
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const isWrapper = window.navigator.userAgent.includes('SmartCampusMobileWrapper') || 
+                              window.location.search.includes('mobile_app=true')
+            setIsMobileApp(isWrapper)
+        }
+    }, [])
 
     // Get user role from localStorage and set initial dashboard
     const userRole = localStorage.getItem('userRole') || 'student'
@@ -1882,146 +1926,165 @@ function App() {
         )
     }
 
+    const currentGroup = SIDEBAR_GROUPS.find(group => group.items.some(item => item.id === activeTab))
+
     return (
         <div className="min-h-screen flex bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300 font-sans overflow-x-hidden w-full max-w-full">
             {/* Security Check Modal */}
             {showSecurityCheck && <SecurityCheckModal onGrant={handleSecurityGrant} />}
 
-            {/* Mobile Sidebar Backstop */}
-            {isSidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-[140] lg:hidden glass-card backdrop-blur-sm"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
+            {/* Sidebar - Hidden on Native Mobile App */}
+            {!isMobileApp && (
+                <>
+                    {/* Mobile Sidebar Backstop */}
+                    {isSidebarOpen && (
+                        <div
+                            className="fixed inset-0 bg-black/50 z-[140] lg:hidden glass-card backdrop-blur-sm"
+                            onClick={() => setSidebarOpen(false)}
+                        />
+                    )}
 
-            {/* Sidebar - Ovalent Style */}
-            <aside className={`fixed h-full z-[150] bg-[var(--bg-primary)] border-r border-[var(--border-color)] flex flex-col transition-all duration-300 ease-in-out group/sidebar ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 shadow-2xl lg:shadow-none ${isSidebarCollapsed ? 'collapsed lg:w-20' : 'lg:w-64'} w-64`}>
-                <div className="p-6 relative">
-                    <div className="flex items-center justify-between mb-8">
-                        <div className={`flex items-center gap-2 transition-all overflow-hidden ${isSidebarCollapsed ? 'justify-center w-full px-0' : ''}`}>
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-                                {companySettings.logo_url ? (
-                                    <img src={companySettings.logo_url} alt="Logo" className="w-full h-full object-contain" />
-                                ) : (
-                                    <div className="w-full h-full bg-black rounded-lg flex items-center justify-center text-white font-bold">S</div>
-                                )}
+                    {/* Sidebar - Ovalent Style */}
+                    <aside className={`fixed h-full z-[150] bg-[var(--bg-primary)] border-r border-[var(--border-color)] flex flex-col transition-all duration-300 ease-in-out group/sidebar ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 shadow-2xl lg:shadow-none ${isSidebarCollapsed ? 'collapsed lg:w-20' : 'lg:w-64'} w-64`}>
+                        <div className="p-6 relative">
+                            <div className="flex items-center justify-between mb-8">
+                                <div className={`flex items-center gap-2 transition-all overflow-hidden ${isSidebarCollapsed ? 'justify-center w-full px-0' : ''}`}>
+                                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+                                        {companySettings.logo_url ? (
+                                            <img src={companySettings.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                                        ) : (
+                                            <div className="w-full h-full bg-black rounded-lg flex items-center justify-center text-white font-bold">S</div>
+                                        )}
+                                    </div>
+                                    <h1 className={`text-xl font-bold text-[var(--text-primary)] whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>{companySettings.company_name}</h1>
+                                </div>
+
+                                {/* Toggle Button (Desktop) */}
+                                <button
+                                    onClick={() => setSidebarCollapsed(!isSidebarCollapsed)}
+                                    className="hidden lg:flex absolute -right-3 top-1.5 w-6 h-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full items-center justify-center shadow-md hover:bg-gray-50 text-gray-500 z-50 transform transition-transform"
+                                >
+                                    {isSidebarCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+                                </button>
+
+                                {/* Close Button Mobile */}
+                                <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 text-[var(--text-secondary)]">
+                                    <ChevronRight className="rotate-180" size={24} />
+                                </button>
                             </div>
-                            <h1 className={`text-xl font-bold text-[var(--text-primary)] whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>{companySettings.company_name}</h1>
+
+                            {/* Unified Navigation - Flex Scrollable Container fitting 100% height */}
+                            <nav className="space-y-4 overflow-y-auto max-h-[calc(100vh-160px)] scrollbar-hide pr-1">
+                                {renderSidebarItems()}
+
+                                {/* Administration - Visible on Mobile for Admins since Top Bar is hidden */}
+                                {role?.toLowerCase() !== 'student' && (isMenuEnabled('settings') || isMenuEnabled('bulk') || isMenuEnabled('company-settings') || isMenuEnabled('ai-settings') || isMenuEnabled('dashboard-designer') || isMenuEnabled('integrations') || isMenuEnabled('audit') || isMenuEnabled('geofencing')) && (
+                                    <SidebarGroup title="Administration" isOpen={openGroups.admin} onToggle={() => toggleGroup('admin')} isSidebarCollapsed={isSidebarCollapsed}>
+                                        {isMenuEnabled('settings') && <NavItem icon={<Settings size={18} />} label="General Settings" active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }} />}
+                                        {isMenuEnabled('bulk') && <NavItem icon={<Database size={18} />} label="Data Management" active={activeTab === 'bulk'} onClick={() => { setActiveTab('bulk'); setSidebarOpen(false); }} />}
+                                        {isMenuEnabled('company-settings') && <NavItem icon={<Building2 size={18} />} label="Company Profile" active={activeTab === 'company-settings'} onClick={() => { setActiveTab('company-settings'); setSidebarOpen(false); }} />}
+                                        {isMenuEnabled('ai-settings') && <NavItem icon={<Brain size={18} />} label="AI Configuration" active={activeTab === 'ai-settings'} onClick={() => { setActiveTab('ai-settings'); setSidebarOpen(false); }} />}
+                                        {isMenuEnabled('dashboard-designer') && <NavItem icon={<Sliders size={18} />} label="Design System" active={activeTab === 'dashboard-designer'} onClick={() => { setActiveTab('dashboard-designer'); setSidebarOpen(false); }} />}
+                                        {isMenuEnabled('integrations') && <NavItem icon={<Server size={18} />} label="API Integrations" active={activeTab === 'integrations'} onClick={() => { setActiveTab('integrations'); setSidebarOpen(false); }} />}
+                                        {isMenuEnabled('audit') && <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => { setActiveTab('audit'); setSidebarOpen(false); }} />}
+                                        {isMenuEnabled('geofencing') && <NavItem icon={<Shield size={18} />} label="IP Geofencing" active={activeTab === 'geofencing'} onClick={() => { setActiveTab('geofencing'); setSidebarOpen(false); }} />}
+                                        {isMenuEnabled('settings') && <NavItem icon={<RefreshCw size={18} />} label="System Update" active={activeTab === 'system-update'} onClick={() => { setActiveTab('system-update'); setSidebarOpen(false); }} />}
+                                    </SidebarGroup>
+                                )}
+                                
+                                <SidebarGroup title="Support" isOpen={openGroups.support} onToggle={() => toggleGroup('support')} isSidebarCollapsed={isSidebarCollapsed}>
+                                    {role?.toLowerCase() !== 'student' && (
+                                        <NavItem icon={<HelpCircle size={18} />} label="Help Center" active={false} onClick={() => { }} />
+                                    )}
+                                    <InstallPWATrigger navStyle />
+                                    <NavItem
+                                        icon={<Smartphone size={18} />}
+                                        label="Android Native App"
+                                        active={false}
+                                        onClick={() => {
+                                            const link = document.createElement('a');
+                                            link.href = '/static/app-debug.apk';
+                                            link.download = 'smart-campus-app.apk';
+                                            document.body.appendChild(link);
+                                            link.click();
+                                            document.body.removeChild(link);
+                                        }}
+                                        badge={<span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-1 py-0.5 rounded leading-none">APK</span>}
+                                    />
+                                </SidebarGroup>
+
+                                {/* Legal Section */}
+                                {role?.toLowerCase() !== 'student' && (
+                                    <SidebarGroup title="Privacy & Legal" isOpen={openGroups.legal} onToggle={() => toggleGroup('legal')} isSidebarCollapsed={isSidebarCollapsed}>
+                                        <NavItem
+                                            icon={<ShieldCheck size={18} />}
+                                            label="Privacy Policy"
+                                            active={activeTab === 'privacy'}
+                                            onClick={() => { setActiveTab('privacy'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
+                                        />
+                                        <NavItem
+                                            icon={<Scale size={18} />}
+                                            label="Data Rights"
+                                            active={activeTab === 'rights'}
+                                            onClick={() => { setActiveTab('rights'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
+                                        />
+                                        <NavItem
+                                            icon={<Database size={18} />}
+                                            label="Cookie Policy"
+                                            active={activeTab === 'cookies'}
+                                            onClick={() => { setActiveTab('cookies'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
+                                        />
+                                    </SidebarGroup>
+                                )}
+                            </nav>
                         </div>
 
-                        {/* Toggle Button (Desktop) */}
-                        <button
-                            onClick={() => setSidebarCollapsed(!isSidebarCollapsed)}
-                            className="hidden lg:flex absolute -right-3 top-1.5 w-6 h-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full items-center justify-center shadow-md hover:bg-gray-50 text-gray-500 z-50 transform transition-transform"
-                        >
-                            {isSidebarCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-                        </button>
-
-                        {/* Close Button Mobile */}
-                        <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 text-[var(--text-secondary)]">
-                            <ChevronRight className="rotate-180" size={24} />
-                        </button>
-                    </div>
-
-                    {/* Unified Navigation - Flex Scrollable Container fitting 100% height */}
-                    <nav className="space-y-4 overflow-y-auto max-h-[calc(100vh-160px)] scrollbar-hide pr-1">
-                        {renderSidebarItems()}
-
-                        {/* Administration - Visible on Mobile for Admins since Top Bar is hidden */}
-                        {role?.toLowerCase() !== 'student' && (isMenuEnabled('settings') || isMenuEnabled('bulk') || isMenuEnabled('company-settings') || isMenuEnabled('ai-settings') || isMenuEnabled('dashboard-designer') || isMenuEnabled('integrations') || isMenuEnabled('audit') || isMenuEnabled('geofencing')) && (
-                            <SidebarGroup title="Administration" isOpen={openGroups.admin} onToggle={() => toggleGroup('admin')} isSidebarCollapsed={isSidebarCollapsed}>
-                                {isMenuEnabled('settings') && <NavItem icon={<Settings size={18} />} label="General Settings" active={activeTab === 'settings'} onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }} />}
-                                {isMenuEnabled('bulk') && <NavItem icon={<Database size={18} />} label="Data Management" active={activeTab === 'bulk'} onClick={() => { setActiveTab('bulk'); setSidebarOpen(false); }} />}
-                                {isMenuEnabled('company-settings') && <NavItem icon={<Building2 size={18} />} label="Company Profile" active={activeTab === 'company-settings'} onClick={() => { setActiveTab('company-settings'); setSidebarOpen(false); }} />}
-                                {isMenuEnabled('ai-settings') && <NavItem icon={<Brain size={18} />} label="AI Configuration" active={activeTab === 'ai-settings'} onClick={() => { setActiveTab('ai-settings'); setSidebarOpen(false); }} />}
-                                {isMenuEnabled('dashboard-designer') && <NavItem icon={<Sliders size={18} />} label="Design System" active={activeTab === 'dashboard-designer'} onClick={() => { setActiveTab('dashboard-designer'); setSidebarOpen(false); }} />}
-                                {isMenuEnabled('integrations') && <NavItem icon={<Server size={18} />} label="API Integrations" active={activeTab === 'integrations'} onClick={() => { setActiveTab('integrations'); setSidebarOpen(false); }} />}
-                                {isMenuEnabled('audit') && <NavItem icon={<History size={18} />} label="Audit Trail" active={activeTab === 'audit'} onClick={() => { setActiveTab('audit'); setSidebarOpen(false); }} />}
-                                {isMenuEnabled('geofencing') && <NavItem icon={<Shield size={18} />} label="IP Geofencing" active={activeTab === 'geofencing'} onClick={() => { setActiveTab('geofencing'); setSidebarOpen(false); }} />}
-                                {isMenuEnabled('settings') && <NavItem icon={<RefreshCw size={18} />} label="System Update" active={activeTab === 'system-update'} onClick={() => { setActiveTab('system-update'); setSidebarOpen(false); }} />}
-                            </SidebarGroup>
-                        )}
-                        
-                        <SidebarGroup title="Support" isOpen={openGroups.support} onToggle={() => toggleGroup('support')} isSidebarCollapsed={isSidebarCollapsed}>
-                            {role?.toLowerCase() !== 'student' && (
-                                <NavItem icon={<HelpCircle size={18} />} label="Help Center" active={false} onClick={() => { }} />
-                            )}
-                            <InstallPWATrigger navStyle />
-                            <NavItem
-                                icon={<Smartphone size={18} />}
-                                label="Android Native App"
-                                active={false}
-                                onClick={() => {
-                                    const link = document.createElement('a');
-                                    link.href = '/static/app-debug.apk';
-                                    link.download = 'smart-campus-app.apk';
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                }}
-                                badge={<span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-1 py-0.5 rounded leading-none">APK</span>}
-                            />
-                        </SidebarGroup>
-
-                        {/* Legal Section */}
-                        {role?.toLowerCase() !== 'student' && (
-                            <SidebarGroup title="Privacy & Legal" isOpen={openGroups.legal} onToggle={() => toggleGroup('legal')} isSidebarCollapsed={isSidebarCollapsed}>
-                                <NavItem
-                                    icon={<ShieldCheck size={18} />}
-                                    label="Privacy Policy"
-                                    active={activeTab === 'privacy'}
-                                    onClick={() => { setActiveTab('privacy'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
-                                />
-                                <NavItem
-                                    icon={<Scale size={18} />}
-                                    label="Data Rights"
-                                    active={activeTab === 'rights'}
-                                    onClick={() => { setActiveTab('rights'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
-                                />
-                                <NavItem
-                                    icon={<Database size={18} />}
-                                    label="Cookie Policy"
-                                    active={activeTab === 'cookies'}
-                                    onClick={() => { setActiveTab('cookies'); if (window.innerWidth < 1024) setSidebarOpen(false); }}
-                                />
-                            </SidebarGroup>
-                        )}
-                    </nav>
-                </div>
-
-                {/* Fixed Bottom Panel */}
-                <div className="mt-auto p-4 border-t border-[var(--border-color)] shrink-0 flex items-center justify-between bg-[var(--bg-primary)]">
-                    <button
-                        onClick={() => setDarkMode(!darkMode)}
-                        className="p-2 rounded-full hover:bg-[var(--bg-primary)] text-[var(--text-secondary)] transition-colors"
-                    >
-                        {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                    </button>
-                    <button
-                        onClick={handleLogout}
-                        className="p-2 rounded-full hover:bg-red-50 text-red-500 transition-colors"
-                    >
-                        <LogOut size={20} />
-                    </button>
-                </div>
-            </aside>
-
+                        {/* Fixed Bottom Panel */}
+                        <div className="mt-auto p-4 border-t border-[var(--border-color)] shrink-0 flex items-center justify-between bg-[var(--bg-primary)]">
+                            <button
+                                onClick={() => setDarkMode(!darkMode)}
+                                className="p-2 rounded-full hover:bg-[var(--bg-primary)] text-[var(--text-secondary)] transition-colors"
+                            >
+                                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                            </button>
+                            <button
+                                onClick={handleLogout}
+                                className="p-2 rounded-full hover:bg-red-50 text-red-500 transition-colors"
+                            >
+                                <LogOut size={20} />
+                            </button>
+                        </div>
+                    </aside>
+                </>
+            )}
 
             {/* Main Content */}
-            <main className={`flex-1 min-w-0 p-2 sm:p-3 lg:p-4 pb-20 lg:pb-4 transition-all duration-300 overflow-x-hidden w-full ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
+            <main className={`flex-1 min-w-0 p-2 sm:p-3 lg:p-4 transition-all duration-300 overflow-x-hidden w-full ${
+                isMobileApp 
+                    ? 'pb-24 lg:pb-6 ml-0 lg:ml-0' 
+                    : `pb-20 lg:pb-4 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`
+            }`}>
                 <Suspense fallback={<PageLoader />}>
                     {/* Top Header - 2 Row Layout */}
                     <header className="flex flex-col gap-2 mb-4 pt-1 pb-1 w-full min-w-0 relative">
                         {/* Row 1: Primary Navigation */}
                         <div className="flex justify-between items-center w-full min-w-0 gap-2">
                             <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                                <button
-                                    onClick={() => setSidebarOpen(true)}
-                                    className="lg:hidden p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--primary-color)] active:scale-95 transition-transform shrink-0"
-                                >
-                                    <Menu size={20} />
-                                </button>
+                                {isMobileApp ? (
+                                    <div className="p-2.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30 flex items-center justify-center shrink-0">
+                                        {(() => {
+                                            const Icon = currentGroup ? getGroupIcon(currentGroup.id) : HelpCircle
+                                            return <Icon size={20} />
+                                        })()}
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setSidebarOpen(true)}
+                                        className="lg:hidden p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--primary-color)] active:scale-95 transition-transform shrink-0"
+                                    >
+                                        <Menu size={20} />
+                                    </button>
+                                )}
 
                                 <h2 className="text-lg sm:text-xl lg:text-2xl font-black capitalize tracking-tight truncate min-w-0 flex-1">
                                     {activeTab.replace(/-/g, ' ')}
@@ -2067,20 +2130,22 @@ function App() {
                             <div className="flex items-center gap-3 relative shrink-0">
                                 {isAuthenticated && (
                                     <>
-                                        <button
-                                            onClick={() => {
-                                                const link = document.createElement('a');
-                                                link.href = '/static/app-debug.apk';
-                                                link.download = 'smart-campus-app.apk';
-                                                document.body.appendChild(link);
-                                                link.click();
-                                                document.body.removeChild(link);
-                                            }}
-                                            className="p-2 rounded-lg relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50 active:scale-95 transition-all flex items-center justify-center"
-                                            title="Download Android App"
-                                        >
-                                            <Smartphone size={20} />
-                                        </button>
+                                        {!isMobileApp && (
+                                            <button
+                                                onClick={() => {
+                                                    const link = document.createElement('a');
+                                                    link.href = '/static/app-debug.apk';
+                                                    link.download = 'smart-campus-app.apk';
+                                                    document.body.appendChild(link);
+                                                    link.click();
+                                                    document.body.removeChild(link);
+                                                }}
+                                                className="p-2 rounded-lg relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50 active:scale-95 transition-all flex items-center justify-center"
+                                                title="Download Android App"
+                                            >
+                                                <Smartphone size={20} />
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => setShowSelfScanModal(true)}
                                             className="p-2 rounded-lg relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50 active:scale-95 transition-all flex items-center justify-center"
@@ -2202,66 +2267,89 @@ function App() {
 
                         {/* Row 2: Context Menu (Secondary Navigation) */}
                         {(() => {
-                            const currentGroup = SIDEBAR_GROUPS.find(group => group.items.some(item => item.id === activeTab))
                             if (currentGroup) {
                                 const enabledItems = currentGroup.items.filter(item => !item.permissionKey || isMenuEnabled(item.permissionKey))
                                 return (
                                     <div className="w-full px-2 pb-1.5">
-                                        <div
-                                            className="flex items-stretch gap-[3px] w-full"
-                                            style={{ perspective: '600px' }}
-                                        >
-                                            {enabledItems.map(item => {
-                                                const isActive = activeTab === item.id
-                                                return (
-                                                    <button
-                                                        key={item.id}
-                                                        onClick={() => setActiveTab(item.id)}
-                                                        title={item.label}
-                                                        className="group relative flex-1 min-w-0 overflow-hidden"
-                                                        style={{
-                                                            transition: 'all 0.22s cubic-bezier(0.34,1.56,0.64,1)',
-                                                            transformStyle: 'preserve-3d',
-                                                        }}
-                                                    >
-                                                        {/* Tab body */}
-                                                        <div
+                                        {isMobileApp ? (
+                                            <div className="w-full overflow-x-auto whitespace-nowrap scrollbar-hide flex items-center gap-2 py-2 scroll-smooth">
+                                                {enabledItems.map(item => {
+                                                    const isActive = activeTab === item.id
+                                                    return (
+                                                        <button
+                                                            key={item.id}
+                                                            onClick={() => setActiveTab(item.id)}
                                                             className={`
-                                                                relative w-full flex items-center justify-center
-                                                                px-1 py-[5px] rounded-lg font-bold text-[10px] tracking-wide uppercase
-                                                                transition-all duration-200 cursor-pointer whitespace-nowrap truncate
+                                                                inline-flex items-center justify-center px-4 py-2 rounded-full font-black text-xs shrink-0
+                                                                transition-all duration-200 cursor-pointer shadow-sm border whitespace-nowrap
                                                                 ${isActive
-                                                                    ? 'bg-[var(--primary-color)] text-white shadow-[0_4px_14px_rgba(0,0,0,0.25)] ring-1 ring-[var(--primary-color)]/40 scale-[1.05] -translate-y-[3px]'
-                                                                    : 'bg-[var(--bg-primary)] dark:bg-slate-800/60 text-[var(--text-secondary)] border border-[var(--border-color)] dark:border-slate-700/50'
+                                                                    ? 'bg-[var(--primary-color)] text-white border-[var(--primary-color)] shadow-[0_4px_12px_rgba(99,102,241,0.35)] scale-[1.03]'
+                                                                    : 'bg-[var(--bg-surface)] dark:bg-slate-800 text-[var(--text-secondary)] border-[var(--border-color)] dark:border-slate-700/50 hover:text-[var(--primary-color)]'
                                                                 }
-                                                                group-hover:scale-[1.08] group-hover:-translate-y-[5px]
-                                                                group-hover:shadow-[0_8px_20px_rgba(0,0,0,0.18),0_2px_6px_rgba(0,0,0,0.12)]
-                                                                ${!isActive ? 'group-hover:text-[var(--primary-color)] group-hover:border-[var(--primary-color)]/40 group-hover:bg-[var(--bg-surface)]' : ''}
                                                             `}
+                                                        >
+                                                            {item.label}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div
+                                                className="flex items-stretch gap-[3px] w-full"
+                                                style={{ perspective: '600px' }}
+                                            >
+                                                {enabledItems.map(item => {
+                                                    const isActive = activeTab === item.id
+                                                    return (
+                                                        <button
+                                                            key={item.id}
+                                                            onClick={() => setActiveTab(item.id)}
+                                                            title={item.label}
+                                                            className="group relative flex-1 min-w-0 overflow-hidden"
                                                             style={{
+                                                                transition: 'all 0.22s cubic-bezier(0.34,1.56,0.64,1)',
                                                                 transformStyle: 'preserve-3d',
-                                                                transform: isActive ? 'translateY(-3px) scale(1.05) rotateX(-2deg)' : undefined,
-                                                                boxShadow: isActive
-                                                                    ? '0 6px 16px rgba(0,0,0,0.22), 0 2px 4px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.15)'
-                                                                    : undefined,
                                                             }}
                                                         >
-                                                            {/* 3D bottom edge for depth */}
-                                                            <span
-                                                                className={`absolute bottom-0 left-0 right-0 h-[3px] rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isActive ? 'opacity-100' : ''}`}
+                                                            {/* Tab body */}
+                                                            <div
+                                                                className={`
+                                                                    relative w-full flex items-center justify-center
+                                                                    px-1 py-[5px] rounded-lg font-bold text-[10px] tracking-wide uppercase
+                                                                    transition-all duration-200 cursor-pointer whitespace-nowrap truncate
+                                                                    ${isActive
+                                                                        ? 'bg-[var(--primary-color)] text-white shadow-[0_4px_14px_rgba(0,0,0,0.25)] ring-1 ring-[var(--primary-color)]/40 scale-[1.05] -translate-y-[3px]'
+                                                                        : 'bg-[var(--bg-primary)] dark:bg-slate-800/60 text-[var(--text-secondary)] border border-[var(--border-color)] dark:border-slate-700/50'
+                                                                    }
+                                                                    group-hover:scale-[1.08] group-hover:-translate-y-[5px]
+                                                                    group-hover:shadow-[0_8px_20px_rgba(0,0,0,0.18),0_2px_6px_rgba(0,0,0,0.12)]
+                                                                    ${!isActive ? 'group-hover:text-[var(--primary-color)] group-hover:border-[var(--primary-color)]/40 group-hover:bg-[var(--bg-surface)]' : ''}
+                                                                `}
                                                                 style={{
-                                                                    background: isActive
-                                                                        ? 'rgba(0,0,0,0.25)'
-                                                                        : 'var(--primary-color)',
-                                                                    transform: 'translateZ(-1px)',
+                                                                    transformStyle: 'preserve-3d',
+                                                                    transform: isActive ? 'translateY(-3px) scale(1.05) rotateX(-2deg)' : undefined,
+                                                                    boxShadow: isActive
+                                                                        ? '0 6px 16px rgba(0,0,0,0.22), 0 2px 4px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.15)'
+                                                                        : undefined,
                                                                 }}
-                                                            />
-                                                            <span className="truncate leading-none px-0.5">{item.label}</span>
-                                                        </div>
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
+                                                            >
+                                                                {/* 3D bottom edge for depth */}
+                                                                <span
+                                                                    className={`absolute bottom-0 left-0 right-0 h-[3px] rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isActive ? 'opacity-100' : ''}`}
+                                                                    style={{
+                                                                        background: isActive
+                                                                            ? 'rgba(0,0,0,0.25)'
+                                                                            : 'var(--primary-color)',
+                                                                        transform: 'translateZ(-1px)',
+                                                                    }}
+                                                                />
+                                                                <span className="truncate leading-none px-0.5">{item.label}</span>
+                                                            </div>
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 )
                             }
@@ -2340,107 +2428,196 @@ function App() {
                     </footer>
                 </Suspense>
 
-                {/* ── Quicker Access FAB Menu – Floating at bottom-right with expanding options ── */}
+                {/* ── Quicker Access FAB Menu / Category Switcher ── */}
                 {isAuthenticated && (
-                    <div className="fixed bottom-20 lg:bottom-6 right-6 z-[1000] flex flex-col items-end gap-3">
-                        {/* Floating Sub-buttons (shown with custom animation when menu is open) */}
+                    <div className={`fixed ${isMobileApp ? 'bottom-6' : 'bottom-20 lg:bottom-6'} right-6 z-[1000] flex flex-col items-end gap-3`}>
+                        {/* Floating Sub-buttons or Category Switcher Panel */}
                         {isQuickMenuOpen && (
-                            <div className="flex flex-col items-end gap-3 mb-2 animate-fade-in">
-                                {/* Scan QR Option (for all authenticated users) - First icon on the top */}
-                                {isAuthenticated && (
-                                    <div 
-                                        onClick={() => { setShowSelfScanModal(true); setIsQuickMenuOpen(false); }}
-                                        className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
-                                    >
-                                        <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
-                                            Scan QR
-                                        </span>
-                                        <button className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
-                                            <QrCode size={18} />
-                                        </button>
-                                    </div>
-                                )}
+                            <>
+                                {isMobileApp ? (
+                                    <>
+                                        {/* Backdrop Blur Overlay */}
+                                        <div 
+                                            onClick={() => setIsQuickMenuOpen(false)}
+                                            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[998] animate-in fade-in duration-200 pointer-events-auto"
+                                        />
+                                        
+                                        {/* Category Switcher Bottom Card */}
+                                        <div 
+                                            className="w-[calc(100vw-3rem)] max-w-sm bg-white/95 dark:bg-slate-900/95 backdrop-blur-md rounded-3xl shadow-2xl border border-slate-200/50 dark:border-slate-800/40 p-5 mb-2 z-[999] animate-in slide-in-from-bottom-5 duration-300 pointer-events-auto"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-850">
+                                                <div>
+                                                    <h3 className="font-black text-sm tracking-wide text-indigo-650 dark:text-indigo-400 uppercase">Smart Campus</h3>
+                                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">Select a category to navigate</p>
+                                                </div>
+                                                <button 
+                                                    onClick={() => setIsQuickMenuOpen(false)}
+                                                    className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                            
+                                            {/* 2-Column Grid of Categories */}
+                                            <div className="grid grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto pr-0.5 scrollbar-hide">
+                                                {(() => {
+                                                    const enabledGroups = SIDEBAR_GROUPS.filter(group => {
+                                                        if (role?.toLowerCase() === 'student') {
+                                                            return ['overview', 'events', 'academics'].includes(group.id)
+                                                        }
+                                                        return group.items.some(item => !item.permissionKey || isMenuEnabled(item.permissionKey))
+                                                    })
+                                                    
+                                                    return enabledGroups.map(group => {
+                                                        const isGroupActive = group.items.some(item => item.id === activeTab)
+                                                        const IconComponent = getGroupIcon(group.id)
+                                                        const colorGradient = getGroupColor(group.id)
+                                                        
+                                                        return (
+                                                            <button
+                                                                key={group.id}
+                                                                onClick={() => {
+                                                                    // Find first enabled item in this group
+                                                                    const firstEnabledItem = group.items.find(item => !item.permissionKey || isMenuEnabled(item.permissionKey))
+                                                                    if (firstEnabledItem) {
+                                                                        setActiveTab(firstEnabledItem.id)
+                                                                    }
+                                                                    setIsQuickMenuOpen(false)
+                                                                }}
+                                                                className={`
+                                                                    flex flex-col items-start p-3.5 rounded-2xl text-left border transition-all duration-300 relative overflow-hidden group/card
+                                                                    ${isGroupActive 
+                                                                        ? 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/20 dark:to-purple-950/20 border-indigo-200 dark:border-indigo-900/50 shadow-md shadow-indigo-100/20' 
+                                                                        : 'bg-white dark:bg-slate-850 border-slate-100 dark:border-slate-800 hover:border-indigo-100 dark:hover:border-indigo-900/30'
+                                                                    }
+                                                                `}
+                                                            >
+                                                                {/* Icon Backdrop */}
+                                                                <div className={`
+                                                                    w-10 h-10 rounded-xl bg-gradient-to-tr ${colorGradient} text-white flex items-center justify-center shadow-lg
+                                                                    transform transition-transform duration-300 group-hover/card:scale-110 group-hover/card:rotate-3
+                                                                `}>
+                                                                    <IconComponent size={18} />
+                                                                </div>
+                                                                
+                                                                <span className="text-[11px] font-black text-slate-800 dark:text-slate-200 mt-3.5 tracking-wide leading-tight truncate w-full">
+                                                                    {group.label}
+                                                                </span>
+                                                                <span className="text-[9px] text-slate-400 mt-1 uppercase tracking-widest font-bold">
+                                                                    {group.items.filter(item => !item.permissionKey || isMenuEnabled(item.permissionKey)).length} Pages
+                                                                </span>
+                                                                
+                                                                {/* Active Glow/Indicator */}
+                                                                {isGroupActive && (
+                                                                    <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 rounded-full bg-indigo-600 shadow-[0_0_8px_rgba(99,102,241,0.5)] animate-pulse" />
+                                                                )}
+                                                            </button>
+                                                        )
+                                                    })
+                                                })()}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-end gap-3 mb-2 animate-fade-in">
+                                        {/* Scan QR Option (for all authenticated users) - First icon on the top */}
+                                        {isAuthenticated && (
+                                            <div 
+                                                onClick={() => { setShowSelfScanModal(true); setIsQuickMenuOpen(false); }}
+                                                className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                            >
+                                                <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
+                                                    Scan QR
+                                                </span>
+                                                <button className="w-12 h-12 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
+                                                    <QrCode size={18} />
+                                                </button>
+                                            </div>
+                                        )}
 
-                                {/* Gate Pass Option – Admin/Guard only */}
-                                {['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
-                                    <div 
-                                        onClick={() => { setShowQuickScanModal(true); setIsQuickMenuOpen(false); }}
-                                        className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
-                                    >
-                                        <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
-                                            Gate Pass
-                                        </span>
-                                        <button className="w-12 h-12 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
-                                            <QrCode size={18} />
-                                        </button>
-                                    </div>
-                                )}
-                                
-                                {/* Notifications Option */}
-                                <div 
-                                    onClick={() => { setShowQuickNotifications(true); setIsQuickMenuOpen(false); }}
-                                    className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
-                                >
-                                    <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none relative">
-                                        Notifications
-                                        {totalUnreadCount > 0 && (
-                                            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 text-[9px] font-black flex items-center justify-center animate-pulse">
-                                                {totalUnreadCount}
+                                        {/* Gate Pass Option – Admin/Guard only */}
+                                        {['superadmin', 'admin', 'guard', 'security lead', 'security'].includes(role?.toLowerCase()) && (
+                                            <div 
+                                                onClick={() => { setShowQuickScanModal(true); setIsQuickMenuOpen(false); }}
+                                                className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                            >
+                                                <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
+                                                    Gate Pass
+                                                </span>
+                                                <button className="w-12 h-12 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
+                                                    <QrCode size={18} />
+                                                </button>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Notifications Option */}
+                                        <div 
+                                            onClick={() => { setShowQuickNotifications(true); setIsQuickMenuOpen(false); }}
+                                            className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                        >
+                                            <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none relative">
+                                                Notifications
+                                                {totalUnreadCount > 0 && (
+                                                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 text-[9px] font-black flex items-center justify-center animate-pulse">
+                                                        {totalUnreadCount}
+                                                    </span>
+                                                )}
                                             </span>
-                                        )}
-                                    </span>
-                                    <button className="w-12 h-12 bg-gradient-to-r from-red-500 via-pink-500 to-purple-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20 relative">
-                                        <Bell size={18} />
-                                        {totalUnreadCount > 0 && (
-                                            <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-ping" />
-                                        )}
-                                    </button>
-                                </div>
-                                
-                                {/* Events Option */}
-                                <div 
-                                    onClick={() => { setActiveTab('events'); setIsQuickMenuOpen(false); }}
-                                    className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
-                                >
-                                    <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
-                                        Events
-                                    </span>
-                                    <button className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
-                                        <Calendar size={18} />
-                                    </button>
-                                </div>
+                                            <button className="w-12 h-12 bg-gradient-to-r from-red-500 via-pink-500 to-purple-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20 relative">
+                                                <Bell size={18} />
+                                                {totalUnreadCount > 0 && (
+                                                    <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full animate-ping" />
+                                                )}
+                                            </button>
+                                        </div>
+                                        
+                                        {/* Events Option */}
+                                        <div 
+                                            onClick={() => { setActiveTab('events'); setIsQuickMenuOpen(false); }}
+                                            className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                        >
+                                            <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
+                                                Events
+                                            </span>
+                                            <button className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
+                                                <Calendar size={18} />
+                                            </button>
+                                        </div>
 
-                                {/* Academics Option */}
-                                <div 
-                                    onClick={() => { setActiveTab('timetable'); setIsQuickMenuOpen(false); }}
-                                    className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
-                                >
-                                    <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
-                                        Academics
-                                    </span>
-                                    <button className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
-                                        <BookOpen size={18} />
-                                    </button>
-                                </div>
+                                        {/* Academics Option */}
+                                        <div 
+                                            onClick={() => { setActiveTab('timetable'); setIsQuickMenuOpen(false); }}
+                                            className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                        >
+                                            <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
+                                                Academics
+                                            </span>
+                                            <button className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
+                                                <BookOpen size={18} />
+                                            </button>
+                                        </div>
 
-                                {/* Fleet Option */}
-                                <div 
-                                    onClick={() => { setActiveTab('fleet'); setIsQuickMenuOpen(false); }}
-                                    className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
-                                >
-                                    <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
-                                        Fleet Management
-                                    </span>
-                                    <button className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
-                                        <Car size={18} />
-                                    </button>
-                                </div>
-                            </div>
+                                        {/* Fleet Option */}
+                                        <div 
+                                            onClick={() => { setActiveTab('fleet'); setIsQuickMenuOpen(false); }}
+                                            className="flex items-center gap-3 cursor-pointer group pointer-events-auto"
+                                        >
+                                            <span className="bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-black px-3 py-1.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 transition-all transform group-hover:scale-105 select-none">
+                                                Fleet Management
+                                            </span>
+                                            <button className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 border border-white/20">
+                                                <Car size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
 
                         {/* Main FAB Toggle Button */}
                         <div className="relative pointer-events-auto">
-                            {/* Notification text preview tooltip cycling through unread notifications */}
                             {!isQuickMenuOpen && currentNotificationTip && (
                                 <div className="absolute right-16 top-1/2 -translate-y-1/2 bg-indigo-600 text-white text-[10px] font-black px-3 py-1.5 rounded-xl shadow-xl whitespace-nowrap animate-bounce flex items-center gap-1.5 border border-indigo-400">
                                     {currentNotificationTip}
@@ -2467,44 +2644,46 @@ function App() {
             </main >
 
             {/* Mobile PWA Bottom Navigation Bar */}
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--bg-surface)] border-t border-[var(--border-color)] z-50 px-2 py-2 flex justify-around items-center safe-area-pb shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-                {isMenuEnabled('dashboard') && (
-                    <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'dashboard' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
-                        <LayoutDashboard size={22} />
-                        <span className="text-[10px] font-medium mt-1">Home</span>
+            {!isMobileApp && (
+                <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-[var(--bg-surface)] border-t border-[var(--border-color)] z-50 px-2 py-2 flex justify-around items-center safe-area-pb shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                    {isMenuEnabled('dashboard') && (
+                        <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'dashboard' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
+                            <LayoutDashboard size={22} />
+                            <span className="text-[10px] font-medium mt-1">Home</span>
+                        </button>
+                    )}
+                    {isMenuEnabled('verification') && (
+                        <button onClick={() => setActiveTab('verification')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'verification' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
+                            <ScanFace size={22} />
+                            <span className="text-[10px] font-medium mt-1">Verify</span>
+                        </button>
+                    )}
+                    {isMenuEnabled('gate') && (
+                        <button onClick={() => setActiveTab('gate')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'gate' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
+                            <DoorOpen size={22} />
+                            <span className="text-[10px] font-medium mt-1">Gate</span>
+                        </button>
+                    )}
+                    {isMenuEnabled('scan-logs') && (
+                        <button onClick={() => setActiveTab('scan-logs')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'scan-logs' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
+                            <List size={22} />
+                            <span className="text-[10px] font-medium mt-1">Logs</span>
+                        </button>
+                    )}
+                    <button onClick={() => setSidebarOpen(true)} className="flex flex-col items-center p-2 rounded-xl transition-colors text-[var(--text-secondary)] relative">
+                        <div className="relative">
+                            <Menu size={22} className={(hasUnreadNotices || unreadIncidents > 0 || unreadLostFound > 0 || hasUnreadUsersActivity) ? "text-indigo-600 animate-pulse" : ""} />
+                            {(hasUnreadNotices || unreadIncidents > 0 || unreadLostFound > 0 || hasUnreadUsersActivity) && (
+                                <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                </span>
+                            )}
+                        </div>
+                        <span className="text-[10px] font-medium mt-1">Menu</span>
                     </button>
-                )}
-                {isMenuEnabled('verification') && (
-                    <button onClick={() => setActiveTab('verification')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'verification' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
-                        <ScanFace size={22} />
-                        <span className="text-[10px] font-medium mt-1">Verify</span>
-                    </button>
-                )}
-                {isMenuEnabled('gate') && (
-                    <button onClick={() => setActiveTab('gate')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'gate' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
-                        <DoorOpen size={22} />
-                        <span className="text-[10px] font-medium mt-1">Gate</span>
-                    </button>
-                )}
-                {isMenuEnabled('scan-logs') && (
-                    <button onClick={() => setActiveTab('scan-logs')} className={`flex flex-col items-center p-2 rounded-xl transition-colors ${activeTab === 'scan-logs' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20' : 'text-[var(--text-secondary)]'}`}>
-                        <List size={22} />
-                        <span className="text-[10px] font-medium mt-1">Logs</span>
-                    </button>
-                )}
-                <button onClick={() => setSidebarOpen(true)} className="flex flex-col items-center p-2 rounded-xl transition-colors text-[var(--text-secondary)] relative">
-                    <div className="relative">
-                        <Menu size={22} className={(hasUnreadNotices || unreadIncidents > 0 || unreadLostFound > 0 || hasUnreadUsersActivity) ? "text-indigo-600 animate-pulse" : ""} />
-                        {(hasUnreadNotices || unreadIncidents > 0 || unreadLostFound > 0 || hasUnreadUsersActivity) && (
-                            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                            </span>
-                        )}
-                    </div>
-                    <span className="text-[10px] font-medium mt-1">Menu</span>
-                </button>
-            </div>
+                </div>
+            )}
 
             {/* Profile Picture Modal */}
             {showProfileModal && (
