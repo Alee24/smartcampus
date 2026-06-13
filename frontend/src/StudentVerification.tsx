@@ -1365,7 +1365,7 @@ export default function StudentVerification() {
                                                                                         ? 'bg-[#22C55E] shadow-[#22C55E]/20' 
                                                                                         : 'bg-amber-600 shadow-amber-600/20'
                                                                                 }`}>
-                                                                                    <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
+                                                                                    <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
                                                                                     {result.gate_status === 'In' ? 'Checked In' : 'Checked Out'}
                                                                                 </div>
                                                                             </div>
@@ -1507,7 +1507,7 @@ export default function StudentVerification() {
                                                                                     ? 'bg-[#22C55E] shadow-[#22C55E]/20' 
                                                                                     : 'bg-teal-600 shadow-teal-600/20'
                                                                             }`}>
-                                                                                <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
+                                                                                <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
                                                                                 {result.gate_status === 'In' ? 'Checked In' : 'Checked Out'}
                                                                             </div>
                                                                         </div>
@@ -1663,7 +1663,7 @@ export default function StudentVerification() {
                                                                                     ? 'bg-[#22C55E] shadow-[#22C55E]/20' 
                                                                                     : 'bg-[#EF4444] shadow-[#EF4444]/20'
                                                                             }`}>
-                                                                                <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
+                                                                                <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
                                                                                 {statusText}
                                                                             </div>
                                                                         </div>
@@ -1877,9 +1877,9 @@ export default function StudentVerification() {
                         <div className="fixed -left-[5000px] top-0">
                             {result.found_in_vehicles ? (() => {
                                 const isVisitor = result.vehicle_type?.toLowerCase() === 'visitor' || result.role?.toLowerCase() === 'visitor' || result.role?.toLowerCase() === 'guest';
-                                const cardBgClass = isVisitor 
-                                    ? 'bg-green-500/10 border-green-300' 
-                                    : 'bg-yellow-500/10 border-yellow-300';
+                                const cardBorderClass = isVisitor 
+                                    ? 'border-green-300' 
+                                    : 'border-yellow-300';
                                 const stripBgClass = isVisitor
                                     ? 'bg-green-600'
                                     : 'bg-yellow-500';
