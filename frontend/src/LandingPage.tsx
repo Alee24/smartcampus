@@ -1,6 +1,7 @@
 import { Shield, QrCode, Clock, CheckCircle, ArrowRight, Smartphone, Lock, BarChart3, Bell, UserCheck, Activity, Database, Zap, Phone, ShieldAlert, Award, Sliders, Server, User, Video, Megaphone, HelpCircle, Key, KeyRound, Check, RefreshCw, Nfc } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import StudentVerification from './StudentVerification'
+import SelfServiceEntry from './SelfServiceEntry'
 
 interface LandingPageProps {
     onGetStarted: () => void
@@ -8,6 +9,7 @@ interface LandingPageProps {
 
 export default function LandingPage({ onGetStarted }: LandingPageProps) {
     const [showVerification, setShowVerification] = useState(false)
+    const [showSelfService, setShowSelfService] = useState(false)
     const [companySettings, setCompanySettings] = useState<{ company_name: string, logo_url: string }>({
         company_name: 'Smart Campus',
         logo_url: ''
@@ -113,6 +115,14 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         "Incident & Asset Logs"
     ]
 
+    if (showSelfService) {
+        return (
+            <div className="min-h-screen bg-[var(--bg-primary)]">
+                <SelfServiceEntry isEmbedded={true} onBack={() => setShowSelfService(false)} />
+            </div>
+        )
+    }
+
     if (showVerification) {
         return (
             <div className="min-h-screen bg-[var(--bg-primary)]">
@@ -169,7 +179,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     
                     <div className="hidden md:flex items-center gap-8 text-sm font-medium text-[var(--text-secondary)]">
                         <button onClick={handleIdVerificationTab} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none font-bold">ID Verification</button>
-                        <button onClick={() => window.location.href = '/gate-pass/entry'} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none">Self Service</button>
+                        <button onClick={() => setShowSelfService(true)} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none font-bold">Self Service</button>
                         <span className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">Technical Support</span>
                     </div>
 
@@ -215,6 +225,12 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                                     className="px-8 py-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-primary)] font-bold hover:bg-[var(--bg-primary)] transition-all flex items-center gap-2 hover:border-blue-500/30 focus:ring-2 focus:ring-blue-500 outline-none"
                                 >
                                     <UserCheck size={18} className="text-blue-600 dark:text-blue-400" /> ID Verification Portal
+                                </button>
+                                <button 
+                                    onClick={() => setShowSelfService(true)}
+                                    className="px-8 py-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-surface)] text-[var(--text-primary)] font-bold hover:bg-[var(--bg-primary)] transition-all flex items-center gap-2 hover:border-purple-500/30 focus:ring-2 focus:ring-purple-500 outline-none"
+                                >
+                                    <User size={18} className="text-purple-600 dark:text-purple-400" /> Self-Service Kiosk
                                 </button>
                             </div>
 
