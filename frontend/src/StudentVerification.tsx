@@ -1228,221 +1228,223 @@ export default function StudentVerification() {
                                                 className="relative transition-all duration-700 preserve-3d h-[520px] w-[896px] origin-top shrink-0"
                                                 style={{ transform: `scale(${scale}) ${isFlipped ? 'rotateY(180deg)' : ''}` }}
                                             >
-                                                {result.found_in_vehicles ? (
-                                                    <>
-                                                        {/* Front Side - Vehicle Pass Template */}
-                                                        <div 
-                                                            className="absolute inset-0 backface-hidden bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 border-slate-200 dark:border-amber-500/50 flex flex-row transition-transform hover:scale-[1.005]"
-                                                            style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
-                                                        >
-                                                            {/* Left Column (Logo, Details) */}
-                                                            <div className="flex-1 flex flex-col justify-between p-8 min-w-0">
-                                                                {/* Logo & Company Info */}
-                                                                <div className="flex items-center gap-4">
-                                                                    <div className="w-14 h-14 bg-slate-100 dark:bg-amber-500/10 rounded-2xl p-1 border border-slate-250 dark:border-amber-500/20 flex items-center justify-center shrink-0">
-                                                                        {companySettings.logo_url ? (
-                                                                            <img src={companySettings.logo_url} className="w-full h-full object-contain filter dark:brightness-110" />
-                                                                        ) : (
-                                                                            <div className="text-2xl font-bold text-[#7A1975] dark:text-amber-500" style={{ fontFamily: "'Museo', sans-serif" }}>RU</div>
-                                                                        )}
+                                                {result.found_in_vehicles ? (() => {
+                                                    const isVisitor = result.vehicle_type?.toLowerCase() === 'visitor' || result.role?.toLowerCase() === 'visitor' || result.role?.toLowerCase() === 'guest';
+                                                    const cardBgClass = isVisitor 
+                                                        ? 'bg-green-500/10 dark:bg-green-950/20 border-green-300 dark:border-green-800' 
+                                                        : 'bg-yellow-500/10 dark:bg-yellow-950/20 border-yellow-300 dark:border-yellow-800';
+                                                    const stripBgClass = isVisitor
+                                                        ? 'bg-green-600 dark:bg-green-700'
+                                                        : 'bg-yellow-500 dark:bg-yellow-600';
+                                                    return (
+                                                        <>
+                                                            {/* Front Side - Vehicle Pass Template */}
+                                                            <div 
+                                                                className={`absolute inset-0 backface-hidden ${cardBgClass} text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 flex flex-row transition-transform hover:scale-[1.005]`}
+                                                                style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                                            >
+                                                                {/* Left Column (Logo, Details) */}
+                                                                <div className="flex-1 flex flex-col justify-between p-8 min-w-0">
+                                                                    {/* Logo & Company Info */}
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className="w-14 h-14 bg-slate-100 dark:bg-amber-500/10 rounded-2xl p-1 border border-slate-250 dark:border-amber-500/20 flex items-center justify-center shrink-0">
+                                                                            {companySettings.logo_url ? (
+                                                                                <img src={companySettings.logo_url} className="w-full h-full object-contain filter dark:brightness-110" />
+                                                                            ) : (
+                                                                                <div className="text-2xl font-bold text-[#7A1975] dark:text-amber-500" style={{ fontFamily: "'Museo', sans-serif" }}>RU</div>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="text-[#7A1975] dark:text-amber-500 leading-none min-w-0">
+                                                                            <h2 className="font-bold text-2xl tracking-tight uppercase truncate" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                                                                {companySettings.company_name || "Riara University"}
+                                                                            </h2>
+                                                                            <p className="text-[11px] font-bold text-slate-400 dark:text-amber-500/70 uppercase tracking-widest mt-1">
+                                                                                VEHICLE GATE PASS
+                                                                            </p>
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="text-[#7A1975] dark:text-amber-500 leading-none min-w-0">
-                                                                        <h2 className="font-bold text-2xl tracking-tight uppercase truncate" style={{ fontFamily: "'Museo', sans-serif" }}>
-                                                                            {companySettings.company_name || "Riara University"}
-                                                                        </h2>
-                                                                        <p className="text-[11px] font-bold text-slate-400 dark:text-amber-500/70 uppercase tracking-widest mt-1">
-                                                                            VEHICLE GATE PASS
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
 
-                                                                {/* Large License Plate Badge */}
-                                                                <div className="flex-1 flex flex-col justify-center my-3">
-                                                                    <span className="text-xs font-bold text-slate-400 dark:text-amber-500/60 uppercase tracking-widest mb-1">Plate Number</span>
-                                                                    <div className="flex flex-row items-start gap-4">
-                                                                        {/* Kenyan Horizontal Plate (White) */}
-                                                                        <div className="bg-white border-2 border-slate-900 text-slate-950 px-2 py-1 rounded-lg flex items-center gap-2 shadow-[0_4px_10px_rgba(0,0,0,0.15)] select-none shrink-0 font-mono tracking-widest font-black text-[45px] h-16 border-double">
-                                                                            {/* Kenyan Flag */}
-                                                                            <div className="flex flex-col w-5 h-3 border border-slate-400 rounded-[0.5px] overflow-hidden relative shrink-0">
-                                                                                <div className="bg-black h-1/3 w-full"></div>
-                                                                                <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
-                                                                                <div className="bg-[#006600] h-1/3 w-full"></div>
-                                                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                                                    <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
-                                                                                        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                                    {/* Large License Plate Badge */}
+                                                                    <div className="flex-1 flex flex-col justify-center my-3">
+                                                                        <span className="text-xs font-bold text-slate-400 dark:text-amber-500/60 uppercase tracking-widest mb-1">Plate Number</span>
+                                                                        <div className="flex flex-row items-start gap-4">
+                                                                            {/* Kenyan Horizontal Plate (White) */}
+                                                                            <div className="bg-white border-2 border-slate-900 text-slate-950 px-2 py-1 rounded-lg flex items-center gap-2 shadow-[0_4px_10px_rgba(0,0,0,0.15)] select-none shrink-0 font-mono tracking-widest font-black text-[45px] h-16 border-double">
+                                                                                {/* Kenyan Flag */}
+                                                                                <div className="flex flex-col w-5 h-3 border border-slate-400 rounded-[0.5px] overflow-hidden relative shrink-0">
+                                                                                    <div className="bg-black h-1/3 w-full"></div>
+                                                                                    <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
+                                                                                    <div className="bg-[#006600] h-1/3 w-full"></div>
+                                                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                                                        <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
+                                                                                            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                                                        </div>
                                                                                     </div>
                                                                                 </div>
+                                                                                <span className="text-slate-900 leading-none font-mono font-black tracking-widest">
+                                                                                    {result.plate_number || result.admission_number}
+                                                                                </span>
                                                                             </div>
-                                                                            <span className="text-slate-900 leading-none font-mono font-black tracking-widest">
-                                                                                {result.plate_number || result.admission_number}
-                                                                            </span>
-                                                                        </div>
 
-                                                                        {/* Kenyan Square Plate (Yellow) */}
-                                                                        {(() => {
-                                                                            const { part1, part2 } = splitPlateNumber(result.plate_number || result.admission_number);
-                                                                            return (
-                                                                                <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[160px] h-[155px] rounded-xl pt-2 pb-2 px-2 flex flex-col items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
-                                                                                    {/* Row 1: Flag top-left only */}
-                                                                                    <div className="w-full flex items-start justify-start px-0.5">
-                                                                                        {/* Kenyan Flag */}
-                                                                                        <div className="flex flex-col w-5 h-3 border border-black rounded-[0.5px] overflow-hidden relative shrink-0">
-                                                                                            <div className="bg-black h-1/3 w-full"></div>
-                                                                                            <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
-                                                                                            <div className="bg-[#006600] h-1/3 w-full"></div>
-                                                                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                                                                <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
-                                                                                                    <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                                            {/* Kenyan Square Plate (Yellow) */}
+                                                                            {(() => {
+                                                                                const { part1, part2 } = splitPlateNumber(result.plate_number || result.admission_number);
+                                                                                return (
+                                                                                    <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[160px] h-[155px] rounded-xl pt-2 pb-2 px-2 flex flex-col items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
+                                                                                        {/* Row 1: Flag top-left only */}
+                                                                                        <div className="w-full flex items-start justify-start px-0.5">
+                                                                                            {/* Kenyan Flag */}
+                                                                                            <div className="flex flex-col w-5 h-3 border border-black rounded-[0.5px] overflow-hidden relative shrink-0">
+                                                                                                <div className="bg-black h-1/3 w-full"></div>
+                                                                                                <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
+                                                                                                <div className="bg-[#006600] h-1/3 w-full"></div>
+                                                                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                                                                    <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
+                                                                                                        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                                                                    </div>
                                                                                                 </div>
                                                                                             </div>
                                                                                         </div>
+                                                                                        {/* Row 2: Part 1 (KCU) */}
+                                                                                        <div className="w-full flex justify-center items-center flex-1">
+                                                                                            <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
+                                                                                                {part1}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        {/* Row 3: Part 2 (109S) */}
+                                                                                        <div className="w-full flex justify-center items-center flex-1">
+                                                                                            <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
+                                                                                                {part2}
+                                                                                            </span>
+                                                                                        </div>
                                                                                     </div>
-                                                                                    {/* Row 2: Part 1 (KCU) */}
-                                                                                    <div className="w-full flex justify-center items-center flex-1">
-                                                                                        <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
-                                                                                            {part1}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    {/* Row 3: Part 2 (109S) */}
-                                                                                    <div className="w-full flex justify-center items-center flex-1">
-                                                                                        <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
-                                                                                            {part2}
-                                                                                        </span>
-                                                                                    </div>
+                                                                                );
+                                                                            })()}
+                                                                        </div>
+                                                                        <span className="text-lg font-bold text-slate-700 dark:text-slate-300 mt-2 uppercase tracking-wide">
+                                                                            {result.make || ""} {result.model || "Vehicle"}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {/* Vehicle/Driver info details */}
+                                                                    <div className="space-y-3">
+                                                                        <div className="grid grid-cols-2 gap-x-4 gap-y-3 bg-slate-100/50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs">
+                                                                            <div>
+                                                                                <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">Driver Name</span>
+                                                                                <span className="font-bold text-sm text-slate-850 dark:text-slate-200 truncate block">{result.driver_name || "N/A"}</span>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">Driver Contact</span>
+                                                                                <span className="font-bold text-xs text-slate-700 dark:text-slate-300 truncate block font-mono">{result.driver_contact || "N/A"}</span>
+                                                                            </div>
+                                                                            <div className="col-span-2">
+                                                                                <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">Reason for Visit</span>
+                                                                                <span className="font-bold text-sm text-slate-850 dark:text-slate-200 block break-words whitespace-normal leading-snug">{result.purpose || result.visit_details || "General Visit"}</span>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-555 uppercase tracking-wider">Entry Time</span>
+                                                                                <span className="font-bold text-xs text-amber-600 dark:text-amber-400 block font-mono">
+                                                                                    {result.entry_time ? formatDateTime(result.entry_time) : "Not Logged In"}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div>
+                                                                                <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-555 uppercase tracking-wider">Last Stay Duration</span>
+                                                                                <span className="font-bold text-xs text-slate-700 dark:text-slate-300 block font-mono">
+                                                                                    {result.last_stay_minutes !== undefined && result.last_stay_minutes !== null
+                                                                                        ? formatDuration(result.last_stay_minutes)
+                                                                                        : "No prior checkout"}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Status (Overlapping QR removed) */}
+                                                                        <div className="flex items-center gap-6 pt-1">
+                                                                            <div className="flex flex-col gap-2">
+                                                                                <div className={`px-4 py-1.5 text-white font-bold text-[10px] uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1.5 select-none ${
+                                                                                    result.gate_status === 'In' 
+                                                                                        ? 'bg-[#22C55E] shadow-[#22C55E]/20' 
+                                                                                        : 'bg-amber-600 shadow-amber-600/20'
+                                                                                }`}>
+                                                                                    <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
+                                                                                    {result.gate_status === 'In' ? 'Checked In' : 'Checked Out'}
                                                                                 </div>
-                                                                            );
-                                                                        })()}
-                                                                    </div>
-                                                                    <span className="text-lg font-bold text-slate-700 dark:text-slate-300 mt-2 uppercase tracking-wide">
-                                                                        {result.make || ""} {result.model || "Vehicle"}
-                                                                    </span>
-                                                                </div>
-
-                                                                {/* Vehicle/Driver info details */}
-                                                                <div className="space-y-3">
-                                                                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 bg-slate-100/50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs">
-                                                                        <div>
-                                                                            <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Driver Name</span>
-                                                                            <span className="font-bold text-sm text-slate-850 dark:text-slate-200 truncate block">{result.driver_name || "N/A"}</span>
-                                                                        </div>
-                                                                        <div>
-                                                                            <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Driver Contact</span>
-                                                                            <span className="font-bold text-xs text-slate-700 dark:text-slate-300 truncate block font-mono">{result.driver_contact || "N/A"}</span>
-                                                                        </div>
-                                                                        <div className="col-span-2">
-                                                                            <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Reason for Visit</span>
-                                                                            <span className="font-bold text-sm text-slate-850 dark:text-slate-200 block break-words whitespace-normal leading-snug">{result.purpose || result.visit_details || "General Visit"}</span>
-                                                                        </div>
-                                                                        <div>
-                                                                            <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Entry Time</span>
-                                                                            <span className="font-bold text-xs text-amber-600 dark:text-amber-400 block font-mono">
-                                                                                {result.entry_time ? formatDateTime(result.entry_time) : "Not Logged In"}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div>
-                                                                            <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Last Stay Duration</span>
-                                                                            <span className="font-bold text-xs text-slate-700 dark:text-slate-300 block font-mono">
-                                                                                {result.last_stay_minutes !== undefined && result.last_stay_minutes !== null
-                                                                                    ? formatDuration(result.last_stay_minutes)
-                                                                                    : "No prior checkout"}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {/* QR Code & Status */}
-                                                                    <div className="flex items-center gap-6 pt-1">
-                                                                        <div className="p-1.5 bg-white rounded-2xl border border-slate-250 dark:border-slate-800 shadow-sm shrink-0">
-                                                                            <QRCodeSVG value={result.admission_number} size={80} level="H" />
-                                                                        </div>
-                                                                        <div className="flex flex-col gap-2">
-                                                                            <div className={`px-4 py-1.5 text-white font-bold text-[10px] uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1.5 select-none ${
-                                                                                result.gate_status === 'In' 
-                                                                                    ? 'bg-[#22C55E] shadow-[#22C55E]/20' 
-                                                                                    : 'bg-amber-600 shadow-amber-600/20'
-                                                                            }`}>
-                                                                                <div className="w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
-                                                                                {result.gate_status === 'In' ? 'Checked In' : 'Checked Out'}
                                                                             </div>
                                                                         </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
 
-                                                            {/* Center-Right Column (Illustration / Meta) */}
-                                                            <div className="w-[300px] border-l border-slate-200 dark:border-slate-800 bg-slate-100/20 dark:bg-slate-900/40 flex flex-col h-full shrink-0">
-                                                                <div className="w-full h-[330px] flex flex-col items-center justify-center relative border-b border-slate-200 dark:border-slate-800 p-6 bg-slate-50/20 dark:bg-slate-950/40">
-                                                                    <div className="w-40 h-40 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center p-3 shadow-md mb-4">
-                                                                        {companySettings.logo_url ? (
-                                                                            <img src={companySettings.logo_url} className="w-full h-full object-contain" />
-                                                                        ) : (
-                                                                            <div className="text-4xl font-bold text-[#7A1975] dark:text-amber-500" style={{ fontFamily: "'Museo', sans-serif" }}>RU</div>
-                                                                        )}
+                                                                {/* Center-Right Column (Illustration / Meta) */}
+                                                                <div className="w-[300px] border-l border-slate-200 dark:border-slate-800 bg-slate-100/20 dark:bg-slate-900/40 flex flex-col h-full shrink-0">
+                                                                    <div className="w-full h-[330px] flex flex-col items-center justify-center relative border-b border-slate-200 dark:border-slate-800 p-6 bg-slate-50/20 dark:bg-slate-950/40">
+                                                                        <div className="w-40 h-40 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center p-3 shadow-md mb-4 select-none">
+                                                                            <QRCodeSVG value={result.plate_number || result.admission_number || 'N/A'} size={130} level="H" />
+                                                                        </div>
+                                                                        <div className="text-center">
+                                                                            <span className="px-3 py-1 bg-slate-250 dark:bg-amber-500/10 text-slate-700 dark:text-amber-400 border border-slate-300 dark:border-amber-500/20 rounded-full text-[11px] font-bold uppercase tracking-widest">
+                                                                                {result.vehicle_type || "VEHICLE"}
+                                                                            </span>
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="text-center">
-                                                                        <span className="px-3 py-1 bg-slate-250 dark:bg-amber-500/10 text-slate-700 dark:text-amber-400 border border-slate-300 dark:border-amber-500/20 rounded-full text-[11px] font-bold uppercase tracking-widest">
-                                                                            {result.vehicle_type || "VEHICLE"}
-                                                                        </span>
+
+                                                                    {/* Technical Details */}
+                                                                    <div className="flex-1 p-6 flex flex-col justify-center text-xs space-y-2.5">
+                                                                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-800/60 pb-1.5">
+                                                                            <span className="text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">VEHICLE TYPE:</span>
+                                                                            <span className="font-extrabold text-slate-700 dark:text-slate-200 uppercase">{result.vehicle_type || "N/A"}</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-800/60 pb-1.5">
+                                                                            <span className="text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">COLOR:</span>
+                                                                            <span className="font-extrabold text-slate-700 dark:text-slate-200 uppercase">{result.color || "N/A"}</span>
+                                                                        </div>
+                                                                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-800/60 pb-1.5">
+                                                                            <span className="text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">PASSENGERS:</span>
+                                                                            <span className="font-extrabold text-slate-700 dark:text-slate-200 font-mono">{result.passengers || "1"}</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
 
-                                                                {/* Technical Details */}
-                                                                <div className="flex-1 p-6 flex flex-col justify-center text-xs space-y-2.5">
-                                                                    <div className="flex justify-between border-b border-slate-200 dark:border-slate-800/60 pb-1.5">
-                                                                        <span className="text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">VEHICLE TYPE:</span>
-                                                                        <span className="font-extrabold text-slate-700 dark:text-slate-200 uppercase">{result.vehicle_type || "N/A"}</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between border-b border-slate-200 dark:border-slate-800/60 pb-1.5">
-                                                                        <span className="text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">COLOR:</span>
-                                                                        <span className="font-extrabold text-slate-700 dark:text-slate-200 uppercase">{result.color || "N/A"}</span>
-                                                                    </div>
-                                                                    <div className="flex justify-between border-b border-slate-200 dark:border-slate-800/60 pb-1.5">
-                                                                        <span className="text-slate-400 dark:text-slate-550 font-bold uppercase tracking-wider">PASSENGERS:</span>
-                                                                        <span className="font-extrabold text-slate-700 dark:text-slate-200 font-mono">{result.passengers || "1"}</span>
-                                                                    </div>
+                                                                {/* Right-most Vertical Bar */}
+                                                                <div className={`w-[80px] ${stripBgClass} flex items-center justify-center relative select-none shrink-0`}>
+                                                                    <span className="text-white dark:text-slate-950 text-[26px] font-black tracking-[0.25em] uppercase absolute transform -rotate-90 whitespace-nowrap" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                                                        VEHICLE PASS
+                                                                    </span>
                                                                 </div>
                                                             </div>
 
-                                                            {/* Right-most Vertical Bar */}
-                                                            <div className="w-[80px] bg-gradient-to-b from-[#7A1975] to-[#9C27B0] dark:from-amber-500 dark:to-yellow-600 flex items-center justify-center relative select-none shrink-0">
-                                                                <span className="text-white dark:text-slate-950 text-[26px] font-black tracking-[0.25em] uppercase absolute transform -rotate-90 whitespace-nowrap" style={{ fontFamily: "'Museo', sans-serif" }}>
-                                                                    VEHICLE PASS
-                                                                </span>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Back Side - Vehicle Pass Template */}
-                                                        <div 
-                                                            className="absolute inset-0 backface-hidden rotate-y-180 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 border-slate-200 dark:border-amber-500/50 flex flex-col justify-between py-8"
-                                                            style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
-                                                        >
-                                                            <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-[#7A1975] to-[#9C27B0] dark:from-amber-500 dark:to-yellow-600"></div>
-                                                            
-                                                            <div className="text-center px-4 mt-6">
-                                                                <h2 className="text-[#7A1975] dark:text-amber-500 font-bold tracking-[0.2em] text-2xl uppercase" style={{ fontFamily: "'Museo', sans-serif" }}>Vehicle Authorization</h2>
-                                                                <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mt-1">Verify Plate & Driver Details at Gate</p>
-                                                            </div>
-                                                            
-                                                            <div className="flex justify-center my-4">
-                                                                <div className="p-3 bg-white rounded-[2rem] shadow-2xl border border-slate-250 dark:border-slate-800">
-                                                                    <QRCodeSVG value={result.admission_number} size={180} level="H" />
+                                                            {/* Back Side - Vehicle Pass Template */}
+                                                            <div 
+                                                                className={`absolute inset-0 backface-hidden rotate-y-180 ${cardBgClass} text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 flex flex-col justify-between py-8`}
+                                                                style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                                            >
+                                                                <div className={`absolute top-0 left-0 w-full h-3 ${stripBgClass}`}></div>
+                                                                
+                                                                <div className="text-center px-4 mt-6">
+                                                                    <h2 className="text-[#7A1975] dark:text-amber-500 font-bold tracking-[0.2em] text-2xl uppercase" style={{ fontFamily: "'Museo', sans-serif" }}>Vehicle Authorization</h2>
+                                                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mt-1">Verify Plate & Driver Details at Gate</p>
                                                                 </div>
+                                                                
+                                                                <div className="flex justify-center my-4">
+                                                                    <div className="p-3 bg-white rounded-[2rem] shadow-2xl border border-slate-250 dark:border-slate-800">
+                                                                        <QRCodeSVG value={result.admission_number} size={180} level="H" />
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                <div className="text-center px-8 mb-6">
+                                                                    <p className="mt-2 font-mono font-bold text-3xl text-[#7A1975] dark:text-amber-500 tracking-[0.15em]">{result.admission_number}</p>
+                                                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase leading-relaxed max-w-md mx-auto mt-3">
+                                                                        This vehicle pass must be clearly verified upon entry and exit. Unauthorized vehicles will be clamped. Property of the University Security.
+                                                                    </p>
+                                                                </div>
+                                                                
+                                                                <div className={`absolute bottom-0 left-0 w-full h-3 ${stripBgClass}`}></div>
                                                             </div>
-                                                            
-                                                            <div className="text-center px-8 mb-6">
-                                                                <p className="mt-2 font-mono font-bold text-3xl text-[#7A1975] dark:text-amber-500 tracking-[0.15em]">{result.admission_number}</p>
-                                                                <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase leading-relaxed max-w-md mx-auto mt-3">
-                                                                    This vehicle pass must be clearly verified upon entry and exit. Unauthorized vehicles will be clamped. Property of the University Security.
-                                                                </p>
-                                                            </div>
-                                                            
-                                                            <div className="absolute bottom-0 left-0 w-full h-3 bg-gradient-to-r from-[#7A1975] to-[#9C27B0] dark:from-amber-500 dark:to-yellow-600"></div>
-                                                        </div>
-                                                    </>
-                                                ) : (result.found_in_visitor_logs || result.found_in_event_visitors) ? (
+                                                        </>
+                                                    );
+                                                })() : (result.found_in_visitor_logs || result.found_in_event_visitors) ? (
                                                     <>
                                                         {/* Front Side - Visitor Pass Template */}
                                                         <div 
-                                                            className="absolute inset-0 backface-hidden bg-emerald-50/50 dark:bg-teal-950 text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 border-emerald-100 dark:border-teal-500/50 flex flex-row transition-transform hover:scale-[1.005]"
+                                                            className="absolute inset-0 backface-hidden bg-green-500/10 dark:bg-green-950/20 text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 border-green-300 dark:border-green-800 flex flex-row transition-transform hover:scale-[1.005]"
                                                             style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                                         >
                                                             {/* Left Column (Logo, Details) */}
@@ -1497,11 +1499,8 @@ export default function StudentVerification() {
                                                                         </div>
                                                                     </div>
 
-                                                                    {/* QR Code & Status */}
+                                                                    {/* Status (Overlapping QR removed) */}
                                                                     <div className="flex items-center gap-6 pt-1">
-                                                                        <div className="p-1.5 bg-white rounded-2xl border border-slate-250 dark:border-teal-800 shadow-sm shrink-0">
-                                                                            <QRCodeSVG value={result.admission_number} size={80} level="H" />
-                                                                        </div>
                                                                         <div className="flex flex-col gap-2">
                                                                             <div className={`px-4 py-1.5 text-white font-bold text-[10px] uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1.5 select-none ${
                                                                                 result.gate_status === 'In' 
@@ -1574,8 +1573,8 @@ export default function StudentVerification() {
                                                             </div>
 
                                                             {/* Right-most Vertical Bar */}
-                                                            <div className="w-[80px] bg-gradient-to-b from-[#7A1975] to-[#9C27B0] dark:from-teal-500 dark:to-emerald-600 flex items-center justify-center relative select-none shrink-0">
-                                                                <span className="text-white dark:text-teal-950 text-[26px] font-black tracking-[0.25em] uppercase absolute transform -rotate-90 whitespace-nowrap" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                                            <div className="w-[80px] bg-green-600 dark:bg-green-700 flex items-center justify-center relative select-none shrink-0">
+                                                                <span className="text-white dark:text-slate-950 text-[26px] font-black tracking-[0.25em] uppercase absolute transform -rotate-90 whitespace-nowrap" style={{ fontFamily: "'Museo', sans-serif" }}>
                                                                     VISITOR PASS
                                                                 </span>
                                                             </div>
@@ -1583,10 +1582,10 @@ export default function StudentVerification() {
 
                                                         {/* Back Side - Visitor Pass Template */}
                                                         <div 
-                                                            className="absolute inset-0 backface-hidden rotate-y-180 bg-slate-50 dark:bg-teal-950 text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 border-slate-200 dark:border-teal-500/50 flex flex-col justify-between py-8"
+                                                            className="absolute inset-0 backface-hidden rotate-y-180 bg-green-500/10 dark:bg-green-950/20 text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 border-green-300 dark:border-green-800 flex flex-col justify-between py-8"
                                                             style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                                         >
-                                                            <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-[#7A1975] to-[#9C27B0] dark:from-teal-500 dark:to-emerald-600"></div>
+                                                            <div className="absolute top-0 left-0 w-full h-3 bg-green-600 dark:bg-green-700"></div>
                                                             
                                                             <div className="text-center px-4 mt-6">
                                                                 <h2 className="text-[#7A1975] dark:text-teal-400 font-bold tracking-[0.2em] text-2xl uppercase" style={{ fontFamily: "'Museo', sans-serif" }}>Visitor Access Pass</h2>
@@ -1606,7 +1605,7 @@ export default function StudentVerification() {
                                                                 </p>
                                                             </div>
                                                             
-                                                            <div className="absolute bottom-0 left-0 w-full h-3 bg-gradient-to-r from-[#7A1975] to-[#9C27B0] dark:from-teal-500 dark:to-emerald-600"></div>
+                                                            <div className="absolute bottom-0 left-0 w-full h-3 bg-green-600 dark:bg-green-700"></div>
                                                         </div>
                                                     </>
                                                 ) : (
@@ -1876,226 +1875,224 @@ export default function StudentVerification() {
 
                     return (
                         <div className="fixed -left-[5000px] top-0">
-                            {result.found_in_vehicles ? (
-                                <>
-                                    {/* Printable Front Side - Vehicle */}
-                                    <div 
-                                        id={`printable-front-${result.id}`} 
-                                        className="w-[1011px] h-[638px] bg-slate-50 text-slate-800 border-2 border-slate-205 rounded-[48px] relative overflow-hidden select-none"
-                                        style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
-                                    >
-                                         {/* Left Column */}
-                                         <div className="absolute left-[45px] top-[42px] bottom-[42px] w-[430px] flex flex-col justify-between">
-                                             {/* Logo & School Name */}
-                                             <div className="flex items-center gap-4">
-                                                 {companySettings.logo_url ? (
-                                                     <img src={companySettings.logo_url} className="h-28 w-auto max-w-[400px] object-contain" />
-                                                 ) : (
-                                                     <>
-                                                         <div className="w-24 h-24 rounded-2xl bg-slate-100 flex items-center justify-center text-[#7A1975] font-bold text-3xl shrink-0 border border-slate-250">
-                                                             RU
-                                                         </div>
-                                                         <div className="flex flex-col leading-[1.1] overflow-hidden">
-                                                             <span className="text-[28px] font-bold text-[#7A1975] uppercase tracking-wide leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>
-                                                                 {companySettings.company_name || "Riara University"}
-                                                             </span>
-                                                             <span className="text-[16px] font-bold text-slate-450 uppercase tracking-widest mt-2">
-                                                                 VEHICLE GATE PASS
-                                                             </span>
-                                                         </div>
-                                                     </>
-                                                 )}
-                                             </div>
+                            {result.found_in_vehicles ? (() => {
+                                const isVisitor = result.vehicle_type?.toLowerCase() === 'visitor' || result.role?.toLowerCase() === 'visitor' || result.role?.toLowerCase() === 'guest';
+                                const cardBgClass = isVisitor 
+                                    ? 'bg-green-500/10 border-green-300' 
+                                    : 'bg-yellow-500/10 border-yellow-300';
+                                const stripBgClass = isVisitor
+                                    ? 'bg-green-600'
+                                    : 'bg-yellow-500';
+                                return (
+                                    <>
+                                        {/* Printable Front Side - Vehicle */}
+                                        <div 
+                                            id={`printable-front-${result.id}`} 
+                                            className={`w-[1011px] h-[638px] ${cardBgClass} text-slate-800 border-2 rounded-[48px] relative overflow-hidden select-none`}
+                                            style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                        >
+                                             {/* Left Column */}
+                                             <div className="absolute left-[45px] top-[42px] bottom-[42px] w-[430px] flex flex-col justify-between">
+                                                 {/* Logo & School Name */}
+                                                 <div className="flex items-center gap-4">
+                                                     {companySettings.logo_url ? (
+                                                         <img src={companySettings.logo_url} className="h-28 w-auto max-w-[400px] object-contain" />
+                                                     ) : (
+                                                         <>
+                                                             <div className="w-24 h-24 rounded-2xl bg-slate-100 flex items-center justify-center text-[#7A1975] font-bold text-3xl shrink-0 border border-slate-250">
+                                                                 RU
+                                                             </div>
+                                                             <div className="flex flex-col leading-[1.1] overflow-hidden">
+                                                                 <span className="text-[28px] font-bold text-[#7A1975] uppercase tracking-wide leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                                                     {companySettings.company_name || "Riara University"}
+                                                                 </span>
+                                                                 <span className="text-[16px] font-bold text-slate-455 uppercase tracking-widest mt-2">
+                                                                     VEHICLE GATE PASS
+                                                                 </span>
+                                                             </div>
+                                                         </>
+                                                     )}
+                                                 </div>
 
-                                             {/* Plate Number */}
-                                             <div className="flex flex-col mt-4 space-y-1">
-                                                 <span className="text-xs font-bold text-slate-450 uppercase tracking-widest">Plate Number</span>
-                                                 <div className="flex flex-row items-start gap-4">
-                                                     {/* Kenyan Horizontal Plate (White) */}
-                                                     <div className="bg-white border-2 border-slate-900 text-slate-950 px-2 py-1 rounded-lg flex items-center gap-2 shadow-md select-none shrink-0 font-mono tracking-widest font-black text-[45px] h-16 border-double">
-                                                         {/* Kenyan Flag */}
-                                                         <div className="flex flex-col w-5 h-3 border border-slate-400 rounded-[0.5px] overflow-hidden relative shrink-0">
-                                                             <div className="bg-black h-1/3 w-full"></div>
-                                                             <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
-                                                             <div className="bg-[#006600] h-1/3 w-full"></div>
-                                                             <div className="absolute inset-0 flex items-center justify-center">
-                                                                 <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
-                                                                     <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                 {/* Plate Number */}
+                                                 <div className="flex flex-col mt-4 space-y-1">
+                                                     <span className="text-xs font-bold text-slate-455 uppercase tracking-widest">Plate Number</span>
+                                                     <div className="flex flex-row items-start gap-4">
+                                                         {/* Kenyan Horizontal Plate (White) */}
+                                                         <div className="bg-white border-2 border-slate-900 text-slate-950 px-2 py-1 rounded-lg flex items-center gap-2 shadow-md select-none shrink-0 font-mono tracking-widest font-black text-[45px] h-16 border-double">
+                                                             {/* Kenyan Flag */}
+                                                             <div className="flex flex-col w-5 h-3 border border-slate-400 rounded-[0.5px] overflow-hidden relative shrink-0">
+                                                                 <div className="bg-black h-1/3 w-full"></div>
+                                                                 <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
+                                                                 <div className="bg-[#006600] h-1/3 w-full"></div>
+                                                                 <div className="absolute inset-0 flex items-center justify-center">
+                                                                     <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
+                                                                         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                                     </div>
                                                                  </div>
                                                              </div>
+                                                             <span className="text-slate-900 leading-none font-mono font-black tracking-widest">
+                                                                 {result.plate_number || result.admission_number}
+                                                             </span>
                                                          </div>
-                                                         <span className="text-slate-900 leading-none font-mono font-black tracking-widest">
-                                                             {result.plate_number || result.admission_number}
-                                                         </span>
-                                                     </div>
 
-                                                     {/* Kenyan Square Plate (Yellow) */}
-                                                     {(() => {
-                                                         const { part1, part2 } = splitPlateNumber(result.plate_number || result.admission_number);
-                                                         return (
-                                                             <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[160px] h-[155px] rounded-xl pt-2 pb-2 px-2 flex flex-col items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
-                                                                 {/* Row 1: Flag top-left only */}
-                                                                 <div className="w-full flex items-start justify-start px-0.5">
-                                                                     {/* Kenyan Flag */}
-                                                                     <div className="flex flex-col w-5 h-3 border border-black rounded-[0.5px] overflow-hidden relative shrink-0">
-                                                                         <div className="bg-black h-1/3 w-full"></div>
-                                                                         <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
-                                                                         <div className="bg-[#006600] h-1/3 w-full"></div>
-                                                                         <div className="absolute inset-0 flex items-center justify-center">
-                                                                             <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
-                                                                                 <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                         {/* Kenyan Square Plate (Yellow) */}
+                                                         {(() => {
+                                                             const { part1, part2 } = splitPlateNumber(result.plate_number || result.admission_number);
+                                                             return (
+                                                                 <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[160px] h-[155px] rounded-xl pt-2 pb-2 px-2 flex flex-col items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
+                                                                     {/* Row 1: Flag top-left only */}
+                                                                     <div className="w-full flex items-start justify-start px-0.5">
+                                                                         {/* Kenyan Flag */}
+                                                                         <div className="flex flex-col w-5 h-3 border border-black rounded-[0.5px] overflow-hidden relative shrink-0">
+                                                                             <div className="bg-black h-1/3 w-full"></div>
+                                                                             <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
+                                                                             <div className="bg-[#006600] h-1/3 w-full"></div>
+                                                                             <div className="absolute inset-0 flex items-center justify-center">
+                                                                                 <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
+                                                                                     <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                                                 </div>
                                                                              </div>
                                                                          </div>
                                                                      </div>
+                                                                     {/* Row 2: Part 1 (KCU) */}
+                                                                     <div className="w-full flex justify-center items-center flex-1">
+                                                                         <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
+                                                                             {part1}
+                                                                         </span>
+                                                                     </div>
+                                                                     {/* Row 3: Part 2 (109S) */}
+                                                                     <div className="w-full flex justify-center items-center flex-1">
+                                                                         <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
+                                                                             {part2}
+                                                                         </span>
+                                                                     </div>
                                                                  </div>
-                                                                 {/* Row 2: Part 1 (KCU) */}
-                                                                 <div className="w-full flex justify-center items-center flex-1">
-                                                                     <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
-                                                                         {part1}
-                                                                     </span>
-                                                                 </div>
-                                                                 {/* Row 3: Part 2 (109S) */}
-                                                                 <div className="w-full flex justify-center items-center flex-1">
-                                                                     <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
-                                                                         {part2}
-                                                                     </span>
-                                                                 </div>
-                                                             </div>
-                                                         );
-                                                     })()}
+                                                             );
+                                                         })()}
+                                                     </div>
+                                                     <span className="text-2xl font-bold text-slate-700 mt-2 uppercase tracking-wide block font-sans">
+                                                         {result.make || ""} {result.model || "Vehicle"}
+                                                     </span>
                                                  </div>
-                                                 <span className="text-2xl font-bold text-slate-700 mt-2 uppercase tracking-wide block font-sans">
-                                                     {result.make || ""} {result.model || "Vehicle"}
+
+                                                 {/* Info Box */}
+                                                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 bg-slate-100/50 p-4 rounded-2xl border border-slate-200 text-xs">
+                                                     <div>
+                                                         <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Driver Name</span>
+                                                         <span className="font-bold text-sm text-slate-850 truncate block">{result.driver_name || "N/A"}</span>
+                                                     </div>
+                                                     <div>
+                                                         <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Driver Contact</span>
+                                                         <span className="font-bold text-xs text-slate-700 truncate block font-mono">{result.driver_contact || "N/A"}</span>
+                                                     </div>
+                                                     <div className="col-span-2">
+                                                         <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Reason for Visit</span>
+                                                         <span className="font-bold text-sm text-slate-850 block break-words whitespace-normal leading-snug">{result.purpose || result.visit_details || "General Visit"}</span>
+                                                     </div>
+                                                     <div>
+                                                         <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Entry Time</span>
+                                                         <span className="font-bold text-xs text-amber-600 block font-mono">
+                                                             {result.entry_time ? formatDateTime(result.entry_time) : "Not Logged In"}
+                                                         </span>
+                                                     </div>
+                                                     <div>
+                                                         <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Last Stay Duration</span>
+                                                         <span className="font-bold text-xs text-slate-700 block font-mono">
+                                                             {result.last_stay_minutes !== undefined && result.last_stay_minutes !== null
+                                                                 ? formatDuration(result.last_stay_minutes)
+                                                                 : "No prior checkout"}
+                                                         </span>
+                                                     </div>
+                                                 </div>
+                                             </div>
+
+                                             {/* Center-Right Column */}
+                                             <div className="absolute left-[490px] top-0 bottom-0 w-[385px] flex flex-col border-l border-slate-200 bg-slate-50/50">
+                                                 {/* Icon / Vehicle QR Code */}
+                                                 <div className="w-full h-[438px] flex flex-col items-center justify-center relative border-b border-slate-200 p-6">
+                                                     <div className="w-52 h-52 rounded-3xl bg-white border-2 border-slate-200 flex items-center justify-center p-3 shadow-xl mb-3">
+                                                         <QRCodeSVG
+                                                             value={result.plate_number || result.admission_number || 'N/A'}
+                                                             size={180}
+                                                             level="H"
+                                                             includeMargin={false}
+                                                         />
+                                                     </div>
+                                                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Scan to Verify</span>
+                                                     <span className="text-base font-black text-slate-700 tracking-widest font-mono mt-0.5">
+                                                         {result.plate_number || result.admission_number}
+                                                     </span>
+                                                     <div className="mt-2">
+                                                         <span className="px-4 py-1.5 bg-slate-200 text-slate-700 border border-slate-300 rounded-full text-[13px] font-bold uppercase tracking-widest">
+                                                             {result.vehicle_type || "VEHICLE"}
+                                                         </span>
+                                                     </div>
+                                                 </div>
+
+                                                 {/* Details Section */}
+                                                 <div className="flex-1 p-6 flex flex-col justify-center text-sm space-y-3">
+                                                     <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                                                         <span className="text-slate-455 font-bold uppercase tracking-wider">VEHICLE TYPE:</span>
+                                                         <span className="font-extrabold text-slate-700 uppercase">{result.vehicle_type || "N/A"}</span>
+                                                     </div>
+                                                     <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                                                         <span className="text-slate-455 font-bold uppercase tracking-wider">COLOR:</span>
+                                                         <span className="font-extrabold text-slate-700 uppercase">{result.color || "N/A"}</span>
+                                                     </div>
+                                                     <div className="flex justify-between border-b border-slate-200 pb-1.5">
+                                                         <span className="text-slate-455 font-bold uppercase tracking-wider">PASSENGERS:</span>
+                                                         <span className="font-extrabold text-slate-700 font-mono">{result.passengers || "1"}</span>
+                                                     </div>
+                                                 </div>
+                                             </div>
+
+                                             {/* Right-most Column */}
+                                             <div className={`absolute right-0 top-0 bottom-0 w-[135px] ${stripBgClass} flex items-center justify-center select-none`}>
+                                                 <span className="text-white text-[48px] font-black uppercase absolute transform -rotate-90 whitespace-nowrap tracking-[0.25em]" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                                     VEHICLE
                                                  </span>
                                              </div>
+                                        </div>
 
-                                             {/* Info Box */}
-                                             <div className="grid grid-cols-2 gap-x-4 gap-y-3 bg-slate-100/50 p-4 rounded-2xl border border-slate-200 text-xs">
-                                                 <div>
-                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Driver Name</span>
-                                                     <span className="font-bold text-sm text-slate-850 truncate block">{result.driver_name || "N/A"}</span>
-                                                 </div>
-                                                 <div>
-                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Driver Contact</span>
-                                                     <span className="font-bold text-xs text-slate-700 truncate block font-mono">{result.driver_contact || "N/A"}</span>
-                                                 </div>
-                                                 <div className="col-span-2">
-                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Reason for Visit</span>
-                                                     <span className="font-bold text-sm text-slate-850 block break-words whitespace-normal leading-snug">{result.purpose || result.visit_details || "General Visit"}</span>
-                                                 </div>
-                                                 <div>
-                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Entry Time</span>
-                                                     <span className="font-bold text-xs text-amber-600 block font-mono">
-                                                         {result.entry_time ? formatDateTime(result.entry_time) : "Not Logged In"}
-                                                     </span>
-                                                 </div>
-                                                 <div>
-                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Last Stay Duration</span>
-                                                     <span className="font-bold text-xs text-slate-700 block font-mono">
-                                                         {result.last_stay_minutes !== undefined && result.last_stay_minutes !== null
-                                                             ? formatDuration(result.last_stay_minutes)
-                                                             : "No prior checkout"}
-                                                     </span>
-                                                 </div>
+                                        {/* Printable Back Side - Vehicle */}
+                                        <div 
+                                            id={`printable-back-${result.id}`} 
+                                            className={`w-[1011px] h-[638px] ${cardBgClass} text-slate-800 border-2 rounded-[48px] relative overflow-hidden flex flex-col items-center justify-between py-10`}
+                                            style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                        >
+                                             <div className={`absolute top-0 left-0 w-full h-[18px] ${stripBgClass}`}></div>
+                                             
+                                             <div className="text-center px-12 mt-2">
+                                                 <h4 className="text-[36px] font-bold text-[#7A1975] uppercase tracking-wider leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>Vehicle Authorization</h4>
+                                                 <p className="text-[20px] text-slate-500 font-bold uppercase tracking-wide mt-2 leading-none">Verify Plate & Driver Details at Gate</p>
                                              </div>
 
-                                             {/* QR Code */}
-                                             <div className="mt-3 flex items-end">
-                                                 <div className="p-1.5 bg-white border border-slate-200 rounded-[20px] shadow-sm shrink-0">
-                                                     <QRCodeSVG 
-                                                         value={result.admission_number} 
-                                                         size={110} 
-                                                         level="H"
-                                                     />
-                                                 </div>
-                                             </div>
-                                         </div>
-
-                                         {/* Center-Right Column */}
-                                         <div className="absolute left-[490px] top-0 bottom-0 w-[385px] flex flex-col border-l border-slate-200 bg-slate-50/50">
-                                             {/* Icon / Vehicle QR Code */}
-                                             <div className="w-full h-[438px] flex flex-col items-center justify-center relative border-b border-slate-200 p-6">
-                                                 <div className="w-52 h-52 rounded-3xl bg-white border-2 border-slate-200 flex items-center justify-center p-3 shadow-xl mb-3">
-                                                     <QRCodeSVG
-                                                         value={result.plate_number || result.admission_number || 'N/A'}
-                                                         size={180}
-                                                         level="H"
-                                                         includeMargin={false}
-                                                     />
-                                                 </div>
-                                                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Scan to Verify</span>
-                                                 <span className="text-base font-black text-slate-700 tracking-widest font-mono mt-0.5">
-                                                     {result.plate_number || result.admission_number}
-                                                 </span>
-                                                 <div className="mt-2">
-                                                     <span className="px-4 py-1.5 bg-slate-200 text-slate-700 border border-slate-300 rounded-full text-[13px] font-bold uppercase tracking-widest">
-                                                         {result.vehicle_type || "VEHICLE"}
-                                                     </span>
-                                                 </div>
+                                             <div className="p-2.5 bg-white border border-slate-200 shadow-sm rounded-[24px] flex items-center justify-center my-2">
+                                                 <QRCodeSVG 
+                                                     value={result.admission_number} 
+                                                     size={200} 
+                                                     level="H"
+                                                 />
                                              </div>
 
-                                             {/* Details Section */}
-                                             <div className="flex-1 p-6 flex flex-col justify-center text-sm space-y-3">
-                                                 <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                                                     <span className="text-slate-450 font-bold uppercase tracking-wider">VEHICLE TYPE:</span>
-                                                     <span className="font-extrabold text-slate-700 uppercase">{result.vehicle_type || "N/A"}</span>
-                                                 </div>
-                                                 <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                                                     <span className="text-slate-450 font-bold uppercase tracking-wider">COLOR:</span>
-                                                     <span className="font-extrabold text-slate-700 uppercase">{result.color || "N/A"}</span>
-                                                 </div>
-                                                 <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                                                     <span className="text-slate-450 font-bold uppercase tracking-wider">PASSENGERS:</span>
-                                                     <span className="font-extrabold text-slate-700 font-mono">{result.passengers || "1"}</span>
-                                                 </div>
+                                             <div className="text-center px-16 mb-2">
+                                                 <p className="text-[34px] font-mono font-bold text-[#7A1975] tracking-wide leading-none">{result.admission_number}</p>
+                                                 <p className="text-[18px] text-slate-500 mt-3.5 font-bold uppercase leading-relaxed px-6">
+                                                     This vehicle pass must be clearly verified upon entry and exit. Unauthorized vehicles will be clamped. Property of the University Security.
+                                                 </p>
                                              </div>
-                                         </div>
-
-                                         {/* Right-most Column */}
-                                         <div className="absolute right-0 top-0 bottom-0 w-[135px] bg-gradient-to-b from-[#7A1975] to-[#9C27B0] flex items-center justify-center select-none">
-                                             <span className="text-white text-[48px] font-black uppercase absolute transform -rotate-90 whitespace-nowrap tracking-[0.25em]" style={{ fontFamily: "'Museo', sans-serif" }}>
-                                                 VEHICLE
-                                             </span>
-                                         </div>
-                                    </div>
-
-                                    {/* Printable Back Side - Vehicle */}
-                                    <div 
-                                        id={`printable-back-${result.id}`} 
-                                        className="w-[1011px] h-[638px] bg-slate-50 text-slate-800 border-2 border-slate-200 rounded-[48px] relative overflow-hidden flex flex-col items-center justify-between py-10"
-                                        style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
-                                    >
-                                         <div className="absolute top-0 left-0 w-full h-[18px] bg-gradient-to-r from-[#7A1975] to-[#9C27B0]"></div>
-                                         
-                                         <div className="text-center px-12 mt-2">
-                                             <h4 className="text-[36px] font-bold text-[#7A1975] uppercase tracking-wider leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>Vehicle Authorization</h4>
-                                             <p className="text-[20px] text-slate-500 font-bold uppercase tracking-wide mt-2 leading-none">Verify Plate & Driver Details at Gate</p>
-                                         </div>
-
-                                         <div className="p-2.5 bg-white border border-slate-200 shadow-sm rounded-[24px] flex items-center justify-center my-2">
-                                             <QRCodeSVG 
-                                                 value={result.admission_number} 
-                                                 size={200} 
-                                                 level="H"
-                                             />
-                                         </div>
-
-                                         <div className="text-center px-16 mb-2">
-                                             <p className="text-[34px] font-mono font-bold text-[#7A1975] tracking-wide leading-none">{result.admission_number}</p>
-                                             <p className="text-[18px] text-slate-500 mt-3.5 font-bold uppercase leading-relaxed px-6">
-                                                 This vehicle pass must be clearly verified upon entry and exit. Unauthorized vehicles will be clamped. Property of the University Security.
-                                             </p>
-                                         </div>
-                                         
-                                         <div className="absolute bottom-0 left-0 w-full h-[18px] bg-gradient-to-r from-[#7A1975] to-[#9C27B0]"></div>
-                                    </div>
-                                </>
-                            ) : (result.found_in_visitor_logs || result.found_in_event_visitors) ? (
+                                             
+                                             <div className={`absolute bottom-0 left-0 w-full h-[18px] ${stripBgClass}`}></div>
+                                        </div>
+                                    </>
+                                );
+                            })() : (result.found_in_visitor_logs || result.found_in_event_visitors) ? (
                                 <>
                                     {/* Printable Front Side - Visitor */}
                                     <div 
                                         id={`printable-front-${result.id}`} 
-                                        className="w-[1011px] h-[638px] bg-slate-50 text-slate-800 border-2 border-slate-200 rounded-[48px] relative overflow-hidden select-none flex flex-row"
+                                        className="w-[1011px] h-[638px] bg-green-500/10 text-slate-800 border-2 border-green-300 rounded-[48px] relative overflow-hidden select-none flex flex-row"
                                         style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                     >
                                          {/* Left Column */}
@@ -2113,7 +2110,7 @@ export default function StudentVerification() {
                                                      <span className="text-[28px] font-bold uppercase tracking-wide block" style={{ fontFamily: "'Museo', sans-serif" }}>
                                                          {companySettings.company_name || "Smart Campus"}
                                                      </span>
-                                                     <span className="text-[14px] font-bold text-slate-450 uppercase tracking-widest mt-1 block">
+                                                     <span className="text-[14px] font-bold text-slate-455 uppercase tracking-widest mt-1 block">
                                                          SMART CAMPUS ID
                                                      </span>
                                                  </div>
@@ -2121,7 +2118,7 @@ export default function StudentVerification() {
  
                                              {/* Visitor Name */}
                                              <div className="flex-1 flex flex-col justify-center my-6">
-                                                 <span className="text-xs font-bold text-slate-450 tracking-widest uppercase mb-1">Visitor Name</span>
+                                                 <span className="text-xs font-bold text-slate-455 tracking-widest uppercase mb-1">Visitor Name</span>
                                                  <span className="text-[42px] font-extrabold text-[#7A1975] leading-[1.1] uppercase break-words tracking-tight" style={{ fontFamily: "'Museo', sans-serif" }}>
                                                      {result.full_name || `${result.first_name || ""} ${result.last_name || ""}`.trim() || "Guest"}
                                                  </span>
@@ -2166,7 +2163,7 @@ export default function StudentVerification() {
                                                  <span className="text-sm font-black text-[#7A1975] font-mono tracking-wider mt-0.5 truncate max-w-[320px]">
                                                      {result.admission_number}
                                                  </span>
-                                                 <span className="mt-1 px-4 py-1 bg-teal-100 text-teal-700 border border-teal-200 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                                 <span className="mt-1 px-4 py-1 bg-green-100 text-green-700 border border-green-200 rounded-full text-[10px] font-black uppercase tracking-widest">
                                                      {result.visitor_type || result.role || "VISITOR"}
                                                  </span>
                                              </div>
@@ -2184,13 +2181,13 @@ export default function StudentVerification() {
                                                  </div>
                                                  {result.check_in_student && (
                                                      <div className="flex justify-between">
-                                                         <span className="text-slate-450 font-bold uppercase">Host:</span>
+                                                         <span className="text-slate-455 font-bold uppercase">Host:</span>
                                                          <span className="font-black text-slate-700 truncate max-w-[200px]">{result.check_in_student}</span>
                                                      </div>
                                                  )}
                                                  {result.plate_number && (
                                                      <div className="flex justify-between">
-                                                         <span className="text-slate-450 font-bold uppercase">Plate:</span>
+                                                         <span className="text-slate-455 font-bold uppercase">Plate:</span>
                                                          <span className="font-black text-slate-700 font-mono">{result.plate_number}</span>
                                                      </div>
                                                  )}
@@ -2207,7 +2204,7 @@ export default function StudentVerification() {
                                              </div>
                                          </div>
                                          {/* Right-most Column */}
-                                         <div className="w-[135px] bg-gradient-to-b from-[#7A1975] to-[#9C27B0] flex items-center justify-center select-none shrink-0 relative">
+                                         <div className="w-[135px] bg-green-600 flex items-center justify-center select-none shrink-0 relative">
                                              <span className="text-white text-[48px] font-black uppercase absolute transform -rotate-90 whitespace-nowrap tracking-[0.25em]" style={{ fontFamily: "'Museo', sans-serif" }}>
                                                  VISITOR
                                              </span>
@@ -2217,10 +2214,10 @@ export default function StudentVerification() {
                                     {/* Printable Back Side - Visitor */}
                                     <div 
                                         id={`printable-back-${result.id}`} 
-                                        className="w-[1011px] h-[638px] bg-slate-50 text-slate-800 border-2 border-slate-200 rounded-[48px] relative overflow-hidden flex flex-col items-center justify-between py-10"
+                                        className="w-[1011px] h-[638px] bg-green-500/10 text-slate-800 border-2 border-green-300 rounded-[48px] relative overflow-hidden flex flex-col items-center justify-between py-10"
                                         style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                     >
-                                         <div className="absolute top-0 left-0 w-full h-[18px] bg-gradient-to-r from-[#7A1975] to-[#9C27B0]"></div>
+                                         <div className="absolute top-0 left-0 w-full h-[18px] bg-green-600"></div>
                                          
                                          <div className="text-center px-12 mt-2">
                                              <h4 className="text-[36px] font-bold text-[#7A1975] uppercase tracking-wider leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>Visitor Access Pass</h4>
@@ -2242,7 +2239,7 @@ export default function StudentVerification() {
                                              </p>
                                          </div>
                                          
-                                         <div className="absolute bottom-0 left-0 w-full h-[18px] bg-gradient-to-r from-teal-500 to-emerald-600"></div>
+                                         <div className="absolute bottom-0 left-0 w-full h-[18px] bg-green-600"></div>
                                     </div>
                                 </>
                             ) : (
