@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Smart Campus</string>
+    <string name="error_no_internet">No Internet Connection</string>
+    <string name="error_check_connection">Please check your network settings and try again.</string>
+    <string name="btn_retry">Try Again</string>
+    <string name="btn_settings">Configure Server</string>
+    <string name="dialog_set_url_title">Configure Server URL</string>
+    <string name="dialog_set_url_msg">Enter the IP or Domain of the Smart Campus server:</string>
+    <string name="dialog_save">Save</string>
+    <string name="dialog_cancel">Cancel</string>
+</resources>
