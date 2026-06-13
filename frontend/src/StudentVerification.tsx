@@ -1928,16 +1928,21 @@ export default function StudentVerification() {
 
                                          {/* Center-Right Column */}
                                          <div className="absolute left-[490px] top-0 bottom-0 w-[385px] flex flex-col border-l border-slate-200 bg-slate-50/50">
-                                             {/* Icon / Company Logo */}
+                                             {/* Icon / Vehicle QR Code */}
                                              <div className="w-full h-[438px] flex flex-col items-center justify-center relative border-b border-slate-200 p-6">
-                                                 <div className="w-44 h-44 rounded-3xl bg-white border border-slate-200 flex items-center justify-center p-4 shadow-md mb-4">
-                                                     {companySettings.logo_url ? (
-                                                         <img src={companySettings.logo_url} className="w-full h-full object-contain" />
-                                                     ) : (
-                                                         <div className="text-5xl font-bold text-[#7A1975] font-sans">RU</div>
-                                                     )}
+                                                 <div className="w-52 h-52 rounded-3xl bg-white border-2 border-slate-200 flex items-center justify-center p-3 shadow-xl mb-3">
+                                                     <QRCodeSVG
+                                                         value={result.plate_number || result.admission_number || 'N/A'}
+                                                         size={180}
+                                                         level="H"
+                                                         includeMargin={false}
+                                                     />
                                                  </div>
-                                                 <div>
+                                                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Scan to Verify</span>
+                                                 <span className="text-base font-black text-slate-700 tracking-widest font-mono mt-0.5">
+                                                     {result.plate_number || result.admission_number}
+                                                 </span>
+                                                 <div className="mt-2">
                                                      <span className="px-4 py-1.5 bg-slate-200 text-slate-700 border border-slate-300 rounded-full text-[13px] font-bold uppercase tracking-widest">
                                                          {result.vehicle_type || "VEHICLE"}
                                                      </span>
