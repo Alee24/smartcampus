@@ -1557,7 +1557,8 @@ async def get_public_company_settings(session: AsyncSession = Depends(get_sessio
                 "logo_url": data.get("logo_url", ""),
                 "primary_color": data.get("primary_color", "#2563eb"),
                 "secondary_color": data.get("secondary_color", "#0284c7"),
-                "accent_color": data.get("accent_color", "#10b981")
+                "accent_color": data.get("accent_color", "#10b981"),
+                "text_color": data.get("text_color", "")
             }
         except:
             pass
@@ -1567,7 +1568,8 @@ async def get_public_company_settings(session: AsyncSession = Depends(get_sessio
         "logo_url": "",
         "primary_color": "#2563eb",
         "secondary_color": "#0284c7",
-        "accent_color": "#10b981"
+        "accent_color": "#10b981",
+        "text_color": ""
     }
 
 

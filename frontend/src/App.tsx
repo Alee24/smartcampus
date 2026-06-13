@@ -628,7 +628,8 @@ function App() {
     const [companyColors, setCompanyColors] = useState<any>({
         primary_color: '#2563eb',
         secondary_color: '#0284c7',
-        accent_color: '#10b981'
+        accent_color: '#10b981',
+        text_color: '#0f172a'
     })
 
     // Apply company colors whenever colors or darkMode changes
@@ -664,6 +665,11 @@ function App() {
         root.style.setProperty('--secondary-color', secondary);
         root.style.setProperty('--accent-color', accent);
         root.style.setProperty('--gradient-primary', `linear-gradient(135deg, ${primary} 0%, ${secondary} 100%)`);
+        // Apply custom body text color if set
+        if (companyColors.text_color) {
+            const textColor = companyColors.text_color;
+            root.style.setProperty('--text-primary', textColor);
+        }
     }, [companyColors, darkMode])
 
     // Fetch company settings (logo, name) for sidebar and all pages
@@ -680,7 +686,8 @@ function App() {
                     setCompanyColors({
                         primary_color: data.primary_color || '#2563eb',
                         secondary_color: data.secondary_color || '#0284c7',
-                        accent_color: data.accent_color || '#10b981'
+                        accent_color: data.accent_color || '#10b981',
+                        text_color: data.text_color || ''
                     })
                 }
             } catch (e) {

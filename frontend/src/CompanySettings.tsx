@@ -28,6 +28,7 @@ interface CompanySettings {
     primary_color?: string
     secondary_color?: string
     accent_color?: string
+    text_color?: string
 }
 
 export default function CompanySettings() {
@@ -47,7 +48,8 @@ export default function CompanySettings() {
         logo_url: '',
         primary_color: '#2563eb',
         secondary_color: '#0284c7',
-        accent_color: '#10b981'
+        accent_color: '#10b981',
+        text_color: '#0f172a'
     })
 
     const [loading, setLoading] = useState(true)
@@ -384,7 +386,7 @@ export default function CompanySettings() {
                                             {/* Custom Color Pickers */}
                         <div className="border-t border-[var(--border-color)] pt-6">
                             <label className="block text-sm font-bold mb-4 text-[var(--text-secondary)] uppercase tracking-wider">Custom Branding Colors</label>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                                 <div className="flex items-center gap-3 bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-color)]">
                                     <input
                                         type="color"
@@ -421,6 +423,21 @@ export default function CompanySettings() {
                                     <div className="flex flex-col">
                                         <span className="text-xs font-bold text-[var(--text-secondary)]">Text Highlights & Accent Color</span>
                                         <span className="text-sm font-mono uppercase">{settings.accent_color}</span>
+                                    </div>
+                                </div>
+
+                                {/* NEW: Body Text Color */}
+                                <div className="flex items-center gap-3 bg-[var(--bg-primary)] p-3 rounded-xl border-2 border-[var(--primary-color)]/30 border-dashed">
+                                    <input
+                                        type="color"
+                                        value={settings.text_color || '#0f172a'}
+                                        onChange={(e) => setSettings({ ...settings, text_color: e.target.value })}
+                                        className="w-10 h-10 rounded-lg cursor-pointer border-none bg-transparent"
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="text-xs font-bold text-[var(--text-secondary)]">Body Text Color</span>
+                                        <span className="text-sm font-mono uppercase">{settings.text_color || '#0f172a'}</span>
+                                        <span className="text-[10px] text-[var(--text-secondary)] mt-0.5">Applies to all text in the app</span>
                                     </div>
                                 </div>
                             </div>
