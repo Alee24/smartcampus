@@ -1183,7 +1183,7 @@ export default function StudentVerification() {
                                                                 {/* Large License Plate Badge */}
                                                                 <div className="flex-1 flex flex-col justify-center my-3">
                                                                     <span className="text-xs font-bold text-slate-400 dark:text-amber-500/60 uppercase tracking-widest mb-1">Plate Number</span>
-                                                                    <div className="flex items-start gap-4 flex-wrap">
+                                                                    <div className="flex flex-row items-start gap-4">
                                                                         {/* Kenyan Horizontal Plate (White) */}
                                                                         <div className="bg-white border-2 border-slate-900 text-slate-950 px-2 py-1 rounded-lg flex items-center gap-2 shadow-[0_4px_10px_rgba(0,0,0,0.15)] select-none shrink-0 font-mono tracking-widest font-black text-[45px] h-16 border-double">
                                                                             {/* Kenyan Flag */}
@@ -1197,7 +1197,7 @@ export default function StudentVerification() {
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
-                                                                            <span className="text-slate-900 leading-none">
+                                                                            <span className="text-slate-900 leading-none font-mono font-black tracking-widest">
                                                                                 {result.plate_number || result.admission_number}
                                                                             </span>
                                                                         </div>
@@ -1206,9 +1206,9 @@ export default function StudentVerification() {
                                                                         {(() => {
                                                                             const { part1, part2 } = splitPlateNumber(result.plate_number || result.admission_number);
                                                                             return (
-                                                                                <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[160px] h-[155px] rounded-xl pt-2 pb-2 px-2 flex flex-col items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative gap-0">
+                                                                                <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[160px] h-[155px] rounded-xl pt-2 pb-2 px-2 flex flex-col items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
                                                                                     {/* Row 1: Flag top-left only */}
-                                                                                    <div className="w-full flex items-start justify-start px-0.5 mb-0">
+                                                                                    <div className="w-full flex items-start justify-start px-0.5">
                                                                                         {/* Kenyan Flag */}
                                                                                         <div className="flex flex-col w-5 h-3 border border-black rounded-[0.5px] overflow-hidden relative shrink-0">
                                                                                             <div className="bg-black h-1/3 w-full"></div>
@@ -1221,15 +1221,15 @@ export default function StudentVerification() {
                                                                                             </div>
                                                                                         </div>
                                                                                     </div>
-                                                                                    {/* Row 2: Part 1 (KCU) centered */}
-                                                                                    <div className="w-full flex justify-center items-center">
-                                                                                        <span className="text-[46px] font-black text-black leading-none tracking-widest">
+                                                                                    {/* Row 2: Part 1 (KCU) */}
+                                                                                    <div className="w-full flex justify-center items-center flex-1">
+                                                                                        <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
                                                                                             {part1}
                                                                                         </span>
                                                                                     </div>
-                                                                                    {/* Row 3: Part 2 (109A) centered */}
-                                                                                    <div className="w-full flex justify-center items-center">
-                                                                                        <span className="text-[52px] font-black text-black leading-none tracking-tight">
+                                                                                    {/* Row 3: Part 2 (109S) */}
+                                                                                    <div className="w-full flex justify-center items-center flex-1">
+                                                                                        <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
                                                                                             {part2}
                                                                                         </span>
                                                                                     </div>
@@ -1825,7 +1825,7 @@ export default function StudentVerification() {
                                              {/* Plate Number */}
                                              <div className="flex flex-col mt-4 space-y-1">
                                                  <span className="text-xs font-bold text-slate-450 uppercase tracking-widest">Plate Number</span>
-                                                 <div className="flex items-start gap-4">
+                                                 <div className="flex flex-row items-start gap-4">
                                                      {/* Kenyan Horizontal Plate (White) */}
                                                      <div className="bg-white border-2 border-slate-900 text-slate-950 px-2 py-1 rounded-lg flex items-center gap-2 shadow-md select-none shrink-0 font-mono tracking-widest font-black text-[45px] h-16 border-double">
                                                          {/* Kenyan Flag */}
@@ -1839,7 +1839,7 @@ export default function StudentVerification() {
                                                                  </div>
                                                              </div>
                                                          </div>
-                                                         <span className="text-slate-900 leading-none">
+                                                         <span className="text-slate-900 leading-none font-mono font-black tracking-widest">
                                                              {result.plate_number || result.admission_number}
                                                          </span>
                                                      </div>
@@ -1848,9 +1848,9 @@ export default function StudentVerification() {
                                                      {(() => {
                                                          const { part1, part2 } = splitPlateNumber(result.plate_number || result.admission_number);
                                                          return (
-                                                             <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[160px] h-[155px] rounded-xl pt-2 pb-2 px-2 flex flex-col items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative gap-0">
+                                                             <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[160px] h-[155px] rounded-xl pt-2 pb-2 px-2 flex flex-col items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
                                                                  {/* Row 1: Flag top-left only */}
-                                                                 <div className="w-full flex items-start justify-start px-0.5 mb-0">
+                                                                 <div className="w-full flex items-start justify-start px-0.5">
                                                                      {/* Kenyan Flag */}
                                                                      <div className="flex flex-col w-5 h-3 border border-black rounded-[0.5px] overflow-hidden relative shrink-0">
                                                                          <div className="bg-black h-1/3 w-full"></div>
@@ -1863,15 +1863,15 @@ export default function StudentVerification() {
                                                                          </div>
                                                                      </div>
                                                                  </div>
-                                                                 {/* Row 2: Part 1 (KCU) centered */}
-                                                                 <div className="w-full flex justify-center items-center">
-                                                                     <span className="text-[46px] font-black text-black leading-none tracking-widest">
+                                                                 {/* Row 2: Part 1 (KCU) */}
+                                                                 <div className="w-full flex justify-center items-center flex-1">
+                                                                     <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
                                                                          {part1}
                                                                      </span>
                                                                  </div>
-                                                                 {/* Row 3: Part 2 (109A) centered */}
-                                                                 <div className="w-full flex justify-center items-center">
-                                                                     <span className="text-[52px] font-black text-black leading-none tracking-tight">
+                                                                 {/* Row 3: Part 2 (109S) */}
+                                                                 <div className="w-full flex justify-center items-center flex-1">
+                                                                     <span className="font-mono font-black tracking-widest text-black leading-none text-[48px]">
                                                                          {part2}
                                                                      </span>
                                                                  </div>
