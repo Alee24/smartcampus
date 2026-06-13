@@ -2176,21 +2176,60 @@ function App() {
                         {(() => {
                             const currentGroup = SIDEBAR_GROUPS.find(group => group.items.some(item => item.id === activeTab))
                             if (currentGroup) {
+                                const enabledItems = currentGroup.items.filter(item => !item.permissionKey || isMenuEnabled(item.permissionKey))
                                 return (
-                                    <div className="w-full overflow-x-auto pb-1 animate-in slide-in-from-left-4">
-                                        <div className="flex items-center gap-2 p-1">
-                                            {currentGroup.items.map(item => {
-                                                const isEnabled = !item.permissionKey || isMenuEnabled(item.permissionKey)
-                                                return isEnabled && (
+                                    <div className="w-full px-2 pb-1.5">
+                                        <div
+                                            className="flex items-stretch gap-[3px] w-full"
+                                            style={{ perspective: '600px' }}
+                                        >
+                                            {enabledItems.map(item => {
+                                                const isActive = activeTab === item.id
+                                                return (
                                                     <button
                                                         key={item.id}
                                                         onClick={() => setActiveTab(item.id)}
-                                                        className={`px-4 py-2 text-sm font-bold rounded-lg transition-all whitespace-nowrap ${activeTab === item.id
-                                                            ? 'bg-[var(--bg-primary)] shadow-sm text-[var(--text-primary)] ring-1 ring-[var(--border-color)]'
-                                                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50'
-                                                            }`}
+                                                        title={item.label}
+                                                        className="group relative flex-1 min-w-0 overflow-hidden"
+                                                        style={{
+                                                            transition: 'all 0.22s cubic-bezier(0.34,1.56,0.64,1)',
+                                                            transformStyle: 'preserve-3d',
+                                                        }}
                                                     >
-                                                        {item.label}
+                                                        {/* Tab body */}
+                                                        <div
+                                                            className={`
+                                                                relative w-full flex items-center justify-center
+                                                                px-1 py-[5px] rounded-lg font-bold text-[10px] tracking-wide uppercase
+                                                                transition-all duration-200 cursor-pointer whitespace-nowrap truncate
+                                                                ${isActive
+                                                                    ? 'bg-[var(--primary-color)] text-white shadow-[0_4px_14px_rgba(0,0,0,0.25)] ring-1 ring-[var(--primary-color)]/40 scale-[1.05] -translate-y-[3px]'
+                                                                    : 'bg-[var(--bg-primary)] dark:bg-slate-800/60 text-[var(--text-secondary)] border border-[var(--border-color)] dark:border-slate-700/50'
+                                                                }
+                                                                group-hover:scale-[1.08] group-hover:-translate-y-[5px]
+                                                                group-hover:shadow-[0_8px_20px_rgba(0,0,0,0.18),0_2px_6px_rgba(0,0,0,0.12)]
+                                                                ${!isActive ? 'group-hover:text-[var(--primary-color)] group-hover:border-[var(--primary-color)]/40 group-hover:bg-[var(--bg-surface)]' : ''}
+                                                            `}
+                                                            style={{
+                                                                transformStyle: 'preserve-3d',
+                                                                transform: isActive ? 'translateY(-3px) scale(1.05) rotateX(-2deg)' : undefined,
+                                                                boxShadow: isActive
+                                                                    ? '0 6px 16px rgba(0,0,0,0.22), 0 2px 4px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.15)'
+                                                                    : undefined,
+                                                            }}
+                                                        >
+                                                            {/* 3D bottom edge for depth */}
+                                                            <span
+                                                                className={`absolute bottom-0 left-0 right-0 h-[3px] rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isActive ? 'opacity-100' : ''}`}
+                                                                style={{
+                                                                    background: isActive
+                                                                        ? 'rgba(0,0,0,0.25)'
+                                                                        : 'var(--primary-color)',
+                                                                    transform: 'translateZ(-1px)',
+                                                                }}
+                                                            />
+                                                            <span className="truncate leading-none px-0.5">{item.label}</span>
+                                                        </div>
                                                     </button>
                                                 )
                                             })}
