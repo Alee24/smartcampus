@@ -1570,6 +1570,42 @@ async def get_public_company_settings(session: AsyncSession = Depends(get_sessio
         "accent_color": "#10b981"
     }
 
+
+class AdminPinRequest(BaseModel):
+    pin: str
+
+@router.post("/verify-admin-pin")
+async def verify_admin_pin(
+    payload: AdminPinRequest,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Checks if the entered pin matches the pin of any active Admin/SuperAdmin/Security Lead user
+    """
+    from app.models import Role, User
+    
+    # 1. Fetch Admin, SuperAdmin, and Security Lead roles
+    roles_stmt = select(Role).where(Role.name.in_(["Admin", "SuperAdmin", "Security Lead"]))
+    roles = (await session.exec(roles_stmt)).all()
+    if not roles:
+        raise HTTPException(status_code=400, detail="Administrative roles not initialized")
+        
+    role_ids = [role.id for role in roles]
+    
+    # 2. Check if there exists an active user with one of these roles and this pin
+    user_stmt = select(User).where(
+        User.role_id.in_(role_ids),
+        User.pin == payload.pin,
+        User.status == "Active"
+    )
+    user = (await session.exec(user_stmt)).first()
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid administrator PIN")
+        
+    return {"status": "success", "message": "PIN verified successfully"}
+
+
 # --- Unified User Management ---
 
 @router.post("/create-complete", response_model=User)

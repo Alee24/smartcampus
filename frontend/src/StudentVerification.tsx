@@ -1206,28 +1206,28 @@ export default function StudentVerification() {
                                                                         {(() => {
                                                                             const { part1, part2 } = splitPlateNumber(result.plate_number || result.admission_number);
                                                                             return (
-                                                                                <div className="bg-[#FFCC00] border-2 border-slate-900 text-slate-955 w-24 h-16 rounded-lg p-1.5 flex flex-col justify-between items-center shadow-[0_4px_10px_rgba(0,0,0,0.15)] select-none shrink-0 border-double">
-                                                                                    {/* Top row with flag and part1 */}
+                                                                                <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[150px] h-[120px] rounded-xl p-3 flex flex-col justify-between items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
+                                                                                    {/* Top Row: Flag + Part 1 */}
                                                                                     <div className="w-full flex items-center justify-between">
-                                                                                        {/* Flag */}
-                                                                                        <div className="flex flex-col w-5 h-3 border border-slate-800 rounded-[0.5px] overflow-hidden relative shrink-0">
+                                                                                        {/* Kenyan Flag */}
+                                                                                        <div className="flex flex-col w-9 h-6 border border-black rounded-[1px] overflow-hidden relative shrink-0">
                                                                                             <div className="bg-black h-1/3 w-full"></div>
                                                                                             <div className="bg-[#990000] h-1/3 w-full border-y-[0.5px] border-white"></div>
                                                                                             <div className="bg-[#006600] h-1/3 w-full"></div>
                                                                                             <div className="absolute inset-0 flex items-center justify-center">
-                                                                                                <div className="w-1.5 h-2 bg-[#990000] rounded-full border-[0.5px] border-white relative">
+                                                                                                <div className="w-2 h-2.5 bg-[#990000] rounded-full border-[0.5px] border-white relative">
                                                                                                     <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
                                                                                                 </div>
                                                                                             </div>
                                                                                         </div>
-                                                                                        {/* Part 1 */}
-                                                                                        <span className="font-mono text-xs font-black text-slate-900 leading-none">
+                                                                                        {/* Part 1 (Letters) */}
+                                                                                        <span className="text-3xl font-black text-black leading-none tracking-tighter">
                                                                                             {part1}
                                                                                         </span>
                                                                                     </div>
-                                                                                    {/* Bottom row with part2 */}
-                                                                                    <div className="w-full flex justify-center pb-0.5">
-                                                                                        <span className="font-mono text-base font-black text-slate-900 leading-none tracking-wider">
+                                                                                    {/* Bottom Row: Part 2 (Numbers + Letter) */}
+                                                                                    <div className="w-full flex justify-center items-center pb-1">
+                                                                                        <span className="text-4xl font-black text-black leading-none tracking-tight">
                                                                                             {part2}
                                                                                         </span>
                                                                                     </div>
@@ -1844,32 +1844,30 @@ export default function StudentVerification() {
 
                                                      {/* Kenyan Square Plate (Yellow) */}
                                                      {(() => {
-                                                         const plate = result.plate_number || result.admission_number || "";
-                                                         const part1 = plate.split(" ")[0] || "";
-                                                         const part2 = plate.split(" ").slice(1).join(" ") || plate;
+                                                         const { part1, part2 } = splitPlateNumber(result.plate_number || result.admission_number);
                                                          return (
-                                                             <div className="bg-[#FFCC00] border-2 border-slate-900 text-slate-955 w-24 h-16 rounded-lg p-1.5 flex flex-col justify-between items-center shadow-md select-none shrink-0 border-double">
-                                                                 {/* Top row with flag and part1 */}
+                                                             <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[150px] h-[120px] rounded-xl p-3 flex flex-col justify-between items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
+                                                                 {/* Top Row: Flag + Part 1 */}
                                                                  <div className="w-full flex items-center justify-between">
-                                                                     {/* Flag */}
-                                                                     <div className="flex flex-col w-5 h-3 border border-slate-800 rounded-[0.5px] overflow-hidden relative shrink-0">
+                                                                     {/* Kenyan Flag */}
+                                                                     <div className="flex flex-col w-9 h-6 border border-black rounded-[1px] overflow-hidden relative shrink-0">
                                                                          <div className="bg-black h-1/3 w-full"></div>
                                                                          <div className="bg-[#990000] h-1/3 w-full border-y-[0.5px] border-white"></div>
                                                                          <div className="bg-[#006600] h-1/3 w-full"></div>
                                                                          <div className="absolute inset-0 flex items-center justify-center">
-                                                                             <div className="w-1.5 h-2 bg-[#990000] rounded-full border-[0.5px] border-white relative">
+                                                                             <div className="w-2 h-2.5 bg-[#990000] rounded-full border-[0.5px] border-white relative">
                                                                                  <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
                                                                              </div>
                                                                          </div>
                                                                      </div>
-                                                                     {/* Part 1 */}
-                                                                     <span className="font-mono text-xs font-black text-slate-900 leading-none">
+                                                                     {/* Part 1 (Letters) */}
+                                                                     <span className="text-3xl font-black text-black leading-none tracking-tighter">
                                                                          {part1}
                                                                      </span>
                                                                  </div>
-                                                                 {/* Bottom row with part2 */}
-                                                                 <div className="w-full flex justify-center pb-0.5">
-                                                                     <span className="font-mono text-base font-black text-slate-900 leading-none tracking-wider">
+                                                                 {/* Bottom Row: Part 2 (Numbers + Letter) */}
+                                                                 <div className="w-full flex justify-center items-center pb-1">
+                                                                     <span className="text-4xl font-black text-black leading-none tracking-tight">
                                                                          {part2}
                                                                      </span>
                                                                  </div>

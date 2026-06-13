@@ -1991,7 +1991,7 @@ function App() {
             <main className={`flex-1 min-w-0 p-2 sm:p-3 lg:p-4 pb-20 lg:pb-4 transition-all duration-300 overflow-x-hidden w-full ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
                 <Suspense fallback={<PageLoader />}>
                     {/* Top Header - 2 Row Layout */}
-                    <header className="flex flex-col gap-2 mb-4 pt-1 pb-1 w-full min-w-0 overflow-hidden">
+                    <header className="flex flex-col gap-2 mb-4 pt-1 pb-1 w-full min-w-0 relative">
                         {/* Row 1: Primary Navigation */}
                         <div className="flex justify-between items-center w-full min-w-0 gap-2">
                             <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
@@ -2153,6 +2153,15 @@ function App() {
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Direct Quick Logout Button */}
+                                <button
+                                    onClick={handleLogout}
+                                    className="p-2 rounded-lg text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/10 active:scale-95 transition-all flex items-center justify-center border border-red-200 dark:border-red-800/30"
+                                    title="Logout"
+                                >
+                                    <LogOut size={20} />
+                                </button>
                             </div>
                         </div>
 

@@ -34,6 +34,14 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import android.nfc.NfcAdapter;
+import android.nfc.NdefMessage;
+import android.nfc.NdefRecord;
+import android.nfc.Tag;
+import android.nfc.tech.Ndef;
+import android.nfc.tech.NdefFormatable;
+import android.app.PendingIntent;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -71,6 +79,12 @@ public class MainActivity extends AppCompatActivity {
     private String mCameraPhotoPath;
     private GeolocationPermissions.Callback mGeoCallback;
     private String mGeoOrigin;
+
+    // NFC variables
+    private NfcAdapter mNfcAdapter;
+    private PendingIntent mPendingIntent;
+    private boolean mNfcScanningEnabled = false;
+    private String mPendingWritePayload = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -120,6 +134,16 @@ public class MainActivity extends AppCompatActivity {
 
         // Check Permissions Proactively
         checkAndRequestPermissions();
+
+        // Initialize NFC Adapter & Pending Intent
+        mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flags |= PendingIntent.FLAG_MUTABLE;
+        }
+        mPendingIntent = PendingIntent.getActivity(this, 0,
+                new Intent(this, getClass()).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                flags);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -146,6 +170,9 @@ public class MainActivity extends AppCompatActivity {
         String defaultAgent = settings.getUserAgentString();
         settings.setUserAgentString(defaultAgent + " SmartCampusMobileWrapper");
 
+        // Add AndroidNFC javascript interface
+        mWebView.addJavascriptInterface(new AndroidNFCInterface(this), "AndroidNFC");
+
         mWebView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
@@ -162,6 +189,7 @@ public class MainActivity extends AppCompatActivity {
                 if (mLayoutSplash != null) {
                     mLayoutSplash.setVisibility(View.GONE);
                 }
+                injectNdefPolyfill(view);
             }
 
             @Override
@@ -467,6 +495,309 @@ public class MainActivity extends AppCompatActivity {
                     .setPositiveButton("Yes", (dialog, which) -> finish())
                     .setNegativeButton("No", null)
                     .show();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mNfcAdapter != null && mNfcScanningEnabled) {
+            try {
+                mNfcAdapter.enableForegroundDispatch(this, mPendingIntent, null, null);
+            } catch (Exception e) {
+                Log.e(TAG, "Error enabling NFC foreground dispatch", e);
+            }
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (mNfcAdapter != null) {
+            try {
+                mNfcAdapter.disableForegroundDispatch(this);
+            } catch (Exception e) {
+                Log.e(TAG, "Error disabling NFC foreground dispatch", e);
+            }
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.getAction()) ||
+            NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction()) ||
+            NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction())) {
+            
+            Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+            if (tag != null) {
+                if (mPendingWritePayload != null) {
+                    final boolean success = writeNdefMessage(tag, mPendingWritePayload);
+                    mPendingWritePayload = null;
+                    runOnUiThread(() -> {
+                        mWebView.evaluateJavascript("if (window.AndroidNFC_callback) window.AndroidNFC_callback(" + success + ", '" + (success ? "" : "Failed to write tag") + "');", null);
+                    });
+                } else {
+                    readNdefMessage(tag);
+                }
+            }
+        }
+    }
+
+    private boolean writeNdefMessage(Tag tag, String payload) {
+        try {
+            Ndef ndef = Ndef.get(tag);
+            if (ndef != null) {
+                ndef.connect();
+                if (!ndef.isWritable()) {
+                    ndef.close();
+                    return false;
+                }
+                NdefRecord record;
+                if (payload.startsWith("http://") || payload.startsWith("https://")) {
+                    record = NdefRecord.createUri(payload);
+                } else {
+                    record = NdefRecord.createTextRecord("en", payload);
+                }
+                NdefMessage message = new NdefMessage(new NdefRecord[]{record});
+                int size = message.toByteArray().length;
+                if (ndef.getMaxSize() < size) {
+                    ndef.close();
+                    return false;
+                }
+                ndef.writeNdefMessage(message);
+                ndef.close();
+                return true;
+            } else {
+                NdefFormatable formatable = NdefFormatable.get(tag);
+                if (formatable != null) {
+                    formatable.connect();
+                    NdefRecord record;
+                    if (payload.startsWith("http://") || payload.startsWith("https://")) {
+                        record = NdefRecord.createUri(payload);
+                    } else {
+                        record = NdefRecord.createTextRecord("en", payload);
+                    }
+                    NdefMessage message = new NdefMessage(new NdefRecord[]{record});
+                    formatable.format(message);
+                    formatable.close();
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error writing NDEF message", e);
+        }
+        return false;
+    }
+
+    private void readNdefMessage(Tag tag) {
+        byte[] id = tag.getId();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < id.length; i++) {
+            sb.append(String.format("%02x", id[i]));
+            if (i < id.length - 1) {
+                sb.append(":");
+            }
+        }
+        final String serialNumber = sb.toString();
+
+        String recordsJson = "[]";
+        try {
+            Ndef ndef = Ndef.get(tag);
+            if (ndef != null) {
+                ndef.connect();
+                NdefMessage message = ndef.getCachedNdefMessage();
+                if (message == null) {
+                    message = ndef.getNdefMessage();
+                }
+                if (message != null) {
+                    NdefRecord[] records = message.getRecords();
+                    org.json.JSONArray jsonArray = new org.json.JSONArray();
+                    for (NdefRecord record : records) {
+                        org.json.JSONObject obj = new org.json.JSONObject();
+                        short tnf = record.getTnf();
+                        byte[] type = record.getType();
+                        byte[] payload = record.getPayload();
+                        
+                        String recordType = "unknown";
+                        String data = "";
+                        
+                        if (tnf == NdefRecord.TNF_WELL_KNOWN) {
+                            if (java.util.Arrays.equals(type, NdefRecord.RTD_URI)) {
+                                recordType = "url";
+                                if (payload.length > 0) {
+                                    byte prefixCode = payload[0];
+                                    String prefix = "";
+                                    switch (prefixCode) {
+                                        case 0x01: prefix = "http://www."; break;
+                                        case 0x02: prefix = "https://www."; break;
+                                        case 0x03: prefix = "http://"; break;
+                                        case 0x04: prefix = "https://"; break;
+                                    }
+                                    data = prefix + new String(payload, 1, payload.length - 1, java.nio.charset.StandardCharsets.UTF_8);
+                                }
+                            } else if (java.util.Arrays.equals(type, NdefRecord.RTD_TEXT)) {
+                                recordType = "text";
+                                if (payload.length > 0) {
+                                    int statusByte = payload[0];
+                                    int langCodeLen = statusByte & 0x1F;
+                                    data = new String(payload, 1 + langCodeLen, payload.length - 1 - langCodeLen, java.nio.charset.StandardCharsets.UTF_8);
+                                }
+                            }
+                        } else if (tnf == NdefRecord.TNF_ABSOLUTE_URI) {
+                            recordType = "url";
+                            data = new String(type, java.nio.charset.StandardCharsets.UTF_8);
+                        }
+                        
+                        obj.put("recordType", recordType);
+                        obj.put("data", data);
+                        jsonArray.put(obj);
+                    }
+                    recordsJson = jsonArray.toString();
+                }
+                ndef.close();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error reading NDEF message", e);
+        }
+        
+        final String finalRecords = recordsJson;
+        runOnUiThread(() -> {
+            android.os.Vibrator vibrator = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (vibrator != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(android.os.VibrationEffect.createOneShot(100, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                } else {
+                    vibrator.vibrate(100);
+                }
+            }
+            mWebView.evaluateJavascript("if (window.receiveNFCTag) window.receiveNFCTag('" + serialNumber + "', '" + finalRecords.replace("'", "\\'") + "');", null);
+        });
+    }
+
+    private void injectNdefPolyfill(WebView view) {
+        String js = "if (!('NDEFReader' in window)) {\n" +
+                "    window.NDEFReader_instances = window.NDEFReader_instances || [];\n" +
+                "    window.NDEFReader = class NDEFReader {\n" +
+                "        constructor() {\n" +
+                "            this.onreading = null;\n" +
+                "            this.onreadingerror = null;\n" +
+                "            window.NDEFReader_instances.push(this);\n" +
+                "        }\n" +
+                "        async scan(options) {\n" +
+                "            window.AndroidNFC.startScan();\n" +
+                "            if (options && options.signal) {\n" +
+                "                options.signal.addEventListener('abort', () => {\n" +
+                "                    window.AndroidNFC.stopScan();\n" +
+                "                    const index = window.NDEFReader_instances.indexOf(this);\n" +
+                "                    if (index > -1) window.NDEFReader_instances.splice(index, 1);\n" +
+                "                });\n" +
+                "            }\n" +
+                "            return Promise.resolve();\n" +
+                "        }\n" +
+                "        async write(message, options) {\n" +
+                "            let payload = '';\n" +
+                "            if (typeof message === 'string') {\n" +
+                "                payload = message;\n" +
+                "            } else if (message && message.records) {\n" +
+                "                for (let rec of message.records) {\n" +
+                "                    if (rec.recordType === 'url') {\n" +
+                "                        payload = rec.data;\n" +
+                "                        if (payload instanceof Uint8Array) {\n" +
+                "                            payload = new TextDecoder().decode(payload);\n" +
+                "                        }\n" +
+                "                    } else if (rec.recordType === 'text') {\n" +
+                "                        payload = rec.data;\n" +
+                "                        if (payload instanceof Uint8Array) {\n" +
+                "                            payload = new TextDecoder().decode(payload);\n" +
+                "                        }\n" +
+                "                    }\n" +
+                "                }\n" +
+                "            }\n" +
+                "            return new Promise((resolve, reject) => {\n" +
+                "                window.AndroidNFC.writeTag(payload);\n" +
+                "                window.AndroidNFC_callback = (success, errorMsg) => {\n" +
+                "                    if (success) resolve();\n" +
+                "                    else reject(new Error(errorMsg || 'Failed to write NFC tag'));\n" +
+                "                };\n" +
+                "            });\n" +
+                "        }\n" +
+                "    };\n" +
+                "    window.receiveNFCTag = function(serialNumber, recordsJson) {\n" +
+                "        let records = [];\n" +
+                "        try {\n" +
+                "            records = JSON.parse(recordsJson).map(r => ({\n" +
+                "                recordType: r.recordType,\n" +
+                "                data: new TextEncoder().encode(r.data)\n" +
+                "            }));\n" +
+                "        } catch (e) { console.error('Error parsing NFC records', e); }\n" +
+                "        const event = {\n" +
+                "            serialNumber: serialNumber,\n" +
+                "            message: { records: records }\n" +
+                "        };\n" +
+                "        window.NDEFReader_instances.forEach(reader => {\n" +
+                "            if (reader.onreading) {\n" +
+                "                try { reader.onreading(event); } catch (e) { console.error(e); }\n" +
+                "            }\n" +
+                "        });\n" +
+                "    };\n" +
+                "}";
+        view.evaluateJavascript(js, null);
+    }
+
+    public class AndroidNFCInterface {
+        Context mContext;
+
+        AndroidNFCInterface(Context c) {
+            mContext = c;
+        }
+
+        @android.webkit.JavascriptInterface
+        public void startScan() {
+            runOnUiThread(() -> {
+                mNfcScanningEnabled = true;
+                if (mNfcAdapter != null) {
+                    try {
+                        mNfcAdapter.enableForegroundDispatch(MainActivity.this, mPendingIntent, null, null);
+                        Toast.makeText(mContext, "NFC Scanning Activated. Tap card.", Toast.LENGTH_SHORT).show();
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error enabling NFC dispatch", e);
+                    }
+                } else {
+                    Toast.makeText(mContext, "NFC Hardware not available on this device", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public void stopScan() {
+            runOnUiThread(() -> {
+                mNfcScanningEnabled = false;
+                if (mNfcAdapter != null) {
+                    try {
+                        mNfcAdapter.disableForegroundDispatch(MainActivity.this);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error disabling NFC dispatch", e);
+                    }
+                }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public void writeTag(String payload) {
+            mPendingWritePayload = payload;
+            runOnUiThread(() -> {
+                mNfcScanningEnabled = true;
+                if (mNfcAdapter != null) {
+                    try {
+                        mNfcAdapter.enableForegroundDispatch(MainActivity.this, mPendingIntent, null, null);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error enabling NFC dispatch", e);
+                    }
+                }
+                Toast.makeText(mContext, "Tap NFC card/tag to write: " + payload, Toast.LENGTH_LONG).show();
+            });
         }
     }
 }
