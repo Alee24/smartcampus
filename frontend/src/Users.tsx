@@ -984,7 +984,7 @@ export default function Users() {
 }
 
 // Side Panel Component
-function UserDetailPanel({ user, onClose, onRefresh }: any) {
+export function UserDetailPanel({ user, onClose, onRefresh }: any) {
     const { showConfirm, showNotification } = useNotification()
     const [isEditing, setIsEditing] = useState(false)
     const [editForm, setEditForm] = useState(user)
@@ -1528,6 +1528,40 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                                 </div>
                             </div>
 
+                            {/* Access & Duration Summary */}
+                            <div className="col-span-1 md:col-span-2 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/10 dark:to-indigo-950/10 rounded-2xl p-5 border border-purple-100/50 dark:border-purple-900/30 grid grid-cols-3 gap-4">
+                                <div>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Total Visits</p>
+                                    <p className="text-lg font-bold text-gray-800 dark:text-gray-250 mt-1">{logs.length} entries</p>
+                                </div>
+                                <div className="border-l border-gray-200 dark:border-gray-800 pl-4">
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Average Stay</p>
+                                    <p className="text-lg font-bold text-gray-800 dark:text-gray-250 mt-1">
+                                        {(() => {
+                                            const completed = logs.filter(l => l.duration_minutes !== null && l.exit_time);
+                                            if (completed.length === 0) return '-';
+                                            const avg = completed.reduce((acc, curr) => acc + curr.duration_minutes, 0) / completed.length;
+                                            if (avg < 60) return `${Math.round(avg)}m`;
+                                            return `${Math.floor(avg / 60)}h ${Math.round(avg % 60)}m`;
+                                        })()}
+                                    </p>
+                                </div>
+                                <div className="border-l border-gray-200 dark:border-gray-800 pl-4">
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Last Visit</p>
+                                    <p className="text-lg font-bold text-gray-800 dark:text-gray-250 mt-1">
+                                        {(() => {
+                                            if (logs.length === 0) return '-';
+                                            const lastLog = logs[0];
+                                            if (!lastLog.exit_time) return <span className="text-green-500 font-black text-[10px] uppercase bg-green-50 dark:bg-green-950/20 px-2 py-0.5 rounded">Inside</span>;
+                                            const mins = lastLog.duration_minutes;
+                                            if (mins === null) return '-';
+                                            if (mins < 60) return `${Math.round(mins)}m`;
+                                            return `${Math.floor(mins / 60)}h ${Math.round(mins % 60)}m`;
+                                        })()}
+                                    </p>
+                                </div>
+                            </div>
+
                             {/* Verification & Access History Table */}
                             <div className="col-span-1 md:col-span-2 bg-gray-50 dark:bg-gray-800/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800/50 space-y-4 max-h-[300px] overflow-y-auto">
                                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -1549,6 +1583,7 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                                                     <th className="py-2.5">Date</th>
                                                     <th className="py-2.5">Gate / Entry</th>
                                                     <th className="py-2.5">Exit Time</th>
+                                                    <th className="py-2.5">Duration</th>
                                                     <th className="py-2.5">Method</th>
                                                     <th className="py-2.5">Status</th>
                                                 </tr>
@@ -1558,6 +1593,15 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                                                     const dateStr = log.entry_time ? new Date(log.entry_time).toLocaleDateString() : 'N/A';
                                                     const entryTimeStr = log.entry_time ? new Date(log.entry_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
                                                     const exitTimeStr = log.exit_time ? new Date(log.exit_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+                                                    
+                                                    const formatDuration = (mins: number | null) => {
+                                                        if (mins === null || mins === undefined) return '-';
+                                                        if (mins < 60) return `${Math.round(mins)}m`;
+                                                        const hrs = Math.floor(mins / 60);
+                                                        const remMins = Math.round(mins % 60);
+                                                        return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
+                                                    };
+                                                    
                                                     return (
                                                         <tr key={log.id} className="hover:bg-gray-100/30 dark:hover:bg-gray-800/10">
                                                             <td className="py-3 font-mono">{dateStr}</td>
@@ -1576,6 +1620,9 @@ function UserDetailPanel({ user, onClose, onRefresh }: any) {
                                                                         Active Inside
                                                                     </span>
                                                                 )}
+                                                            </td>
+                                                            <td className="py-3 font-mono">
+                                                                {formatDuration(log.duration_minutes)}
                                                             </td>
                                                             <td className="py-3 uppercase font-mono text-[10px]">{log.method}</td>
                                                             <td className="py-3">

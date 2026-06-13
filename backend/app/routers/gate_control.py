@@ -2376,6 +2376,12 @@ async def get_vehicle_logs(session: AsyncSession = Depends(get_session)):
             t_entry = log.entry_time.isoformat() if log.entry_time else None
             t_exit = log.exit_time.isoformat() if log.exit_time else None
             
+            duration_minutes = None
+            if log.entry_time and log.exit_time:
+                duration_minutes = round((log.exit_time - log.entry_time).total_seconds() / 60, 1)
+            elif log.entry_time:
+                duration_minutes = round((get_eat_time() - log.entry_time).total_seconds() / 60, 1) # Active stay duration
+
             logs.append({
                 "id": str(log.id),
                 "plate": vehicle.plate_number,
@@ -2395,7 +2401,8 @@ async def get_vehicle_logs(session: AsyncSession = Depends(get_session)):
                 "destination": log.destination,
                 "entry_gate_name": gate_map.get(log.gate_id, "Unknown Gate"),
                 "exit_gate_name": gate_map.get(log.exit_gate_id) if log.exit_gate_id else None,
-                "manual_override": log.manual_override
+                "manual_override": log.manual_override,
+                "duration_minutes": duration_minutes
             })
         return logs
     except Exception as e:
@@ -3671,3 +3678,188 @@ async def get_visitor_center_logs(session: AsyncSession = Depends(get_session)):
     except Exception as e:
         print(f"Error getting visitor center logs: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch visitor logs: {str(e)}")
+
+
+@router.get("/analytics/overview")
+async def get_analytics_overview(session: AsyncSession = Depends(get_session)):
+    try:
+        from app.models import Visitor, VehicleLog, EntryLog, User, Role
+        from datetime import datetime, timedelta
+        from app.utils.timezone import get_eat_time
+        
+        now = get_eat_time()
+        
+        # 1. Visitor Durations
+        visitors_stmt = select(Visitor).where(Visitor.time_out != None)
+        visitors = (await session.exec(visitors_stmt)).all()
+        visitor_durations = [(v.time_out - v.time_in).total_seconds() / 60 for v in visitors if v.time_out]
+        avg_visitor_duration = round(sum(visitor_durations) / len(visitor_durations), 1) if visitor_durations else 0.0
+        
+        # 2. Vehicle Durations
+        vehicles_stmt = select(VehicleLog).where(VehicleLog.exit_time != None)
+        vehicle_logs = (await session.exec(vehicles_stmt)).all()
+        vehicle_durations = [(vl.exit_time - vl.entry_time).total_seconds() / 60 for vl in vehicle_logs if vl.exit_time]
+        avg_vehicle_duration = round(sum(vehicle_durations) / len(vehicle_durations), 1) if vehicle_durations else 0.0
+        
+        # 3. User Durations
+        users_stmt = select(EntryLog).where(EntryLog.exit_time != None)
+        user_logs = (await session.exec(users_stmt)).all()
+        user_durations = [(ul.exit_time - ul.entry_time).total_seconds() / 60 for ul in user_logs if ul.exit_time]
+        avg_user_duration = round(sum(user_durations) / len(user_durations), 1) if user_durations else 0.0
+        
+        # Daily averages for the last 7 days
+        daily_trends = []
+        for i in range(6, -1, -1):
+            day_date = (now - timedelta(days=i)).date()
+            day_start = datetime.combine(day_date, datetime.min.time())
+            day_end = datetime.combine(day_date, datetime.max.time())
+            
+            # Visitors
+            day_v = [v for v in visitors if day_start <= v.time_in <= day_end]
+            avg_v = round(sum([(v.time_out - v.time_in).total_seconds() / 60 for v in day_v]) / len(day_v), 1) if day_v else 0.0
+            
+            # Vehicles
+            day_veh = [vl for vl in vehicle_logs if day_start <= vl.entry_time <= day_end]
+            avg_veh = round(sum([(vl.exit_time - vl.entry_time).total_seconds() / 60 for vl in day_veh]) / len(day_veh), 1) if day_veh else 0.0
+            
+            # Users
+            day_u = [ul for ul in user_logs if day_start <= ul.entry_time <= day_end]
+            avg_u = round(sum([(ul.exit_time - ul.entry_time).total_seconds() / 60 for ul in day_u]) / len(day_u), 1) if day_u else 0.0
+            
+            daily_trends.append({
+                "date": day_date.strftime("%b %d"),
+                "visitors": avg_v,
+                "vehicles": avg_veh,
+                "users": avg_u
+            })
+            
+        # Total counts today
+        today_start = datetime.combine(now.date(), datetime.min.time())
+        
+        active_visitors = len((await session.exec(select(Visitor).where(Visitor.time_in >= today_start).where(Visitor.status == 'checked_in'))).all())
+        exited_visitors = len((await session.exec(select(Visitor).where(Visitor.time_in >= today_start).where(Visitor.status == 'checked_out'))).all())
+        
+        active_vehicles = len((await session.exec(select(VehicleLog).where(VehicleLog.entry_time >= today_start).where(VehicleLog.exit_time == None))).all())
+        exited_vehicles = len((await session.exec(select(VehicleLog).where(VehicleLog.entry_time >= today_start).where(VehicleLog.exit_time != None))).all())
+        
+        active_users = len((await session.exec(select(EntryLog).where(EntryLog.entry_time >= today_start).where(EntryLog.exit_time == None))).all())
+        exited_users = len((await session.exec(select(EntryLog).where(EntryLog.entry_time >= today_start).where(EntryLog.exit_time != None))).all())
+        
+        return {
+            "avg_visitor_duration": avg_visitor_duration,
+            "avg_vehicle_duration": avg_vehicle_duration,
+            "avg_user_duration": avg_user_duration,
+            "daily_trends": daily_trends,
+            "active_counts": {
+                "visitors": active_visitors,
+                "vehicles": active_vehicles,
+                "users": active_users
+            },
+            "exited_counts": {
+                "visitors": exited_visitors,
+                "vehicles": exited_vehicles,
+                "users": exited_users
+            }
+        }
+    except Exception as e:
+        print(f"Error in analytics overview: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/analytics/vehicles")
+async def get_analytics_vehicles(session: AsyncSession = Depends(get_session)):
+    try:
+        from app.models import VehicleLog, Vehicle, Gate
+        from app.utils.timezone import get_eat_time
+        
+        query = select(VehicleLog, Vehicle).join(Vehicle).order_by(VehicleLog.entry_time.desc())
+        results = (await session.exec(query)).all()
+        
+        gates = (await session.exec(select(Gate))).all()
+        gate_map = {gate.id: gate.name for gate in gates}
+        
+        vehicle_logs = []
+        for log, vehicle in results:
+            duration_minutes = None
+            if log.entry_time and log.exit_time:
+                duration_minutes = round((log.exit_time - log.entry_time).total_seconds() / 60, 1)
+            elif log.entry_time:
+                duration_minutes = round((get_eat_time() - log.entry_time).total_seconds() / 60, 1) # Active stay duration
+                
+            vehicle_logs.append({
+                "id": str(log.id),
+                "plate": vehicle.plate_number,
+                "make": vehicle.make or "Unknown",
+                "model": vehicle.model or "Unknown",
+                "color": vehicle.color or "Unknown",
+                "driver_name": vehicle.driver_name or "Unknown",
+                "driver_contact": vehicle.driver_contact or "N/A",
+                "time_in": log.entry_time.isoformat() if log.entry_time else None,
+                "time_out": log.exit_time.isoformat() if log.exit_time else None,
+                "duration_minutes": duration_minutes,
+                "status": "Parked" if not log.exit_time else "Exited",
+                "purpose": log.purpose or "N/A",
+                "entry_gate": gate_map.get(log.gate_id, "Main Gate"),
+                "exit_gate": gate_map.get(log.exit_gate_id) if log.exit_gate_id else None
+            })
+            
+        return vehicle_logs
+    except Exception as e:
+        print(f"Error in analytics vehicles: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/analytics/users")
+async def get_analytics_users(session: AsyncSession = Depends(get_session)):
+    try:
+        from app.models import User, EntryLog, Role
+        from sqlalchemy.orm import selectinload
+        from app.utils.timezone import get_eat_time
+        
+        # Get all users who have entry logs
+        users_stmt = select(User).options(selectinload(User.role))
+        users = (await session.exec(users_stmt)).all()
+        
+        user_analytics = []
+        for u in users:
+            logs_stmt = select(EntryLog).where(EntryLog.user_id == u.id).order_by(EntryLog.entry_time.desc())
+            user_logs = (await session.exec(logs_stmt)).all()
+            
+            if not user_logs:
+                continue
+                
+            total_visits = len(user_logs)
+            last_log = user_logs[0]
+            last_entry = last_log.entry_time
+            
+            # Last duration spent
+            last_duration = None
+            if last_log.entry_time and last_log.exit_time:
+                last_duration = round((last_log.exit_time - last_log.entry_time).total_seconds() / 60, 1)
+            elif last_log.entry_time:
+                last_duration = round((get_eat_time() - last_log.entry_time).total_seconds() / 60, 1) # still inside
+                
+            # Average duration
+            completed_logs = [l for l in user_logs if l.entry_time and l.exit_time]
+            durations = [(l.exit_time - l.entry_time).total_seconds() / 60 for l in completed_logs]
+            avg_duration = round(sum(durations) / len(durations), 1) if durations else None
+            
+            user_analytics.append({
+                "id": str(u.id),
+                "full_name": u.full_name,
+                "role": u.role.name if u.role else "User",
+                "email": u.email or "N/A",
+                "phone_number": u.phone_number or "N/A",
+                "total_visits": total_visits,
+                "last_visit_time": last_entry.isoformat() if last_entry else None,
+                "last_duration_minutes": last_duration,
+                "avg_duration_minutes": avg_duration,
+                "currently_inside": last_log.exit_time is None
+            })
+            
+        # Sort users by total visits desc
+        user_analytics.sort(key=lambda x: x["total_visits"], reverse=True)
+        return user_analytics
+    except Exception as e:
+        print(f"Error in analytics users: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

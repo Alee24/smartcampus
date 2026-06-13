@@ -206,6 +206,22 @@ export default function VehicleIntel() {
     const exitedCount = logs.filter(v => v.exit_time).length
     const totalRegistered = vehicles.length
 
+    const getAverageStay = () => {
+        const completedLogs = logs.filter(l => l.exit_time && l.time)
+        if (completedLogs.length === 0) return '0m'
+        const totalMinutes = completedLogs.reduce((acc, log) => {
+            const entry = new Date(log.time || log.entry_time).getTime()
+            const exit = new Date(log.exit_time).getTime()
+            return acc + (exit - entry) / (1000 * 60)
+        }, 0)
+        const avg = totalMinutes / completedLogs.length
+        if (avg < 60) return `${Math.round(avg)}m`
+        const hrs = Math.floor(avg / 60)
+        const mins = Math.round(avg % 60)
+        return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`
+    }
+    const avgStayDuration = getAverageStay()
+
     return (
         <div className="animate-fade-in p-2">
             <header className="mb-8 flex justify-between items-end">
@@ -238,7 +254,7 @@ export default function VehicleIntel() {
             </header>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div className="glass-card p-4 border-l-4 border-blue-500">
                     <div className="flex items-center justify-between">
                         <div>
@@ -264,6 +280,15 @@ export default function VehicleIntel() {
                             <p className="text-3xl font-bold text-gray-600">{exitedCount}</p>
                         </div>
                         <ArrowUpCircle className="text-gray-500" size={32} />
+                    </div>
+                </div>
+                <div className="glass-card p-4 border-l-4 border-indigo-500">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-[var(--text-secondary)]">Avg Stay Duration</p>
+                            <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{avgStayDuration}</p>
+                        </div>
+                        <Clock className="text-indigo-500" size={32} />
                     </div>
                 </div>
             </div>
@@ -370,6 +395,7 @@ export default function VehicleIntel() {
                                     <th className="p-4">Plate No.</th>
                                     <th className="p-4">Details</th>
                                     <th className="p-4">{viewMode === 'fleet' ? 'Last Activity' : 'Timestamps'}</th>
+                                    {viewMode === 'logs' && <th className="p-4">Stay Duration</th>}
                                     <th className="p-4">Status</th>
                                     <th className="p-4 text-center">Action</th>
                                 </tr>
@@ -419,7 +445,7 @@ export default function VehicleIntel() {
                                 ) : (
                                     // LOGS VIEW
                                     filteredLogs.length === 0 ? (
-                                        <tr><td colSpan={5} className="p-8 text-center text-gray-400">No logs found.</td></tr>
+                                        <tr><td colSpan={6} className="p-8 text-center text-gray-400">No logs found.</td></tr>
                                     ) : (
                                         filteredLogs.map((v, i) => {
                                             const isParked = !v.exit_time
@@ -433,6 +459,27 @@ export default function VehicleIntel() {
                                                     <td className="p-4 text-sm font-mono">
                                                         <div className="flex items-center gap-1"><ArrowDownCircle size={12} className="text-green-500" /> {formatTime(v.time)}</div>
                                                         {v.exit_time && <div className="flex items-center gap-1 mt-1"><ArrowUpCircle size={12} className="text-gray-500" /> {formatTime(v.exit_time)}</div>}
+                                                    </td>
+                                                    <td className="p-4 text-sm font-semibold">
+                                                        {(() => {
+                                                            const entry = new Date(v.time || v.entry_time).getTime()
+                                                            const exit = v.exit_time ? new Date(v.exit_time).getTime() : new Date().getTime()
+                                                            const diffMins = Math.round((exit - entry) / (1000 * 60))
+                                                            
+                                                            if (!v.exit_time) {
+                                                                const color = diffMins > 360 ? 'text-red-650 bg-red-500/10' : diffMins > 120 ? 'text-amber-600 bg-amber-500/10' : 'text-green-600 bg-green-500/10'
+                                                                return (
+                                                                    <span className={`px-2 py-1 rounded-md text-xs font-bold ${color}`}>
+                                                                        {diffMins < 60 ? `${diffMins}m` : `${Math.floor(diffMins / 60)}h ${diffMins % 60}m`}
+                                                                    </span>
+                                                                )
+                                                            }
+                                                            return (
+                                                                <span className="text-gray-500 dark:text-gray-400 font-mono">
+                                                                    {diffMins < 60 ? `${diffMins}m` : `${Math.floor(diffMins / 60)}h ${diffMins % 60}m`}
+                                                                </span>
+                                                            )
+                                                        })()}
                                                     </td>
                                                     <td className="p-4">
                                                         <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${isParked ? 'text-green-500 bg-green-500/10' : 'text-gray-500 bg-gray-500/10'}`}>
@@ -491,6 +538,30 @@ export default function VehicleIntel() {
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div className="glass-card p-6 h-fit mt-6">
+                    <h3 className="font-bold mb-4 flex items-center gap-2 text-indigo-600"><Clock size={18} /> Longest Stays Today</h3>
+                    {stats && stats.longest_stays && stats.longest_stays.length > 0 ? (
+                        <div className="space-y-3">
+                            {stats.longest_stays.map((s: any, idx: number) => (
+                                <div key={idx} className="p-3 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] flex justify-between items-center">
+                                    <div>
+                                        <div className="font-mono font-bold text-sm text-[var(--text-primary)]">{s.plate}</div>
+                                        <div className="text-[10px] text-[var(--text-secondary)]">{s.make} ({s.driver})</div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="font-bold text-xs text-indigo-650 dark:text-indigo-400">{s.duration_fmt}</div>
+                                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-black ${s.status === 'Parked' ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'}`}>
+                                            {s.status.toUpperCase()}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-xs text-[var(--text-secondary)] text-center py-4">No stay logs computed for today yet.</p>
+                    )}
                 </div>
             </div>
 

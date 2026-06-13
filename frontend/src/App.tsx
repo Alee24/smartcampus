@@ -66,6 +66,7 @@ const AssetManagement = lazy(() => import('./AssetManagement'))
 const IncidentReporting = lazy(() => import('./IncidentReporting'))
 const LostAndFound = lazy(() => import('./LostAndFound'))
 const VisitorCenter = lazy(() => import('./VisitorCenter'))
+const Analytics = lazy(() => import('./Analytics'))
 
 // 3. Non-lazy components (small/critical)
 import InstallPWA, { InstallPWATrigger } from './components/InstallPWA'
@@ -1065,7 +1066,8 @@ function App() {
                 'lost-found': true,
                 'reports': true,
                 'gates-dashboard': true,
-                'visitor-center': true
+                'visitor-center': true,
+                'analytics': true
             },
             'Stores': {
                 'dashboard': true,
@@ -1210,7 +1212,8 @@ function App() {
                 'incidents': true,
                 'lost-found': true,
                 'self-service': true,
-                'visitor-center': true
+                'visitor-center': true,
+                'analytics': true
             },
             'SuperAdmin': {
                 'dashboard': true,
@@ -1234,7 +1237,8 @@ function App() {
                 'incidents': true,
                 'lost-found': true,
                 'self-service': true,
-                'visitor-center': true
+                'visitor-center': true,
+                'analytics': true
             }
         }
     }
@@ -1584,6 +1588,14 @@ function App() {
                                 label="Visitor Center"
                                 active={activeTab === 'visitor-center'}
                                 onClick={() => { setActiveTab('visitor-center'); setSidebarOpen(false); }}
+                            />
+                        )}
+                        {isMenuEnabled('analytics') && (
+                            <NavItem
+                                icon={<BarChart3 size={18} />}
+                                label="Stay Analytics"
+                                active={activeTab === 'analytics'}
+                                onClick={() => { setActiveTab('analytics'); setSidebarOpen(false); }}
                             />
                         )}
                         {isMenuEnabled('vehicles') && (
@@ -2193,6 +2205,7 @@ function App() {
                     {activeTab === 'dashboard' && role === 'Driver' && <DriverDashboard currentUser={currentUser} onNavigate={setActiveTab} />}
                     {activeTab === 'visitors' && <VisitorManagement />}
                     {activeTab === 'visitor-center' && <VisitorCenter />}
+                    {activeTab === 'analytics' && <Analytics />}
                     {activeTab === 'self-service' && <SelfServiceEntry />}
                     {activeTab === 'calendar' && <CampusCalendar />}
                     {activeTab === 'dashboard' && role !== 'Guardian' && role !== 'Security' && role !== 'Security Lead' && role !== 'Guard' && role !== 'Student' && role !== 'Lecturer' && role !== 'Staff' && role !== 'Guest' && role !== 'Management' && role !== 'Stores' && role !== 'Driver' && (

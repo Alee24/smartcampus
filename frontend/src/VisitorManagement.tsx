@@ -1214,6 +1214,23 @@ export default function VisitorManagement() {
                                             {selectedDetailVisitor.time_out ? new Date(selectedDetailVisitor.time_out).toLocaleString() : '-'}
                                         </span>
                                     </div>
+                                    {selectedDetailVisitor.time_in && (
+                                        <div>
+                                            <span className="text-slate-400 font-bold block text-[10px]">DURATION SPENT</span>
+                                            <span className="font-semibold text-purple-600 dark:text-purple-400">
+                                                {(() => {
+                                                    const tIn = new Date(selectedDetailVisitor.time_in).getTime();
+                                                    const tOut = selectedDetailVisitor.time_out ? new Date(selectedDetailVisitor.time_out).getTime() : new Date().getTime();
+                                                    const diffMins = Math.round((tOut - tIn) / (1000 * 60));
+                                                    if (!selectedDetailVisitor.time_out) {
+                                                        return `Inside for ${diffMins < 60 ? `${diffMins}m` : `${Math.floor(diffMins / 60)}h ${diffMins % 60}m`}`;
+                                                    }
+                                                    if (diffMins < 60) return `${diffMins}m`;
+                                                    return `${Math.floor(diffMins / 60)}h ${diffMins % 60}m`;
+                                                })()}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

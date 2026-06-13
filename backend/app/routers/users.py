@@ -1975,6 +1975,13 @@ async def get_user_entry_logs(
     for log in logs:
         gate = await session.get(Gate, log.gate_id)
         exit_gate = await session.get(Gate, log.exit_gate_id) if log.exit_gate_id else None
+        
+        duration_minutes = None
+        if log.entry_time and log.exit_time:
+            duration_minutes = round((log.exit_time - log.entry_time).total_seconds() / 60, 1)
+        elif log.entry_time:
+            duration_minutes = round((get_eat_time() - log.entry_time).total_seconds() / 60, 1) # Active stay duration
+
         results.append({
             "id": str(log.id),
             "entry_time": log.entry_time.isoformat() if log.entry_time else None,
@@ -1982,7 +1989,8 @@ async def get_user_entry_logs(
             "method": log.method,
             "status": log.status,
             "gate_name": gate.name if gate else "Main Gate",
-            "exit_gate_name": exit_gate.name if exit_gate else None
+            "exit_gate_name": exit_gate.name if exit_gate else None,
+            "duration_minutes": duration_minutes
         })
     return results
 
