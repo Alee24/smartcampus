@@ -14,7 +14,7 @@ export default function AllScansDownload() {
     const [downloading, setDownloading] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
     const [currentPage, setCurrentPage] = useState(1)
-    const itemsPerPage = 10
+    const itemsPerPage = 8
 
     // Tab state: 'units' or 'scans'
     const [activeSubTab, setActiveSubTab] = useState<'units' | 'scans'>('units')
@@ -31,7 +31,7 @@ export default function AllScansDownload() {
     const [showQRModal, setShowQRModal] = useState(false)
     const [courseSearchQuery, setCourseSearchQuery] = useState('')
     const [coursesPage, setCoursesPage] = useState(1)
-    const coursesPerPage = 10
+    const coursesPerPage = 8
 
     const fetchLogs = async () => {
         setLoading(true)

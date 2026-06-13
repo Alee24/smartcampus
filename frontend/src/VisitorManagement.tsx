@@ -22,6 +22,11 @@ export default function VisitorManagement() {
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
     const [activeTab, setActiveTab] = useState<'pending' | 'active' | 'exited' | 'all'>('pending')
+    const [currentPage, setCurrentPage] = useState(1)
+
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [search, activeTab])
     const [stats, setStats] = useState<{
         total_today: number;
         active_now: number;
@@ -345,6 +350,38 @@ export default function VisitorManagement() {
         (v.plate_number || '').toLowerCase().includes(search.toLowerCase())
     )
 
+    const itemsPerPage = 8
+    const totalPages = Math.ceil(filteredVisitors.length / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const paginatedVisitors = filteredVisitors.slice(startIndex, startIndex + itemsPerPage)
+
+    const renderPagination = () => {
+        if (totalPages <= 1) return null
+        return (
+            <div className="flex items-center justify-between p-4 border-t border-[var(--border-color)] bg-[var(--bg-surface)] text-xs font-semibold rounded-b-2xl">
+                <span className="text-[var(--text-secondary)]">
+                    Page {currentPage} of {totalPages}
+                </span>
+                <div className="flex gap-2">
+                    <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        className="px-3 py-1.5 border border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--border-color)] text-[var(--text-primary)] disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer"
+                    >
+                        Previous
+                    </button>
+                    <button
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        className="px-3 py-1.5 border border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--border-color)] text-[var(--text-primary)] disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer"
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     const pendingCount = visitors.filter(v => v.status === 'pending').length
 
     return (
@@ -588,7 +625,7 @@ export default function VisitorManagement() {
                             No pending registrations to verify.
                         </div>
                     ) : (
-                        filteredVisitors.map(req => (
+                        paginatedVisitors.map(req => (
                             <div key={req.id} className="p-6 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-sm flex flex-col justify-between hover:shadow-md transition-all gap-5 relative">
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-start">
@@ -776,6 +813,7 @@ export default function VisitorManagement() {
                         ))
                     )}
                 </div>
+                {activeTab === 'pending' && renderPagination()}
             )}
 
             {/* Standard Visitor Logs Table (For active, exited and all logs) */}
@@ -801,7 +839,7 @@ export default function VisitorManagement() {
                                 ) : filteredVisitors.length === 0 ? (
                                     <tr><td colSpan={8} className="p-8 text-center text-[var(--text-secondary)]">No logs found.</td></tr>
                                 ) : (
-                                    filteredVisitors.map(visitor => (
+                                    paginatedVisitors.map(visitor => (
                                         <tr key={visitor.id} className="hover:bg-[var(--bg-surface)] transition-colors text-sm">
                                             <td className="p-4">
                                                 <div className="flex items-center gap-3">
@@ -893,6 +931,7 @@ export default function VisitorManagement() {
                             </tbody>
                         </table>
                     </div>
+                    {renderPagination()}
                 </div>
             )}
 

@@ -42,6 +42,11 @@ export default function VehicleIntel() {
 
     // Selected vehicle log details modal
     const [selectedLog, setSelectedLog] = useState<any | null>(null)
+    const [currentPage, setCurrentPage] = useState(1)
+
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [searchQuery, viewMode])
 
     const fetchData = async () => {
         const token = localStorage.getItem('token')
@@ -200,6 +205,44 @@ export default function VehicleIntel() {
         const q = searchQuery.toLowerCase()
         return !q || v.plate?.toLowerCase().includes(q) || v.make?.toLowerCase().includes(q)
     })
+
+    const itemsPerPage = 8
+
+    // Paginate fleet view
+    const totalFleetPages = Math.ceil(fleetList.length / itemsPerPage)
+    const paginatedFleet = fleetList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+    // Paginate logs view
+    const totalLogPages = Math.ceil(filteredLogs.length / itemsPerPage)
+    const paginatedLogs = filteredLogs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+    const renderPagination = () => {
+        const totalPages = viewMode === 'fleet' ? totalFleetPages : totalLogPages
+        if (totalPages <= 1) return null
+        return (
+            <div className="flex items-center justify-between p-4 border-t border-[var(--border-color)] bg-[var(--bg-surface)] text-xs font-semibold">
+                <span className="text-[var(--text-secondary)]">
+                    Page {currentPage} of {totalPages}
+                </span>
+                <div className="flex gap-2">
+                    <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        className="px-3 py-1.5 border border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--border-color)] text-[var(--text-primary)] disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer"
+                    >
+                        Previous
+                    </button>
+                    <button
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        className="px-3 py-1.5 border border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--border-color)] text-[var(--text-primary)] disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer"
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
+        )
+    }
 
     // Stats
     const parkedCount = logs.filter(v => !v.exit_time).length
@@ -403,10 +446,10 @@ export default function VehicleIntel() {
                             <tbody className="divide-y divide-[var(--border-color)]">
                                 {viewMode === 'fleet' ? (
                                     // FLEET VIEW
-                                    fleetList.length === 0 ? (
+                                    paginatedFleet.length === 0 ? (
                                         <tr><td colSpan={5} className="p-8 text-center text-gray-400">No registered vehicles found.</td></tr>
                                     ) : (
-                                        fleetList.map((v, i) => (
+                                        paginatedFleet.map((v, i) => (
                                             <tr key={i} className="hover:bg-[var(--bg-primary)] transition-colors">
                                                 <td className="p-4 font-mono font-bold text-lg">{v.plate_number}</td>
                                                 <td className="p-4">
@@ -444,10 +487,10 @@ export default function VehicleIntel() {
                                     )
                                 ) : (
                                     // LOGS VIEW
-                                    filteredLogs.length === 0 ? (
+                                    paginatedLogs.length === 0 ? (
                                         <tr><td colSpan={6} className="p-8 text-center text-gray-400">No logs found.</td></tr>
                                     ) : (
-                                        filteredLogs.map((v, i) => {
+                                        paginatedLogs.map((v, i) => {
                                             const isParked = !v.exit_time
                                             return (
                                                 <tr key={i} className="hover:bg-[var(--bg-primary)] transition-colors">
@@ -510,11 +553,13 @@ export default function VehicleIntel() {
                                             )
                                         })
                                     )
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                )
+                            )}
+                        </tbody>
+                    </table>
                 </div>
+                {renderPagination()}
+            </div>
 
                 <div className="glass-card p-6 h-fit">
                     <h3 className="font-bold mb-4 flex items-center gap-2"><AlertTriangle size={18} className="text-yellow-500" /> Watchlist</h3>

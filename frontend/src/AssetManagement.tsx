@@ -258,7 +258,7 @@ export default function AssetManagement({ initialView = 'assets' }: { initialVie
         }
     }, [activeTab, assets])
 
-    const itemsPerPage = 10
+    const itemsPerPage = 8
     const totalPages = Math.max(1, Math.ceil(assets.length / itemsPerPage))
     const safeCurrentPage = Math.min(currentPage, totalPages)
     const indexOfLastItem = safeCurrentPage * itemsPerPage

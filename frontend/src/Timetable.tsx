@@ -752,7 +752,7 @@ export default function Timetable() {
 
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {(() => {
-                            const itemsPerPage = 9;
+                            const itemsPerPage = 8;
                             const startIndex = (classroomPage - 1) * itemsPerPage;
                             const paginated = classrooms.slice(startIndex, startIndex + itemsPerPage);
                             return paginated.map(room => (

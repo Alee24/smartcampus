@@ -30,7 +30,7 @@ export default function AuditLogs() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const itemsPerPage = 8;
 
     // Security PIN states
     const [pinPromptOpen, setPinPromptOpen] = useState(false);

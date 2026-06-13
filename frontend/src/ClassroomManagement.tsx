@@ -605,7 +605,7 @@ export default function ClassroomManagement() {
 
                         return a.room_code.localeCompare(b.room_code)
                     });
-                    const itemsPerPage = 9;
+                    const itemsPerPage = 8;
                     const paginated = sorted.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
                     return paginated.map((room) => {
                         const isEditing = editingRoom?.id === room.id

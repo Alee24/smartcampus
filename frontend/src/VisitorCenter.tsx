@@ -49,6 +49,11 @@ export default function VisitorCenter() {
     const [selectedStatus, setSelectedStatus] = useState<string>('all')
     const [selectedDate, setSelectedDate] = useState<string>('')
     const [previewImage, setPreviewImage] = useState<{ src: string, title: string } | null>(null)
+    const [currentPage, setCurrentPage] = useState(1)
+
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [searchQuery, selectedType, selectedStatus, selectedDate])
 
     useEffect(() => {
         fetchData()
@@ -107,6 +112,38 @@ export default function VisitorCenter() {
 
         return matchesSearch && matchesType && matchesStatus && matchesDate
     })
+
+    const itemsPerPage = 8
+    const totalPages = Math.ceil(filteredLogs.length / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const paginatedLogs = filteredLogs.slice(startIndex, startIndex + itemsPerPage)
+
+    const renderPagination = () => {
+        if (totalPages <= 1) return null
+        return (
+            <div className="flex items-center justify-between p-4 border-t border-[var(--border-color)] bg-[var(--bg-surface)] text-xs font-semibold rounded-b-2xl">
+                <span className="text-[var(--text-secondary)]">
+                    Page {currentPage} of {totalPages}
+                </span>
+                <div className="flex gap-2">
+                    <button
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        className="px-3 py-1.5 border border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--border-color)] text-[var(--text-primary)] disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer"
+                    >
+                        Previous
+                    </button>
+                    <button
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        className="px-3 py-1.5 border border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--border-color)] text-[var(--text-primary)] disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer"
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
+        )
+    }
 
     // Export to CSV
     const handleExportCSV = () => {
@@ -330,14 +367,14 @@ export default function VisitorCenter() {
                                         Synchronizing Log Data...
                                     </td>
                                 </tr>
-                            ) : filteredLogs.length === 0 ? (
+                            ) : paginatedLogs.length === 0 ? (
                                 <tr>
                                     <td colSpan={8} className="p-12 text-center text-[var(--text-secondary)] font-bold">
                                         No visitor logs match your search criteria.
                                     </td>
                                 </tr>
                             ) : (
-                                filteredLogs.map((log) => {
+                                paginatedLogs.map((log) => {
                                     const timeIn = new Date(log.time_in).toLocaleString()
                                     const timeOut = log.time_out ? new Date(log.time_out).toLocaleString() : 'Still Inside'
 
@@ -459,6 +496,7 @@ export default function VisitorCenter() {
                         </tbody>
                     </table>
                 </div>
+                {renderPagination()}
             </div>
 
             {/* Portal mounted zoom image dialog */}

@@ -17,7 +17,9 @@ import android.provider.MediaStore;
 import android.text.InputType;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.CookieManager;
+import android.widget.FrameLayout;
 import android.webkit.GeolocationPermissions;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -53,7 +55,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private static final String PREFS_NAME = "SmartCampusPrefs";
     private static final String KEY_SERVER_URL = "server_url";
-    private static final String DEFAULT_URL = "http://10.0.2.2:9613"; // Default for emulator host
+    private static final String DEFAULT_URL = "https://smartcampus.ru.ac.ke/"; // Default smartcampus portal
 
     private static final int REQUEST_CODE_PERMISSIONS = 1001;
     private static final int INPUT_FILE_REQUEST_CODE = 1;
@@ -62,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar mProgressBar;
     private SwipeRefreshLayout mSwipeRefresh;
     private LinearLayout mLayoutOffline;
+    private LinearLayout mLayoutSplash;
     private String mServerUrl;
 
     private ValueCallback<Uri[]> mFilePathCallback;
@@ -74,15 +77,16 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Load configured Server URL
+        // Load configured Server URL (defaults to null to prompt on first run)
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        mServerUrl = prefs.getString(KEY_SERVER_URL, DEFAULT_URL);
+        mServerUrl = prefs.getString(KEY_SERVER_URL, null);
 
         // Initialize UI Elements
         mWebView = findViewById(R.id.webView);
         mProgressBar = findViewById(R.id.progressBar);
         mSwipeRefresh = findViewById(R.id.swipeRefreshLayout);
         mLayoutOffline = findViewById(R.id.layoutOffline);
+        mLayoutSplash = findViewById(R.id.layoutSplash);
 
         Button btnRetry = findViewById(R.id.btnRetry);
         Button btnSettings = findViewById(R.id.btnSettings);
@@ -104,8 +108,15 @@ public class MainActivity extends AppCompatActivity {
         // Initialize and Setup WebView
         setupWebView();
 
-        // Load current URL
-        loadUrl(mServerUrl);
+        // Load current URL if configured, otherwise prompt user
+        if (mServerUrl == null) {
+            if (mLayoutSplash != null) {
+                mLayoutSplash.setVisibility(View.GONE); // Hide splash loader to let user interact with setup dialog
+            }
+            showInitialUrlConfigDialog();
+        } else {
+            loadUrl(mServerUrl);
+        }
 
         // Check Permissions Proactively
         checkAndRequestPermissions();
@@ -148,6 +159,9 @@ public class MainActivity extends AppCompatActivity {
                 super.onPageFinished(view, url);
                 mProgressBar.setVisibility(View.GONE);
                 mSwipeRefresh.setRefreshing(false);
+                if (mLayoutSplash != null) {
+                    mLayoutSplash.setVisibility(View.GONE);
+                }
             }
 
             @Override
@@ -155,6 +169,9 @@ public class MainActivity extends AppCompatActivity {
                 super.onReceivedError(view, request, error);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     Log.e(TAG, "WebView error: " + error.getDescription() + " (Code: " + error.getErrorCode() + ")");
+                }
+                if (mLayoutSplash != null) {
+                    mLayoutSplash.setVisibility(View.GONE);
                 }
                 // Only trigger offline screen for main frame load failures
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -311,7 +328,7 @@ public class MainActivity extends AppCompatActivity {
             String newUrl = input.getText().toString().trim();
             if (!newUrl.isEmpty()) {
                 if (!newUrl.startsWith("http://") && !newUrl.startsWith("https://")) {
-                    newUrl = "http://" + newUrl;
+                    newUrl = "https://" + newUrl;
                 }
                 mServerUrl = newUrl;
                 SharedPreferences.Editor editor = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit();
@@ -319,12 +336,63 @@ public class MainActivity extends AppCompatActivity {
                 editor.apply();
                 
                 Toast.makeText(MainActivity.this, "URL updated to: " + mServerUrl, Toast.LENGTH_SHORT).show();
+                if (mLayoutSplash != null) {
+                    mLayoutSplash.setVisibility(View.VISIBLE);
+                }
                 loadUrl(mServerUrl);
             }
         });
 
         builder.setNegativeButton(R.string.dialog_cancel, (dialog, which) -> dialog.cancel());
         builder.show();
+    }
+
+    private void showInitialUrlConfigDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Smart Campus Setup");
+        builder.setMessage("Please enter the server website URL to connect:");
+        builder.setCancelable(false);
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        input.setHint("https://smartcampus.ru.ac.ke");
+
+        int paddingDp = 20;
+        float density = getResources().getDisplayMetrics().density;
+        int paddingPx = (int)(paddingDp * density);
+        FrameLayout container = new FrameLayout(this);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.leftMargin = paddingPx;
+        params.rightMargin = paddingPx;
+        input.setLayoutParams(params);
+        container.addView(input);
+        builder.setView(container);
+
+        builder.setPositiveButton("Connect", null);
+
+        final AlertDialog dialog = builder.create();
+        dialog.show();
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String url = input.getText().toString().trim();
+            if (url.isEmpty()) {
+                input.setError("URL is required");
+                return;
+            }
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                url = "https://" + url;
+            }
+            mServerUrl = url;
+            SharedPreferences.Editor editor = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit();
+            editor.putString(KEY_SERVER_URL, mServerUrl);
+            editor.apply();
+
+            dialog.dismiss();
+            if (mLayoutSplash != null) {
+                mLayoutSplash.setVisibility(View.VISIBLE);
+            }
+            loadUrl(mServerUrl);
+        });
     }
 
     private void checkAndRequestPermissions() {

@@ -19,7 +19,7 @@ export default function IDPrinting() {
         logo_url: ''
     })
     const [currentPage, setCurrentPage] = useState(1)
-    const itemsPerPage = 10
+    const itemsPerPage = 8
 
     const cardsRef = useRef<HTMLDivElement>(null)
 

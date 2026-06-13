@@ -28,7 +28,7 @@ export default function Users() {
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1)
-    const usersPerPage = 10
+    const usersPerPage = 8
 
     useEffect(() => {
         fetchUsers()
@@ -1589,7 +1589,7 @@ export function UserDetailPanel({ user, onClose, onRefresh }: any) {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-150 dark:divide-gray-850 text-xs font-semibold text-gray-800 dark:text-gray-200">
-                                                {logs.map((log) => {
+                                                {logs.slice(0, 8).map((log) => {
                                                     const dateStr = log.entry_time ? new Date(log.entry_time).toLocaleDateString() : 'N/A';
                                                     const entryTimeStr = log.entry_time ? new Date(log.entry_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
                                                     const exitTimeStr = log.exit_time ? new Date(log.exit_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;

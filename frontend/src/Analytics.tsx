@@ -70,6 +70,15 @@ export default function Analytics() {
     const [activeTab, setActiveTab] = useState<'overview' | 'visitors' | 'vehicles' | 'users'>('overview')
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedUser, setSelectedUser] = useState<any | null>(null)
+    const [visitorPage, setVisitorPage] = useState(1)
+    const [vehiclePage, setVehiclePage] = useState(1)
+    const [userPage, setUserPage] = useState(1)
+
+    useEffect(() => {
+        setVisitorPage(1)
+        setVehiclePage(1)
+        setUserPage(1)
+    }, [searchQuery, activeTab])
 
     const fetchData = async () => {
         setLoading(true)
@@ -179,6 +188,44 @@ export default function Analytics() {
         const q = searchQuery.toLowerCase()
         return !q || u.full_name.toLowerCase().includes(q) || u.role.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
     })
+
+    const ITEMS_PER_PAGE = 8
+
+    const totalVisitorPages = Math.ceil(filteredVisitors.length / ITEMS_PER_PAGE)
+    const paginatedVisitors = filteredVisitors.slice((visitorPage - 1) * ITEMS_PER_PAGE, visitorPage * ITEMS_PER_PAGE)
+
+    const totalVehiclePages = Math.ceil(filteredVehicles.length / ITEMS_PER_PAGE)
+    const paginatedVehicles = filteredVehicles.slice((vehiclePage - 1) * ITEMS_PER_PAGE, vehiclePage * ITEMS_PER_PAGE)
+
+    const totalUserPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE)
+    const paginatedUsers = filteredUsers.slice((userPage - 1) * ITEMS_PER_PAGE, userPage * ITEMS_PER_PAGE)
+
+    const renderPagination = (currentPage: number, totalPages: number, setPage: (page: number) => void) => {
+        if (totalPages <= 1) return null
+        return (
+            <div className="flex items-center justify-between p-4 border-t border-[var(--border-color)] bg-[var(--bg-surface)] text-xs font-semibold">
+                <span className="text-[var(--text-secondary)]">
+                    Page {currentPage} of {totalPages}
+                </span>
+                <div className="flex gap-2">
+                    <button
+                        disabled={currentPage === 1}
+                        onClick={() => setPage(currentPage - 1)}
+                        className="px-3 py-1.5 border border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--border-color)] text-[var(--text-primary)] disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer"
+                    >
+                        Previous
+                    </button>
+                    <button
+                        disabled={currentPage === totalPages}
+                        onClick={() => setPage(currentPage + 1)}
+                        className="px-3 py-1.5 border border-[var(--border-color)] rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--border-color)] text-[var(--text-primary)] disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer"
+                    >
+                        Next
+                    </button>
+                </div>
+            </div>
+        )
+    }
 
     // Recharts Data Prep
     const overviewChartData = stats ? [
@@ -335,12 +382,12 @@ export default function Analytics() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[var(--border-color)] text-xs font-semibold">
-                                    {filteredVisitors.length === 0 ? (
+                                    {paginatedVisitors.length === 0 ? (
                                         <tr>
                                             <td colSpan={7} className="p-8 text-center text-[var(--text-secondary)]">No visitor stay records found.</td>
                                         </tr>
                                     ) : (
-                                        filteredVisitors.map(v => {
+                                        paginatedVisitors.map(v => {
                                             const duration = v.time_in && v.time_out
                                                 ? Math.round((new Date(v.time_out).getTime() - new Date(v.time_in).getTime()) / (1000 * 60))
                                                 : null
@@ -375,6 +422,7 @@ export default function Analytics() {
                                 </tbody>
                             </table>
                         </div>
+                        {renderPagination(visitorPage, totalVisitorPages, setVisitorPage)}
                     )}
 
                     {/* Vehicles Tab Data */}
@@ -393,12 +441,12 @@ export default function Analytics() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[var(--border-color)] text-xs font-semibold">
-                                    {filteredVehicles.length === 0 ? (
+                                    {paginatedVehicles.length === 0 ? (
                                         <tr>
                                             <td colSpan={7} className="p-8 text-center text-[var(--text-secondary)]">No vehicle stay logs found.</td>
                                         </tr>
                                     ) : (
-                                        filteredVehicles.map(v => (
+                                        paginatedVehicles.map(v => (
                                             <tr key={v.id} className="hover:bg-[var(--bg-primary)]/10 transition-colors">
                                                 <td className="p-4 font-mono font-bold text-lg text-indigo-650 dark:text-indigo-400">{v.plate}</td>
                                                 <td className="p-4">
@@ -427,6 +475,7 @@ export default function Analytics() {
                                 </tbody>
                             </table>
                         </div>
+                        {renderPagination(vehiclePage, totalVehiclePages, setVehiclePage)}
                     )}
 
                     {/* Users Tab Data */}
@@ -445,12 +494,12 @@ export default function Analytics() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-[var(--border-color)] text-xs font-semibold">
-                                    {filteredUsers.length === 0 ? (
+                                    {paginatedUsers.length === 0 ? (
                                         <tr>
                                             <td colSpan={7} className="p-8 text-center text-[var(--text-secondary)]">No user stay activity found.</td>
                                         </tr>
                                     ) : (
-                                        filteredUsers.map(u => (
+                                        paginatedUsers.map(u => (
                                             <tr key={u.id} className="hover:bg-[var(--bg-primary)]/10 transition-colors">
                                                 <td className="p-4">
                                                     <div className="font-bold text-[var(--text-primary)]">{u.full_name}</div>
@@ -488,6 +537,7 @@ export default function Analytics() {
                                 </tbody>
                             </table>
                         </div>
+                        {renderPagination(userPage, totalUserPages, setUserPage)}
                     )}
                 </div>
             )}
