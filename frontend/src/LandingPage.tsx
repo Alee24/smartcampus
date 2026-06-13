@@ -1,4 +1,4 @@
-import { Shield, QrCode, Clock, CheckCircle, ArrowRight, Smartphone, Lock, BarChart3, Bell, UserCheck, Activity, Database, Zap, Phone, ShieldAlert, Award, Sliders, Server, User, Video, Megaphone, HelpCircle, Key, KeyRound, Check, RefreshCw } from 'lucide-react'
+import { Shield, QrCode, Clock, CheckCircle, ArrowRight, Smartphone, Lock, BarChart3, Bell, UserCheck, Activity, Database, Zap, Phone, ShieldAlert, Award, Sliders, Server, User, Video, Megaphone, HelpCircle, Key, KeyRound, Check, RefreshCw, Nfc } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import StudentVerification from './StudentVerification'
 
@@ -249,18 +249,24 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                                     <div className="group w-full max-w-[280px] h-[160px] [perspective:1000px] cursor-pointer mx-auto">
                                         <div className="relative w-full h-full rounded-2xl shadow-xl transition-all duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
                                             {/* Front */}
-                                            <div className="absolute inset-0 w-full h-full rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-4 text-white flex flex-col justify-between [backface-visibility:hidden] border border-blue-500/20">
-                                                <div className="flex justify-between items-start">
-                                                    <span className="text-[10px] font-black tracking-widest uppercase">Smart Campus Card</span>
-                                                    <div className="w-8 h-6 bg-gradient-to-r from-amber-400 to-yellow-300 rounded-md opacity-90 flex items-center justify-center border border-yellow-500/30">
-                                                        <div className="w-4 h-4 border border-indigo-950/20 rounded"></div>
-                                                    </div>
-                                                </div>
-                                                <div className="mt-2">
-                                                    <div className="text-sm font-black tracking-wide truncate">{companySettings.company_name}</div>
-                                                    <div className="text-[9px] opacity-75 mt-0.5 uppercase tracking-widest font-bold">RFID/NFC ACTIVE</div>
-                                                </div>
-                                            </div>
+                                             <div className="absolute inset-0 w-full h-full rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-4 text-white flex flex-col justify-between [backface-visibility:hidden] border border-blue-500/20">
+                                                 <div className="flex justify-between items-center">
+                                                     <span className="text-[10px] font-black tracking-widest uppercase">Smart Campus Card</span>
+                                                     <Nfc size={18} className="text-white animate-pulse" />
+                                                 </div>
+                                                 <div className="flex-1 flex items-center justify-center my-1.5">
+                                                     <div className="p-1.5 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
+                                                         <QrCode size={36} className="text-white" />
+                                                     </div>
+                                                 </div>
+                                                 <div className="mt-1 flex justify-between items-end">
+                                                     <div>
+                                                         <div className="text-xs font-black tracking-wide truncate max-w-[170px]">{companySettings.company_name}</div>
+                                                         <div className="text-[8px] opacity-75 mt-0.5 uppercase tracking-widest font-bold">RFID/NFC ACTIVE</div>
+                                                     </div>
+                                                     <span className="text-[8px] opacity-50 font-mono">ID: 849A-38C0</span>
+                                                 </div>
+                                             </div>
                                             {/* Back */}
                                             <div className="absolute inset-0 w-full h-full rounded-2xl bg-slate-900 border border-slate-700 p-4 text-white flex flex-col justify-between [transform:rotateY(180deg)] [backface-visibility:hidden]">
                                                 <div className="w-full h-7 bg-slate-800 rounded"></div>
