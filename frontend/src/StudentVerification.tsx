@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNotification } from './components/Notification'
-import { Search, CheckCircle, XCircle, Shield, Calendar, User, Building, Sparkles, UploadCloud, Loader2, Camera, QrCode, LogIn, LogOut, RefreshCcw, Printer, AlertTriangle, Car, Radio } from 'lucide-react'
+import { Search, CheckCircle, XCircle, Shield, Calendar, User, Building, Sparkles, UploadCloud, Loader2, Camera, QrCode, LogIn, LogOut, RefreshCcw, Printer, AlertTriangle, Car, Radio, Mail } from 'lucide-react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { QRCodeSVG } from 'qrcode.react'
 import html2canvas from 'html2canvas'
@@ -57,6 +57,7 @@ export default function StudentVerification() {
     const [rotation, setRotation] = useState(0)
     const [previewUrl, setPreviewUrl] = useState<string | null>(null)
     const [isPrinting, setIsPrinting] = useState(false)
+    const [emailingId, setEmailingId] = useState(false)
     const [importing, setImporting] = useState(false)
     const qrScannerRef = useRef<Html5Qrcode | null>(null)
     const printRef = useRef<HTMLDivElement>(null)
@@ -775,11 +776,11 @@ export default function StudentVerification() {
             const cardWidth = 85.6
             const cardHeight = 53.98
             pdf.setFontSize(10)
-            pdf.text("Student ID Card (Front)", margin, margin - 5)
+            pdf.text("Smart Campus ID (Front)", margin, margin - 5)
             pdf.addImage(canvasFront.toDataURL('image/png'), 'PNG', margin, margin, cardWidth, cardHeight)
-            pdf.text("Student ID Card (Back)", margin, margin + cardHeight + 15)
+            pdf.text("Smart Campus ID (Back)", margin, margin + cardHeight + 15)
             pdf.addImage(canvasBack.toDataURL('image/png'), 'PNG', margin, margin + cardHeight + 20, cardWidth, cardHeight)
-            pdf.save(`ID_Card_${result.admission_number}.pdf`)
+            pdf.save(`Smart_Campus_ID_${result.admission_number}.pdf`)
             showNotification('ID Card downloaded successfully!', 'success')
         } catch (e) {
             showNotification('Failed to generate PDF', 'error')
@@ -787,6 +788,72 @@ export default function StudentVerification() {
             setIsPrinting(false)
         }
     }
+
+    const handleEmailId = async () => {
+        if (!result) return
+        
+        let targetEmail = result.email || '';
+        if (!targetEmail || !targetEmail.includes('@')) {
+            const entered = prompt("Please enter the visitor's email address to send the ID:", "");
+            if (entered === null) return;
+            if (!entered.trim() || !entered.includes('@')) {
+                showNotification('Invalid email address provided', 'error');
+                return;
+            }
+            targetEmail = entered.trim();
+        }
+
+        setEmailingId(true)
+        showNotification('Generating PDF and preparing email...', 'info')
+        try {
+            const front = document.getElementById(`printable-front-${result.id}`)
+            const back = document.getElementById(`printable-back-${result.id}`)
+            if (!front || !back) {
+                showNotification('Error: Printable elements not found', 'error')
+                return
+            }
+            await document.fonts.ready;
+            const canvasFront = await html2canvas(front, { scale: 3, useCORS: true, backgroundColor: null })
+            const canvasBack = await html2canvas(back, { scale: 3, useCORS: true, backgroundColor: null })
+            const pdf = new jsPDF('p', 'mm', 'a4')
+            const margin = 20
+            const cardWidth = 85.6
+            const cardHeight = 53.98
+            pdf.setFontSize(10)
+            pdf.text("Smart Campus ID (Front)", margin, margin - 5)
+            pdf.addImage(canvasFront.toDataURL('image/png'), 'PNG', margin, margin, cardWidth, cardHeight)
+            pdf.text("Smart Campus ID (Back)", margin, margin + cardHeight + 15)
+            pdf.addImage(canvasBack.toDataURL('image/png'), 'PNG', margin, margin + cardHeight + 20, cardWidth, cardHeight)
+            
+            const pdfBase64 = pdf.output('datauristring')
+            
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/users/email-visitor-id', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    email: targetEmail,
+                    visitor_name: result.full_name || 'Visitor',
+                    pdf_base64: pdfBase64
+                })
+            })
+            
+            if (res.ok) {
+                showNotification(`ID card successfully emailed to ${targetEmail}!`, 'success')
+            } else {
+                const err = await res.json()
+                showNotification(err.detail || 'Failed to email ID card', 'error')
+            }
+        } catch (e) {
+            showNotification('Failed to process and email PDF', 'error')
+        } finally {
+            setEmailingId(false)
+        }
+    }
+
 
     const handleImageUpload = async (file: File) => {
         if (!result) return
@@ -1101,6 +1168,15 @@ export default function StudentVerification() {
                                 >
                                     {isPrinting ? <Loader2 className="animate-spin" size={16} /> : <Printer size={16} />} Print ID
                                 </button>
+                                {(result?.found_in_visitor_logs || result?.found_in_event_visitors) && (
+                                    <button 
+                                        onClick={handleEmailId}
+                                        disabled={emailingId}
+                                        className="py-3 px-4 sm:py-4 sm:px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl sm:rounded-2xl font-bold flex items-center justify-center gap-2 text-xs sm:text-sm transition-all active:scale-95 disabled:opacity-60"
+                                    >
+                                        {emailingId ? <Loader2 className="animate-spin" size={16} /> : <Mail size={16} />} Email ID
+                                    </button>
+                                )}
                                 <button 
                                     onClick={() => setIsFlipped(!isFlipped)} 
                                     className="py-3 px-4 sm:py-4 sm:px-6 bg-[#7A1975] hover:bg-[#60145c] text-white rounded-xl sm:rounded-2xl font-bold flex items-center justify-center gap-2 text-xs sm:text-sm transition-all active:scale-95"
@@ -1382,10 +1458,10 @@ export default function StudentVerification() {
                                                                     </div>
                                                                     <div className="text-[#7A1975] dark:text-teal-400 leading-none min-w-0">
                                                                         <h2 className="font-bold text-2xl tracking-tight uppercase truncate" style={{ fontFamily: "'Museo', sans-serif" }}>
-                                                                            {companySettings.company_name || "Riara University"}
+                                                                            {companySettings.company_name || "Smart Campus"}
                                                                         </h2>
                                                                         <p className="text-[11px] font-bold text-slate-400 dark:text-teal-400/70 uppercase tracking-widest mt-1">
-                                                                            VISITOR PASS
+                                                                            SMART CAMPUS ID
                                                                         </p>
                                                                     </div>
                                                                 </div>
@@ -1440,49 +1516,58 @@ export default function StudentVerification() {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Center-Right Column (Photo & Details) */}
-                                                            <div className="w-[300px] border-l border-slate-200 dark:border-teal-800 bg-slate-100/20 dark:bg-teal-900/20 flex flex-col h-full shrink-0">
-                                                                <div className="w-full h-[330px] flex flex-col items-center justify-center relative border-b border-slate-200 dark:border-teal-800 p-6 bg-slate-50/20 dark:bg-teal-950/40">
-                                                                    {result.profile_image ? (
-                                                                        <img src={result.profile_image} className="w-full h-full object-cover rounded-[1.5rem]" />
-                                                                    ) : (
-                                                                        <div className="w-40 h-40 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center p-3 shadow-md mb-4">
-                                                                            {companySettings.logo_url ? (
-                                                                                <img src={companySettings.logo_url} className="w-full h-full object-contain" />
-                                                                            ) : (
-                                                                                <div className="text-4xl font-bold text-[#7A1975] dark:text-teal-400" style={{ fontFamily: "'Museo', sans-serif" }}>RU</div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="text-center mt-2">
-                                                                        <span className="px-3 py-1 bg-slate-250 dark:bg-teal-500/10 text-slate-700 dark:text-teal-300 border border-slate-300 dark:border-teal-500/20 rounded-full text-[11px] font-bold uppercase tracking-widest">
-                                                                            {result.visitor_type || result.role || "VISITOR"}
-                                                                        </span>
+                                                            {/* Center-Right Column (QR + Last Visit Details) */}
+                                                            <div className="w-[280px] border-l border-slate-200 dark:border-teal-800 bg-slate-50/50 dark:bg-teal-900/20 flex flex-col h-full shrink-0 overflow-hidden">
+                                                                {/* QR Code Section */}
+                                                                <div className="flex flex-col items-center justify-center p-4 border-b border-slate-200 dark:border-teal-800 bg-white dark:bg-teal-950/40">
+                                                                    <div className="p-2 bg-white border-2 border-slate-200 rounded-2xl shadow-lg">
+                                                                        <QRCodeSVG
+                                                                            value={result.admission_number || result.id?.toString() || 'N/A'}
+                                                                            size={130}
+                                                                            level="H"
+                                                                            includeMargin={false}
+                                                                        />
                                                                     </div>
+                                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1.5">Scan to Verify</span>
+                                                                    <span className="text-[11px] font-black text-[#7A1975] dark:text-teal-400 font-mono tracking-wider mt-0.5 truncate max-w-[230px]">
+                                                                        {result.admission_number}
+                                                                    </span>
+                                                                    <span className="mt-1 px-3 py-0.5 bg-teal-100 dark:bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/30 rounded-full text-[9px] font-black uppercase tracking-widest">
+                                                                        {result.visitor_type || result.role || "VISITOR"}
+                                                                    </span>
                                                                 </div>
 
-                                                                {/* Technical Details */}
-                                                                <div className="flex-1 p-6 flex flex-col justify-center text-xs space-y-2.5">
-                                                                    <div className="flex justify-between border-b border-slate-200 dark:border-teal-850 pb-1.5">
-                                                                        <span className="text-slate-400 dark:text-teal-400/60 font-bold uppercase tracking-wider">CATEGORY:</span>
-                                                                        <span className="font-extrabold text-slate-700 dark:text-teal-200 uppercase">{result.visitor_type || "Visitor"}</span>
+                                                                {/* Last Visit Details */}
+                                                                <div className="flex-1 p-3 flex flex-col justify-center text-[10px] space-y-1.5 overflow-hidden">
+                                                                    <p className="text-[9px] font-black text-[#7A1975] dark:text-teal-400 uppercase tracking-widest border-b border-slate-200 dark:border-teal-800 pb-1 mb-1">Last Visit Details</p>
+                                                                    <div className="flex justify-between">
+                                                                        <span className="text-slate-400 font-bold uppercase">Date In:</span>
+                                                                        <span className="font-black text-slate-700 dark:text-teal-200 font-mono text-right">{result.time_in ? formatDateTime(result.time_in) : 'N/A'}</span>
                                                                     </div>
-                                                                    {result.plate_number && (
-                                                                        <div className="flex justify-between border-b border-slate-200 dark:border-teal-850 pb-1.5">
-                                                                            <span className="text-slate-400 dark:text-teal-400/60 font-bold uppercase tracking-wider">CAR PLATE:</span>
-                                                                            <span className="font-extrabold text-slate-700 dark:text-teal-200 font-mono">{result.plate_number}</span>
-                                                                        </div>
-                                                                    )}
+                                                                    <div className="flex justify-between">
+                                                                        <span className="text-slate-400 font-bold uppercase">Date Out:</span>
+                                                                        <span className="font-black text-slate-700 dark:text-teal-200 font-mono text-right">{result.time_out ? formatDateTime(result.time_out) : 'Not yet'}</span>
+                                                                    </div>
                                                                     {result.check_in_student && (
-                                                                        <div className="flex justify-between border-b border-slate-200 dark:border-teal-850 pb-1.5 text-right">
-                                                                            <span className="text-slate-400 dark:text-teal-400/60 font-bold uppercase tracking-wider text-left">HOST / STUDENT:</span>
-                                                                            <span className="font-extrabold text-slate-700 dark:text-teal-200 uppercase truncate max-w-[150px]">{result.check_in_student}</span>
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-slate-400 font-bold uppercase">Host:</span>
+                                                                            <span className="font-black text-slate-700 dark:text-teal-200 truncate max-w-[130px]">{result.check_in_student}</span>
                                                                         </div>
                                                                     )}
+                                                                    {result.plate_number && (
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-slate-400 font-bold uppercase">Plate:</span>
+                                                                            <span className="font-black text-slate-700 dark:text-teal-200 font-mono">{result.plate_number}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex justify-between">
+                                                                        <span className="text-slate-400 font-bold uppercase">Purpose:</span>
+                                                                        <span className="font-black text-slate-700 dark:text-teal-200 truncate max-w-[130px]">{result.visit_details || result.purpose || 'General'}</span>
+                                                                    </div>
                                                                     {result.event_name && (
-                                                                        <div className="flex justify-between border-b border-slate-200 dark:border-teal-855 pb-1.5">
-                                                                            <span className="text-slate-400 dark:text-teal-400/60 font-bold uppercase tracking-wider">EVENT:</span>
-                                                                            <span className="font-extrabold text-slate-700 dark:text-teal-200 uppercase truncate max-w-[150px]">{result.event_name}</span>
+                                                                        <div className="flex justify-between">
+                                                                            <span className="text-slate-400 font-bold uppercase">Event:</span>
+                                                                            <span className="font-black text-slate-700 dark:text-teal-200 truncate max-w-[130px]">{result.event_name}</span>
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -2010,114 +2095,119 @@ export default function StudentVerification() {
                                     {/* Printable Front Side - Visitor */}
                                     <div 
                                         id={`printable-front-${result.id}`} 
-                                        className="w-[1011px] h-[638px] bg-slate-50 text-slate-800 border-2 border-slate-200 rounded-[48px] relative overflow-hidden select-none"
+                                        className="w-[1011px] h-[638px] bg-slate-50 text-slate-800 border-2 border-slate-200 rounded-[48px] relative overflow-hidden select-none flex flex-row"
                                         style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                     >
                                          {/* Left Column */}
-                                         <div className="absolute left-[45px] top-[42px] bottom-[42px] w-[430px] flex flex-col justify-between">
+                                         <div className="flex-1 flex flex-col justify-between p-10 min-w-0">
                                              {/* Logo & School Name */}
                                              <div className="flex items-center gap-4">
-                                                 {companySettings.logo_url ? (
-                                                     <img src={companySettings.logo_url} className="h-28 w-auto max-w-[400px] object-contain" />
-                                                 ) : (
-                                                     <>
-                                                         <div className="w-24 h-24 rounded-2xl bg-slate-100 flex items-center justify-center text-[#7A1975] font-bold text-3xl shrink-0 border border-slate-250">
-                                                             RU
-                                                         </div>
-                                                         <div className="flex flex-col leading-[1.1] overflow-hidden">
-                                                             <span className="text-[28px] font-bold text-[#7A1975] uppercase tracking-wide leading-none" style={{ fontFamily: "'Museo', sans-serif" }}>
-                                                                 {companySettings.company_name || "Riara University"}
-                                                             </span>
-                                                             <span className="text-[16px] font-bold text-slate-450 uppercase tracking-widest mt-2">
-                                                                 VISITOR PASS
-                                                             </span>
-                                                         </div>
-                                                     </>
-                                                 )}
+                                                 <div className="w-16 h-16 bg-slate-100 rounded-2xl p-1.5 border border-slate-250 flex items-center justify-center shrink-0">
+                                                     {companySettings.logo_url ? (
+                                                         <img src={companySettings.logo_url} className="w-full h-full object-contain" />
+                                                     ) : (
+                                                         <div className="text-3xl font-bold text-[#7A1975]">RU</div>
+                                                     )}
+                                                 </div>
+                                                 <div className="text-[#7A1975] leading-none min-w-0">
+                                                     <span className="text-[28px] font-bold uppercase tracking-wide block" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                                         {companySettings.company_name || "Smart Campus"}
+                                                     </span>
+                                                     <span className="text-[14px] font-bold text-slate-450 uppercase tracking-widest mt-1 block">
+                                                         SMART CAMPUS ID
+                                                     </span>
+                                                 </div>
                                              </div>
-
+ 
                                              {/* Visitor Name */}
-                                             <div className="flex flex-col mt-4 space-y-1">
-                                                 <span className="text-xs font-bold text-slate-450 tracking-widest">Visitor Name</span>
-                                                 <span className="text-[40px] font-bold text-[#7A1975] leading-[1.1] uppercase break-words" style={{ fontFamily: "'Museo', sans-serif" }}>
+                                             <div className="flex-1 flex flex-col justify-center my-6">
+                                                 <span className="text-xs font-bold text-slate-450 tracking-widest uppercase mb-1">Visitor Name</span>
+                                                 <span className="text-[42px] font-extrabold text-[#7A1975] leading-[1.1] uppercase break-words tracking-tight" style={{ fontFamily: "'Museo', sans-serif" }}>
                                                      {result.full_name || `${result.first_name || ""} ${result.last_name || ""}`.trim() || "Guest"}
                                                  </span>
                                              </div>
-
+ 
                                              {/* Info Box */}
-                                             <div className="grid grid-cols-2 gap-x-4 gap-y-3 bg-slate-100/50 p-4 rounded-2xl border border-slate-200 text-xs">
+                                             <div className="grid grid-cols-2 gap-x-5 gap-y-4 bg-slate-100/50 p-5 rounded-3xl border border-slate-200 text-xs">
                                                  <div>
-                                                     <span className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">ID / Passport No</span>
-                                                     <span className="font-bold text-sm text-slate-850 truncate block font-mono">{result.admission_number || "N/A"}</span>
+                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">ID / Passport No</span>
+                                                     <span className="font-bold text-base text-slate-850 truncate block font-mono mt-0.5">{result.admission_number || "N/A"}</span>
                                                  </div>
                                                  <div>
-                                                     <span className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Phone Number</span>
-                                                     <span className="font-bold text-xs text-slate-700 truncate block font-mono">{result.phone_number || "N/A"}</span>
+                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Phone Number</span>
+                                                     <span className="font-bold text-sm text-slate-700 truncate block font-mono mt-0.5">{result.phone_number || "N/A"}</span>
                                                  </div>
                                                  <div className="col-span-2">
-                                                     <span className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Reason for Visit</span>
-                                                     <span className="font-bold text-sm text-slate-850 block break-words whitespace-normal leading-snug">{result.visit_details || result.purpose || "General Visit"}</span>
+                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Reason for Visit</span>
+                                                     <span className="font-bold text-sm text-slate-850 block break-words whitespace-normal leading-snug mt-0.5">{result.visit_details || result.purpose || "General Visit"}</span>
                                                  </div>
                                                  <div className="col-span-2">
-                                                     <span className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Entry Time</span>
-                                                     <span className="font-bold text-xs text-teal-700 block font-mono">
+                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Entry Time</span>
+                                                     <span className="font-bold text-sm text-teal-700 block font-mono mt-0.5">
                                                          {result.time_in ? formatDateTime(result.time_in) : "Not Checked In"}
                                                      </span>
                                                  </div>
                                              </div>
-
-                                             {/* QR Code */}
-                                             <div className="mt-3 flex items-end">
-                                                 <div className="p-1.5 bg-white border border-slate-200 rounded-[20px] shadow-sm shrink-0">
-                                                     <QRCodeSVG 
-                                                         value={result.admission_number} 
-                                                         size={110} 
+                                         </div>
+ 
+                                         {/* Center-Right Column (QR + Last Visit Details) */}
+                                         <div className="w-[385px] border-l border-slate-200 bg-slate-50/50 flex flex-col h-full shrink-0 overflow-hidden">
+                                             {/* QR Code Section */}
+                                             <div className="flex flex-col items-center justify-center p-6 border-b border-slate-200 bg-white">
+                                                 <div className="p-3 bg-white border-2 border-slate-200 rounded-3xl shadow-xl">
+                                                     <QRCodeSVG
+                                                         value={result.admission_number || result.id?.toString() || 'N/A'}
+                                                         size={180}
                                                          level="H"
+                                                         includeMargin={false}
                                                      />
                                                  </div>
+                                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">Scan to Verify</span>
+                                                 <span className="text-sm font-black text-[#7A1975] font-mono tracking-wider mt-0.5 truncate max-w-[320px]">
+                                                     {result.admission_number}
+                                                 </span>
+                                                 <span className="mt-1 px-4 py-1 bg-teal-100 text-teal-700 border border-teal-200 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                                     {result.visitor_type || result.role || "VISITOR"}
+                                                 </span>
                                              </div>
-                                         </div>
-
-                                         {/* Center-Right Column */}
-                                         <div className="absolute left-[490px] top-0 bottom-0 w-[385px] flex flex-col border-l border-slate-200 bg-slate-50/50">
-                                             {/* Photo fallback company logo */}
-                                             <div className="w-full h-[438px] flex flex-col items-center justify-center relative border-b border-slate-200 bg-slate-50/20">
-                                                 {result.profile_image ? (
-                                                     <img src={result.profile_image} className="w-full h-full object-cover" />
-                                                 ) : (
-                                                     <div className="w-44 h-44 rounded-3xl bg-white border border-slate-200 flex items-center justify-center p-4 shadow-md">
-                                                         {companySettings.logo_url ? (
-                                                             <img src={companySettings.logo_url} className="w-full h-full object-contain" />
-                                                         ) : (
-                                                             <div className="text-5xl font-bold text-[#7A1975] font-sans">RU</div>
-                                                         )}
-                                                     </div>
-                                                 )}
-                                             </div>
-
-                                             {/* Details Section */}
-                                             <div className="flex-1 p-6 flex flex-col justify-center text-sm space-y-3">
-                                                 <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                                                     <span className="text-slate-450 font-bold uppercase tracking-wider">CATEGORY:</span>
-                                                     <span className="font-extrabold text-slate-700 uppercase">{result.visitor_type || "Visitor"}</span>
+ 
+                                             {/* Last Visit Details */}
+                                             <div className="flex-1 p-6 flex flex-col justify-center text-xs space-y-2">
+                                                 <p className="text-[11px] font-black text-[#7A1975] uppercase tracking-widest border-b border-slate-200 pb-1.5 mb-1.5">Last Visit Details</p>
+                                                 <div className="flex justify-between">
+                                                     <span className="text-slate-450 font-bold uppercase">Date In:</span>
+                                                     <span className="font-black text-slate-700 font-mono text-right">{result.time_in ? formatDateTime(result.time_in) : 'N/A'}</span>
                                                  </div>
-                                                 {result.plate_number && (
-                                                     <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                                                         <span className="text-slate-450 font-bold uppercase tracking-wider">CAR PLATE:</span>
-                                                         <span className="font-extrabold text-slate-700 font-mono">{result.plate_number}</span>
+                                                 <div className="flex justify-between">
+                                                     <span className="text-slate-450 font-bold uppercase">Date Out:</span>
+                                                     <span className="font-black text-slate-700 font-mono text-right">{result.time_out ? formatDateTime(result.time_out) : 'Not yet'}</span>
+                                                 </div>
+                                                 {result.check_in_student && (
+                                                     <div className="flex justify-between">
+                                                         <span className="text-slate-450 font-bold uppercase">Host:</span>
+                                                         <span className="font-black text-slate-700 truncate max-w-[200px]">{result.check_in_student}</span>
                                                      </div>
                                                  )}
-                                                 {result.check_in_student && (
-                                                     <div className="flex justify-between border-b border-slate-200 pb-1.5">
-                                                         <span className="text-slate-450 font-bold uppercase tracking-wider">HOST / STUDENT:</span>
-                                                         <span className="font-extrabold text-slate-700 uppercase truncate max-w-[170px]">{result.check_in_student}</span>
+                                                 {result.plate_number && (
+                                                     <div className="flex justify-between">
+                                                         <span className="text-slate-450 font-bold uppercase">Plate:</span>
+                                                         <span className="font-black text-slate-700 font-mono">{result.plate_number}</span>
+                                                     </div>
+                                                 )}
+                                                 <div className="flex justify-between">
+                                                     <span className="text-slate-455 font-bold uppercase">Purpose:</span>
+                                                     <span className="font-black text-slate-700 truncate max-w-[200px]">{result.visit_details || result.purpose || 'General'}</span>
+                                                 </div>
+                                                 {result.event_name && (
+                                                     <div className="flex justify-between">
+                                                         <span className="text-slate-455 font-bold uppercase">Event:</span>
+                                                         <span className="font-black text-slate-700 truncate max-w-[200px]">{result.event_name}</span>
                                                      </div>
                                                  )}
                                              </div>
                                          </div>
-
                                          {/* Right-most Column */}
-                                         <div className="absolute right-0 top-0 bottom-0 w-[135px] bg-gradient-to-b from-[#7A1975] to-[#9C27B0] flex items-center justify-center select-none">
+                                         <div className="w-[135px] bg-gradient-to-b from-[#7A1975] to-[#9C27B0] flex items-center justify-center select-none shrink-0 relative">
                                              <span className="text-white text-[48px] font-black uppercase absolute transform -rotate-90 whitespace-nowrap tracking-[0.25em]" style={{ fontFamily: "'Museo', sans-serif" }}>
                                                  VISITOR
                                              </span>

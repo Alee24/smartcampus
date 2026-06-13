@@ -413,6 +413,17 @@ export function InstallPWATrigger({ compact = false, navStyle = false }: { compa
                                 </button>
                             </div>
                         </div>
+                        <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 rounded-xl">
+                            <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Android Native App</p>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2 font-medium">Have an Android device? Download the native app APK file directly.</p>
+                            <a
+                                href="/static/app-debug.apk"
+                                download="smart-campus-app.apk"
+                                className="flex items-center justify-center gap-2 w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-500/20 active:scale-95"
+                            >
+                                <Smartphone size={14} /> Download Android App (APK)
+                            </a>
+                        </div>
                         {window.location.protocol === 'http:' && !window.location.hostname.includes('localhost') && (
                             <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-2">
                                 <Info size={14} className="text-amber-600 mt-0.5 shrink-0" />
@@ -421,6 +432,7 @@ export function InstallPWATrigger({ compact = false, navStyle = false }: { compa
                                 </p>
                             </div>
                         )}
+
                         <div className="grid grid-cols-2 gap-3">
                             <button onClick={() => setShowGuide(false)} className="py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-sm transition-colors">
                                 Close

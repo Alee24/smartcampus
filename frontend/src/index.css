@@ -95,15 +95,15 @@
     scroll-behavior: smooth;
     overflow-x: hidden;
     max-width: 100vw;
-    font-family: 'Roboto Mono', monospace;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Merriweather Sans", sans-serif;
   }
 
   *, *::before, *::after {
-    font-family: 'Roboto Mono', monospace;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Merriweather Sans", sans-serif;
   }
 
   body {
-    font-family: 'Roboto Mono', monospace;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Merriweather Sans", sans-serif;
     @apply antialiased text-[var(--text-primary)] bg-[var(--bg-primary)] transition-colors duration-300;
     /* Performance optimizations */
     -webkit-font-smoothing: antialiased;
@@ -114,6 +114,12 @@
     max-width: 100vw;
     width: 100%;
   }
+
+  code, pre, kbd, samp, .font-mono, [class*="font-mono"] {
+    font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  }
+
+
 
   /* Performance hints for animations */
   .glass-card,

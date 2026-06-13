@@ -149,6 +149,33 @@ if [ "$RESTART_REQUIRED" = "true" ]; then
     # Build and boot containers in detached mode
     $DOCKER_CMD -f $COMPOSE_FILE up -d --build
     
+    # E. Build Android APK
+    echo "----------------------------------------------------------"
+    echo "Step E: Building Android APK..."
+    echo "----------------------------------------------------------"
+    if [ -d "mobile-app" ]; then
+        (
+            cd mobile-app
+            chmod +x gradlew
+            if ! command -v java >/dev/null 2>&1; then
+                echo "Java is not installed. Installing OpenJDK 17..."
+                sudo apt-get update && sudo apt-get install -y openjdk-17-jdk openjdk-17-jre
+            fi
+            ./gradlew assembleDebug || echo "[WARNING] APK build failed. Check Java/Android SDK configuration."
+            
+            if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+                echo "Copying compiled APK to backend static folder..."
+                mkdir -p ../backend/static
+                cp app/build/outputs/apk/debug/app-debug.apk ../backend/static/app-debug.apk
+                echo "[SUCCESS] APK copied to backend/static/app-debug.apk"
+            else
+                echo "[WARNING] Compiled APK not found at expected path."
+            fi
+        )
+    else
+        echo "[WARNING] mobile-app directory not found. Skipping APK build."
+    fi
+
     echo "=========================================================="
     echo "Restart complete! Gatepass services are booting up."
     echo "Active Gatepass containers:"
@@ -158,3 +185,4 @@ if [ "$RESTART_REQUIRED" = "true" ]; then
     echo "automatically during the backend container startup."
     echo "=========================================================="
 fi
+

@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense, useRef } from 'react'
 import {
     LayoutDashboard, Users, Shield, ClipboardList, Car, Moon, Sun, LogOut, Check,
     Bell, Settings, HelpCircle, Briefcase, ChevronRight, ChevronLeft, QrCode, Megaphone, Trash2, Plus, Radio, Nfc,
-    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, UserCheck, X, Activity, BarChart3, Play, History, Printer, Download, Inbox, Search, ScanFace, DoorOpen, List, Menu, BookOpen, Grid, CheckCircle, XCircle, RefreshCw
+    Server, Database, ShieldCheck, Calendar, CalendarDays, Video, Wifi, AlertTriangle, MapPin, Scale, FileText, MonitorPlay, Sliders, Brain, Building2, Building, User, UserCheck, X, Activity, BarChart3, Play, History, Printer, Download, Inbox, Search, ScanFace, DoorOpen, List, Menu, BookOpen, Grid, CheckCircle, XCircle, RefreshCw, Smartphone
 } from 'lucide-react'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
@@ -1943,12 +1943,26 @@ function App() {
                             </SidebarGroup>
                         )}
                         
-                        {role?.toLowerCase() !== 'student' && (
-                            <SidebarGroup title="Support" isOpen={openGroups.support} onToggle={() => toggleGroup('support')} isSidebarCollapsed={isSidebarCollapsed}>
+                        <SidebarGroup title="Support" isOpen={openGroups.support} onToggle={() => toggleGroup('support')} isSidebarCollapsed={isSidebarCollapsed}>
+                            {role?.toLowerCase() !== 'student' && (
                                 <NavItem icon={<HelpCircle size={18} />} label="Help Center" active={false} onClick={() => { }} />
-                                <InstallPWATrigger navStyle />
-                            </SidebarGroup>
-                        )}
+                            )}
+                            <InstallPWATrigger navStyle />
+                            <NavItem
+                                icon={<Smartphone size={18} />}
+                                label="Android Native App"
+                                active={false}
+                                onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = '/static/app-debug.apk';
+                                    link.download = 'smart-campus-app.apk';
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                }}
+                                badge={<span className="text-[9px] font-black bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-1 py-0.5 rounded leading-none">APK</span>}
+                            />
+                        </SidebarGroup>
 
                         {/* Legal Section */}
                         {role?.toLowerCase() !== 'student' && (
@@ -2053,6 +2067,20 @@ function App() {
                             <div className="flex items-center gap-3 relative shrink-0">
                                 {isAuthenticated && (
                                     <>
+                                        <button
+                                            onClick={() => {
+                                                const link = document.createElement('a');
+                                                link.href = '/static/app-debug.apk';
+                                                link.download = 'smart-campus-app.apk';
+                                                document.body.appendChild(link);
+                                                link.click();
+                                                document.body.removeChild(link);
+                                            }}
+                                            className="p-2 rounded-lg relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50 active:scale-95 transition-all flex items-center justify-center"
+                                            title="Download Android App"
+                                        >
+                                            <Smartphone size={20} />
+                                        </button>
                                         <button
                                             onClick={() => setShowSelfScanModal(true)}
                                             className="p-2 rounded-lg relative text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]/50 active:scale-95 transition-all flex items-center justify-center"

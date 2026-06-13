@@ -2071,4 +2071,67 @@ async def get_user_entry_logs(
         })
     return results
 
+class EmailVisitorIDRequest(BaseModel):
+    email: str
+    visitor_name: str
+    pdf_base64: str
+
+@router.post("/email-visitor-id")
+async def email_visitor_id(
+    payload: EmailVisitorIDRequest,
+    current_user: User = Depends(get_current_user)
+):
+    import base64
+    import tempfile
+    import os
+    
+    try:
+        pdf_data = payload.pdf_base64
+        if "," in pdf_data:
+            pdf_data = pdf_data.split(",")[1]
+        
+        file_content = base64.b64decode(pdf_data)
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(file_content)
+            tmp_path = tmp.name
+            
+        from app.email_utils import send_attendance_email
+        
+        body = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h1 style="color: #7A1975; margin: 0; font-size: 24px;">Smart Campus</h1>
+                <p style="color: #718096; margin: 4px 0 0 0; font-size: 14px;">Digital ID Copy</p>
+            </div>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-bottom: 24px;" />
+            <h3 style="color: #2d3748; margin-top: 0; margin-bottom: 12px;">Hello {payload.visitor_name},</h3>
+            <p style="color: #4a5568; line-height: 1.6; font-size: 15px;">
+                Please find your Smart Campus ID card attached to this email as a PDF document.
+            </p>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 28px 0 20px 0;" />
+            <p style="font-size: 11px; color: #a0aec0; text-align: center; margin: 0;">
+                This is an automated safety notification from the Smart Campus Gateway Pass System.<br/>
+                Please do not reply directly to this email.
+            </p>
+        </div>
+        """
+        
+        await send_attendance_email(
+            recipients=[payload.email],
+            subject=f"Smart Campus ID - {payload.visitor_name}",
+            body=body,
+            attachments=[tmp_path]
+        )
+        
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+            
+        return {"status": "success", "message": "ID card emailed successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to email ID card: {str(e)}")
+
+
 
