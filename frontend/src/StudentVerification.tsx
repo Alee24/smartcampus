@@ -1168,7 +1168,7 @@ export default function StudentVerification() {
                                 >
                                     {isPrinting ? <Loader2 className="animate-spin" size={16} /> : <Printer size={16} />} Print ID
                                 </button>
-                                {(result?.found_in_visitor_logs || result?.found_in_event_visitors) && (
+                                {(result?.found_in_visitor_logs || result?.found_in_event_visitors || result?.role?.toLowerCase() === 'visitor' || result?.role?.toLowerCase() === 'guest' || result?.user_type?.toLowerCase() === 'visitor' || result?.user_type?.toLowerCase() === 'guest') && (
                                     <button 
                                         onClick={handleEmailId}
                                         disabled={emailingId}
@@ -1230,9 +1230,9 @@ export default function StudentVerification() {
                                             >
                                                 {result.found_in_vehicles ? (() => {
                                                     const isVisitor = result.vehicle_type?.toLowerCase() === 'visitor' || result.role?.toLowerCase() === 'visitor' || result.role?.toLowerCase() === 'guest';
-                                                    const cardBgClass = isVisitor 
-                                                        ? 'bg-green-500/10 dark:bg-green-950/20 border-green-300 dark:border-green-800' 
-                                                        : 'bg-yellow-500/10 dark:bg-yellow-950/20 border-yellow-300 dark:border-yellow-800';
+                                                    const cardBorderClass = isVisitor 
+                                                        ? 'border-green-300 dark:border-green-800' 
+                                                        : 'border-yellow-300 dark:border-yellow-800';
                                                     const stripBgClass = isVisitor
                                                         ? 'bg-green-600 dark:bg-green-700'
                                                         : 'bg-yellow-500 dark:bg-yellow-600';
@@ -1240,8 +1240,8 @@ export default function StudentVerification() {
                                                         <>
                                                             {/* Front Side - Vehicle Pass Template */}
                                                             <div 
-                                                                className={`absolute inset-0 backface-hidden ${cardBgClass} text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 flex flex-row transition-transform hover:scale-[1.005]`}
-                                                                style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                                                className={`absolute inset-0 backface-hidden ${cardBorderClass} text-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden border-2 flex flex-row transition-transform hover:scale-[1.005]`}
+                                                                style={{ backgroundColor: isVisitor ? '#E9F9EF' : '#FDF7E6', fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                                             >
                                                                 {/* Left Column (Logo, Details) */}
                                                                 <div className="flex-1 flex flex-col justify-between p-8 min-w-0">
@@ -1413,8 +1413,8 @@ export default function StudentVerification() {
 
                                                             {/* Back Side - Vehicle Pass Template */}
                                                             <div 
-                                                                className={`absolute inset-0 backface-hidden rotate-y-180 ${cardBgClass} text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 flex flex-col justify-between py-8`}
-                                                                style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                                                className={`absolute inset-0 backface-hidden rotate-y-180 ${cardBorderClass} text-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden border-2 flex flex-col justify-between py-8`}
+                                                                style={{ backgroundColor: isVisitor ? '#E9F9EF' : '#FDF7E6', fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                                             >
                                                                 <div className={`absolute top-0 left-0 w-full h-3 ${stripBgClass}`}></div>
                                                                 
@@ -1440,12 +1440,12 @@ export default function StudentVerification() {
                                                             </div>
                                                         </>
                                                     );
-                                                })() : (result.found_in_visitor_logs || result.found_in_event_visitors) ? (
+                                                })() : (result.found_in_visitor_logs || result.found_in_event_visitors || result.role?.toLowerCase() === 'visitor' || result.role?.toLowerCase() === 'guest' || result.user_type?.toLowerCase() === 'visitor' || result.user_type?.toLowerCase() === 'guest') ? (
                                                     <>
                                                         {/* Front Side - Visitor Pass Template */}
                                                         <div 
-                                                            className="absolute inset-0 backface-hidden bg-green-500/10 dark:bg-green-950/20 text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 border-green-300 dark:border-green-800 flex flex-row transition-transform hover:scale-[1.005]"
-                                                            style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                                            className="absolute inset-0 backface-hidden text-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden border-2 border-green-300 dark:border-green-800 flex flex-row transition-transform hover:scale-[1.005]"
+                                                            style={{ backgroundColor: '#E9F9EF', fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                                         >
                                                             {/* Left Column (Logo, Details) */}
                                                             <div className="flex-1 flex flex-col justify-between p-8 min-w-0">
@@ -1582,8 +1582,8 @@ export default function StudentVerification() {
 
                                                         {/* Back Side - Visitor Pass Template */}
                                                         <div 
-                                                            className="absolute inset-0 backface-hidden rotate-y-180 bg-green-500/10 dark:bg-green-950/20 text-slate-800 dark:text-white rounded-[2.5rem] shadow-2xl overflow-hidden border-2 border-green-300 dark:border-green-800 flex flex-col justify-between py-8"
-                                                            style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                                            className="absolute inset-0 backface-hidden rotate-y-180 text-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden border-2 border-green-300 dark:border-green-800 flex flex-col justify-between py-8"
+                                                            style={{ backgroundColor: '#E9F9EF', fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                                         >
                                                             <div className="absolute top-0 left-0 w-full h-3 bg-green-600 dark:bg-green-700"></div>
                                                             
@@ -1888,8 +1888,8 @@ export default function StudentVerification() {
                                         {/* Printable Front Side - Vehicle */}
                                         <div 
                                             id={`printable-front-${result.id}`} 
-                                            className={`w-[1011px] h-[638px] ${cardBgClass} text-slate-800 border-2 rounded-[48px] relative overflow-hidden select-none`}
-                                            style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                            className={`w-[1011px] h-[638px] ${cardBorderClass} text-slate-800 border-2 rounded-[48px] relative overflow-hidden select-none`}
+                                            style={{ backgroundColor: isVisitor ? '#E9F9EF' : '#FDF7E6', fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                         >
                                              {/* Left Column */}
                                              <div className="absolute left-[45px] top-[42px] bottom-[42px] w-[430px] flex flex-col justify-between">
@@ -2058,8 +2058,8 @@ export default function StudentVerification() {
                                         {/* Printable Back Side - Vehicle */}
                                         <div 
                                             id={`printable-back-${result.id}`} 
-                                            className={`w-[1011px] h-[638px] ${cardBgClass} text-slate-800 border-2 rounded-[48px] relative overflow-hidden flex flex-col items-center justify-between py-10`}
-                                            style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                            className={`w-[1011px] h-[638px] ${cardBorderClass} text-slate-800 border-2 rounded-[48px] relative overflow-hidden flex flex-col items-center justify-between py-10`}
+                                            style={{ backgroundColor: isVisitor ? '#E9F9EF' : '#FDF7E6', fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                         >
                                              <div className={`absolute top-0 left-0 w-full h-[18px] ${stripBgClass}`}></div>
                                              
@@ -2087,13 +2087,13 @@ export default function StudentVerification() {
                                         </div>
                                     </>
                                 );
-                            })() : (result.found_in_visitor_logs || result.found_in_event_visitors) ? (
+                            })() : (result.found_in_visitor_logs || result.found_in_event_visitors || result.role?.toLowerCase() === 'visitor' || result.role?.toLowerCase() === 'guest' || result.user_type?.toLowerCase() === 'visitor' || result.user_type?.toLowerCase() === 'guest') ? (
                                 <>
                                     {/* Printable Front Side - Visitor */}
                                     <div 
                                         id={`printable-front-${result.id}`} 
-                                        className="w-[1011px] h-[638px] bg-green-500/10 text-slate-800 border-2 border-green-300 rounded-[48px] relative overflow-hidden select-none flex flex-row"
-                                        style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                        className="w-[1011px] h-[638px] text-slate-800 border-2 border-green-300 rounded-[48px] relative overflow-hidden select-none flex flex-row"
+                                        style={{ backgroundColor: '#E9F9EF', fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                     >
                                          {/* Left Column */}
                                          <div className="flex-1 flex flex-col justify-between p-10 min-w-0">
@@ -2214,8 +2214,8 @@ export default function StudentVerification() {
                                     {/* Printable Back Side - Visitor */}
                                     <div 
                                         id={`printable-back-${result.id}`} 
-                                        className="w-[1011px] h-[638px] bg-green-500/10 text-slate-800 border-2 border-green-300 rounded-[48px] relative overflow-hidden flex flex-col items-center justify-between py-10"
-                                        style={{ fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
+                                        className="w-[1011px] h-[638px] text-slate-800 border-2 border-green-300 rounded-[48px] relative overflow-hidden flex flex-col items-center justify-between py-10"
+                                        style={{ backgroundColor: '#E9F9EF', fontFamily: "'Museo', 'Museo Sans', 'Inter', sans-serif", letterSpacing: '0.01px' }}
                                     >
                                          <div className="absolute top-0 left-0 w-full h-[18px] bg-green-600"></div>
                                          

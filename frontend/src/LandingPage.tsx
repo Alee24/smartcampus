@@ -384,7 +384,15 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                         ].map((page) => (
                             <button
                                 key={page.id}
-                                onClick={() => setActivePage(page.id)}
+                                onClick={() => {
+                                    setActivePage(page.id);
+                                    const element = document.getElementById(page.id);
+                                    if (element) {
+                                        const yOffset = -80;
+                                        const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+                                        window.scrollTo({ top: y, behavior: 'smooth' });
+                                    }
+                                }}
                                 className={`transition-all hover:text-[var(--text-primary-val)] outline-none py-1 relative ${
                                     activePage === page.id ? 'text-[#0066FF]' : ''
                                 }`}
@@ -428,8 +436,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             <div className="pt-20">
                 
                 {/* 1. HOME PAGE */}
-                {activePage === 'home' && (
-                    <div>
+                <div id="home">
                         {/* Hero Section */}
                         <section className="relative min-h-[90vh] py-20 px-6 flex items-center overflow-hidden">
                             <div className="absolute inset-0 security-grid opacity-50 pointer-events-none" />
@@ -684,11 +691,9 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                             </div>
                         </section>
                     </div>
-                )}
 
                 {/* 2. FEATURES PAGE */}
-                {activePage === 'features' && (
-                    <section className="py-16 px-6 max-w-7xl mx-auto">
+                <section id="features" className="py-16 px-6 max-w-7xl mx-auto">
                         <div className="text-center mb-16 max-w-3xl mx-auto">
                             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4 text-[var(--text-primary-val)]">
                                 Integrated Access Modules
@@ -784,11 +789,9 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                             </div>
                         </div>
                     </section>
-                )}
 
                 {/* 3. COMMAND CENTER PAGE */}
-                {activePage === 'command' && (
-                    <section className="py-16 px-6 max-w-7xl mx-auto">
+                <section id="command" className="py-16 px-6 max-w-7xl mx-auto">
                         <div className="text-center mb-12 max-w-3xl mx-auto">
                             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4 text-[var(--text-primary-val)]">
                                 HQ Operations Command Center
@@ -942,11 +945,9 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                             </div>
                         </div>
                     </section>
-                )}
 
                 {/* 4. INDUSTRIES PAGE */}
-                {activePage === 'industries' && (
-                    <section className="py-16 px-6 max-w-7xl mx-auto">
+                <section id="industries" className="py-16 px-6 max-w-7xl mx-auto">
                         <div className="text-center mb-16 max-w-3xl mx-auto">
                             <h2 className="text-3xl md:text-5xl font-black tracking-tight mb-4 text-[var(--text-primary-val)]">
                                 Tailored Sector Solutions
@@ -1088,11 +1089,9 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                             )}
                         </div>
                     </section>
-                )}
 
                 {/* 5. SECURITY PAGE */}
-                {activePage === 'security' && (
-                    <section className="py-16 px-6 max-w-7xl mx-auto">
+                <section id="security" className="py-16 px-6 max-w-7xl mx-auto">
                         <div className="grid lg:grid-cols-12 gap-12 items-center max-w-5xl mx-auto text-left">
                             <div className="lg:col-span-7">
                                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[#0066FF] text-xs font-bold uppercase tracking-widest mb-4">
@@ -1136,11 +1135,9 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                             </div>
                         </div>
                     </section>
-                )}
 
                 {/* 6. WHY SMART ACCESS (COMPARISON & CTA) */}
-                {activePage === 'why-smart-access' && (
-                    <div>
+                <div id="why-smart-access">
                         {/* Comparison Matrix */}
                         <section className="py-16 px-6 max-w-7xl mx-auto">
                             <div className="text-center mb-16 max-w-3xl mx-auto">
@@ -1248,7 +1245,6 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                             </div>
                         </section>
                     </div>
-                )}
             </div>
 
             {/* Footer */}
@@ -1281,7 +1277,6 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     <div>
                         <h4 className="uppercase text-[var(--text-primary-val)] mb-4 tracking-wider">Company</h4>
                         <ul className="space-y-2">
-                            <li><a href="https://www.kkdes.co.ke" target="_blank" rel="noopener noreferrer" className="hover:text-[#0066FF] font-bold text-[#0066FF]">KKDES ENGINEERING</a></li>
                             <li><span className="hover:text-[var(--text-primary-val)] cursor-pointer">Security Audits</span></li>
                             <li><span className="hover:text-[var(--text-primary-val)] cursor-pointer">Terms of Service</span></li>
                         </ul>

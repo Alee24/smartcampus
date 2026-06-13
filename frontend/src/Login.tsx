@@ -325,7 +325,6 @@ export default function Login({ onLogin }: LoginProps) {
 
                 <div className="mt-6 text-center text-xs text-gray-500">
                     <p>Protected by AI Security Protocols</p>
-                    <p>Developed by <a href="https://www.kkdes.co.ke" target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:underline">KKDES</a></p>
                 </div>
             </div>
         </div>
