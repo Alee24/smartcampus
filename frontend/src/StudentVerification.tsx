@@ -5,6 +5,26 @@ import { Html5Qrcode } from 'html5-qrcode'
 import { QRCodeSVG } from 'qrcode.react'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
+const splitPlateNumber = (plate: string) => {
+    if (!plate) return { part1: 'KCU', part2: '109A' };
+    const cleaned = plate.trim().toUpperCase();
+    const match = cleaned.match(/^([A-Z]{3})\s*(.*)$/);
+    if (match) {
+        return { part1: match[1], part2: match[2] };
+    }
+    const mid = Math.ceil(cleaned.length / 2);
+    return {
+        part1: cleaned.substring(0, mid),
+        part2: cleaned.substring(mid)
+    };
+};
+
+const formatDuration = (mins: number) => {
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`;
+};
 
 export default function StudentVerification() {
     const { showNotification } = useNotification()
@@ -1163,9 +1183,57 @@ export default function StudentVerification() {
                                                                 {/* Large License Plate Badge */}
                                                                 <div className="flex-1 flex flex-col justify-center my-3">
                                                                     <span className="text-xs font-bold text-slate-400 dark:text-amber-500/60 uppercase tracking-widest mb-1">Plate Number</span>
-                                                                    <div className="border-4 border-slate-850 dark:border-amber-500 bg-slate-900/5 dark:bg-amber-500/5 text-slate-800 dark:text-amber-400 px-6 py-2.5 rounded-2xl font-mono tracking-widest font-extrabold text-3xl w-fit flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(0,0,0,0.05)] dark:shadow-[0_0_20px_rgba(245,158,11,0.1)] border-double">
-                                                                        <span className="text-xs font-black text-slate-400 dark:text-amber-500/50 border-r border-slate-300 dark:border-amber-500/30 pr-2 mr-1">KE</span>
-                                                                        {result.plate_number || result.admission_number}
+                                                                    <div className="flex items-center gap-4 flex-wrap">
+                                                                        {/* Kenyan Horizontal Plate (White) */}
+                                                                        <div className="bg-white border-2 border-slate-900 text-slate-950 px-4 py-2 rounded-lg flex items-center gap-3 shadow-[0_4px_10px_rgba(0,0,0,0.15)] select-none shrink-0 font-mono tracking-wider font-extrabold text-2xl h-16 border-double">
+                                                                            {/* Kenyan Flag */}
+                                                                            <div className="flex flex-col w-6 h-4 border border-slate-355 rounded-[1px] overflow-hidden relative shrink-0">
+                                                                                <div className="bg-black h-1/3 w-full"></div>
+                                                                                <div className="bg-[#990000] h-1/3 w-full border-y-[0.5px] border-white"></div>
+                                                                                <div className="bg-[#006600] h-1/3 w-full"></div>
+                                                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                                                    <div className="w-1.5 h-2 bg-[#990000] rounded-full border-[0.5px] border-white relative">
+                                                                                        <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                            <span className="text-slate-900">
+                                                                                {result.plate_number || result.admission_number}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        {/* Kenyan Square Plate (Yellow) */}
+                                                                        {(() => {
+                                                                            const { part1, part2 } = splitPlateNumber(result.plate_number || result.admission_number);
+                                                                            return (
+                                                                                <div className="bg-[#FFCC00] border-2 border-slate-900 text-slate-955 w-24 h-16 rounded-lg p-1.5 flex flex-col justify-between items-center shadow-[0_4px_10px_rgba(0,0,0,0.15)] select-none shrink-0 border-double">
+                                                                                    {/* Top row with flag and part1 */}
+                                                                                    <div className="w-full flex items-center justify-between">
+                                                                                        {/* Flag */}
+                                                                                        <div className="flex flex-col w-5 h-3 border border-slate-800 rounded-[0.5px] overflow-hidden relative shrink-0">
+                                                                                            <div className="bg-black h-1/3 w-full"></div>
+                                                                                            <div className="bg-[#990000] h-1/3 w-full border-y-[0.5px] border-white"></div>
+                                                                                            <div className="bg-[#006600] h-1/3 w-full"></div>
+                                                                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                                                                <div className="w-1.5 h-2 bg-[#990000] rounded-full border-[0.5px] border-white relative">
+                                                                                                    <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        {/* Part 1 */}
+                                                                                        <span className="font-mono text-xs font-black text-slate-900 leading-none">
+                                                                                            {part1}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    {/* Bottom row with part2 */}
+                                                                                    <div className="w-full flex justify-center pb-0.5">
+                                                                                        <span className="font-mono text-base font-black text-slate-900 leading-none tracking-wider">
+                                                                                            {part2}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })()}
                                                                     </div>
                                                                     <span className="text-lg font-bold text-slate-700 dark:text-slate-300 mt-2 uppercase tracking-wide">
                                                                         {result.make || ""} {result.model || "Vehicle"}
@@ -1187,10 +1255,18 @@ export default function StudentVerification() {
                                                                             <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Reason for Visit</span>
                                                                             <span className="font-bold text-sm text-slate-850 dark:text-slate-200 block break-words whitespace-normal leading-snug">{result.purpose || result.visit_details || "General Visit"}</span>
                                                                         </div>
-                                                                        <div className="col-span-2">
+                                                                        <div>
                                                                             <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Entry Time</span>
                                                                             <span className="font-bold text-xs text-amber-600 dark:text-amber-400 block font-mono">
                                                                                 {result.entry_time ? formatDateTime(result.entry_time) : "Not Logged In"}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Last Stay Duration</span>
+                                                                            <span className="font-bold text-xs text-slate-700 dark:text-slate-300 block font-mono">
+                                                                                {result.last_stay_minutes !== undefined && result.last_stay_minutes !== null
+                                                                                    ? formatDuration(result.last_stay_minutes)
+                                                                                    : "No prior checkout"}
                                                                             </span>
                                                                         </div>
                                                                     </div>
@@ -1747,9 +1823,59 @@ export default function StudentVerification() {
                                              {/* Plate Number */}
                                              <div className="flex flex-col mt-4 space-y-1">
                                                  <span className="text-xs font-bold text-slate-450 uppercase tracking-widest">Plate Number</span>
-                                                 <div className="border-4 border-slate-850 bg-slate-900/5 text-slate-800 px-6 py-2.5 rounded-2xl font-mono tracking-widest font-extrabold text-3xl w-fit flex items-center justify-center gap-3 border-double">
-                                                     <span className="text-xs font-black text-slate-400 border-r border-slate-300 pr-2 mr-1">KE</span>
-                                                     {result.plate_number || result.admission_number}
+                                                 <div className="flex items-center gap-4">
+                                                     {/* Kenyan Horizontal Plate (White) */}
+                                                     <div className="bg-white border-2 border-slate-900 text-slate-950 px-4 py-2 rounded-lg flex items-center gap-3 shadow-md select-none shrink-0 font-mono tracking-wider font-extrabold text-2xl h-16 border-double">
+                                                         {/* Kenyan Flag */}
+                                                         <div className="flex flex-col w-6 h-4 border border-slate-300 rounded-[1px] overflow-hidden relative shrink-0">
+                                                             <div className="bg-black h-1/3 w-full"></div>
+                                                             <div className="bg-[#990000] h-1/3 w-full border-y-[0.5px] border-white"></div>
+                                                             <div className="bg-[#006600] h-1/3 w-full"></div>
+                                                             <div className="absolute inset-0 flex items-center justify-center">
+                                                                 <div className="w-1.5 h-2 bg-[#990000] rounded-full border-[0.5px] border-white relative">
+                                                                     <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                         <span className="text-slate-900">
+                                                             {result.plate_number || result.admission_number}
+                                                         </span>
+                                                     </div>
+
+                                                     {/* Kenyan Square Plate (Yellow) */}
+                                                     {(() => {
+                                                         const plate = result.plate_number || result.admission_number || "";
+                                                         const part1 = plate.split(" ")[0] || "";
+                                                         const part2 = plate.split(" ").slice(1).join(" ") || plate;
+                                                         return (
+                                                             <div className="bg-[#FFCC00] border-2 border-slate-900 text-slate-955 w-24 h-16 rounded-lg p-1.5 flex flex-col justify-between items-center shadow-md select-none shrink-0 border-double">
+                                                                 {/* Top row with flag and part1 */}
+                                                                 <div className="w-full flex items-center justify-between">
+                                                                     {/* Flag */}
+                                                                     <div className="flex flex-col w-5 h-3 border border-slate-800 rounded-[0.5px] overflow-hidden relative shrink-0">
+                                                                         <div className="bg-black h-1/3 w-full"></div>
+                                                                         <div className="bg-[#990000] h-1/3 w-full border-y-[0.5px] border-white"></div>
+                                                                         <div className="bg-[#006600] h-1/3 w-full"></div>
+                                                                         <div className="absolute inset-0 flex items-center justify-center">
+                                                                             <div className="w-1.5 h-2 bg-[#990000] rounded-full border-[0.5px] border-white relative">
+                                                                                 <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
+                                                                             </div>
+                                                                         </div>
+                                                                     </div>
+                                                                     {/* Part 1 */}
+                                                                     <span className="font-mono text-xs font-black text-slate-900 leading-none">
+                                                                         {part1}
+                                                                     </span>
+                                                                 </div>
+                                                                 {/* Bottom row with part2 */}
+                                                                 <div className="w-full flex justify-center pb-0.5">
+                                                                     <span className="font-mono text-base font-black text-slate-900 leading-none tracking-wider">
+                                                                         {part2}
+                                                                     </span>
+                                                                 </div>
+                                                             </div>
+                                                         );
+                                                     })()}
                                                  </div>
                                                  <span className="text-2xl font-bold text-slate-700 mt-2 uppercase tracking-wide block font-sans">
                                                      {result.make || ""} {result.model || "Vehicle"}
@@ -1759,21 +1885,29 @@ export default function StudentVerification() {
                                              {/* Info Box */}
                                              <div className="grid grid-cols-2 gap-x-4 gap-y-3 bg-slate-100/50 p-4 rounded-2xl border border-slate-200 text-xs">
                                                  <div>
-                                                     <span className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Driver Name</span>
+                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Driver Name</span>
                                                      <span className="font-bold text-sm text-slate-850 truncate block">{result.driver_name || "N/A"}</span>
                                                  </div>
                                                  <div>
-                                                     <span className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Driver Contact</span>
+                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Driver Contact</span>
                                                      <span className="font-bold text-xs text-slate-700 truncate block font-mono">{result.driver_contact || "N/A"}</span>
                                                  </div>
                                                  <div className="col-span-2">
-                                                     <span className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Reason for Visit</span>
+                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Reason for Visit</span>
                                                      <span className="font-bold text-sm text-slate-850 block break-words whitespace-normal leading-snug">{result.purpose || result.visit_details || "General Visit"}</span>
                                                  </div>
-                                                 <div className="col-span-2">
-                                                     <span className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider">Entry Time</span>
+                                                 <div>
+                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Entry Time</span>
                                                      <span className="font-bold text-xs text-amber-600 block font-mono">
                                                          {result.entry_time ? formatDateTime(result.entry_time) : "Not Logged In"}
+                                                     </span>
+                                                 </div>
+                                                 <div>
+                                                     <span className="block text-[10px] font-bold text-slate-455 uppercase tracking-wider">Last Stay Duration</span>
+                                                     <span className="font-bold text-xs text-slate-700 block font-mono">
+                                                         {result.last_stay_minutes !== undefined && result.last_stay_minutes !== null
+                                                             ? formatDuration(result.last_stay_minutes)
+                                                             : "No prior checkout"}
                                                      </span>
                                                  </div>
                                              </div>

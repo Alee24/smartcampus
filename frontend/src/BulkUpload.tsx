@@ -522,6 +522,42 @@ export default function BulkUpload() {
         }
     }
 
+    const handleDataCleanup = async () => {
+        const confirm = await showConfirm({
+            title: "Clean & Format Database Data",
+            message: "This will scan and format all existing records in the database. Names will be formatted to sentence case, plates to the format 'XXX XXXX' in uppercase, and phone numbers will be prepended with the Kenyan country code (+254) if missing. This is a clean-up operation and will not delete any entries.\n\nAre you sure you want to clean up existing data?",
+            confirmText: "Yes, Format Data",
+            cancelText: "Cancel",
+            isDanger: false
+        })
+        if (!confirm) return
+
+        setLoading(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch('/api/admin/database/data-cleanup', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+
+            const data = await res.json()
+            if (res.ok) {
+                showNotification(data.message || "Success: Database cleanup complete.", "success")
+                fetchStats()
+            } else {
+                showNotification("Error: " + (data.detail || data.message || "Failed to cleanup database data"), "error")
+            }
+        } catch (e: any) {
+            console.error(e)
+            showNotification("Network error: " + (e.message || "Could not connect to the server"), "error")
+        } finally {
+            setLoading(false)
+        }
+    }
+
 
     return (
         <div className="animate-fade-in max-w-6xl mx-auto space-y-8 pb-20">
@@ -532,6 +568,14 @@ export default function BulkUpload() {
                     <p className="text-[var(--text-secondary)]">Follow the sequence to initialize your campus database correctly.</p>
                 </div>
                 <div className="flex gap-4">
+                    <button 
+                        onClick={handleDataCleanup} 
+                        disabled={loading}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-50 transition-all font-semibold"
+                    >
+                        {loading ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
+                        Clean & Format DB Data
+                    </button>
                     <button onClick={fetchStats} className="px-4 py-2 border border-[var(--border-color)] rounded-lg text-sm hover:bg-[var(--bg-primary)]">Refresh Live Stats</button>
                 </div>
             </div>

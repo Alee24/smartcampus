@@ -2931,3 +2931,174 @@ async def seed_dummy_database(
         raise HTTPException(status_code=500, detail=f"Database seeding failed: {str(e)}")
 
 
+@router.post("/database/data-cleanup")
+async def data_cleanup(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    admin: User = Depends(ensure_admin)
+):
+    """
+    Formats existing database entries:
+    - Names (sentence/title case)
+    - Plates (XXX XXXX uppercase spaced format)
+    - Phone Numbers (prefixed with Kenyan code +254)
+    """
+    try:
+        from app.models import (
+            User, Visitor, Vehicle, EventVisitor, FleetPassengerManifest,
+            clean_name, clean_phone, clean_plate
+        )
+        
+        # 1. Users
+        users_result = await session.execute(select(User))
+        users = users_result.scalars().all()
+        updated_users = 0
+        for user in users:
+            changed = False
+            cleaned_full = clean_name(user.full_name)
+            cleaned_first = clean_name(user.first_name)
+            cleaned_last = clean_name(user.last_name)
+            cleaned_phone = clean_phone(user.phone_number)
+            
+            if cleaned_full != user.full_name:
+                user.full_name = cleaned_full
+                changed = True
+            if cleaned_first != user.first_name:
+                user.first_name = cleaned_first
+                changed = True
+            if cleaned_last != user.last_name:
+                user.last_name = cleaned_last
+                changed = True
+            if cleaned_phone != user.phone_number:
+                user.phone_number = cleaned_phone
+                changed = True
+                
+            if changed:
+                session.add(user)
+                updated_users += 1
+                
+        # 2. Visitors
+        visitors_result = await session.execute(select(Visitor))
+        visitors = visitors_result.scalars().all()
+        updated_visitors = 0
+        for visitor in visitors:
+            changed = False
+            cleaned_first = clean_name(visitor.first_name)
+            cleaned_last = clean_name(visitor.last_name)
+            cleaned_phone = clean_phone(visitor.phone_number)
+            cleaned_plate = clean_plate(visitor.plate_number)
+            
+            if cleaned_first != visitor.first_name:
+                visitor.first_name = cleaned_first
+                changed = True
+            if cleaned_last != visitor.last_name:
+                visitor.last_name = cleaned_last
+                changed = True
+            if cleaned_phone != visitor.phone_number:
+                visitor.phone_number = cleaned_phone
+                changed = True
+            if cleaned_plate != visitor.plate_number:
+                visitor.plate_number = cleaned_plate
+                changed = True
+                
+            if changed:
+                session.add(visitor)
+                updated_visitors += 1
+                
+        # 3. Vehicles
+        vehicles_result = await session.execute(select(Vehicle))
+        vehicles = vehicles_result.scalars().all()
+        updated_vehicles = 0
+        for vehicle in vehicles:
+            changed = False
+            cleaned_plate = clean_plate(vehicle.plate_number)
+            cleaned_driver = clean_name(vehicle.driver_name)
+            cleaned_contact = clean_phone(vehicle.driver_contact)
+            
+            if cleaned_plate != vehicle.plate_number:
+                vehicle.plate_number = cleaned_plate
+                changed = True
+            if cleaned_driver != vehicle.driver_name:
+                vehicle.driver_name = cleaned_driver
+                changed = True
+            if cleaned_contact != vehicle.driver_contact:
+                vehicle.driver_contact = cleaned_contact
+                changed = True
+                
+            if changed:
+                session.add(vehicle)
+                updated_vehicles += 1
+                
+        # 4. EventVisitors
+        event_visitors_result = await session.execute(select(EventVisitor))
+        event_visitors = event_visitors_result.scalars().all()
+        updated_event_visitors = 0
+        for ev in event_visitors:
+            changed = False
+            cleaned_name_val = clean_name(ev.visitor_name)
+            cleaned_phone_val = clean_phone(ev.phone_number)
+            
+            if cleaned_name_val != ev.visitor_name:
+                ev.visitor_name = cleaned_name_val
+                changed = True
+            if cleaned_phone_val != ev.phone_number:
+                ev.phone_number = cleaned_phone_val
+                changed = True
+                
+            if changed:
+                session.add(ev)
+                updated_event_visitors += 1
+                
+        # 5. FleetPassengerManifest
+        passenger_manifest_result = await session.execute(select(FleetPassengerManifest))
+        passengers = passenger_manifest_result.scalars().all()
+        updated_passengers = 0
+        for ps in passengers:
+            changed = False
+            cleaned_name_val = clean_name(ps.passenger_name)
+            cleaned_phone_val = clean_phone(ps.phone_number)
+            cleaned_emergency = clean_phone(ps.emergency_contact_phone)
+            
+            if cleaned_name_val != ps.passenger_name:
+                ps.passenger_name = cleaned_name_val
+                changed = True
+            if cleaned_phone_val != ps.phone_number:
+                ps.phone_number = cleaned_phone_val
+                changed = True
+            if cleaned_emergency != ps.emergency_contact_phone:
+                ps.emergency_contact_phone = cleaned_emergency
+                changed = True
+                
+            if changed:
+                session.add(ps)
+                updated_passengers += 1
+                
+        await session.commit()
+        
+        await log_action(
+            session=session,
+            action_type="database_data_cleanup",
+            user=admin,
+            table_name="multiple",
+            description=f"Cleaned up and formatted database formats: {updated_users} users, {updated_visitors} visitors, {updated_vehicles} vehicles, {updated_event_visitors} event visitors, {updated_passengers} passengers.",
+            new_values={"users_count": updated_users, "visitors_count": updated_visitors, "vehicles_count": updated_vehicles},
+            request=request
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Successfully formatted existing database entries:\n"
+                       f"• {updated_users} system users updated\n"
+                       f"• {updated_visitors} visitor logs updated\n"
+                       f"• {updated_vehicles} vehicles updated\n"
+                       f"• {updated_event_visitors} event visitors updated\n"
+                       f"• {updated_passengers} passenger manifests updated"
+        }
+    except Exception as e:
+        await session.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Database data cleanup failed: {str(e)}")
+
+
+

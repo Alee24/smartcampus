@@ -3,6 +3,46 @@ import { Car, User, Truck, CheckCircle, ArrowRight, UserCheck, Shield, Camera, A
 import { PrivacyPolicy } from './privacy/PrivacyPolicy'
 import { CookiePolicy } from './privacy/CookiePolicy'
 
+// Helper functions for data sanitization
+const cleanName = (val: string) => {
+    if (!val) return '';
+    return val.trim().split(/\s+/).map(word => {
+        if (!word) return '';
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join(' ');
+};
+
+const cleanPhone = (val: string) => {
+    if (!val) return '';
+    const cleaned = val.replace(/[^\d+]/g, '');
+    if (!cleaned) return '';
+    if (cleaned.startsWith('+254')) return cleaned;
+    if (cleaned.startsWith('254') && cleaned.length === 12) return '+' + cleaned;
+    if (cleaned.startsWith('0') && cleaned.length === 10) return '+254' + cleaned.slice(1);
+    if (cleaned.length === 9 && (cleaned.startsWith('7') || cleaned.startsWith('1'))) return '+254' + cleaned;
+    if (cleaned.length === 10 && !cleaned.startsWith('+')) return '+254' + cleaned;
+    return cleaned;
+};
+
+const cleanPlate = (val: string) => {
+    if (!val) return '';
+    const cleaned = val.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (!cleaned) return '';
+    if (cleaned.length === 7) {
+        return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
+    } else if (cleaned.length === 8) {
+        return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
+    } else if (cleaned.length === 6) {
+        return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
+    } else {
+        if (cleaned.length > 4) {
+            const mid = Math.floor(cleaned.length / 2);
+            return `${cleaned.slice(0, mid)} ${cleaned.slice(mid)}`;
+        }
+        return cleaned;
+    }
+};
+
 export default function SelfServiceEntry() {
     const [step, setStep] = useState(1) // 1: Role, 2: Form, 3: Success
     const [role, setRole] = useState('')
@@ -375,6 +415,24 @@ export default function SelfServiceEntry() {
         e.preventDefault()
         setSubmitting(true)
         setError(null)
+        
+        const fName = cleanName(formData.first_name || '')
+        const lName = cleanName(formData.last_name || '')
+        const dContact = cleanPhone(formData.driver_contact || '')
+        const pNumber = cleanPlate(formData.plate_number || '')
+        const dName = `${fName} ${lName}`.trim()
+        
+        // Update local state to reflect formatting
+        const updatedForm = {
+            ...formData,
+            first_name: fName,
+            last_name: lName,
+            driver_contact: dContact,
+            plate_number: pNumber,
+            driver_name: dName
+        }
+        setFormData(updatedForm)
+
         try {
             const res = await fetch('/api/gate/public/access-request', {
                 method: 'POST',
@@ -383,12 +441,12 @@ export default function SelfServiceEntry() {
                     gate_id: gateId,
                     role: 'vehicle_registration',
                     data: {
-                        first_name: formData.first_name || '',
-                        last_name: formData.last_name || '',
-                        driver_name: `${formData.first_name || ''} ${formData.last_name || ''}`.trim() || formData.driver_name,
+                        first_name: fName,
+                        last_name: lName,
+                        driver_name: dName || formData.driver_name,
                         driver_id_number: formData.driver_id_number,
-                        driver_contact: formData.driver_contact,
-                        plate_number: formData.plate_number,
+                        driver_contact: dContact,
+                        plate_number: pNumber,
                         vehicle_role: formData.role || 'student',
                         auto_delete_24h: autoDelete24h
                     }
@@ -425,19 +483,39 @@ export default function SelfServiceEntry() {
         // Construct role-specific payload
         let payloadData: any = {}
         if (role === 'visitor') {
+            const fName = cleanName(formData.first_name || '')
+            const lName = cleanName(formData.last_name || '')
+            const mobile = cleanPhone(formData.mobile || '')
+            const fullName = `${fName} ${lName}`.trim()
+            
+            setFormData(prev => ({
+                ...prev,
+                first_name: fName,
+                last_name: lName,
+                mobile: mobile,
+                name: fullName
+            }))
+            
             payloadData = {
-                first_name: formData.first_name || '',
-                last_name: formData.last_name || '',
-                name: `${formData.first_name || ''} ${formData.last_name || ''}`.trim() || formData.name,
-                mobile: formData.mobile,
+                first_name: fName,
+                last_name: lName,
+                name: fullName || formData.name,
+                mobile: mobile,
                 id_number: formData.id_number,
                 purpose: formData.purpose,
                 profile_image: visitorProfileImage || undefined,
                 auto_delete_24h: autoDelete24h
             }
         } else if (role === 'taxi') {
+            const pNumber = cleanPlate(formData.plate_number || '')
+            
+            setFormData(prev => ({
+                ...prev,
+                plate_number: pNumber
+            }))
+            
             payloadData = {
-                plate_number: formData.plate_number,
+                plate_number: pNumber,
                 passengers: formData.passengers || 1,
                 purpose: `${taxiServiceType === 'pickup' ? 'Pick Up' : 'Drop Off'}: ${dropoffName || userSearchQuery}`,
                 dropoff_admission_number: dropoffAdmission || undefined,
@@ -447,11 +525,24 @@ export default function SelfServiceEntry() {
                 auto_delete_24h: autoDelete24h
             }
         } else if (role === 'delivery') {
+            const fName = cleanName(formData.first_name || '')
+            const lName = cleanName(formData.last_name || '')
+            const mobile = cleanPhone(formData.mobile || '')
+            const fullName = `${fName} ${lName}`.trim()
+            
+            setFormData(prev => ({
+                ...prev,
+                first_name: fName,
+                last_name: lName,
+                mobile: mobile,
+                name: fullName
+            }))
+            
             payloadData = {
-                first_name: formData.first_name || '',
-                last_name: formData.last_name || '',
-                name: `${formData.first_name || ''} ${formData.last_name || ''}`.trim() || formData.name,
-                mobile: formData.mobile,
+                first_name: fName,
+                last_name: lName,
+                name: fullName || formData.name,
+                mobile: mobile,
                 id_number: formData.id_number,
                 delivery_details: formData.delivery_details,
                 delivery_image_package: deliveryPackageImage,
@@ -1061,6 +1152,7 @@ export default function SelfServiceEntry() {
                                                         className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
                                                         value={formData.first_name || ''}
                                                         onChange={e => setFormData({ ...formData, first_name: e.target.value })} 
+                                                        onBlur={e => setFormData({ ...formData, first_name: cleanName(e.target.value) })}
                                                     />
                                                 </div>
                                                 <div>
@@ -1071,6 +1163,7 @@ export default function SelfServiceEntry() {
                                                         className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
                                                         value={formData.last_name || ''}
                                                         onChange={e => setFormData({ ...formData, last_name: e.target.value })} 
+                                                        onBlur={e => setFormData({ ...formData, last_name: cleanName(e.target.value) })}
                                                     />
                                                 </div>
                                             </div>
@@ -1084,6 +1177,7 @@ export default function SelfServiceEntry() {
                                                         className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
                                                         value={formData.driver_contact || ''}
                                                         onChange={e => setFormData({ ...formData, driver_contact: e.target.value })} 
+                                                        onBlur={e => setFormData({ ...formData, driver_contact: cleanPhone(e.target.value) })}
                                                     />
                                                 </div>
                                                 <div>
@@ -1106,6 +1200,7 @@ export default function SelfServiceEntry() {
                                                         className="w-full p-4 bg-slate-50 dark:bg-slate-800/85 rounded-2xl border border-slate-150 dark:border-slate-800 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white font-mono uppercase"
                                                         value={formData.plate_number || ''}
                                                         onChange={e => setFormData({ ...formData, plate_number: e.target.value })} 
+                                                        onBlur={e => setFormData({ ...formData, plate_number: cleanPlate(e.target.value) })}
                                                     />
                                                 </div>
                                                 <div>
@@ -1197,6 +1292,7 @@ export default function SelfServiceEntry() {
                                                             className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
                                                             value={formData.first_name || ''}
                                                             onChange={e => setFormData({ ...formData, first_name: e.target.value })} 
+                                                            onBlur={e => setFormData({ ...formData, first_name: cleanName(e.target.value) })}
                                                         />
                                                     </div>
                                                     <div>
@@ -1207,6 +1303,7 @@ export default function SelfServiceEntry() {
                                                             className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
                                                             value={formData.last_name || ''}
                                                             onChange={e => setFormData({ ...formData, last_name: e.target.value })} 
+                                                            onBlur={e => setFormData({ ...formData, last_name: cleanName(e.target.value) })}
                                                         />
                                                     </div>
                                                 </div>
@@ -1223,6 +1320,7 @@ export default function SelfServiceEntry() {
                                                         className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-850 dark:text-white"
                                                         value={formData.mobile || ''}
                                                         onChange={e => setFormData({ ...formData, mobile: e.target.value })} 
+                                                        onBlur={e => setFormData({ ...formData, mobile: cleanPhone(e.target.value) })}
                                                     />
                                                 </div>
                                             )}
@@ -1238,6 +1336,7 @@ export default function SelfServiceEntry() {
                                                             className="w-full p-4 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-150 dark:border-slate-85 text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-855 dark:text-white font-mono uppercase"
                                                             value={formData.plate_number || ''}
                                                             onChange={e => setFormData({ ...formData, plate_number: e.target.value })} 
+                                                            onBlur={e => setFormData({ ...formData, plate_number: cleanPlate(e.target.value) })}
                                                         />
                                                     </div>
                                                     <div>

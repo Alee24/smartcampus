@@ -368,176 +368,182 @@ export default function Analytics() {
 
                     {/* Visitors Tab Data */}
                     {activeTab === 'visitors' && (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="text-[10px] text-[var(--text-secondary)] uppercase bg-[var(--bg-primary)] border-b border-[var(--border-color)] font-black tracking-wider">
-                                    <tr>
-                                        <th className="p-4">Visitor</th>
-                                        <th className="p-4">Category</th>
-                                        <th className="p-4">ID/Passport</th>
-                                        <th className="p-4">Check In</th>
-                                        <th className="p-4">Check Out</th>
-                                        <th className="p-4">Duration</th>
-                                        <th className="p-4">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[var(--border-color)] text-xs font-semibold">
-                                    {paginatedVisitors.length === 0 ? (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="text-[10px] text-[var(--text-secondary)] uppercase bg-[var(--bg-primary)] border-b border-[var(--border-color)] font-black tracking-wider">
                                         <tr>
-                                            <td colSpan={7} className="p-8 text-center text-[var(--text-secondary)]">No visitor stay records found.</td>
+                                            <th className="p-4">Visitor</th>
+                                            <th className="p-4">Category</th>
+                                            <th className="p-4">ID/Passport</th>
+                                            <th className="p-4">Check In</th>
+                                            <th className="p-4">Check Out</th>
+                                            <th className="p-4">Duration</th>
+                                            <th className="p-4">Status</th>
                                         </tr>
-                                    ) : (
-                                        paginatedVisitors.map(v => {
-                                            const duration = v.time_in && v.time_out
-                                                ? Math.round((new Date(v.time_out).getTime() - new Date(v.time_in).getTime()) / (1000 * 60))
-                                                : null
-                                            return (
-                                                <tr key={v.id} className="hover:bg-[var(--bg-primary)]/10 transition-colors">
-                                                    <td className="p-4">
-                                                        <div className="font-bold text-[var(--text-primary)]">{v.visitor_name}</div>
-                                                        <div className="text-[10px] text-[var(--text-secondary)]">{v.contact || 'N/A'}</div>
-                                                    </td>
-                                                    <td className="p-4 capitalize">
-                                                        <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px]">
-                                                            {v.visitor_type}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-4 font-mono">{v.id_number || 'N/A'}</td>
-                                                    <td className="p-4 text-[var(--text-secondary)]">{v.time_in ? new Date(v.time_in).toLocaleString() : '-'}</td>
-                                                    <td className="p-4 text-[var(--text-secondary)]">{v.time_out ? new Date(v.time_out).toLocaleString() : '-'}</td>
-                                                    <td className="p-4 font-mono font-bold text-indigo-650 dark:text-indigo-400">
-                                                        {duration !== null ? formatDuration(duration) : (v.status === 'checked_in' ? 'Inside' : '-')}
-                                                    </td>
-                                                    <td className="p-4 capitalize">
-                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider ${
-                                                            v.status === 'checked_in' ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'
-                                                        }`}>
-                                                            {v.status}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                        {renderPagination(visitorPage, totalVisitorPages, setVisitorPage)}
+                                    </thead>
+                                    <tbody className="divide-y divide-[var(--border-color)] text-xs font-semibold">
+                                        {paginatedVisitors.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} className="p-8 text-center text-[var(--text-secondary)]">No visitor stay records found.</td>
+                                            </tr>
+                                        ) : (
+                                            paginatedVisitors.map(v => {
+                                                const duration = v.time_in && v.time_out
+                                                    ? Math.round((new Date(v.time_out).getTime() - new Date(v.time_in).getTime()) / (1000 * 60))
+                                                    : null
+                                                return (
+                                                    <tr key={v.id} className="hover:bg-[var(--bg-primary)]/10 transition-colors">
+                                                        <td className="p-4">
+                                                            <div className="font-bold text-[var(--text-primary)]">{v.visitor_name}</div>
+                                                            <div className="text-[10px] text-[var(--text-secondary)]">{v.contact || 'N/A'}</div>
+                                                        </td>
+                                                        <td className="p-4 capitalize">
+                                                            <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px]">
+                                                                {v.visitor_type}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-4 font-mono">{v.id_number || 'N/A'}</td>
+                                                        <td className="p-4 text-[var(--text-secondary)]">{v.time_in ? new Date(v.time_in).toLocaleString() : '-'}</td>
+                                                        <td className="p-4 text-[var(--text-secondary)]">{v.time_out ? new Date(v.time_out).toLocaleString() : '-'}</td>
+                                                        <td className="p-4 font-mono font-bold text-indigo-650 dark:text-indigo-400">
+                                                            {duration !== null ? formatDuration(duration) : (v.status === 'checked_in' ? 'Inside' : '-')}
+                                                        </td>
+                                                        <td className="p-4 capitalize">
+                                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider ${
+                                                                v.status === 'checked_in' ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'
+                                                            }`}>
+                                                                {v.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {renderPagination(visitorPage, totalVisitorPages, setVisitorPage)}
+                        </>
                     )}
 
                     {/* Vehicles Tab Data */}
                     {activeTab === 'vehicles' && (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="text-[10px] text-[var(--text-secondary)] uppercase bg-[var(--bg-primary)] border-b border-[var(--border-color)] font-black tracking-wider">
-                                    <tr>
-                                        <th className="p-4">Plate No.</th>
-                                        <th className="p-4">Details</th>
-                                        <th className="p-4">Driver</th>
-                                        <th className="p-4">Entry Time</th>
-                                        <th className="p-4">Exit Time</th>
-                                        <th className="p-4">Duration</th>
-                                        <th className="p-4">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[var(--border-color)] text-xs font-semibold">
-                                    {paginatedVehicles.length === 0 ? (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="text-[10px] text-[var(--text-secondary)] uppercase bg-[var(--bg-primary)] border-b border-[var(--border-color)] font-black tracking-wider">
                                         <tr>
-                                            <td colSpan={7} className="p-8 text-center text-[var(--text-secondary)]">No vehicle stay logs found.</td>
+                                            <th className="p-4">Plate No.</th>
+                                            <th className="p-4">Details</th>
+                                            <th className="p-4">Driver</th>
+                                            <th className="p-4">Entry Time</th>
+                                            <th className="p-4">Exit Time</th>
+                                            <th className="p-4">Duration</th>
+                                            <th className="p-4">Status</th>
                                         </tr>
-                                    ) : (
-                                        paginatedVehicles.map(v => (
-                                            <tr key={v.id} className="hover:bg-[var(--bg-primary)]/10 transition-colors">
-                                                <td className="p-4 font-mono font-bold text-lg text-indigo-650 dark:text-indigo-400">{v.plate}</td>
-                                                <td className="p-4">
-                                                    <div className="font-bold">{v.make} {v.model}</div>
-                                                    <div className="text-[10px] text-[var(--text-secondary)]">{v.color}</div>
-                                                </td>
-                                                <td className="p-4">
-                                                    <div>{v.driver_name}</div>
-                                                    <div className="text-[10px] text-[var(--text-secondary)]">{v.driver_contact}</div>
-                                                </td>
-                                                <td className="p-4 text-[var(--text-secondary)]">{v.time_in ? new Date(v.time_in).toLocaleString() : '-'}</td>
-                                                <td className="p-4 text-[var(--text-secondary)]">{v.time_out ? new Date(v.time_out).toLocaleString() : '-'}</td>
-                                                <td className="p-4 font-mono font-bold">
-                                                    {formatDuration(v.duration_minutes)}
-                                                </td>
-                                                <td className="p-4">
-                                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider ${
-                                                        v.status === 'Parked' ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'
-                                                    }`}>
-                                                        {v.status.toUpperCase()}
-                                                    </span>
-                                                </td>
+                                    </thead>
+                                    <tbody className="divide-y divide-[var(--border-color)] text-xs font-semibold">
+                                        {paginatedVehicles.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} className="p-8 text-center text-[var(--text-secondary)]">No vehicle stay logs found.</td>
                                             </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                        {renderPagination(vehiclePage, totalVehiclePages, setVehiclePage)}
+                                        ) : (
+                                            paginatedVehicles.map(v => (
+                                                <tr key={v.id} className="hover:bg-[var(--bg-primary)]/10 transition-colors">
+                                                    <td className="p-4 font-mono font-bold text-lg text-indigo-650 dark:text-indigo-400">{v.plate}</td>
+                                                    <td className="p-4">
+                                                        <div className="font-bold">{v.make} {v.model}</div>
+                                                        <div className="text-[10px] text-[var(--text-secondary)]">{v.color}</div>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <div>{v.driver_name}</div>
+                                                        <div className="text-[10px] text-[var(--text-secondary)]">{v.driver_contact}</div>
+                                                    </td>
+                                                    <td className="p-4 text-[var(--text-secondary)]">{v.time_in ? new Date(v.time_in).toLocaleString() : '-'}</td>
+                                                    <td className="p-4 text-[var(--text-secondary)]">{v.time_out ? new Date(v.time_out).toLocaleString() : '-'}</td>
+                                                    <td className="p-4 font-mono font-bold">
+                                                        {formatDuration(v.duration_minutes)}
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider ${
+                                                            v.status === 'Parked' ? 'bg-green-500/10 text-green-500' : 'bg-gray-500/10 text-gray-500'
+                                                        }`}>
+                                                            {v.status.toUpperCase()}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {renderPagination(vehiclePage, totalVehiclePages, setVehiclePage)}
+                        </>
                     )}
 
                     {/* Users Tab Data */}
                     {activeTab === 'users' && (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead className="text-[10px] text-[var(--text-secondary)] uppercase bg-[var(--bg-primary)] border-b border-[var(--border-color)] font-black tracking-wider">
-                                    <tr>
-                                        <th className="p-4">Name</th>
-                                        <th className="p-4">Role</th>
-                                        <th className="p-4">Total Visits</th>
-                                        <th className="p-4">Last Visit</th>
-                                        <th className="p-4">Avg Duration</th>
-                                        <th className="p-4">Last Duration</th>
-                                        <th className="p-4 text-center">Profile</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[var(--border-color)] text-xs font-semibold">
-                                    {paginatedUsers.length === 0 ? (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="text-[10px] text-[var(--text-secondary)] uppercase bg-[var(--bg-primary)] border-b border-[var(--border-color)] font-black tracking-wider">
                                         <tr>
-                                            <td colSpan={7} className="p-8 text-center text-[var(--text-secondary)]">No user stay activity found.</td>
+                                            <th className="p-4">Name</th>
+                                            <th className="p-4">Role</th>
+                                            <th className="p-4">Total Visits</th>
+                                            <th className="p-4">Last Visit</th>
+                                            <th className="p-4">Avg Duration</th>
+                                            <th className="p-4">Last Duration</th>
+                                            <th className="p-4 text-center">Profile</th>
                                         </tr>
-                                    ) : (
-                                        paginatedUsers.map(u => (
-                                            <tr key={u.id} className="hover:bg-[var(--bg-primary)]/10 transition-colors">
-                                                <td className="p-4">
-                                                    <div className="font-bold text-[var(--text-primary)]">{u.full_name}</div>
-                                                    <div className="text-[10px] text-[var(--text-secondary)]">{u.email}</div>
-                                                </td>
-                                                <td className="p-4">
-                                                    <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] uppercase">
-                                                        {u.role}
-                                                    </span>
-                                                </td>
-                                                <td className="p-4 font-mono font-bold text-center">{u.total_visits}</td>
-                                                <td className="p-4 text-[var(--text-secondary)]">{u.last_visit_time ? new Date(u.last_visit_time).toLocaleString() : '-'}</td>
-                                                <td className="p-4 font-mono font-bold text-purple-600 dark:text-purple-400">
-                                                    {formatDuration(u.avg_duration_minutes)}
-                                                </td>
-                                                <td className="p-4 font-mono font-semibold">
-                                                    {u.currently_inside ? (
-                                                        <span className="text-green-500 font-black text-[9px] uppercase bg-green-50 dark:bg-green-950/20 px-2 py-0.5 rounded">Inside</span>
-                                                    ) : (
-                                                        formatDuration(u.last_duration_minutes)
-                                                    )}
-                                                </td>
-                                                <td className="p-4 text-center">
-                                                    <button
-                                                        onClick={() => setSelectedUser(u)}
-                                                        className="text-slate-500 hover:text-indigo-650 p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border-none bg-transparent"
-                                                        title="Drill Down Profile Details"
-                                                    >
-                                                        <Eye size={16} />
-                                                    </button>
-                                                </td>
+                                    </thead>
+                                    <tbody className="divide-y divide-[var(--border-color)] text-xs font-semibold">
+                                        {paginatedUsers.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} className="p-8 text-center text-[var(--text-secondary)]">No user stay activity found.</td>
                                             </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                        {renderPagination(userPage, totalUserPages, setUserPage)}
+                                        ) : (
+                                            paginatedUsers.map(u => (
+                                                <tr key={u.id} className="hover:bg-[var(--bg-primary)]/10 transition-colors">
+                                                    <td className="p-4">
+                                                        <div className="font-bold text-[var(--text-primary)]">{u.full_name}</div>
+                                                        <div className="text-[10px] text-[var(--text-secondary)]">{u.email}</div>
+                                                    </td>
+                                                    <td className="p-4">
+                                                        <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/30 text-indigo-650 dark:text-indigo-400 font-bold text-[10px] uppercase">
+                                                            {u.role}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 font-mono font-bold text-center">{u.total_visits}</td>
+                                                    <td className="p-4 text-[var(--text-secondary)]">{u.last_visit_time ? new Date(u.last_visit_time).toLocaleString() : '-'}</td>
+                                                    <td className="p-4 font-mono font-bold text-purple-650 dark:text-purple-400">
+                                                        {formatDuration(u.avg_duration_minutes)}
+                                                    </td>
+                                                    <td className="p-4 font-mono font-semibold">
+                                                        {u.currently_inside ? (
+                                                            <span className="text-green-500 font-black text-[9px] uppercase bg-green-50 dark:bg-green-950/20 px-2 py-0.5 rounded">Inside</span>
+                                                        ) : (
+                                                            formatDuration(u.last_duration_minutes)
+                                                        )}
+                                                    </td>
+                                                    <td className="p-4 text-center">
+                                                        <button
+                                                            onClick={() => setSelectedUser(u)}
+                                                            className="text-slate-500 hover:text-indigo-650 p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer border-none bg-transparent"
+                                                            title="Drill Down Profile Details"
+                                                        >
+                                                            <Eye size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {renderPagination(userPage, totalUserPages, setUserPage)}
+                        </>
                     )}
                 </div>
             )}

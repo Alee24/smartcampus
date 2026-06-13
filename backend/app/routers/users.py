@@ -964,6 +964,30 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
         visitor_query = select(Visitor).where(Visitor.id_number == admission_number).order_by(Visitor.time_in.desc())
         visitor = (await session.exec(visitor_query)).first()
         if visitor:
+            last_stay_minutes = None
+            if visitor.plate_number:
+                last_visitor = (await session.exec(
+                    select(Visitor)
+                    .where(Visitor.plate_number == visitor.plate_number)
+                    .where(Visitor.status == "checked_out")
+                    .where(Visitor.time_out != None)
+                    .order_by(Visitor.time_out.desc())
+                )).first()
+                if last_visitor and last_visitor.time_in and last_visitor.time_out:
+                    duration = last_visitor.time_out - last_visitor.time_in
+                    last_stay_minutes = int(duration.total_seconds() / 60)
+            elif visitor.id_number:
+                last_visitor = (await session.exec(
+                    select(Visitor)
+                    .where(Visitor.id_number == visitor.id_number)
+                    .where(Visitor.status == "checked_out")
+                    .where(Visitor.time_out != None)
+                    .order_by(Visitor.time_out.desc())
+                )).first()
+                if last_visitor and last_visitor.time_in and last_visitor.time_out:
+                    duration = last_visitor.time_out - last_visitor.time_in
+                    last_stay_minutes = int(duration.total_seconds() / 60)
+
             return {
                 "id": str(visitor.id),
                 "full_name": f"{visitor.first_name} {visitor.last_name}".strip(),
@@ -987,7 +1011,8 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
                 "passengers": visitor.passengers,
                 "dropoff_name": visitor.dropoff_name,
                 "dropoff_admission_number": visitor.dropoff_admission_number,
-                "check_in_student": visitor.check_in_student
+                "check_in_student": visitor.check_in_student,
+                "last_stay_minutes": last_stay_minutes
             }
             
         # Fallback 2: check EventVisitor table
@@ -1033,6 +1058,19 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
                 .order_by(VehicleLog.entry_time.desc())
             )).first()
             gate_status = "In" if active_log else "Out"
+
+            # Query last completed log
+            last_checkout_log = (await session.exec(
+                select(VehicleLog)
+                .where(VehicleLog.vehicle_id == vehicle.id)
+                .where(VehicleLog.exit_time != None)
+                .order_by(VehicleLog.exit_time.desc())
+            )).first()
+            
+            last_stay_minutes = None
+            if last_checkout_log and last_checkout_log.entry_time and last_checkout_log.exit_time:
+                duration = last_checkout_log.exit_time - last_checkout_log.entry_time
+                last_stay_minutes = int(duration.total_seconds() / 60)
             
             return {
                 "id": str(vehicle.id),
@@ -1059,7 +1097,8 @@ async def verify_student(admission_number: str, session: AsyncSession = Depends(
                 "entry_time": active_log.entry_time.isoformat() if active_log else None,
                 "passengers": active_log.detected_passengers if active_log else 1,
                 "purpose": active_log.purpose if active_log else None,
-                "destination": active_log.destination if active_log else None
+                "destination": active_log.destination if active_log else None,
+                "last_stay_minutes": last_stay_minutes
             }
         raise HTTPException(status_code=404, detail="Student/Visitor/Guest/Vehicle not found")
     

@@ -771,3 +771,103 @@ class LostAndFoundItem(UUIDModel, table=True):
     
     claimant: Optional[User] = Relationship(sa_relationship_kwargs={"foreign_keys": "[LostAndFoundItem.claimant_id]"})
     handler: User = Relationship(sa_relationship_kwargs={"foreign_keys": "[LostAndFoundItem.handler_id]"})
+
+
+from sqlalchemy import event
+
+# Formatter helper functions
+def clean_name(name: Optional[str]) -> Optional[str]:
+    if not name:
+        return name
+    words = name.strip().split()
+    return " ".join(word.capitalize() for word in words)
+
+def clean_phone(phone: Optional[str]) -> Optional[str]:
+    if not phone:
+        return phone
+    cleaned = "".join(c for c in phone if c.isdigit() or c == '+')
+    if not cleaned:
+        return phone
+    if cleaned.startswith("+254"):
+        return cleaned
+    if cleaned.startswith("254") and len(cleaned) == 12:
+        return "+" + cleaned
+    if cleaned.startswith("0") and len(cleaned) == 10:
+        return "+254" + cleaned[1:]
+    if len(cleaned) == 9 and (cleaned.startswith("7") or cleaned.startswith("1")):
+        return "+254" + cleaned
+    if len(cleaned) == 10 and not cleaned.startswith("+"):
+        return "+254" + cleaned
+    return cleaned
+
+def clean_plate(plate: Optional[str]) -> Optional[str]:
+    if not plate:
+        return plate
+    cleaned = "".join(c for c in plate if c.isalnum()).upper()
+    if not cleaned:
+        return plate
+    if len(cleaned) == 7:
+        return f"{cleaned[:3]} {cleaned[3:]}"
+    elif len(cleaned) == 8:
+        return f"{cleaned[:4]} {cleaned[4:]}"
+    elif len(cleaned) == 6:
+        return f"{cleaned[:3]} {cleaned[3:]}"
+    else:
+        if len(cleaned) > 4:
+            mid = len(cleaned) // 2
+            return f"{cleaned[:mid]} {cleaned[mid:]}"
+        return cleaned
+
+# Listeners
+@event.listens_for(User, 'before_insert')
+@event.listens_for(User, 'before_update')
+def receive_user_save(mapper, connection, target):
+    if target.full_name:
+        target.full_name = clean_name(target.full_name)
+    if target.first_name:
+        target.first_name = clean_name(target.first_name)
+    if target.last_name:
+        target.last_name = clean_name(target.last_name)
+    if target.phone_number:
+        target.phone_number = clean_phone(target.phone_number)
+
+@event.listens_for(Visitor, 'before_insert')
+@event.listens_for(Visitor, 'before_update')
+def receive_visitor_save(mapper, connection, target):
+    if target.first_name:
+        target.first_name = clean_name(target.first_name)
+    if target.last_name:
+        target.last_name = clean_name(target.last_name)
+    if target.phone_number:
+        target.phone_number = clean_phone(target.phone_number)
+    if target.plate_number:
+        target.plate_number = clean_plate(target.plate_number)
+
+@event.listens_for(Vehicle, 'before_insert')
+@event.listens_for(Vehicle, 'before_update')
+def receive_vehicle_save(mapper, connection, target):
+    if target.plate_number:
+        target.plate_number = clean_plate(target.plate_number)
+    if target.driver_name:
+        target.driver_name = clean_name(target.driver_name)
+    if target.driver_contact:
+        target.driver_contact = clean_phone(target.driver_contact)
+
+@event.listens_for(EventVisitor, 'before_insert')
+@event.listens_for(EventVisitor, 'before_update')
+def receive_event_visitor_save(mapper, connection, target):
+    if target.visitor_name:
+        target.visitor_name = clean_name(target.visitor_name)
+    if target.phone_number:
+        target.phone_number = clean_phone(target.phone_number)
+
+@event.listens_for(FleetPassengerManifest, 'before_insert')
+@event.listens_for(FleetPassengerManifest, 'before_update')
+def receive_fleet_passenger_save(mapper, connection, target):
+    if target.passenger_name:
+        target.passenger_name = clean_name(target.passenger_name)
+    if target.phone_number:
+        target.phone_number = clean_phone(target.phone_number)
+    if target.emergency_contact_phone:
+        target.emergency_contact_phone = clean_phone(target.emergency_contact_phone)
+

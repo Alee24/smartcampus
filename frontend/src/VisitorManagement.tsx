@@ -16,6 +16,46 @@ import {
     Legend
 } from 'recharts'
 
+// Helper functions for data sanitization
+const cleanName = (val: string) => {
+    if (!val) return '';
+    return val.trim().split(/\s+/).map(word => {
+        if (!word) return '';
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join(' ');
+};
+
+const cleanPhone = (val: string) => {
+    if (!val) return '';
+    const cleaned = val.replace(/[^\d+]/g, '');
+    if (!cleaned) return '';
+    if (cleaned.startsWith('+254')) return cleaned;
+    if (cleaned.startsWith('254') && cleaned.length === 12) return '+' + cleaned;
+    if (cleaned.startsWith('0') && cleaned.length === 10) return '+254' + cleaned.slice(1);
+    if (cleaned.length === 9 && (cleaned.startsWith('7') || cleaned.startsWith('1'))) return '+254' + cleaned;
+    if (cleaned.length === 10 && !cleaned.startsWith('+')) return '+254' + cleaned;
+    return cleaned;
+};
+
+const cleanPlate = (val: string) => {
+    if (!val) return '';
+    const cleaned = val.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (!cleaned) return '';
+    if (cleaned.length === 7) {
+        return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
+    } else if (cleaned.length === 8) {
+        return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
+    } else if (cleaned.length === 6) {
+        return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
+    } else {
+        if (cleaned.length > 4) {
+            const mid = Math.floor(cleaned.length / 2);
+            return `${cleaned.slice(0, mid)} ${cleaned.slice(mid)}`;
+        }
+        return cleaned;
+    }
+};
+
 export default function VisitorManagement() {
     const { showConfirm } = useNotification()
     const [visitors, setVisitors] = useState<any[]>([])
@@ -119,6 +159,19 @@ export default function VisitorManagement() {
     const handleCheckIn = async (e: React.FormEvent) => {
         e.preventDefault()
         setSubmitting(true)
+
+        const fName = cleanName(formData.first_name || '')
+        const lName = cleanName(formData.last_name || '')
+        const pNumber = cleanPhone(formData.phone_number || '')
+        
+        const cleanedForm = {
+            ...formData,
+            first_name: fName,
+            last_name: lName,
+            phone_number: pNumber
+        }
+        setFormData(cleanedForm)
+
         try {
             const token = localStorage.getItem('token')
             const res = await fetch('/api/gate/visitors/check-in', {
@@ -127,7 +180,7 @@ export default function VisitorManagement() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(cleanedForm)
             })
 
             if (res.ok) {
@@ -292,6 +345,21 @@ export default function VisitorManagement() {
     const handleQuickCheckInSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setSubmitting(true)
+
+        const fName = cleanName(quickFormData.first_name || '')
+        const lName = cleanName(quickFormData.last_name || '')
+        const pNumber = cleanPhone(quickFormData.phone_number || '')
+        const plate = cleanPlate(quickFormData.plate_number || '')
+
+        const cleanedForm = {
+            ...quickFormData,
+            first_name: fName,
+            last_name: lName,
+            phone_number: pNumber,
+            plate_number: plate
+        }
+        setQuickFormData(cleanedForm)
+
         try {
             const token = localStorage.getItem('token')
             const res = await fetch('/api/gate/visitors/check-in', {
@@ -300,7 +368,7 @@ export default function VisitorManagement() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(quickFormData)
+                body: JSON.stringify(cleanedForm)
             })
 
             if (res.ok) {
@@ -617,7 +685,8 @@ export default function VisitorManagement() {
 
             {/* Pending Requests Grid Layout (Visual, easy for guards to verify) */}
             {activeTab === 'pending' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {loading ? (
                         <div className="col-span-2 text-center py-12 text-[var(--text-secondary)] font-bold">Loading pending requests...</div>
                     ) : filteredVisitors.length === 0 ? (
@@ -812,8 +881,9 @@ export default function VisitorManagement() {
                             </div>
                         ))
                     )}
-                </div>
-                {activeTab === 'pending' && renderPagination()}
+                    </div>
+                    {renderPagination()}
+                </>
             )}
 
             {/* Standard Visitor Logs Table (For active, exited and all logs) */}
@@ -1046,12 +1116,16 @@ export default function VisitorManagement() {
                                                 <div>
                                                     <label className="block font-medium mb-1">First Name</label>
                                                     <input required type="text" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
-                                                        value={quickFormData.first_name} onChange={e => setQuickFormData({ ...quickFormData, first_name: e.target.value })} />
+                                                        value={quickFormData.first_name} 
+                                                        onChange={e => setQuickFormData({ ...quickFormData, first_name: e.target.value })}
+                                                        onBlur={e => setQuickFormData({ ...quickFormData, first_name: cleanName(e.target.value) })} />
                                                 </div>
                                                 <div>
                                                     <label className="block font-medium mb-1">Last Name</label>
                                                     <input required type="text" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
-                                                        value={quickFormData.last_name} onChange={e => setQuickFormData({ ...quickFormData, last_name: e.target.value })} />
+                                                        value={quickFormData.last_name} 
+                                                        onChange={e => setQuickFormData({ ...quickFormData, last_name: e.target.value })}
+                                                        onBlur={e => setQuickFormData({ ...quickFormData, last_name: cleanName(e.target.value) })} />
                                                 </div>
                                             </div>
 
@@ -1064,7 +1138,9 @@ export default function VisitorManagement() {
                                                 <div>
                                                     <label className="block font-medium mb-1">Phone Number</label>
                                                     <input required type="tel" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold"
-                                                        value={quickFormData.phone_number} onChange={e => setQuickFormData({ ...quickFormData, phone_number: e.target.value })} />
+                                                        value={quickFormData.phone_number} 
+                                                        onChange={e => setQuickFormData({ ...quickFormData, phone_number: e.target.value })}
+                                                        onBlur={e => setQuickFormData({ ...quickFormData, phone_number: cleanPhone(e.target.value) })} />
                                                 </div>
                                             </div>
 
@@ -1072,7 +1148,9 @@ export default function VisitorManagement() {
                                                 <div className="col-span-2">
                                                     <label className="block font-medium mb-1">Plate Number (Optional)</label>
                                                     <input type="text" placeholder="e.g. KAA 123A" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] font-semibold uppercase"
-                                                        value={quickFormData.plate_number} onChange={e => setQuickFormData({ ...quickFormData, plate_number: e.target.value })} />
+                                                        value={quickFormData.plate_number} 
+                                                        onChange={e => setQuickFormData({ ...quickFormData, plate_number: e.target.value })}
+                                                        onBlur={e => setQuickFormData({ ...quickFormData, plate_number: cleanPlate(e.target.value) })} />
                                                 </div>
                                                 <div>
                                                     <label className="block font-medium mb-1">Passengers</label>
@@ -1134,12 +1212,16 @@ export default function VisitorManagement() {
                                 <div>
                                     <label className="block font-medium mb-1">First Name</label>
                                     <input required type="text" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-xs font-semibold"
-                                        value={formData.first_name} onChange={e => setFormData({ ...formData, first_name: e.target.value })} />
+                                         value={formData.first_name} 
+                                         onChange={e => setFormData({ ...formData, first_name: e.target.value })}
+                                         onBlur={e => setFormData({ ...formData, first_name: cleanName(e.target.value) })} />
                                 </div>
                                 <div>
                                     <label className="block font-medium mb-1">Last Name</label>
                                     <input required type="text" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-xs font-semibold"
-                                        value={formData.last_name} onChange={e => setFormData({ ...formData, last_name: e.target.value })} />
+                                         value={formData.last_name} 
+                                         onChange={e => setFormData({ ...formData, last_name: e.target.value })}
+                                         onBlur={e => setFormData({ ...formData, last_name: cleanName(e.target.value) })} />
                                 </div>
                             </div>
                             <div className="text-xs">
@@ -1150,7 +1232,9 @@ export default function VisitorManagement() {
                             <div className="text-xs">
                                 <label className="block font-medium mb-1">Phone Number</label>
                                 <input required type="tel" className="w-full p-2.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-color)] text-xs font-semibold"
-                                    value={formData.phone_number} onChange={e => setFormData({ ...formData, phone_number: e.target.value })} />
+                                    value={formData.phone_number} 
+                                    onChange={e => setFormData({ ...formData, phone_number: e.target.value })}
+                                    onBlur={e => setFormData({ ...formData, phone_number: cleanPhone(e.target.value) })} />
                             </div>
                             <div className="text-xs">
                                 <label className="block font-medium mb-1">Visit Purpose / Host</label>
