@@ -293,3 +293,77 @@ async def trigger_system_update(
         "message": f"Update container started on branch '{branch}' using host path '{host_repo_path}'. The application is rebuilding in the background.",
         "container_id": container_id
     }
+
+
+# --- Support Tickets APIs ---
+from pydantic import BaseModel
+from typing import Optional
+
+class SupportTicketCreate(BaseModel):
+    name: str
+    contact: str
+    subject: str
+    description: str
+
+class SupportTicketRespond(BaseModel):
+    admin_response: str
+    status: str
+
+@router.post("/support-tickets")
+async def create_support_ticket(
+    payload: SupportTicketCreate,
+    session: AsyncSession = Depends(get_session)
+):
+    from app.models import SupportTicket
+    import uuid
+    from app.models import get_eat_time
+    
+    ticket = SupportTicket(
+        id=str(uuid.uuid4()),
+        name=payload.name,
+        contact=payload.contact,
+        subject=payload.subject,
+        description=payload.description,
+        status="Pending",
+        created_at=get_eat_time(),
+        updated_at=get_eat_time()
+    )
+    session.add(ticket)
+    await session.commit()
+    await session.refresh(ticket)
+    return {"status": "success", "ticket": ticket}
+
+@router.get("/support-tickets")
+async def list_support_tickets(
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(ensure_admin)
+):
+    from app.models import SupportTicket
+    stmt = select(SupportTicket).order_by(SupportTicket.created_at.desc())
+    res = await session.exec(stmt)
+    tickets = res.all()
+    return tickets
+
+@router.post("/support-tickets/{ticket_id}/respond")
+async def respond_to_support_ticket(
+    ticket_id: str,
+    payload: SupportTicketRespond,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(ensure_admin)
+):
+    from app.models import SupportTicket
+    from app.models import get_eat_time
+    
+    stmt = select(SupportTicket).where(SupportTicket.id == ticket_id)
+    res = await session.exec(stmt)
+    ticket = res.first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Support ticket not found")
+        
+    ticket.admin_response = payload.admin_response
+    ticket.status = payload.status
+    ticket.updated_at = get_eat_time()
+    session.add(ticket)
+    await session.commit()
+    await session.refresh(ticket)
+    return {"status": "success", "ticket": ticket}

@@ -43,7 +43,7 @@ const cleanPlate = (val: string) => {
     }
 };
 
-export default function SelfServiceEntry() {
+export default function SelfServiceEntry({ isEmbedded = false, onBack }: { isEmbedded?: boolean, onBack?: () => void }) {
     const [step, setStep] = useState(1) // 1: Role, 2: Form, 3: Success
     const [role, setRole] = useState('')
     const [gateId, setGateId] = useState('')
@@ -879,12 +879,21 @@ export default function SelfServiceEntry() {
             <div className="max-w-6xl mx-auto w-full relative flex-1 flex flex-col justify-between py-6">
                 {/* Header Back Link & Brand */}
                 <div className="flex justify-between items-center mb-8">
-                    <button 
-                        onClick={() => window.location.href = '/'}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-400 hover:text-indigo-650 dark:hover:text-indigo-400 rounded-2xl text-xs font-black shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                    >
-                        &larr; Back to Homepage
-                    </button>
+                    {!isEmbedded ? (
+                        <button 
+                            onClick={() => window.location.href = '/'}
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-400 hover:text-indigo-650 dark:hover:text-indigo-400 rounded-2xl text-xs font-black shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                        >
+                            &larr; Back to Homepage
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={onBack}
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-400 hover:text-indigo-650 dark:hover:text-indigo-400 rounded-2xl text-xs font-black shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                        >
+                            &larr; Return to Homepage
+                        </button>
+                    )}
                     <div className="flex items-center gap-2 text-slate-800 dark:text-white">
                         {companyColors.logo_url ? (
                             <img src={companyColors.logo_url} className="w-5 h-5 object-contain" alt="Logo" />
@@ -1710,29 +1719,27 @@ export default function SelfServiceEntry() {
             )}
         </div>
     )
-}
-
-function RoleCard({ icon: Icon, label, desc, onClick, color = "blue" }: any) {
+}function RoleCard({ icon: Icon, label, desc, onClick, color = "blue" }: any) {
     const colorClasses: any = {
         blue: {
-            bg: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/40',
-            glow: 'hover:shadow-blue-500/10 hover:border-blue-300'
+            bg: 'from-blue-500/20 to-indigo-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800/30',
+            glow: 'hover:shadow-blue-500/10 hover:border-blue-400/50'
         },
         indigo: {
-            bg: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/40',
-            glow: 'hover:shadow-indigo-500/10 hover:border-indigo-300'
+            bg: 'from-indigo-500/20 to-purple-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/30',
+            glow: 'hover:shadow-indigo-500/10 hover:border-indigo-400/50'
         },
         purple: {
-            bg: 'bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-100 dark:border-purple-900/40',
-            glow: 'hover:shadow-purple-500/10 hover:border-purple-300'
+            bg: 'from-purple-500/20 to-pink-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800/30',
+            glow: 'hover:shadow-purple-500/10 hover:border-purple-400/50'
         },
         amber: {
-            bg: 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/40',
-            glow: 'hover:shadow-amber-500/10 hover:border-amber-300'
+            bg: 'from-amber-500/20 to-orange-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/30',
+            glow: 'hover:shadow-amber-500/10 hover:border-amber-400/50'
         },
         emerald: {
-            bg: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40',
-            glow: 'hover:shadow-emerald-500/10 hover:border-emerald-300'
+            bg: 'from-emerald-500/20 to-teal-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/30',
+            glow: 'hover:shadow-emerald-500/10 hover:border-emerald-400/50'
         }
     };
     const activeColor = colorClasses[color] || colorClasses.blue;
@@ -1740,19 +1747,20 @@ function RoleCard({ icon: Icon, label, desc, onClick, color = "blue" }: any) {
     return (
         <button 
             onClick={onClick} 
-            className={`w-full bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between h-56 text-left group hover:shadow-xl hover:-translate-y-1 transition-all active:scale-[0.98] cursor-pointer ${activeColor.glow}`}
+            className={`w-full bg-[var(--bg-surface)] p-6 rounded-3xl border border-[var(--border-color)] shadow-md flex flex-col justify-between h-56 text-left group hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 active:scale-[0.98] cursor-pointer ${activeColor.glow}`}
         >
             <div className="flex items-start justify-between w-full mb-4">
-                <div className={`w-14 h-14 rounded-2xl ${activeColor.bg} flex items-center justify-center shadow-inner border`}>
-                    <Icon size={26} />
+                {/* Modern Double Layer Glow Badge for Icon */}
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-tr ${activeColor.bg} flex items-center justify-center shadow-lg border group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon size={26} className="transition-transform group-hover:rotate-6 duration-300" />
                 </div>
-                <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-850 flex items-center justify-center text-slate-350 dark:text-slate-605 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:scale-110 transition-all">
+                <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 border border-[var(--border-color)] flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white dark:group-hover:bg-blue-500 group-hover:scale-110 transition-all duration-300">
                     <ArrowRight size={16} />
                 </div>
             </div>
             <div className="mt-auto">
-                <h3 className="font-black text-slate-800 dark:text-white text-base leading-snug group-hover:text-indigo-650 dark:group-hover:text-indigo-400 transition-colors">{label}</h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500 font-bold mt-1.5 leading-relaxed">{desc}</p>
+                <h3 className="font-extrabold text-[var(--text-primary)] text-lg leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-300">{label}</h3>
+                <p className="text-xs text-[var(--text-secondary)] font-medium mt-2 leading-relaxed">{desc}</p>
             </div>
         </button>
     )

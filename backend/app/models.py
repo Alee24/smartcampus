@@ -773,6 +773,19 @@ class LostAndFoundItem(UUIDModel, table=True):
     handler: User = Relationship(sa_relationship_kwargs={"foreign_keys": "[LostAndFoundItem.handler_id]"})
 
 
+class SupportTicket(UUIDModel, table=True):
+    __tablename__ = "support_tickets"
+    
+    name: str = Field(index=True)
+    contact: str = Field(index=True)
+    subject: str = Field(index=True)
+    description: str = Field(sa_column=Column(Text))
+    status: str = Field(default="Pending", index=True) # Pending, In Progress, Resolved
+    admin_response: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    created_at: datetime = Field(default_factory=get_eat_time)
+    updated_at: datetime = Field(default_factory=get_eat_time)
+
+
 from sqlalchemy import event
 
 # Formatter helper functions

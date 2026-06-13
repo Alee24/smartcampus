@@ -1183,21 +1183,21 @@ export default function StudentVerification() {
                                                                 {/* Large License Plate Badge */}
                                                                 <div className="flex-1 flex flex-col justify-center my-3">
                                                                     <span className="text-xs font-bold text-slate-400 dark:text-amber-500/60 uppercase tracking-widest mb-1">Plate Number</span>
-                                                                    <div className="flex items-center gap-4 flex-wrap">
+                                                                    <div className="flex items-start gap-4 flex-wrap">
                                                                         {/* Kenyan Horizontal Plate (White) */}
-                                                                        <div className="bg-white border-2 border-slate-900 text-slate-950 px-4 py-2 rounded-lg flex items-center gap-3 shadow-[0_4px_10px_rgba(0,0,0,0.15)] select-none shrink-0 font-mono tracking-wider font-extrabold text-2xl h-16 border-double">
+                                                                        <div className="bg-white border-2 border-slate-900 text-slate-950 px-2 py-1 rounded-lg flex items-center gap-2 shadow-[0_4px_10px_rgba(0,0,0,0.15)] select-none shrink-0 font-mono tracking-widest font-black text-[45px] h-16 border-double">
                                                                             {/* Kenyan Flag */}
-                                                                            <div className="flex flex-col w-6 h-4 border border-slate-355 rounded-[1px] overflow-hidden relative shrink-0">
+                                                                            <div className="flex flex-col w-5 h-3 border border-slate-400 rounded-[0.5px] overflow-hidden relative shrink-0">
                                                                                 <div className="bg-black h-1/3 w-full"></div>
-                                                                                <div className="bg-[#990000] h-1/3 w-full border-y-[0.5px] border-white"></div>
+                                                                                <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
                                                                                 <div className="bg-[#006600] h-1/3 w-full"></div>
                                                                                 <div className="absolute inset-0 flex items-center justify-center">
-                                                                                    <div className="w-1.5 h-2 bg-[#990000] rounded-full border-[0.5px] border-white relative">
+                                                                                    <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
                                                                                         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
                                                                                     </div>
                                                                                 </div>
                                                                             </div>
-                                                                            <span className="text-slate-900">
+                                                                            <span className="text-slate-900 leading-none">
                                                                                 {result.plate_number || result.admission_number}
                                                                             </span>
                                                                         </div>
@@ -1206,28 +1206,28 @@ export default function StudentVerification() {
                                                                         {(() => {
                                                                             const { part1, part2 } = splitPlateNumber(result.plate_number || result.admission_number);
                                                                             return (
-                                                                                <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[150px] h-[120px] rounded-xl p-3 flex flex-col justify-between items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
+                                                                                <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[150px] h-[120px] rounded-xl p-2 flex flex-col justify-between items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
                                                                                     {/* Top Row: Flag + Part 1 */}
-                                                                                    <div className="w-full flex items-center justify-between">
+                                                                                    <div className="w-full flex items-center justify-between px-1">
                                                                                         {/* Kenyan Flag */}
-                                                                                        <div className="flex flex-col w-9 h-6 border border-black rounded-[1px] overflow-hidden relative shrink-0">
+                                                                                        <div className="flex flex-col w-5 h-3 border border-black rounded-[0.5px] overflow-hidden relative shrink-0">
                                                                                             <div className="bg-black h-1/3 w-full"></div>
-                                                                                            <div className="bg-[#990000] h-1/3 w-full border-y-[0.5px] border-white"></div>
+                                                                                            <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
                                                                                             <div className="bg-[#006600] h-1/3 w-full"></div>
                                                                                             <div className="absolute inset-0 flex items-center justify-center">
-                                                                                                <div className="w-2 h-2.5 bg-[#990000] rounded-full border-[0.5px] border-white relative">
+                                                                                                <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
                                                                                                     <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
                                                                                                 </div>
                                                                                             </div>
                                                                                         </div>
                                                                                         {/* Part 1 (Letters) */}
-                                                                                        <span className="text-3xl font-black text-black leading-none tracking-tighter">
+                                                                                        <span className="text-[42px] font-black text-black leading-none tracking-tighter">
                                                                                             {part1}
                                                                                         </span>
                                                                                     </div>
                                                                                     {/* Bottom Row: Part 2 (Numbers + Letter) */}
                                                                                     <div className="w-full flex justify-center items-center pb-1">
-                                                                                        <span className="text-4xl font-black text-black leading-none tracking-tight">
+                                                                                        <span className="text-[54px] font-black text-black leading-none tracking-tight">
                                                                                             {part2}
                                                                                         </span>
                                                                                     </div>
@@ -1823,21 +1823,21 @@ export default function StudentVerification() {
                                              {/* Plate Number */}
                                              <div className="flex flex-col mt-4 space-y-1">
                                                  <span className="text-xs font-bold text-slate-450 uppercase tracking-widest">Plate Number</span>
-                                                 <div className="flex items-center gap-4">
+                                                 <div className="flex items-start gap-4">
                                                      {/* Kenyan Horizontal Plate (White) */}
-                                                     <div className="bg-white border-2 border-slate-900 text-slate-950 px-4 py-2 rounded-lg flex items-center gap-3 shadow-md select-none shrink-0 font-mono tracking-wider font-extrabold text-2xl h-16 border-double">
+                                                     <div className="bg-white border-2 border-slate-900 text-slate-950 px-2 py-1 rounded-lg flex items-center gap-2 shadow-md select-none shrink-0 font-mono tracking-widest font-black text-[45px] h-16 border-double">
                                                          {/* Kenyan Flag */}
-                                                         <div className="flex flex-col w-6 h-4 border border-slate-300 rounded-[1px] overflow-hidden relative shrink-0">
+                                                         <div className="flex flex-col w-5 h-3 border border-slate-400 rounded-[0.5px] overflow-hidden relative shrink-0">
                                                              <div className="bg-black h-1/3 w-full"></div>
-                                                             <div className="bg-[#990000] h-1/3 w-full border-y-[0.5px] border-white"></div>
+                                                             <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
                                                              <div className="bg-[#006600] h-1/3 w-full"></div>
                                                              <div className="absolute inset-0 flex items-center justify-center">
-                                                                 <div className="w-1.5 h-2 bg-[#990000] rounded-full border-[0.5px] border-white relative">
+                                                                 <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
                                                                      <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
                                                                  </div>
                                                              </div>
                                                          </div>
-                                                         <span className="text-slate-900">
+                                                         <span className="text-slate-900 leading-none">
                                                              {result.plate_number || result.admission_number}
                                                          </span>
                                                      </div>
@@ -1846,28 +1846,28 @@ export default function StudentVerification() {
                                                      {(() => {
                                                          const { part1, part2 } = splitPlateNumber(result.plate_number || result.admission_number);
                                                          return (
-                                                             <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[150px] h-[120px] rounded-xl p-3 flex flex-col justify-between items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
+                                                             <div className="bg-[#FFCC00] border-[3px] border-black text-black w-[150px] h-[120px] rounded-xl p-2 flex flex-col justify-between items-center shadow-[0_4px_12px_rgba(0,0,0,0.2)] select-none shrink-0 font-mono border-double relative">
                                                                  {/* Top Row: Flag + Part 1 */}
-                                                                 <div className="w-full flex items-center justify-between">
+                                                                 <div className="w-full flex items-center justify-between px-1">
                                                                      {/* Kenyan Flag */}
-                                                                     <div className="flex flex-col w-9 h-6 border border-black rounded-[1px] overflow-hidden relative shrink-0">
+                                                                     <div className="flex flex-col w-5 h-3 border border-black rounded-[0.5px] overflow-hidden relative shrink-0">
                                                                          <div className="bg-black h-1/3 w-full"></div>
-                                                                         <div className="bg-[#990000] h-1/3 w-full border-y-[0.5px] border-white"></div>
+                                                                         <div className="bg-[#990000] h-1/3 w-full border-y-[0.3px] border-white"></div>
                                                                          <div className="bg-[#006600] h-1/3 w-full"></div>
                                                                          <div className="absolute inset-0 flex items-center justify-center">
-                                                                             <div className="w-2 h-2.5 bg-[#990000] rounded-full border-[0.5px] border-white relative">
+                                                                             <div className="w-1 h-1.5 bg-[#990000] rounded-full border-[0.3px] border-white relative">
                                                                                  <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-black"></div>
                                                                              </div>
                                                                          </div>
                                                                      </div>
                                                                      {/* Part 1 (Letters) */}
-                                                                     <span className="text-3xl font-black text-black leading-none tracking-tighter">
+                                                                     <span className="text-[42px] font-black text-black leading-none tracking-tighter">
                                                                          {part1}
                                                                      </span>
                                                                  </div>
                                                                  {/* Bottom Row: Part 2 (Numbers + Letter) */}
                                                                  <div className="w-full flex justify-center items-center pb-1">
-                                                                     <span className="text-4xl font-black text-black leading-none tracking-tight">
+                                                                     <span className="text-[54px] font-black text-black leading-none tracking-tight">
                                                                          {part2}
                                                                      </span>
                                                                  </div>

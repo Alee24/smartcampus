@@ -40,6 +40,7 @@ async def init_db():
     await migrate_assets()
     await migrate_self_service()
     await migrate_events()
+    await migrate_support_tickets()
 async def get_session() -> AsyncSession:
     async_session = sessionmaker(
         engine, class_=AsyncSession, expire_on_commit=False
@@ -474,5 +475,30 @@ async def migrate_events():
             print("Events schema migration checked/applied.")
     except Exception as e:
         print(f"Events migration failed: {e}")
+
+async def migrate_support_tickets():
+    """Manual migration to create support_tickets table if not exists."""
+    print("Checking support_tickets table...")
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS support_tickets (
+                    id VARCHAR(36) NOT NULL,
+                    name VARCHAR(150) NOT NULL,
+                    contact VARCHAR(150) NOT NULL,
+                    subject VARCHAR(200) NOT NULL,
+                    description TEXT NOT NULL,
+                    status VARCHAR(50) DEFAULT 'Pending',
+                    admin_response TEXT DEFAULT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    KEY idx_support_ticket_status (status),
+                    KEY idx_support_ticket_name (name)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """))
+            print("Support tickets table checked/created successfully.")
+    except Exception as e:
+        print(f"Support tickets table migration skipped/failed: {e}")
 
 
